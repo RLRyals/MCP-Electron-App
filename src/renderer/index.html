@@ -210,6 +210,212 @@
             font-size: 0.9rem;
             opacity: 0.8;
         }
+
+        /* Diagnostics Styles */
+        .diagnostics-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 20px;
+        }
+
+        .diagnostics-card h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .diagnostics-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .diagnostics-buttons button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .diagnostics-buttons button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .diagnostics-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #system-test-results {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            display: none;
+        }
+
+        #system-test-results.show {
+            display: block;
+        }
+
+        #system-test-results h4 {
+            margin-bottom: 10px;
+        }
+
+        #system-test-results ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        #system-test-results li {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #system-test-results li.success {
+            background: rgba(0, 255, 0, 0.1);
+            border-left: 3px solid #4caf50;
+        }
+
+        #system-test-results li.error {
+            background: rgba(255, 0, 0, 0.1);
+            border-left: 3px solid #f44336;
+        }
+
+        #system-test-results li.warning {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ff9800;
+        }
+
+        #system-test-results .icon {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Error Dialog Styles */
+        .error-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-dialog-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        .error-dialog-content {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .error-dialog-content h3 {
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .error-dialog-content p {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .error-stack {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            max-height: 200px;
+            margin-bottom: 20px;
+        }
+
+        .error-dialog-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .error-dialog-buttons .button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .error-dialog-buttons .button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .error-dialog-buttons .button.primary {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -287,6 +493,21 @@
             </div>
 
             <button class="test-button" id="check-prerequisites">Check Prerequisites</button>
+        </div>
+
+        <div class="diagnostics-card">
+            <h2>Diagnostics & Logging</h2>
+            <p style="margin-bottom: 20px; opacity: 0.9;">
+                Tools for debugging and troubleshooting the application.
+            </p>
+
+            <div class="diagnostics-buttons">
+                <button id="view-logs">View Logs</button>
+                <button id="test-system">Test System</button>
+                <button id="export-report">Export Diagnostic Report</button>
+            </div>
+
+            <div id="system-test-results"></div>
         </div>
     </main>
 

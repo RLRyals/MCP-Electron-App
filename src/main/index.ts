@@ -1,19 +1,140 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import * as path from 'path';
-import * as log from 'electron-log';
 import * as prerequisites from './prerequisites';
+import logger, { initializeLogger, getRecentLogs, LogCategory, logWithCategory } from './logger';
+import {
+  openLogFile,
+  openLogsDirectory,
+  exportDiagnosticReport,
+  testSystem,
+  generateGitHubIssueTemplate,
+  openGitHubIssue,
+} from './diagnostics';
 
-// Configure logging
-log.transports.file.level = 'info';
-log.transports.console.level = 'info';
+// Initialize logging system
+initializeLogger();
 
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * Create the application menu
+ */
+function createMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'File',
+      submenu: [
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Diagnostics',
+      submenu: [
+        {
+          label: 'View Logs',
+          click: async () => {
+            try {
+              await openLogFile();
+            } catch (error) {
+              logger.error('Error opening log file:', error);
+            }
+          },
+        },
+        {
+          label: 'Open Logs Directory',
+          click: async () => {
+            try {
+              await openLogsDirectory();
+            } catch (error) {
+              logger.error('Error opening logs directory:', error);
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Export Diagnostic Report',
+          click: async () => {
+            try {
+              const result = await exportDiagnosticReport();
+              if (result.success) {
+                logger.info('Diagnostic report exported successfully');
+              } else {
+                logger.error('Failed to export diagnostic report:', result.error);
+              }
+            } catch (error) {
+              logger.error('Error exporting diagnostic report:', error);
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Test System',
+          click: async () => {
+            try {
+              const results = await testSystem();
+              logger.info('System test completed', results);
+              // Send results to renderer if window exists
+              if (mainWindow) {
+                mainWindow.webContents.send('system-test-results', results);
+              }
+            } catch (error) {
+              logger.error('Error running system tests:', error);
+            }
+          },
+        },
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Report Issue',
+          click: async () => {
+            try {
+              await openGitHubIssue('General Issue', 'Please describe the issue');
+            } catch (error) {
+              logger.error('Error opening GitHub issue:', error);
+            }
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 /**
  * Create the main application window
  */
 function createWindow(): void {
-  log.info('Creating main window...');
+  logger.info('Creating main window...');
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -36,7 +157,7 @@ function createWindow(): void {
 
   // Show window when ready to avoid visual flash
   mainWindow.once('ready-to-show', () => {
-    log.info('Window ready to show');
+    logger.info('Window ready to show');
     mainWindow?.show();
   });
 
@@ -49,7 +170,7 @@ function createWindow(): void {
     mainWindow = null;
   });
 
-  log.info('Main window created');
+  logger.info('Main window created');
 }
 
 /**
@@ -58,7 +179,7 @@ function createWindow(): void {
 function setupIPC(): void {
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {
-    log.info('Received ping from renderer');
+    logger.info('Received ping from renderer');
     return 'pong';
   });
 
@@ -78,32 +199,32 @@ function setupIPC(): void {
 
   // Prerequisites checks
   ipcMain.handle('prerequisites:check-docker', async () => {
-    log.info('Checking Docker installation...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Checking Docker installation...');
     return await prerequisites.checkDockerInstalled();
   });
 
   ipcMain.handle('prerequisites:check-docker-running', async () => {
-    log.info('Checking if Docker is running...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Checking if Docker is running...');
     return await prerequisites.checkDockerRunning();
   });
 
   ipcMain.handle('prerequisites:get-docker-version', async () => {
-    log.info('Getting Docker version...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Getting Docker version...');
     return await prerequisites.getDockerVersion();
   });
 
   ipcMain.handle('prerequisites:check-git', async () => {
-    log.info('Checking Git installation...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Checking Git installation...');
     return await prerequisites.checkGit();
   });
 
   ipcMain.handle('prerequisites:check-wsl', async () => {
-    log.info('Checking WSL status...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Checking WSL status...');
     return await prerequisites.checkWSL();
   });
 
   ipcMain.handle('prerequisites:check-all', async () => {
-    log.info('Running all prerequisite checks...');
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Running all prerequisite checks...');
     return await prerequisites.checkAll();
   });
 
@@ -111,13 +232,47 @@ function setupIPC(): void {
     return prerequisites.getPlatformInfo();
   });
 
-  log.info('IPC handlers registered');
+  // Logging and diagnostics IPC handlers
+  ipcMain.handle('logger:open', async () => {
+    logger.info('Opening log file...');
+    return await openLogFile();
+  });
+
+  ipcMain.handle('logger:open-directory', async () => {
+    logger.info('Opening logs directory...');
+    return await openLogsDirectory();
+  });
+
+  ipcMain.handle('logger:export', async () => {
+    logger.info('Exporting diagnostic report...');
+    return await exportDiagnosticReport();
+  });
+
+  ipcMain.handle('logger:test-system', async () => {
+    logger.info('Running system tests...');
+    return await testSystem();
+  });
+
+  ipcMain.handle('logger:get-logs', async (_, lines: number = 100) => {
+    return getRecentLogs(lines);
+  });
+
+  ipcMain.handle('logger:generate-issue-template', async (_, title: string, message: string, stack?: string) => {
+    return generateGitHubIssueTemplate(title, message, stack);
+  });
+
+  ipcMain.handle('logger:open-github-issue', async (_, title: string, message: string, stack?: string) => {
+    return await openGitHubIssue(title, message, stack);
+  });
+
+  logger.info('IPC handlers registered');
 }
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
-  log.info('App is ready');
+  logger.info('App is ready');
   setupIPC();
+  createMenu();
   createWindow();
 
   app.on('activate', () => {
@@ -137,14 +292,14 @@ app.on('window-all-closed', () => {
 
 // Handle app before quit
 app.on('before-quit', () => {
-  log.info('App is quitting...');
+  logger.info('App is quitting...');
 });
 
 // Log any unhandled errors
 process.on('uncaughtException', (error) => {
-  log.error('Uncaught exception:', error);
+  logger.error('Uncaught exception:', error);
 });
 
 process.on('unhandledRejection', (reason) => {
-  log.error('Unhandled rejection:', reason);
+  logger.error('Unhandled rejection:', reason);
 });
