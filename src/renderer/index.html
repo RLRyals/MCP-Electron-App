@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>MCP Electron App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .welcome-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .welcome-card h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .welcome-card p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-item strong {
+            display: block;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .info-item span {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .test-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .test-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .test-result {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 5px;
+            display: none;
+        }
+
+        .test-result.show {
+            display: block;
+        }
+
+        footer {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MCP Electron App</h1>
+        <p class="subtitle">Model Context Protocol Integration</p>
+    </header>
+
+    <main>
+        <div class="welcome-card">
+            <h2>Welcome!</h2>
+            <p>
+                This is a modern Electron application with TypeScript support, designed to integrate
+                the Model Context Protocol (MCP) for enhanced AI capabilities.
+            </p>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Version</strong>
+                    <span id="app-version">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Platform</strong>
+                    <span id="platform">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Architecture</strong>
+                    <span id="architecture">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Node Version</strong>
+                    <span id="node-version">Loading...</span>
+                </div>
+            </div>
+
+            <button class="test-button" id="test-ipc">Test IPC Communication</button>
+            <div class="test-result" id="test-result">
+                IPC communication successful!
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 MCP Electron App | Built with Electron & TypeScript</p>
+    </footer>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
