@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as log from 'electron-log';
+import * as prerequisites from './prerequisites';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -73,6 +74,41 @@ function setupIPC(): void {
       arch: process.arch,
       version: process.version,
     };
+  });
+
+  // Prerequisites checks
+  ipcMain.handle('prerequisites:check-docker', async () => {
+    log.info('Checking Docker installation...');
+    return await prerequisites.checkDockerInstalled();
+  });
+
+  ipcMain.handle('prerequisites:check-docker-running', async () => {
+    log.info('Checking if Docker is running...');
+    return await prerequisites.checkDockerRunning();
+  });
+
+  ipcMain.handle('prerequisites:get-docker-version', async () => {
+    log.info('Getting Docker version...');
+    return await prerequisites.getDockerVersion();
+  });
+
+  ipcMain.handle('prerequisites:check-git', async () => {
+    log.info('Checking Git installation...');
+    return await prerequisites.checkGit();
+  });
+
+  ipcMain.handle('prerequisites:check-wsl', async () => {
+    log.info('Checking WSL status...');
+    return await prerequisites.checkWSL();
+  });
+
+  ipcMain.handle('prerequisites:check-all', async () => {
+    log.info('Running all prerequisite checks...');
+    return await prerequisites.checkAll();
+  });
+
+  ipcMain.handle('prerequisites:get-platform-info', async () => {
+    return prerequisites.getPlatformInfo();
   });
 
   log.info('IPC handlers registered');
