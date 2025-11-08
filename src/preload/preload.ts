@@ -392,6 +392,63 @@ interface PortConflictResult {
 }
 
 /**
+ * Update info for a component
+ */
+interface UpdateInfo {
+  available: boolean;
+  currentVersion?: string;
+  latestVersion?: string;
+  currentDate?: string;
+  latestDate?: string;
+  commitMessage?: string;
+  error?: string;
+}
+
+/**
+ * Update check result
+ */
+interface UpdateCheckResult {
+  hasUpdates: boolean;
+  mcpServers: UpdateInfo;
+  typingMind: UpdateInfo;
+  checkedAt: string;
+}
+
+/**
+ * Update result
+ */
+interface UpdateResult {
+  success: boolean;
+  message: string;
+  error?: string;
+  rollback?: boolean;
+}
+
+/**
+ * Update preferences
+ */
+interface UpdatePreferences {
+  autoCheck: boolean;
+  checkInterval: number;
+  lastChecked?: string;
+  notifyOnlyIfUpdatesAvailable: boolean;
+  skippedVersions?: {
+    mcpServers?: string;
+    typingMind?: string;
+  };
+}
+
+/**
+ * Update progress
+ */
+interface UpdateProgress {
+  message: string;
+  percent: number;
+  step: string;
+  status: 'checking' | 'downloading' | 'updating' | 'complete' | 'error';
+}
+
+/**
  * Expose a secure API to the renderer process
  * This API is the only way the renderer can communicate with the main process
  */
@@ -985,6 +1042,103 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     removeProgressListener: (): void => {
       ipcRenderer.removeAllListeners('mcp-system:progress');
+    },
+  },
+
+  /**
+   * Updater API
+   */
+  updater: {
+    /**
+     * Check for all updates
+     */
+    checkAll: (): Promise<UpdateCheckResult> => {
+      return ipcRenderer.invoke('updater:check-all');
+    },
+
+    /**
+     * Check for MCP servers updates
+     */
+    checkMCPServers: (): Promise<UpdateInfo> => {
+      return ipcRenderer.invoke('updater:check-mcp-servers');
+    },
+
+    /**
+     * Check for Typing Mind updates
+     */
+    checkTypingMind: (): Promise<UpdateInfo> => {
+      return ipcRenderer.invoke('updater:check-typing-mind');
+    },
+
+    /**
+     * Update all components
+     */
+    updateAll: (): Promise<UpdateResult> => {
+      return ipcRenderer.invoke('updater:update-all');
+    },
+
+    /**
+     * Update MCP servers
+     */
+    updateMCPServers: (): Promise<UpdateResult> => {
+      return ipcRenderer.invoke('updater:update-mcp-servers');
+    },
+
+    /**
+     * Update Typing Mind
+     */
+    updateTypingMind: (): Promise<UpdateResult> => {
+      return ipcRenderer.invoke('updater:update-typing-mind');
+    },
+
+    /**
+     * Get update preferences
+     */
+    getPreferences: (): Promise<UpdatePreferences> => {
+      return ipcRenderer.invoke('updater:get-preferences');
+    },
+
+    /**
+     * Set update preferences
+     */
+    setPreferences: (prefs: UpdatePreferences): Promise<void> => {
+      return ipcRenderer.invoke('updater:set-preferences', prefs);
+    },
+
+    /**
+     * Listen for update progress
+     */
+    onProgress: (callback: (progress: UpdateProgress) => void): void => {
+      ipcRenderer.on('updater:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove update progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('updater:progress');
+    },
+
+    /**
+     * Listen for update check complete (from menu)
+     */
+    onCheckComplete: (callback: (result: UpdateCheckResult) => void): void => {
+      ipcRenderer.on('updater:check-complete', (_, result) => callback(result));
+    },
+
+    /**
+     * Listen for auto-check complete on startup
+     */
+    onAutoCheckComplete: (callback: (result: UpdateCheckResult) => void): void => {
+      ipcRenderer.on('updater:auto-check-complete', (_, result) => callback(result));
+    },
+
+    /**
+     * Remove check complete listeners
+     */
+    removeCheckListeners: (): void => {
+      ipcRenderer.removeAllListeners('updater:check-complete');
+      ipcRenderer.removeAllListeners('updater:auto-check-complete');
     },
   },
 });

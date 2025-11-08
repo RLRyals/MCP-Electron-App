@@ -17,6 +17,7 @@ import * as installationWizard from './installation-wizard';
 import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
+import * as updater from './updater';
 
 // Initialize logging system
 initializeLogger();
@@ -119,6 +120,22 @@ function createMenu(): void {
     {
       label: 'Help',
       submenu: [
+        {
+          label: 'Check for Updates...',
+          click: async () => {
+            try {
+              const updates = await updater.checkForAllUpdates();
+              logger.info('Update check completed', updates);
+              // Send results to renderer if window exists
+              if (mainWindow) {
+                mainWindow.webContents.send('updater:check-complete', updates);
+              }
+            } catch (error) {
+              logger.error('Error checking for updates:', error);
+            }
+          },
+        },
+        { type: 'separator' },
         {
           label: 'Report Issue',
           click: async () => {
@@ -611,15 +628,102 @@ function setupIPC(): void {
     return mcpSystem.getMCPWorkingDirectoryPath();
   });
 
+  // Updater IPC handlers
+  ipcMain.handle('updater:check-all', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for all updates...');
+    return await updater.checkForAllUpdates();
+  });
+
+  ipcMain.handle('updater:check-mcp-servers', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for MCP servers updates...');
+    return await updater.checkForMCPServersUpdate();
+  });
+
+  ipcMain.handle('updater:check-typing-mind', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for Typing Mind updates...');
+    return await updater.checkForTypingMindUpdate();
+  });
+
+  ipcMain.handle('updater:update-all', async (_event) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating all components...');
+
+    // Send progress updates to renderer
+    const progressCallback: updater.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('updater:progress', progress);
+      }
+    };
+
+    return await updater.updateAll(progressCallback);
+  });
+
+  ipcMain.handle('updater:update-mcp-servers', async (_event) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating MCP servers...');
+
+    // Send progress updates to renderer
+    const progressCallback: updater.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('updater:progress', progress);
+      }
+    };
+
+    return await updater.updateMCPServers(progressCallback);
+  });
+
+  ipcMain.handle('updater:update-typing-mind', async (_event) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating Typing Mind...');
+
+    // Send progress updates to renderer
+    const progressCallback: updater.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('updater:progress', progress);
+      }
+    };
+
+    return await updater.updateTypingMind(progressCallback);
+  });
+
+  ipcMain.handle('updater:get-preferences', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting update preferences...');
+    return await updater.getUpdatePreferences();
+  });
+
+  ipcMain.handle('updater:set-preferences', async (_, prefs: updater.UpdatePreferences) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting update preferences...');
+    return await updater.setUpdatePreferences(prefs);
+  });
+
   logger.info('IPC handlers registered');
 }
 
 // This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   logger.info('App is ready');
   setupIPC();
   createMenu();
   createWindow();
+
+  // Auto-check for updates on startup
+  try {
+    const shouldCheck = await updater.shouldAutoCheck();
+    if (shouldCheck) {
+      logWithCategory('info', LogCategory.SYSTEM, 'Auto-checking for updates...');
+      const updates = await updater.checkForAllUpdates();
+
+      if (updates.hasUpdates) {
+        logWithCategory('info', LogCategory.SYSTEM, 'Updates available!');
+        // Notify renderer if window is ready
+        if (mainWindow) {
+          mainWindow.webContents.send('updater:auto-check-complete', updates);
+        }
+      } else {
+        logWithCategory('info', LogCategory.SYSTEM, 'All components are up to date');
+      }
+    }
+  } catch (error) {
+    logger.error('Error during auto-update check:', error);
+    // Non-fatal, just log and continue
+  }
 
   app.on('activate', () => {
     // On macOS, re-create window when dock icon is clicked and no windows are open
