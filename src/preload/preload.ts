@@ -326,6 +326,72 @@ interface TypingMindUpdateCheck {
 }
 
 /**
+ * MCP System progress update
+ */
+interface MCPSystemProgress {
+  message: string;
+  percent: number;
+  step: string;
+  status: 'starting' | 'checking' | 'ready' | 'error';
+}
+
+/**
+ * MCP System operation result
+ */
+interface MCPSystemOperationResult {
+  success: boolean;
+  message: string;
+  error?: string;
+  urls?: ServiceUrls;
+}
+
+/**
+ * Service URLs
+ */
+interface ServiceUrls {
+  typingMind?: string;
+  mcpConnector?: string;
+  postgres?: string;
+}
+
+/**
+ * Container health status
+ */
+interface ContainerHealth {
+  name: string;
+  status: string;
+  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
+  running: boolean;
+}
+
+/**
+ * MCP System status
+ */
+interface MCPSystemStatus {
+  running: boolean;
+  healthy: boolean;
+  containers: ContainerHealth[];
+  message: string;
+}
+
+/**
+ * Service logs result
+ */
+interface ServiceLogsResult {
+  success: boolean;
+  logs: string;
+  error?: string;
+}
+
+/**
+ * Port conflict check result
+ */
+interface PortConflictResult {
+  success: boolean;
+  conflicts: number[];
+}
+
+/**
  * Expose a secure API to the renderer process
  * This API is the only way the renderer can communicate with the main process
  */
@@ -841,6 +907,84 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     removeProgressListener: (): void => {
       ipcRenderer.removeAllListeners('docker-images:progress');
+    },
+  },
+
+  /**
+   * MCP System API
+   */
+  mcpSystem: {
+    /**
+     * Start the MCP system (core services and selected clients)
+     */
+    start: (): Promise<MCPSystemOperationResult> => {
+      return ipcRenderer.invoke('mcp-system:start');
+    },
+
+    /**
+     * Stop the MCP system
+     */
+    stop: (): Promise<MCPSystemOperationResult> => {
+      return ipcRenderer.invoke('mcp-system:stop');
+    },
+
+    /**
+     * Restart the MCP system
+     */
+    restart: (): Promise<MCPSystemOperationResult> => {
+      return ipcRenderer.invoke('mcp-system:restart');
+    },
+
+    /**
+     * Get current system status
+     */
+    getStatus: (): Promise<MCPSystemStatus> => {
+      return ipcRenderer.invoke('mcp-system:status');
+    },
+
+    /**
+     * Get service URLs
+     */
+    getUrls: (): Promise<ServiceUrls> => {
+      return ipcRenderer.invoke('mcp-system:urls');
+    },
+
+    /**
+     * Get service logs
+     */
+    getLogs: (
+      serviceName: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind',
+      tail?: number
+    ): Promise<ServiceLogsResult> => {
+      return ipcRenderer.invoke('mcp-system:logs', serviceName, tail);
+    },
+
+    /**
+     * Check for port conflicts
+     */
+    checkPorts: (): Promise<PortConflictResult> => {
+      return ipcRenderer.invoke('mcp-system:check-ports');
+    },
+
+    /**
+     * Get MCP working directory path
+     */
+    getWorkingDirectory: (): Promise<string> => {
+      return ipcRenderer.invoke('mcp-system:working-directory');
+    },
+
+    /**
+     * Listen for MCP system progress updates
+     */
+    onProgress: (callback: (progress: MCPSystemProgress) => void): void => {
+      ipcRenderer.on('mcp-system:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove MCP system progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('mcp-system:progress');
     },
   },
 });

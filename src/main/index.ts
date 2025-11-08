@@ -16,6 +16,7 @@ import * as envConfig from './env-config';
 import * as installationWizard from './installation-wizard';
 import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
+import * as mcpSystem from './mcp-system';
 
 // Initialize logging system
 initializeLogger();
@@ -550,6 +551,64 @@ function setupIPC(): void {
   ipcMain.handle('docker-images:check-disk-space', async () => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Checking disk space...');
     return await dockerImages.checkDiskSpace();
+  });
+
+  // MCP System IPC handlers
+  ipcMain.handle('mcp-system:start', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting MCP system...');
+
+    // Send progress updates to renderer
+    const progressCallback: mcpSystem.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('mcp-system:progress', progress);
+      }
+    };
+
+    const result = await mcpSystem.startMCPSystem(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('mcp-system:stop', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Stopping MCP system...');
+    return await mcpSystem.stopMCPSystem();
+  });
+
+  ipcMain.handle('mcp-system:restart', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Restarting MCP system...');
+
+    // Send progress updates to renderer
+    const progressCallback: mcpSystem.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('mcp-system:progress', progress);
+      }
+    };
+
+    const result = await mcpSystem.restartMCPSystem(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('mcp-system:status', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting MCP system status...');
+    return await mcpSystem.getSystemStatus();
+  });
+
+  ipcMain.handle('mcp-system:urls', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting service URLs...');
+    return await mcpSystem.getServiceUrls();
+  });
+
+  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => {
+    logWithCategory('info', LogCategory.DOCKER, `IPC: Getting logs for ${serviceName}...`);
+    return await mcpSystem.viewServiceLogs(serviceName, tail);
+  });
+
+  ipcMain.handle('mcp-system:check-ports', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Checking port conflicts...');
+    return await mcpSystem.checkPortConflicts();
+  });
+
+  ipcMain.handle('mcp-system:working-directory', async () => {
+    return mcpSystem.getMCPWorkingDirectoryPath();
   });
 
   logger.info('IPC handlers registered');
