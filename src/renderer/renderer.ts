@@ -5,6 +5,7 @@
  */
 
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers';
+import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -120,6 +121,37 @@ interface DockerContainersResult {
   error?: string;
 }
 
+interface ClientMetadata {
+  id: string;
+  name: string;
+  type: 'web-based' | 'native';
+  description: string;
+  features: string[];
+  requirements: string[];
+  downloadSize: string;
+  installation: 'automatic' | 'manual';
+}
+
+interface ClientSelection {
+  clients: string[];
+  selectedAt: string;
+  version?: string;
+}
+
+interface ClientStatus {
+  id: string;
+  name: string;
+  selected: boolean;
+  installed: boolean;
+  installationDate?: string;
+  version?: string;
+}
+
+interface SaveSelectionResult {
+  success: boolean;
+  error?: string;
+}
+
 interface ElectronAPI {
   ping: () => Promise<string>;
   getAppVersion: () => Promise<string>;
@@ -176,6 +208,15 @@ interface ElectronAPI {
     copyCommand: (command: string) => Promise<boolean>;
     getStep: (stepNumber: number) => Promise<InstallationStep | null>;
     getExplanation: () => Promise<string>;
+  };
+  clientSelection: {
+    getOptions: () => Promise<ClientMetadata[]>;
+    saveSelection: (clients: string[]) => Promise<SaveSelectionResult>;
+    getSelection: () => Promise<ClientSelection | null>;
+    getStatus: () => Promise<ClientStatus[]>;
+    clearSelection: () => Promise<SaveSelectionResult>;
+    getById: (clientId: string) => Promise<ClientMetadata | null>;
+    getSelectionFilePath: () => Promise<string>;
   };
 }
 
@@ -598,6 +639,10 @@ function init(): void {
   // Setup environment configuration listeners and load config
   setupEnvConfigListeners();
   loadEnvConfig();
+
+  // Setup client selection listeners and load options
+  setupClientSelectionListeners();
+  loadClientOptions();
 
   // Set up Docker control event listeners
   const startButton = document.getElementById('start-docker');
