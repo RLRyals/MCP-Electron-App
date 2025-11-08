@@ -40,11 +40,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Initialize step-specific content
         await initializeCurrentStep();
+
+        // Attach event listeners
+        attachEventListeners();
     } catch (error) {
         console.error('Error initializing wizard:', error);
         showError('Failed to initialize wizard. Please restart the application.');
     }
 });
+
+/**
+ * Attach event listeners to buttons
+ */
+function attachEventListeners() {
+    // Navigation buttons
+    const nextBtn = document.getElementById('next-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const checkPrereqBtn = document.getElementById('check-prerequisites-btn');
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', nextStep);
+    }
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', previousStep);
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelWizard);
+    }
+
+    if (checkPrereqBtn) {
+        checkPrereqBtn.addEventListener('click', checkPrerequisites);
+    }
+}
 
 /**
  * Initialize sidebar step navigation
@@ -827,9 +857,15 @@ async function initializeDownloadStep() {
                 </div>
             </div>
             <div style="margin-top: 20px;">
-                <button class="wizard-btn" onclick="initializeDownloadStep()">Retry Downloads</button>
+                <button class="wizard-btn" id="retry-download-btn">Retry Downloads</button>
             </div>
         `;
+
+        // Attach retry button listener
+        const retryBtn = document.getElementById('retry-download-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', initializeDownloadStep);
+        }
     }
 }
 
@@ -916,9 +952,15 @@ async function initializeSystemStartupStep() {
                 </div>
             </div>
             <div style="margin-top: 20px;">
-                <button class="wizard-btn" onclick="initializeSystemStartupStep()">Retry Startup</button>
+                <button class="wizard-btn" id="retry-startup-btn">Retry Startup</button>
             </div>
         `;
+
+        // Attach retry button listener
+        const retryBtn = document.getElementById('retry-startup-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', initializeSystemStartupStep);
+        }
     }
 }
 
@@ -987,19 +1029,55 @@ async function initializeCompleteStep() {
  * Create service URL item HTML
  */
 function createServiceUrlItem(name: string, url: string, description: string, openable: boolean = false): string {
-    return `
-        <div class="service-url-item">
+    const id = `service-url-${name.toLowerCase().replace(/\s+/g, '-')}`;
+    const copyBtnId = `${id}-copy`;
+    const openBtnId = `${id}-open`;
+
+    const html = `
+        <div class="service-url-item" id="${id}">
             <div class="service-url-info">
                 <div class="service-url-label">${name}</div>
                 <div class="service-url-value">${url}</div>
                 <div style="font-size: 0.85rem; opacity: 0.8; margin-top: 5px;">${description}</div>
             </div>
             <div class="service-url-actions">
-                <button class="icon-btn" onclick="copyToClipboard('${url}')">Copy</button>
-                ${openable ? `<button class="icon-btn" onclick="openBrowser('${url}')">Open</button>` : ''}
+                <button class="icon-btn" id="${copyBtnId}" data-url="${escapeHtml(url)}">Copy</button>
+                ${openable ? `<button class="icon-btn" id="${openBtnId}" data-url="${escapeHtml(url)}">Open</button>` : ''}
             </div>
         </div>
     `;
+
+    // Schedule event listener attachment
+    setTimeout(() => {
+        const copyBtn = document.getElementById(copyBtnId);
+        if (copyBtn) {
+            copyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const urlToCopy = copyBtn.getAttribute('data-url') || '';
+                copyToClipboard(urlToCopy);
+            });
+        }
+
+        const openBtn = document.getElementById(openBtnId);
+        if (openBtn) {
+            openBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const urlToOpen = openBtn.getAttribute('data-url') || '';
+                openBrowser(urlToOpen);
+            });
+        }
+    }, 0);
+
+    return html;
+}
+
+/**
+ * Escape HTML special characters in strings
+ */
+function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 /**
