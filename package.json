@@ -20,10 +20,12 @@
     "clean": "rm -rf dist out"
   },
   "dependencies": {
-    "electron-log": "^5.1.2"
+    "electron-log": "^5.1.2",
+    "fs-extra": "^11.2.0"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
+    "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.11.19",
     "electron": "^28.2.3",
     "electron-builder": "^24.13.3",
