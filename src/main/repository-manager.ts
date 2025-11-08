@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import logger, { logWithCategory, LogCategory } from './logger';
 import { checkGit } from './prerequisites';
+import { getGitHubCredentialManager, sanitizeUrlForLogging } from './github-credential-manager';
 import {
   CloneOptions,
   RepositoryProgress,
@@ -80,6 +81,16 @@ export class RepositoryManager {
       const depth = options.depth;
       const timeout = options.timeout || 300000; // 5 minutes default
 
+      // Get credential manager and prepare authenticated URL if needed
+      const credentialManager = getGitHubCredentialManager();
+      let cloneUrl = url;
+
+      // Use authenticated URL for HTTPS URLs if GitHub token is available
+      if (url.includes('https://github.com') && credentialManager.isConfigured()) {
+        cloneUrl = credentialManager.getAuthenticatedUrl(url);
+        logWithCategory('info', LogCategory.GENERAL, 'Using authenticated GitHub URL for clone');
+      }
+
       // Build clone command
       let cloneArgs = ['clone'];
 
@@ -96,11 +107,11 @@ export class RepositoryManager {
         cloneArgs.push('--no-checkout');
       }
 
-      cloneArgs.push('--progress', url, targetPath);
+      cloneArgs.push('--progress', cloneUrl, targetPath);
 
       // Execute clone
       options.onProgress?.({
-        message: `Cloning repository from ${url}...`,
+        message: `Cloning repository from ${sanitizeUrlForLogging(url)}...`,
         percent: 10,
         step: 'cloning',
         status: 'cloning',
@@ -361,10 +372,18 @@ export class RepositoryManager {
     return new Promise((resolve, reject) => {
       logWithCategory('info', LogCategory.GENERAL, `Executing Git command: git ${args.join(' ')}`);
 
+      // Get credential manager environment
+      const credentialManager = getGitHubCredentialManager();
+      const credentialEnv = credentialManager.getGitEnvironment();
+
       const child = spawn('git', args, {
         cwd,
         shell: false,
         windowsHide: true,
+        env: {
+          ...process.env,
+          ...credentialEnv,
+        },
       });
 
       this.activeProcess = child;
