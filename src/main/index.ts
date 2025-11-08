@@ -853,7 +853,7 @@ function setupIPC(): void {
   ipcMain.handle('github-credentials:set-token', async (_, token: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting GitHub token...');
     const { getGitHubCredentialManager } = await import('./github-credential-manager');
-    const credentialManager = getGitHubCredentialManager(token);
+    getGitHubCredentialManager(token);
     return { success: true };
   });
 
