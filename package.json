@@ -99,7 +99,8 @@
         "deb"
       ],
       "icon": "resources/icon.png",
-      "category": "Development"
+      "category": "Development",
+      "maintainer": "MCP Team <mcp@example.com>"
     }
   }
 }
