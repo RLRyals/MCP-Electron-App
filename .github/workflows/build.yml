@@ -53,8 +53,14 @@ jobs:
       - name: Build Electron app
         run: npm run ${{ matrix.build_script }}
         env:
-          # Disable code signing for now (add certificates later)
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Code signing configuration (signs only if secrets are set)
+          CSC_LINK: ${{ matrix.platform == 'win' && secrets.WIN_CSC_LINK || matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'win' && secrets.WIN_CSC_KEY_PASSWORD || matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          APPLE_APP_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
+          # Auto-discovery will enable signing if CSC_LINK is set
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ (matrix.platform == 'win' && secrets.WIN_CSC_LINK != '' && 'true') || (matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && 'true') || 'false' }}
 
       - name: Generate checksums (Windows)
         if: matrix.os == 'windows-latest'

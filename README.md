@@ -184,7 +184,8 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 **For Developers:**
 - **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview
 - **[Contributing](docs/CONTRIBUTING.md)** - How to contribute to the project
-- **[Release Process](docs/RELEASE-PROCESS.md)** - How releases are created
+- **[Creating Releases](docs/CREATING_RELEASES.md)** - How to create and publish releases
+- **[Code Signing](docs/CODE_SIGNING.md)** - Setting up code signing certificates
 
 **Additional Resources:**
 - **[Video Tutorial Script](docs/VIDEO-SCRIPT.md)** - Guide for creating tutorial videos
@@ -397,7 +398,7 @@ The release workflow will automatically:
 - Create a GitHub Release
 - Upload all installers and checksums
 
-See [RELEASE.md](RELEASE.md) for detailed release instructions.
+See [docs/CREATING_RELEASES.md](docs/CREATING_RELEASES.md) for detailed release instructions.
 
 ### Contributing
 
