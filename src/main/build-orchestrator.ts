@@ -4,8 +4,7 @@
  * with comprehensive progress tracking, output streaming, and error handling
  */
 
-import { exec, spawn, ChildProcess } from 'child_process';
-import { promisify } from 'util';
+import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LogCategory, logWithCategory, logError } from './logger';
@@ -23,8 +22,6 @@ import {
   CustomScriptOptions,
   BuildConfig,
 } from '../types/build';
-
-const execAsync = promisify(exec);
 
 /**
  * Default timeout for build operations (30 minutes)
