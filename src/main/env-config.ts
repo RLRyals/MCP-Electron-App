@@ -285,6 +285,15 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         ...parsed,
       };
 
+      // If GITHUB_TOKEN is not set in .env, check environment variables
+      if (!config.GITHUB_TOKEN) {
+        const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
+        if (envToken && envToken.trim().length > 0) {
+          config.GITHUB_TOKEN = envToken.trim();
+          logger.info('Using GITHUB_AUTH_TOKEN from environment variable');
+        }
+      }
+
       // Log with sanitized content
       const sanitized = sanitizeEnvFileContent(content);
       logger.info('Loaded .env configuration from:', envPath);
@@ -293,18 +302,28 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
       return config;
     } else {
       logger.info('No .env file found, using defaults with generated secrets');
+
+      // Check for GitHub token in environment variables even if no .env file exists
+      const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
+
       return {
         ...DEFAULT_CONFIG,
         POSTGRES_PASSWORD: generatePassword(),
         MCP_AUTH_TOKEN: generateAuthToken(),
+        GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
       };
     }
   } catch (error) {
     logger.error('Error loading .env file:', error);
+
+    // Check for GitHub token in environment variables even on error
+    const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
+
     return {
       ...DEFAULT_CONFIG,
       POSTGRES_PASSWORD: generatePassword(),
       MCP_AUTH_TOKEN: generateAuthToken(),
+      GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
     };
   }
 }
