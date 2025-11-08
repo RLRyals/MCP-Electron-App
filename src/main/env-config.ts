@@ -312,14 +312,6 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         MCP_AUTH_TOKEN: generateAuthToken(),
         GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
       };
-
-      // Check for GITHUB_AUTH_TOKEN in environment variables
-      if (process.env.GITHUB_AUTH_TOKEN) {
-        config.GITHUB_TOKEN = process.env.GITHUB_AUTH_TOKEN;
-        logger.info('GitHub token loaded from GITHUB_AUTH_TOKEN environment variable');
-      }
-
-      return config;
     }
   } catch (error) {
     logger.error('Error loading .env file:', error);
@@ -333,14 +325,6 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
       MCP_AUTH_TOKEN: generateAuthToken(),
       GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
     };
-
-    // Check for GITHUB_AUTH_TOKEN in environment variables
-    if (process.env.GITHUB_AUTH_TOKEN) {
-      config.GITHUB_TOKEN = process.env.GITHUB_AUTH_TOKEN;
-      logger.info('GitHub token loaded from GITHUB_AUTH_TOKEN environment variable');
-    }
-
-    return config;
   }
 }
 
