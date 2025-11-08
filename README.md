@@ -157,6 +157,55 @@ Built applications will be placed in the `out/` directory:
 - **macOS**: `out/MCP Electron App.dmg`
 - **Linux**: `out/MCP Electron App.AppImage`, `out/mcp-electron-app.deb`
 
+## CI/CD and Releases
+
+This project uses GitHub Actions for automated builds and releases.
+
+### Continuous Integration
+
+Every push to `main` or `develop` branches and all pull requests trigger automated builds on:
+- Windows (latest)
+- macOS (latest)
+- Linux (Ubuntu latest)
+
+The CI pipeline:
+1. Installs dependencies
+2. Builds TypeScript
+3. Packages the Electron app for each platform
+4. Generates SHA256 checksums
+5. Uploads build artifacts (retained for 7 days)
+
+### Creating a Release
+
+To create a new release:
+
+1. Update the version in `package.json`
+2. Commit the change: `git commit -am "Bump version to X.X.X"`
+3. Create a git tag: `git tag -a vX.X.X -m "Release version X.X.X"`
+4. Push the tag: `git push origin vX.X.X`
+
+The release workflow will automatically:
+- Build for all platforms (Windows, macOS, Linux)
+- Generate checksums for all artifacts
+- Create a GitHub Release with release notes
+- Upload all installers and checksums
+
+### Release Artifacts
+
+Each release includes:
+- **Windows**: NSIS installer (.exe)
+- **macOS**: DMG with universal binary (Intel + Apple Silicon)
+- **Linux**: AppImage and Debian package (.deb)
+- **Checksums**: SHA256 checksums for all artifacts
+
+### Versioning
+
+We follow [Semantic Versioning](https://semver.org/):
+- **MAJOR.MINOR.PATCH** (e.g., v1.2.3)
+- Pre-releases: `v1.0.0-alpha.1`, `v1.0.0-beta.1`, `v1.0.0-rc.1`
+
+For detailed release instructions, see [RELEASE.md](RELEASE.md).
+
 ## Architecture
 
 ### Main Process (`src/main/`)
@@ -249,6 +298,8 @@ MIT License - see LICENSE file for details
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [Electron Builder](https://www.electron.build/)
 - [Electron Security](https://www.electronjs.org/docs/tutorial/security)
+- [Release Process](RELEASE.md) - Detailed release instructions
+- [GitHub Actions Workflows](.github/workflows/) - CI/CD configuration
 
 ## Support
 

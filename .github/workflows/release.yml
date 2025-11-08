@@ -1,0 +1,324 @@
+name: Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release - showing all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Changes since $PREV_TAG"
+            COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Create release notes
+          cat << EOF > release_notes.md
+          ## What's Changed
+
+          $COMMITS
+
+          ## Installation
+
+          ### Windows
+          Download and run \`MCP-Electron-App-Setup-${{ steps.get_version.outputs.version }}.exe\`
+
+          ### macOS
+          Download \`MCP-Electron-App-${{ steps.get_version.outputs.version }}.dmg\`, mount it, and drag the app to Applications
+
+          ### Linux
+          **AppImage**: Download \`MCP-Electron-App-${{ steps.get_version.outputs.version }}.AppImage\`, make it executable, and run
+          \`\`\`bash
+          chmod +x MCP-Electron-App-*.AppImage
+          ./MCP-Electron-App-*.AppImage
+          \`\`\`
+
+          **Debian/Ubuntu**: Download and install the \`.deb\` package
+          \`\`\`bash
+          sudo dpkg -i mcp-electron-app_*.deb
+          \`\`\`
+
+          ## Checksums (SHA256)
+
+          Checksums are included in separate \`checksums.txt\` files for each platform.
+
+          ## Notes
+
+          - Code signing certificates are not yet configured (Windows and macOS may show security warnings)
+          - Please verify checksums before installation
+          EOF
+
+          cat release_notes.md
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: MCP Electron App ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+
+  build-windows:
+    name: Build Windows
+    needs: create-release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build Windows app
+        run: npm run package:win
+        env:
+          # TODO: Add code signing certificate
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate checksums
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path out/release
+          Get-ChildItem -Path out -Filter *.exe -Recurse | ForEach-Object {
+            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+            $filename = $_.Name
+            "$($hash.Hash.ToLower())  $filename" | Out-File -Append -FilePath out/release/checksums-windows.txt -Encoding utf8
+            # Copy executable to release folder
+            Copy-Item $_.FullName -Destination out/release/
+          }
+          Get-Content out/release/checksums-windows.txt
+
+      - name: Upload Windows Installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./out/release/MCP Electron App Setup ${{ needs.create-release.outputs.version }}.exe
+          asset_name: MCP-Electron-App-Setup-${{ needs.create-release.outputs.version }}.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./out/release/checksums-windows.txt
+          asset_name: checksums-windows.txt
+          asset_content_type: text/plain
+
+  build-macos:
+    name: Build macOS
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build macOS app
+        run: npm run package:mac
+        env:
+          # TODO: Add code signing certificate
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate checksums
+        run: |
+          mkdir -p out/release
+          cd out
+          find . -type f \( -name "*.dmg" -o -name "*.zip" \) -exec sh -c '
+            for file; do
+              filename=$(basename "$file")
+              shasum -a 256 "$file" | sed "s|$file|$filename|" >> release/checksums-macos.txt
+              cp "$file" release/
+            done
+          ' sh {} +
+          cat release/checksums-macos.txt
+
+      - name: Upload macOS DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./out/release/MCP Electron App-${{ needs.create-release.outputs.version }}.dmg
+          asset_name: MCP-Electron-App-${{ needs.create-release.outputs.version }}.dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload macOS Checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./out/release/checksums-macos.txt
+          asset_name: checksums-macos.txt
+          asset_content_type: text/plain
+
+  build-linux:
+    name: Build Linux
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build Linux app
+        run: npm run package:linux
+
+      - name: Generate checksums
+        run: |
+          mkdir -p out/release
+          cd out
+          find . -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec sh -c '
+            for file; do
+              filename=$(basename "$file")
+              sha256sum "$file" | sed "s|$file|$filename|" >> release/checksums-linux.txt
+              cp "$file" release/
+            done
+          ' sh {} +
+          cat release/checksums-linux.txt
+
+      - name: Find AppImage
+        id: find_appimage
+        run: |
+          APPIMAGE=$(find out/release -name "*.AppImage" | head -n 1)
+          echo "appimage=$APPIMAGE" >> $GITHUB_OUTPUT
+          echo "Found AppImage: $APPIMAGE"
+
+      - name: Find Deb Package
+        id: find_deb
+        run: |
+          DEB=$(find out/release -name "*.deb" | head -n 1)
+          echo "deb=$DEB" >> $GITHUB_OUTPUT
+          echo "Found Deb: $DEB"
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ steps.find_appimage.outputs.appimage }}
+          asset_name: MCP-Electron-App-${{ needs.create-release.outputs.version }}.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux Deb Package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ steps.find_deb.outputs.deb }}
+          asset_name: mcp-electron-app_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux Checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./out/release/checksums-linux.txt
+          asset_name: checksums-linux.txt
+          asset_content_type: text/plain
+
+  release-complete:
+    name: Release Complete
+    needs: [create-release, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check release status
+        run: |
+          if [ "${{ needs.build-windows.result }}" != "success" ] || \
+             [ "${{ needs.build-macos.result }}" != "success" ] || \
+             [ "${{ needs.build-linux.result }}" != "success" ]; then
+            echo "::error::One or more platform builds failed"
+            echo "Windows: ${{ needs.build-windows.result }}"
+            echo "macOS: ${{ needs.build-macos.result }}"
+            echo "Linux: ${{ needs.build-linux.result }}"
+            exit 1
+          fi
+          echo "::notice::Release ${{ needs.create-release.outputs.version }} completed successfully!"
+          echo "All platform builds succeeded"

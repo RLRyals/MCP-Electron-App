@@ -1,0 +1,119 @@
+name: Build Electron App
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            platform: win
+            artifact_name: windows-build
+            build_script: package:win
+          - os: macos-latest
+            platform: mac
+            artifact_name: macos-build
+            build_script: package:mac
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: linux-build
+            build_script: package:linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build Electron app
+        run: npm run ${{ matrix.build_script }}
+        env:
+          # Disable code signing for now (add certificates later)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate checksums (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          Get-ChildItem -Path out -Filter *.exe -Recurse | ForEach-Object {
+            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+            $relativePath = $_.FullName.Replace((Get-Location).Path + '\out\', '')
+            "$($hash.Hash.ToLower())  $relativePath" | Out-File -Append -FilePath out/checksums.txt -Encoding utf8
+          }
+          if (Test-Path out/checksums.txt) {
+            Get-Content out/checksums.txt
+          }
+
+      - name: Generate checksums (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd out
+          find . -type f \( -name "*.dmg" -o -name "*.zip" \) -exec shasum -a 256 {} \; > checksums.txt
+          cat checksums.txt
+
+      - name: Generate checksums (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd out
+          find . -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec sha256sum {} \; > checksums.txt
+          cat checksums.txt
+
+      - name: List build artifacts
+        shell: bash
+        run: |
+          echo "Build artifacts:"
+          ls -lR out/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            out/*.exe
+            out/*.dmg
+            out/*.zip
+            out/*.AppImage
+            out/*.deb
+            out/checksums.txt
+          retention-days: 7
+          if-no-files-found: error
+
+  build-summary:
+    name: Build Summary
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::One or more builds failed"
+            exit 1
+          fi
+          echo "::notice::All builds completed successfully!"
