@@ -1503,7 +1503,7 @@
                 </div>
             </div>
 
-            <button class="test-button" id="check-prerequisites">Check Prerequisites</button>
+            <button class="test-button" id="check-prerequisites" title="Verify that Docker Desktop and Git are properly installed and running on your system">Check Prerequisites</button>
         </div>
 
         <!-- Main Dashboard -->
@@ -1521,11 +1521,11 @@
             <div class="dashboard-section">
                 <h3>Quick Actions</h3>
                 <div class="dashboard-actions">
-                    <button id="dashboard-start-system" class="action-button primary">Start System</button>
-                    <button id="dashboard-stop-system" class="action-button">Stop System</button>
-                    <button id="dashboard-restart-system" class="action-button">Restart System</button>
-                    <button id="dashboard-open-typing-mind" class="action-button secondary">Open Typing Mind</button>
-                    <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh Status">🔄</button>
+                    <button id="dashboard-start-system" class="action-button primary" title="Start all MCP services including PostgreSQL database and MCP Servers">Start System</button>
+                    <button id="dashboard-stop-system" class="action-button" title="Gracefully shut down all running MCP services">Stop System</button>
+                    <button id="dashboard-restart-system" class="action-button" title="Stop and restart all MCP services (useful for troubleshooting)">Restart System</button>
+                    <button id="dashboard-open-typing-mind" class="action-button secondary" title="Open Typing Mind web interface in your default browser">Open Typing Mind</button>
+                    <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh the status of all services and update the dashboard">🔄</button>
                 </div>
             </div>
 
@@ -1556,7 +1556,7 @@
                             <div class="service-info">
                                 <span id="postgres-port" class="service-detail">Port: 5432</span>
                             </div>
-                            <button class="service-action-btn view-logs-btn" data-service="postgres">View Logs</button>
+                            <button class="service-action-btn view-logs-btn" data-service="postgres" title="View recent PostgreSQL database logs for troubleshooting">View Logs</button>
                         </div>
                     </div>
 
@@ -1575,7 +1575,7 @@
                             <div class="service-info">
                                 <span class="service-detail">Version: latest</span>
                             </div>
-                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers">View Logs</button>
+                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers" title="View recent MCP Servers logs for troubleshooting">View Logs</button>
                         </div>
                     </div>
 
@@ -1595,8 +1595,8 @@
                                 <span id="mcp-connector-port" class="service-detail">Port: 50880</span>
                             </div>
                             <div class="service-actions">
-                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector">View Logs</button>
-                                <button class="service-action-btn copy-token-btn">Copy Token</button>
+                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector" title="View recent MCP Connector logs for troubleshooting">View Logs</button>
+                                <button class="service-action-btn copy-token-btn" title="Copy the MCP authentication token to clipboard for configuring Claude Desktop">Copy Token</button>
                             </div>
                         </div>
                     </div>
@@ -1617,8 +1617,8 @@
                                 <span id="typing-mind-port" class="service-detail">Port: 3000</span>
                             </div>
                             <div class="service-actions">
-                                <button class="service-action-btn view-logs-btn" data-service="typing-mind">View Logs</button>
-                                <button class="service-action-btn open-browser-btn" data-url="">Open Browser</button>
+                                <button class="service-action-btn view-logs-btn" data-service="typing-mind" title="View recent Typing Mind logs for troubleshooting">View Logs</button>
+                                <button class="service-action-btn open-browser-btn" data-url="" title="Open Typing Mind interface in your default web browser">Open Browser</button>
                             </div>
                         </div>
                     </div>
@@ -1649,9 +1649,9 @@
             </div>
 
             <div class="client-selection-actions">
-                <button id="skip-client-selection">Configure Later</button>
-                <button id="clear-client-selection" disabled>Clear Selection</button>
-                <button id="save-client-selection" class="primary" disabled>Save Selection</button>
+                <button id="skip-client-selection" title="Skip client selection and configure AI clients later">Configure Later</button>
+                <button id="clear-client-selection" disabled title="Clear all selected clients and start over">Clear Selection</button>
+                <button id="save-client-selection" class="primary" disabled title="Save your client selection and proceed with installation">Save Selection</button>
             </div>
 
             <div class="client-selection-status" id="client-selection-status"></div>
@@ -1767,8 +1767,8 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="button" class="secondary-button" id="reset-defaults">Use Defaults</button>
-                    <button type="submit" class="primary-button" id="save-config">Save Configuration</button>
+                    <button type="button" class="secondary-button" id="reset-defaults" title="Reset all configuration values to recommended defaults">Use Defaults</button>
+                    <button type="submit" class="primary-button" id="save-config" title="Save the configuration to .env file and apply changes">Save Configuration</button>
                 </div>
             </form>
 
@@ -1786,10 +1786,10 @@
             </div>
 
             <div class="docker-buttons">
-                <button id="start-docker">Start Docker</button>
-                <button id="stop-docker">Stop Docker</button>
-                <button id="restart-docker">Restart Docker</button>
-                <button id="check-docker-health">Check Health</button>
+                <button id="start-docker" title="Start Docker Desktop application">Start Docker</button>
+                <button id="stop-docker" title="Stop Docker Desktop application (this will stop all running containers)">Stop Docker</button>
+                <button id="restart-docker" title="Restart Docker Desktop to resolve issues">Restart Docker</button>
+                <button id="check-docker-health" title="Perform a comprehensive health check on Docker Desktop">Check Health</button>
             </div>
 
             <div class="docker-progress" id="docker-progress">
@@ -1811,9 +1811,9 @@
             </p>
 
             <div class="diagnostics-buttons">
-                <button id="view-logs">View Logs</button>
-                <button id="test-system">Test System</button>
-                <button id="export-report">Export Diagnostic Report</button>
+                <button id="view-logs" title="Open the application log file to view detailed activity and error messages">View Logs</button>
+                <button id="test-system" title="Run a comprehensive system test to verify all components are working correctly">Test System</button>
+                <button id="export-report" title="Export a complete diagnostic report including logs, configuration, and system information for troubleshooting">Export Diagnostic Report</button>
             </div>
 
             <div id="system-test-results"></div>

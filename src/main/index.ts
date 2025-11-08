@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import * as path from 'path';
 import * as prerequisites from './prerequisites';
 import logger, { initializeLogger, getRecentLogs, LogCategory, logWithCategory } from './logger';
@@ -122,6 +122,31 @@ function createMenu(): void {
       label: 'Help',
       submenu: [
         {
+          label: 'User Guide',
+          click: async () => {
+            await shell.openExternal('https://github.com/RLRyals/MCP-Electron-App/blob/main/docs/USER-GUIDE.md');
+          },
+        },
+        {
+          label: 'Quick Start',
+          click: async () => {
+            await shell.openExternal('https://github.com/RLRyals/MCP-Electron-App/blob/main/docs/QUICK-START.md');
+          },
+        },
+        {
+          label: 'Troubleshooting',
+          click: async () => {
+            await shell.openExternal('https://github.com/RLRyals/MCP-Electron-App/blob/main/docs/TROUBLESHOOTING.md');
+          },
+        },
+        {
+          label: 'FAQ',
+          click: async () => {
+            await shell.openExternal('https://github.com/RLRyals/MCP-Electron-App/blob/main/docs/FAQ.md');
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'Check for Updates...',
           click: async () => {
             try {
@@ -145,6 +170,21 @@ function createMenu(): void {
             } catch (error) {
               logger.error('Error opening GitHub issue:', error);
             }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'About MCP Electron App',
+          click: () => {
+            const aboutMessage = `MCP Electron App v${app.getVersion()}\n\nA user-friendly desktop application for managing the MCP Writing System.\n\nCopyright © 2025 MCP Team\nLicense: MIT`;
+            const { dialog } = require('electron');
+            dialog.showMessageBox(mainWindow!, {
+              type: 'info',
+              title: 'About MCP Electron App',
+              message: 'MCP Electron App',
+              detail: aboutMessage,
+              buttons: ['OK'],
+            });
           },
         },
       ],

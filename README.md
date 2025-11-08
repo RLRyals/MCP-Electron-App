@@ -174,9 +174,21 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 ## Support & Help
 
 ### Documentation
-- **Setup Guide:** Detailed setup instructions are built into the app
-- **User Manual:** Available in the app's Help menu
-- **FAQ:** Common questions answered in the app and on GitHub
+
+**For End Users:**
+- **[User Guide](docs/USER-GUIDE.md)** - Complete installation and usage guide
+- **[Quick Start](docs/QUICK-START.md)** - Fast setup for experienced users
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Solutions to common problems
+- **[FAQ](docs/FAQ.md)** - Frequently asked questions
+
+**For Developers:**
+- **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview
+- **[Contributing](docs/CONTRIBUTING.md)** - How to contribute to the project
+- **[Release Process](docs/RELEASE-PROCESS.md)** - How releases are created
+
+**Additional Resources:**
+- **[Video Tutorial Script](docs/VIDEO-SCRIPT.md)** - Guide for creating tutorial videos
+- **In-App Help:** Menu: Help → User Guide, Troubleshooting, FAQ
 
 ### Getting Help
 
@@ -407,12 +419,21 @@ We welcome contributions! Here's how to get started:
 
 ### Developer Documentation
 
-Additional developer documentation is available in the `docs/` directory:
-- [ELECTRON-APP-REQUIREMENTS.md](docs/ELECTRON-APP-REQUIREMENTS.md) - Technical requirements and implementation details
-- [ELECTRON-BUNDLE-CHECKLIST.md](docs/ELECTRON-BUNDLE-CHECKLIST.md) - Checklist for bundling resources
-- [GITHUB-ISSUES-ELECTRON-APP.md](docs/GITHUB-ISSUES-ELECTRON-APP.md) - Issue templates and tracking
-- [ELECTRON-DEPLOYMENT.md](docs/ELECTRON-DEPLOYMENT.md) - Deployment and release process
-- [DOCKER-IMAGE-PRELOADING.md](docs/DOCKER-IMAGE-PRELOADING.md) - Docker image bundling strategy
+Complete developer documentation is available in the `docs/` directory:
+
+**Core Documentation:**
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and design
+- **[CONTRIBUTING.md](docs/CONTRIBUTING.md)** - How to contribute (setup, coding standards, PR process)
+- **[RELEASE-PROCESS.md](docs/RELEASE-PROCESS.md)** - Release workflow and version management
+
+**Implementation Details:**
+- [ELECTRON-APP-REQUIREMENTS.md](docs/ELECTRON-APP-REQUIREMENTS.md) - Technical requirements
+- [ELECTRON-BUNDLE-CHECKLIST.md](docs/ELECTRON-BUNDLE-CHECKLIST.md) - Bundling checklist
+- [ELECTRON-DEPLOYMENT.md](docs/ELECTRON-DEPLOYMENT.md) - Deployment details
+- [DOCKER-IMAGE-PRELOADING.md](docs/DOCKER-IMAGE-PRELOADING.md) - Docker image bundling
+- [GITHUB-ISSUES-ELECTRON-APP.md](docs/GITHUB-ISSUES-ELECTRON-APP.md) - Issue templates
+
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for complete development setup instructions.
 
 ### Troubleshooting Development Issues
 
