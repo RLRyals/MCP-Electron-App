@@ -1,0 +1,272 @@
+/* Wizard Dialog Styles */
+.wizard-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wizard-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+.wizard-content {
+    position: relative;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wizard-header {
+    padding: 20px 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.wizard-header h2 {
+    color: #fff;
+    margin: 0 0 5px 0;
+    font-size: 1.8rem;
+}
+
+.wizard-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    margin: 0;
+}
+
+.wizard-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.wizard-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.wizard-body {
+    padding: 30px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.wizard-progress {
+    margin-bottom: 30px;
+}
+
+.progress-bar {
+    background: rgba(0, 0, 0, 0.2);
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+}
+
+.wizard-step-content {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 25px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.step-number {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.step-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.4rem;
+}
+
+.step-description {
+    margin-bottom: 15px;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+}
+
+.step-command {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.step-command code {
+    flex: 1;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+}
+
+.copy-command-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.copy-command-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.copy-command-btn.copied {
+    background: rgba(76, 175, 80, 0.3);
+    border-color: rgba(76, 175, 80, 0.5);
+}
+
+.step-warning {
+    color: #ffeb3b;
+    font-size: 0.9rem;
+    margin: 10px 0;
+}
+
+.step-time {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.wizard-notes {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.wizard-notes h4 {
+    color: #fff;
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
+}
+
+.wizard-notes ul {
+    margin: 0;
+    padding-left: 20px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.wizard-notes li {
+    margin: 5px 0;
+    line-height: 1.6;
+}
+
+.wizard-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.9);
+    font-style: italic;
+}
+
+.wizard-footer {
+    padding: 20px 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.wizard-button {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.wizard-button.primary {
+    background: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.wizard-button.primary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.7);
+    transform: translateY(-2px);
+}
+
+.wizard-button.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.wizard-button.secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.wizard-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

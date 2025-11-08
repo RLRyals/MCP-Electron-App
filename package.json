@@ -1,0 +1,106 @@
+{
+  "name": "mcp-electron-app",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) integration for Electron applications",
+  "main": "dist/main/index.js",
+  "author": "MCP Team",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start": "electron .",
+    "export-docker-images": "bash scripts/export-docker-images.sh",
+    "package": "npm run build && electron-builder build --publish never",
+    "package:win": "npm run build && electron-builder build --win --publish never",
+    "package:mac": "npm run build && electron-builder build --mac --publish never",
+    "package:linux": "npm run build && electron-builder build --linux --publish never",
+    "package:all": "npm run build && electron-builder build -mwl --publish never",
+    "clean": "rm -rf dist out"
+  },
+  "dependencies": {
+    "electron-log": "^5.1.2"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/node": "^20.11.19",
+    "electron": "^28.2.3",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.3.3"
+  },
+  "build": {
+    "appId": "com.mcp.electronapp",
+    "productName": "MCP Electron App",
+    "directories": {
+      "output": "out",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "resources/icon.png",
+      "category": "Development",
+      "maintainer": "MCP Team <mcp@example.com>"
+    }
+  }
+}
