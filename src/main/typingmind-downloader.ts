@@ -54,8 +54,8 @@ export interface TypingMindMetadata {
 }
 
 // GitHub repository configuration
-const REPO_URL = 'https://github.com/RLRyals/MCP-Tutorial-New.git';
-const SPARSE_CHECKOUT_PATH = 'typing-mind-static';
+const REPO_URL = 'https://github.com/typingMind/typingmind.git';
+const SPARSE_CHECKOUT_PATH = 'src';
 const TEMP_CLONE_DIR = 'temp-typing-mind-clone';
 
 // Active download process tracking

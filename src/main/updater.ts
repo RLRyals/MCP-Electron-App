@@ -99,7 +99,7 @@ interface SystemMetadata {
 }
 
 // GitHub repository configuration
-const MCP_SERVERS_REPO = 'RLRyals/MCP-Tutorial-New';
+const MCP_SERVERS_REPO = 'RLRyals/MCP-Writing-Servers';
 const MCP_SERVERS_REPO_URL = `https://github.com/${MCP_SERVERS_REPO}.git`;
 const MCP_SERVERS_BRANCH = 'main';
 
