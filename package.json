@@ -8,10 +8,11 @@
   "private": true,
   "scripts": {
     "dev": "npm run build && electron .",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.js",
     "build:watch": "tsc --watch",
     "start": "electron .",
     "export-docker-images": "bash scripts/export-docker-images.sh",
+    "copy-assets": "node scripts/copy-assets.js",
     "package": "npm run build && electron-builder build --publish never",
     "package:win": "npm run build && electron-builder build --win --publish never",
     "package:mac": "npm run build && electron-builder build --mac --publish never",

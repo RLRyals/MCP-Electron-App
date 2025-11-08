@@ -8,8 +8,9 @@ dist/
 out/
 build/
 
-# Compiled TypeScript
+# Compiled TypeScript (but keep build scripts)
 *.js
+!scripts/*.js
 *.js.map
 *.d.ts
 *.d.ts.map
