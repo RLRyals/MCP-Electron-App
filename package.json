@@ -11,6 +11,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "start": "electron .",
+    "export-docker-images": "bash scripts/export-docker-images.sh",
     "package": "npm run build && electron-builder build --publish never",
     "package:win": "npm run build && electron-builder build --win --publish never",
     "package:mac": "npm run build && electron-builder build --mac --publish never",
