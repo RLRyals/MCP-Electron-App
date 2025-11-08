@@ -141,6 +141,77 @@ interface DockerContainersResult {
 }
 
 /**
+ * Docker image information
+ */
+interface DockerImageInfo {
+  name: string;
+  tag: string;
+  fullName: string;
+  fileName: string;
+  size?: number;
+  exists: boolean;
+}
+
+/**
+ * Docker image progress update
+ */
+interface DockerImageProgress {
+  imageName: string;
+  currentImage: number;
+  totalImages: number;
+  percent: number;
+  bytesLoaded: number;
+  totalBytes: number;
+  step: 'checking' | 'extracting' | 'loading' | 'verifying' | 'complete' | 'error';
+  message: string;
+}
+
+/**
+ * Image loading result
+ */
+interface ImageLoadResult {
+  success: boolean;
+  imageName: string;
+  message: string;
+  error?: string;
+}
+
+/**
+ * All images loading result
+ */
+interface AllImagesLoadResult {
+  success: boolean;
+  loaded: string[];
+  skipped: string[];
+  failed: string[];
+  errors: string[];
+}
+
+/**
+ * Image list result
+ */
+interface ImageListResult {
+  success: boolean;
+  images: Array<{
+    repository: string;
+    tag: string;
+    imageId: string;
+    size: string;
+  }>;
+  error?: string;
+}
+
+/**
+ * Disk space check result
+ */
+interface DiskSpaceResult {
+  available: boolean;
+  freeSpace: number;
+  requiredSpace: number;
+  error?: string;
+}
+
+/**
  * Installation step interface
  */
 interface InstallationStep {
@@ -165,6 +236,93 @@ interface InstallationInstructions {
   steps: InstallationStep[];
   notes: string[];
   additionalInfo?: string;
+}
+
+/**
+ * Client metadata interface
+ */
+interface ClientMetadata {
+  id: string;
+  name: string;
+  type: 'web-based' | 'native';
+  description: string;
+  features: string[];
+  requirements: string[];
+  downloadSize: string;
+  installation: 'automatic' | 'manual';
+}
+
+/**
+ * Client selection interface
+ */
+interface ClientSelection {
+  clients: string[];
+  selectedAt: string;
+  version?: string;
+}
+
+/**
+ * Client status interface
+ */
+interface ClientStatus {
+  id: string;
+  name: string;
+  selected: boolean;
+  installed: boolean;
+  installationDate?: string;
+  version?: string;
+}
+
+/**
+ * Save selection result
+ */
+interface SaveSelectionResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Typing Mind progress update
+ */
+interface TypingMindProgress {
+  message: string;
+  percent: number;
+  step: string;
+  status: 'downloading' | 'verifying' | 'complete' | 'error';
+}
+
+/**
+ * Typing Mind download result
+ */
+interface TypingMindDownloadResult {
+  success: boolean;
+  message: string;
+  path?: string;
+  version?: string;
+  error?: string;
+}
+
+/**
+ * Typing Mind metadata
+ */
+interface TypingMindMetadata {
+  installed: boolean;
+  version?: string;
+  installedAt?: string;
+  lastUpdated?: string;
+  path?: string;
+  repositoryUrl?: string;
+  commitHash?: string;
+}
+
+/**
+ * Typing Mind update check result
+ */
+interface TypingMindUpdateCheck {
+  hasUpdate: boolean;
+  currentVersion?: string;
+  latestVersion?: string;
+  error?: string;
 }
 
 /**
@@ -500,6 +658,189 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getExplanation: (): Promise<string> => {
       return ipcRenderer.invoke('wizard:get-explanation');
+    },
+  },
+
+  /**
+   * Client Selection API
+   */
+  clientSelection: {
+    /**
+     * Get all available client options
+     */
+    getOptions: (): Promise<ClientMetadata[]> => {
+      return ipcRenderer.invoke('client:get-options');
+    },
+
+    /**
+     * Save client selection
+     */
+    saveSelection: (clients: string[]): Promise<SaveSelectionResult> => {
+      return ipcRenderer.invoke('client:save-selection', clients);
+    },
+
+    /**
+     * Get current client selection
+     */
+    getSelection: (): Promise<ClientSelection | null> => {
+      return ipcRenderer.invoke('client:get-selection');
+    },
+
+    /**
+     * Get status of all clients
+     */
+    getStatus: (): Promise<ClientStatus[]> => {
+      return ipcRenderer.invoke('client:get-status');
+    },
+
+    /**
+     * Clear client selection
+     */
+    clearSelection: (): Promise<SaveSelectionResult> => {
+      return ipcRenderer.invoke('client:clear-selection');
+    },
+
+    /**
+     * Get a specific client by ID
+     */
+    getById: (clientId: string): Promise<ClientMetadata | null> => {
+      return ipcRenderer.invoke('client:get-by-id', clientId);
+    },
+
+    /**
+     * Get the path where client selection is saved
+     */
+    getSelectionFilePath: (): Promise<string> => {
+      return ipcRenderer.invoke('client:get-selection-file-path');
+    },
+  },
+
+  /**
+   * Typing Mind Downloader API
+   */
+  typingMind: {
+    /**
+     * Download Typing Mind UI files from GitHub
+     */
+    download: (): Promise<TypingMindDownloadResult> => {
+      return ipcRenderer.invoke('typingmind:download');
+    },
+
+    /**
+     * Cancel ongoing download
+     */
+    cancelDownload: (): Promise<boolean> => {
+      return ipcRenderer.invoke('typingmind:cancel-download');
+    },
+
+    /**
+     * Check if Typing Mind is installed
+     */
+    isInstalled: (): Promise<boolean> => {
+      return ipcRenderer.invoke('typingmind:is-installed');
+    },
+
+    /**
+     * Get Typing Mind version information
+     */
+    getVersion: (): Promise<TypingMindMetadata> => {
+      return ipcRenderer.invoke('typingmind:get-version');
+    },
+
+    /**
+     * Uninstall Typing Mind
+     */
+    uninstall: (): Promise<TypingMindDownloadResult> => {
+      return ipcRenderer.invoke('typingmind:uninstall');
+    },
+
+    /**
+     * Check for Typing Mind updates
+     */
+    checkForUpdates: (): Promise<TypingMindUpdateCheck> => {
+      return ipcRenderer.invoke('typingmind:check-updates');
+    },
+
+    /**
+     * Get the installation path
+     */
+    getInstallPath: (): Promise<string> => {
+      return ipcRenderer.invoke('typingmind:get-install-path');
+    },
+
+    /**
+     * Listen for Typing Mind download progress updates
+     */
+    onProgress: (callback: (progress: TypingMindProgress) => void): void => {
+      ipcRenderer.on('typingmind:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove Typing Mind progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('typingmind:progress');
+    },
+  },
+
+  /**
+   * Docker Images API
+   */
+  dockerImages: {
+    /**
+     * Load all bundled Docker images
+     */
+    loadAll: (): Promise<AllImagesLoadResult> => {
+      return ipcRenderer.invoke('docker-images:load-all');
+    },
+
+    /**
+     * Load a specific Docker image from a tar.gz file
+     */
+    loadImage: (imagePath: string, imageName: string): Promise<ImageLoadResult> => {
+      return ipcRenderer.invoke('docker-images:load-image', imagePath, imageName);
+    },
+
+    /**
+     * Check if a Docker image exists locally
+     */
+    checkExists: (imageName: string): Promise<boolean> => {
+      return ipcRenderer.invoke('docker-images:check-exists', imageName);
+    },
+
+    /**
+     * Get list of all Docker images
+     */
+    listImages: (): Promise<ImageListResult> => {
+      return ipcRenderer.invoke('docker-images:list');
+    },
+
+    /**
+     * Get information about bundled images
+     */
+    getBundledImages: (): Promise<DockerImageInfo[]> => {
+      return ipcRenderer.invoke('docker-images:get-bundled');
+    },
+
+    /**
+     * Check available disk space
+     */
+    checkDiskSpace: (): Promise<DiskSpaceResult> => {
+      return ipcRenderer.invoke('docker-images:check-disk-space');
+    },
+
+    /**
+     * Listen for image loading progress updates
+     */
+    onProgress: (callback: (progress: DockerImageProgress) => void): void => {
+      ipcRenderer.on('docker-images:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove image loading progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('docker-images:progress');
     },
   },
 });

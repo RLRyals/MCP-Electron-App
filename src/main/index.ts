@@ -11,8 +11,11 @@ import {
   openGitHubIssue,
 } from './diagnostics';
 import * as docker from './docker';
+import * as dockerImages from './docker-images';
 import * as envConfig from './env-config';
 import * as installationWizard from './installation-wizard';
+import * as clientSelection from './client-selection';
+import * as typingMindDownloader from './typingmind-downloader';
 
 // Initialize logging system
 initializeLogger();
@@ -419,6 +422,134 @@ function setupIPC(): void {
 
   ipcMain.handle('wizard:get-explanation', async () => {
     return installationWizard.getWhyDockerExplanation();
+  });
+
+  // Client selection IPC handlers
+  ipcMain.handle('client:get-options', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting available client options...');
+    return clientSelection.getAvailableClients();
+  });
+
+  ipcMain.handle('client:save-selection', async (_, clients: string[]) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Saving client selection: ${clients.join(', ')}`);
+    return await clientSelection.saveClientSelection(clients);
+  });
+
+  ipcMain.handle('client:get-selection', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting current client selection...');
+    return await clientSelection.loadClientSelection();
+  });
+
+  ipcMain.handle('client:get-status', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting client status...');
+    return await clientSelection.getClientStatus();
+  });
+
+  ipcMain.handle('client:clear-selection', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Clearing client selection...');
+    return await clientSelection.clearClientSelection();
+  });
+
+  ipcMain.handle('client:get-by-id', async (_, clientId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Getting client by ID: ${clientId}`);
+    return clientSelection.getClientById(clientId);
+  });
+
+  ipcMain.handle('client:get-selection-file-path', async () => {
+    return clientSelection.getSelectionFilePath();
+  });
+
+  // Typing Mind downloader IPC handlers
+  ipcMain.handle('typingmind:download', async (_event) => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Starting Typing Mind download...');
+
+    // Send progress updates to renderer
+    const progressCallback: typingMindDownloader.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('typingmind:progress', progress);
+      }
+    };
+
+    const result = await typingMindDownloader.downloadTypingMind(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('typingmind:cancel-download', async () => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Cancelling Typing Mind download...');
+    return await typingMindDownloader.cancelDownload();
+  });
+
+  ipcMain.handle('typingmind:is-installed', async () => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking if Typing Mind is installed...');
+    return await typingMindDownloader.isInstalled();
+  });
+
+  ipcMain.handle('typingmind:get-version', async () => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Getting Typing Mind version...');
+    return await typingMindDownloader.getVersion();
+  });
+
+  ipcMain.handle('typingmind:uninstall', async () => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Uninstalling Typing Mind...');
+    return await typingMindDownloader.uninstall();
+  });
+
+  ipcMain.handle('typingmind:check-updates', async () => {
+    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking for Typing Mind updates...');
+    return await typingMindDownloader.checkForUpdates();
+  });
+
+  ipcMain.handle('typingmind:get-install-path', async () => {
+    return typingMindDownloader.getTypingMindDirectory();
+  });
+
+  // Docker Images IPC handlers
+  ipcMain.handle('docker-images:load-all', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Loading all Docker images...');
+
+    // Send progress updates to renderer
+    const progressCallback: dockerImages.ImageProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker-images:progress', progress);
+      }
+    };
+
+    const result = await dockerImages.loadAllDockerImages(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker-images:load-image', async (_event, imagePath: string, imageName: string) => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, `IPC: Loading Docker image ${imageName} from ${imagePath}...`);
+
+    // Send progress updates to renderer
+    const progressCallback: dockerImages.ImageProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker-images:progress', progress);
+      }
+    };
+
+    const result = await dockerImages.loadImage(imagePath, imageName, progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker-images:check-exists', async (_event, imageName: string) => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, `IPC: Checking if image exists: ${imageName}`);
+    return await dockerImages.checkImageExists(imageName);
+  });
+
+  ipcMain.handle('docker-images:list', async () => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Getting Docker image list...');
+    return await dockerImages.getImageList();
+  });
+
+  ipcMain.handle('docker-images:get-bundled', async () => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Getting bundled images information...');
+    return await dockerImages.getBundledImages();
+  });
+
+  ipcMain.handle('docker-images:check-disk-space', async () => {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Checking disk space...');
+    return await dockerImages.checkDiskSpace();
   });
 
   logger.info('IPC handlers registered');
