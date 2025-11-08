@@ -1,0 +1,140 @@
+{
+  "version": "1.0.0",
+  "title": "MCP Electron App - Build Configuration",
+  "description": "Configuration for automated setup and build of the MCP Electron application and its dependencies",
+  "baseClonePath": "./repositories",
+  "repositories": [
+    {
+      "id": "mcp-electron-app",
+      "name": "MCP Electron App",
+      "url": "https://github.com/RLRyals/MCP-Electron-App.git",
+      "clonePath": "mcp-electron-app",
+      "branch": "main",
+      "optional": false,
+      "description": "Main Electron application for MCP integration"
+    },
+    {
+      "id": "mcp-server-template",
+      "name": "MCP Server Template",
+      "url": "https://github.com/anthropics/mcp-server-template.git",
+      "clonePath": "mcp-server-template",
+      "branch": "main",
+      "optional": false,
+      "description": "Template repository for creating MCP servers"
+    },
+    {
+      "id": "typing-mind",
+      "name": "Typing Mind",
+      "url": "https://github.com/RLRyals/typing-mind.git",
+      "clonePath": "typing-mind",
+      "branch": "main",
+      "optional": true,
+      "description": "Optional Typing Mind component"
+    }
+  ],
+  "buildOrder": {
+    "order": [
+      "mcp-server-template",
+      "mcp-electron-app",
+      "typing-mind"
+    ],
+    "dependencies": {
+      "mcp-electron-app": [
+        "mcp-server-template"
+      ],
+      "typing-mind": []
+    },
+    "allowParallel": false
+  },
+  "buildSteps": [
+    {
+      "id": "mcp-template-install",
+      "name": "MCP Template - Install Dependencies",
+      "repositoryId": "mcp-server-template",
+      "command": "npm install",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 300
+    },
+    {
+      "id": "mcp-template-build",
+      "name": "MCP Template - Build",
+      "repositoryId": "mcp-server-template",
+      "command": "npm run build",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 300
+    },
+    {
+      "id": "electron-app-install",
+      "name": "Electron App - Install Dependencies",
+      "repositoryId": "mcp-electron-app",
+      "command": "npm install",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 600
+    },
+    {
+      "id": "electron-app-build",
+      "name": "Electron App - Build",
+      "repositoryId": "mcp-electron-app",
+      "command": "npm run build",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 600
+    },
+    {
+      "id": "typing-mind-install",
+      "name": "Typing Mind - Install Dependencies",
+      "repositoryId": "typing-mind",
+      "command": "npm install",
+      "workingDir": ".",
+      "continueOnError": true,
+      "timeout": 300
+    }
+  ],
+  "dockerImages": {
+    "mcp-electron-app": {
+      "repository": "mcp-electron-app",
+      "tag": "latest",
+      "buildContextPath": ".",
+      "dockerfilePath": "Dockerfile"
+    },
+    "mcp-server-template": {
+      "repository": "mcp-server",
+      "tag": "latest",
+      "buildContextPath": ".",
+      "dockerfilePath": "Dockerfile"
+    }
+  },
+  "components": [
+    {
+      "id": "core-system",
+      "name": "Core System",
+      "description": "Core MCP Electron application and required dependencies",
+      "enabled": true,
+      "repositoryIds": [
+        "mcp-server-template",
+        "mcp-electron-app"
+      ]
+    },
+    {
+      "id": "typing-mind-component",
+      "name": "Typing Mind Integration",
+      "description": "Optional Typing Mind integration component",
+      "enabled": false,
+      "repositoryIds": [
+        "typing-mind"
+      ]
+    }
+  ],
+  "globalEnv": {
+    "NODE_ENV": "production",
+    "LOG_LEVEL": "info"
+  },
+  "metadata": {
+    "createdAt": "2025-11-08T21:00:00Z",
+    "updatedAt": "2025-11-08T21:00:00Z",
+    "author": "MCP Development Team"
+  }
+}
