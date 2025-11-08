@@ -47,11 +47,11 @@ export function getEnvFilePath(): string {
 }
 
 /**
- * Generate a secure random password
+ * Generate a secure random password (alphanumeric only for PostgreSQL compatibility)
  * @param length Length of the password (default: 16)
  */
 export function generatePassword(length: number = 16): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const bytes = crypto.randomBytes(length * 2);
 
   let password = '';
@@ -60,18 +60,17 @@ export function generatePassword(length: number = 16): string {
     password += charset[randomIndex];
   }
 
-  // Ensure password contains at least one of each type
+  // Ensure password contains at least one of each type (uppercase, lowercase, number)
   const hasLowercase = /[a-z]/.test(password);
   const hasUppercase = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
-  const hasSymbol = /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password);
 
   // If missing any type, regenerate (recursive with small probability of deep recursion)
-  if (!hasLowercase || !hasUppercase || !hasNumber || !hasSymbol) {
+  if (!hasLowercase || !hasUppercase || !hasNumber) {
     return generatePassword(length);
   }
 
-  logger.info('Generated secure password');
+  logger.info('Generated secure alphanumeric password');
   return password;
 }
 
@@ -86,7 +85,7 @@ export function generateAuthToken(): string {
 }
 
 /**
- * Calculate password strength
+ * Calculate password strength (adjusted for alphanumeric passwords)
  * @param password The password to check
  * @returns Strength level: 'weak', 'medium', or 'strong'
  */
@@ -98,11 +97,11 @@ export function calculatePasswordStrength(password: string): 'weak' | 'medium' |
   const hasLowercase = /[a-z]/.test(password);
   const hasUppercase = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
-  const hasSymbol = /[^a-zA-Z0-9]/.test(password);
 
-  const typesCount = [hasLowercase, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
+  const typesCount = [hasLowercase, hasUppercase, hasNumber].filter(Boolean).length;
 
-  if (password.length >= 16 && typesCount >= 3) {
+  // Strong: 16+ chars with all three types (uppercase, lowercase, numbers)
+  if (password.length >= 16 && typesCount === 3) {
     return 'strong';
   } else if (password.length >= 12 && typesCount >= 2) {
     return 'medium';
