@@ -385,7 +385,20 @@ function setupIPC(): void {
     if (!validation.valid) {
       return { success: false, error: 'Validation failed: ' + validation.errors.join(', ') };
     }
-    return await envConfig.saveEnvConfig(config);
+    const result = await envConfig.saveEnvConfig(config);
+
+    // Update GitHub credentials if token changed
+    if (config.GITHUB_TOKEN) {
+      try {
+        const { getGitHubCredentialManager } = await import('./github-credential-manager');
+        getGitHubCredentialManager(config.GITHUB_TOKEN);
+        logger.info('GitHub credentials updated from saved config');
+      } catch (error) {
+        logger.warn('Error updating GitHub credentials:', error);
+      }
+    }
+
+    return result;
   });
 
   ipcMain.handle('env:generate-password', async (_, length?: number) => {
@@ -836,6 +849,43 @@ function setupIPC(): void {
     return await setupWizard.canProceedToNextStep(step);
   });
 
+  // GitHub Credentials IPC handlers
+  ipcMain.handle('github-credentials:set-token', async (_, token: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting GitHub token...');
+    const { getGitHubCredentialManager } = await import('./github-credential-manager');
+    getGitHubCredentialManager(token);
+    return { success: true };
+  });
+
+  ipcMain.handle('github-credentials:get-status', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting GitHub credentials status...');
+    const { getGitHubCredentialManager } = await import('./github-credential-manager');
+    const credentialManager = getGitHubCredentialManager();
+    return {
+      configured: credentialManager.isConfigured(),
+    };
+  });
+
+  ipcMain.handle('github-credentials:test-token', async (_, token?: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Testing GitHub token...');
+    const { getGitHubCredentialManager } = await import('./github-credential-manager');
+    const credentialManager = getGitHubCredentialManager();
+    return await credentialManager.testTokenValidity(token);
+  });
+
+  ipcMain.handle('github-credentials:validate-token-format', async (_, token: string) => {
+    const { GitHubCredentialManager } = await import('./github-credential-manager');
+    return GitHubCredentialManager.validateTokenFormat(token);
+  });
+
+  ipcMain.handle('github-credentials:clear-token', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Clearing GitHub token...');
+    const { getGitHubCredentialManager } = await import('./github-credential-manager');
+    const credentialManager = getGitHubCredentialManager();
+    credentialManager.clearToken();
+    return { success: true };
+  });
+
   logger.info('IPC handlers registered');
 }
 
@@ -844,6 +894,18 @@ app.whenReady().then(async () => {
   logger.info('App is ready');
   setupIPC();
   createMenu();
+
+  // Initialize GitHub credentials from environment
+  try {
+    const config = await envConfig.loadEnvConfig();
+    if (config.GITHUB_TOKEN) {
+      const { getGitHubCredentialManager } = await import('./github-credential-manager');
+      getGitHubCredentialManager(config.GITHUB_TOKEN);
+      logger.info('GitHub credentials initialized from environment');
+    }
+  } catch (error) {
+    logger.warn('Error initializing GitHub credentials from environment:', error);
+  }
 
   // Check if this is the first run
   const isFirst = await setupWizard.isFirstRun();

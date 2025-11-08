@@ -22,6 +22,7 @@ export interface EnvConfig {
   MCP_CONNECTOR_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
+  GITHUB_TOKEN?: string;
 }
 
 /**
@@ -35,6 +36,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   MCP_CONNECTOR_PORT: 50880,
   MCP_AUTH_TOKEN: '',
   TYPING_MIND_PORT: 3000,
+  GITHUB_TOKEN: '',
 };
 
 /**
@@ -256,6 +258,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'TYPING_MIND_PORT':
           config.TYPING_MIND_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'GITHUB_TOKEN':
+          config.GITHUB_TOKEN = unquotedValue;
+          break;
       }
     }
   }
@@ -320,8 +325,14 @@ export function formatEnvFile(config: EnvConfig): string {
     `MCP_CONNECTOR_PORT=${config.MCP_CONNECTOR_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
     `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
-    '',
   ];
+
+  // Only include GITHUB_TOKEN if it's set
+  if (config.GITHUB_TOKEN) {
+    lines.push(`GITHUB_TOKEN=${config.GITHUB_TOKEN}`);
+  }
+
+  lines.push('');
 
   return lines.join('\n');
 }
