@@ -3,6 +3,7 @@
  * Validates the setup configuration against the schema
  */
 
+import * as fs from 'fs';
 import { SetupConfig, ConfigValidationResult, Repository, BuildStep, BuildOrder, ComponentFlag } from '../types/setup-config';
 
 /**
@@ -207,7 +208,7 @@ export function validateSetupConfig(config: unknown): ConfigValidationResult {
 
     for (let i = 0; i < cfg.repositories.length; i++) {
       const repo = cfg.repositories[i] as Record<string, unknown>;
-      const { errors: repoErrors, warnings: repoWarnings } = validateRepository(repo as Repository, i);
+      const { errors: repoErrors, warnings: repoWarnings } = validateRepository(repo as unknown as Repository, i);
       errors.push(...repoErrors);
       warnings.push(...repoWarnings);
 
@@ -231,7 +232,7 @@ export function validateSetupConfig(config: unknown): ConfigValidationResult {
 
       for (let i = 0; i < cfg.buildSteps.length; i++) {
         const step = cfg.buildSteps[i] as Record<string, unknown>;
-        const { errors: stepErrors, warnings: stepWarnings } = validateBuildStep(step as BuildStep, i, repositoryIds);
+        const { errors: stepErrors, warnings: stepWarnings } = validateBuildStep(step as unknown as BuildStep, i, repositoryIds);
         errors.push(...stepErrors);
         warnings.push(...stepWarnings);
 
@@ -255,7 +256,7 @@ export function validateSetupConfig(config: unknown): ConfigValidationResult {
 
         for (let i = 0; i < cfg.components.length; i++) {
           const component = cfg.components[i] as Record<string, unknown>;
-          const { errors: compErrors, warnings: compWarnings } = validateComponentFlag(component as ComponentFlag, i, repositoryIds);
+          const { errors: compErrors, warnings: compWarnings } = validateComponentFlag(component as unknown as ComponentFlag, i, repositoryIds);
           errors.push(...compErrors);
           warnings.push(...compWarnings);
 
@@ -284,7 +285,6 @@ export function loadAndValidateConfig(filePath: string): { config: SetupConfig |
   let config: SetupConfig | null = null;
 
   try {
-    const fs = require('fs');
     const content = fs.readFileSync(filePath, 'utf-8');
     config = JSON.parse(content);
   } catch (error) {
