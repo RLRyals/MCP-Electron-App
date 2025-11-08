@@ -324,14 +324,20 @@ Built applications are placed in the `out/` directory:
 
 ```
 MCP-Electron-App/
+├── config/                # Configuration files
+│   └── setup-config.json  # Build automation setup configuration
 ├── src/
 │   ├── main/              # Main process (Node.js environment)
 │   │   └── index.ts       # Main process entry point
 │   ├── renderer/          # Renderer process (Browser environment)
 │   │   ├── index.html     # Main HTML file
 │   │   └── renderer.ts    # Renderer process script
-│   └── preload/           # Preload scripts (IPC bridge)
-│       └── preload.ts     # Secure IPC bridge
+│   ├── preload/           # Preload scripts (IPC bridge)
+│   │   └── preload.ts     # Secure IPC bridge
+│   ├── types/             # TypeScript type definitions
+│   │   └── setup-config.ts # Configuration schema interfaces
+│   └── utils/             # Utility modules
+│       └── config-validator.ts # Configuration validation
 ├── resources/             # Static assets and build resources
 ├── dist/                  # Compiled TypeScript output (gitignored)
 ├── out/                   # Built application packages (gitignored)
@@ -340,6 +346,82 @@ MCP-Electron-App/
 ├── tsconfig.json          # TypeScript configuration
 └── README.md              # This file
 ```
+
+### Setup Configuration
+
+The application uses a configuration system defined in `config/setup-config.json` to manage build automation and repository management.
+
+#### Configuration Schema
+
+The setup configuration defines:
+
+1. **Repositories** - List of git repositories to clone and manage
+   - Repository URL, local clone path, branch/version
+   - Optional flag for non-essential repositories
+   - Description and metadata
+
+2. **Build Order** - Sequence of repository builds
+   - Ordered list of repositories to build
+   - Dependencies between repositories
+   - Parallel build support configuration
+
+3. **Build Steps** - Individual build commands
+   - Custom shell commands per repository
+   - Working directory and environment variables
+   - Error handling and timeout configuration
+
+4. **Docker Images** - Docker image naming and build config
+   - Repository-to-image mapping
+   - Tag naming conventions
+   - Dockerfile path configuration
+
+5. **Components** - Feature flags and optional components
+   - Component enablement toggles
+   - Repository grouping by functionality
+   - Descriptions for UI presentation
+
+#### Configuration Files
+
+- **`config/setup-config.json`** - The primary configuration file with all setup parameters
+- **`src/types/setup-config.ts`** - TypeScript interfaces defining the configuration schema
+- **`src/utils/config-validator.ts`** - Configuration validation and loading utilities
+
+#### Using the Configuration
+
+To load and validate the setup configuration in your code:
+
+```typescript
+import { validateSetupConfig, loadAndValidateConfig } from './src/utils/config-validator';
+import { SetupConfig } from './src/types/setup-config';
+
+// Option 1: Load from file and validate
+const { config, validation } = loadAndValidateConfig('./config/setup-config.json');
+
+if (validation.valid) {
+  const setupConfig: SetupConfig = config!;
+  // Use the configuration
+} else {
+  console.error('Configuration errors:', validation.errors);
+  console.warn('Configuration warnings:', validation.warnings);
+}
+
+// Option 2: Validate a configuration object
+const result = validateSetupConfig(configObject);
+if (result.valid) {
+  // Configuration is valid
+} else {
+  // Handle validation errors
+}
+```
+
+#### Configuration Example
+
+See `config/setup-config.json` for a complete example configuration including:
+- Multiple repository definitions
+- Build order with dependencies
+- Custom build steps for each repository
+- Docker image configurations
+- Optional component flags
 
 ### Architecture
 
