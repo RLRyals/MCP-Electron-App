@@ -211,6 +211,132 @@
             opacity: 0.8;
         }
 
+        /* Docker Control Styles */
+        .docker-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 20px;
+        }
+
+        .docker-card h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .docker-status {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .docker-status.success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .docker-status.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .docker-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .docker-buttons button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .docker-buttons button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .docker-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .docker-progress {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .docker-progress.show {
+            display: block;
+        }
+
+        .docker-progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .docker-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .docker-progress-text {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .docker-health-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .docker-health-info.show {
+            display: block;
+        }
+
+        .docker-health-info .success {
+            color: #4caf50;
+        }
+
+        .docker-health-info .warning {
+            color: #ff9800;
+        }
+
+        .docker-health-info .error {
+            color: #f44336;
+        }
+
         /* Diagnostics Styles */
         .diagnostics-card {
             background: rgba(255, 255, 255, 0.1);
@@ -416,6 +542,245 @@
                 opacity: 0;
             }
         }
+
+        /* Environment Configuration Styles */
+        .env-config-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 30px;
+        }
+
+        .env-config-card h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .env-config-card code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tooltip {
+            cursor: help;
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .input-with-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .input-with-buttons input {
+            flex: 1;
+        }
+
+        .icon-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+
+        .icon-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .input-with-indicator {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-with-indicator input {
+            flex: 1;
+            padding-right: 40px;
+        }
+
+        .port-indicator {
+            position: absolute;
+            right: 10px;
+            font-size: 1.2rem;
+        }
+
+        .port-indicator .available {
+            color: #4caf50;
+        }
+
+        .port-indicator .unavailable {
+            color: #f44336;
+        }
+
+        .port-indicator .loading {
+            opacity: 0.5;
+        }
+
+        .password-strength {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .strength-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .strength-fill {
+            height: 100%;
+            transition: all 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .strength-fill.weak {
+            width: 33%;
+            background: #f44336;
+        }
+
+        .strength-fill.medium {
+            width: 66%;
+            background: #ff9800;
+        }
+
+        .strength-fill.strong {
+            width: 100%;
+            background: #4caf50;
+        }
+
+        .strength-text {
+            font-size: 0.85rem;
+            min-width: 60px;
+        }
+
+        .validation-error {
+            color: #ffcdd2;
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .validation-error.show {
+            display: block;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            justify-content: flex-end;
+        }
+
+        .primary-button,
+        .secondary-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .primary-button {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .primary-button:hover:not(:disabled) {
+            background: rgba(76, 175, 80, 0.5);
+            border-color: rgba(76, 175, 80, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .secondary-button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .primary-button:disabled,
+        .secondary-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .config-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .config-status.show {
+            display: block;
+        }
+
+        .config-status.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+
+        .config-status.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -493,6 +858,153 @@
             </div>
 
             <button class="test-button" id="check-prerequisites">Check Prerequisites</button>
+        </div>
+
+        <div class="env-config-card">
+            <h2>Environment Configuration</h2>
+            <p style="margin-bottom: 20px; opacity: 0.9;">
+                Configure environment variables for the MCP system. Settings will be saved to <code id="env-file-path">Loading...</code>
+            </p>
+
+            <form id="env-config-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="postgres-db">
+                            Database Name
+                            <span class="tooltip" title="Name of the PostgreSQL database">ⓘ</span>
+                        </label>
+                        <input type="text" id="postgres-db" name="POSTGRES_DB" required>
+                        <span class="validation-error" id="postgres-db-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postgres-user">
+                            Database User
+                            <span class="tooltip" title="PostgreSQL username">ⓘ</span>
+                        </label>
+                        <input type="text" id="postgres-user" name="POSTGRES_USER" required>
+                        <span class="validation-error" id="postgres-user-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postgres-password">
+                            Database Password
+                            <span class="tooltip" title="PostgreSQL password (auto-generated for security)">ⓘ</span>
+                        </label>
+                        <div class="input-with-buttons">
+                            <input type="password" id="postgres-password" name="POSTGRES_PASSWORD" required>
+                            <button type="button" class="icon-button" id="toggle-password" title="Show/Hide Password">
+                                <span class="eye-icon">👁️</span>
+                            </button>
+                            <button type="button" class="icon-button" id="regenerate-password" title="Regenerate Password">
+                                <span class="regenerate-icon">🔄</span>
+                            </button>
+                        </div>
+                        <div class="password-strength" id="password-strength">
+                            <div class="strength-bar">
+                                <div class="strength-fill" id="strength-fill"></div>
+                            </div>
+                            <span class="strength-text" id="strength-text">Weak</span>
+                        </div>
+                        <span class="validation-error" id="postgres-password-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postgres-port">
+                            PostgreSQL Port
+                            <span class="tooltip" title="Port for PostgreSQL database (default: 5432)">ⓘ</span>
+                        </label>
+                        <div class="input-with-indicator">
+                            <input type="number" id="postgres-port" name="POSTGRES_PORT" min="1024" max="65535" required>
+                            <span class="port-indicator" id="postgres-port-indicator">
+                                <span class="loading">⏳</span>
+                            </span>
+                        </div>
+                        <span class="validation-error" id="postgres-port-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcp-connector-port">
+                            MCP Connector Port
+                            <span class="tooltip" title="Port for MCP connector service (default: 50880)">ⓘ</span>
+                        </label>
+                        <div class="input-with-indicator">
+                            <input type="number" id="mcp-connector-port" name="MCP_CONNECTOR_PORT" min="1024" max="65535" required>
+                            <span class="port-indicator" id="mcp-connector-port-indicator">
+                                <span class="loading">⏳</span>
+                            </span>
+                        </div>
+                        <span class="validation-error" id="mcp-connector-port-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="typing-mind-port">
+                            Typing Mind Port
+                            <span class="tooltip" title="Port for Typing Mind service (default: 3000)">ⓘ</span>
+                        </label>
+                        <div class="input-with-indicator">
+                            <input type="number" id="typing-mind-port" name="TYPING_MIND_PORT" min="1024" max="65535" required>
+                            <span class="port-indicator" id="typing-mind-port-indicator">
+                                <span class="loading">⏳</span>
+                            </span>
+                        </div>
+                        <span class="validation-error" id="typing-mind-port-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mcp-auth-token">
+                            MCP Auth Token
+                            <span class="tooltip" title="Authentication token for MCP (auto-generated)">ⓘ</span>
+                        </label>
+                        <div class="input-with-buttons">
+                            <input type="password" id="mcp-auth-token" name="MCP_AUTH_TOKEN" required>
+                            <button type="button" class="icon-button" id="toggle-token" title="Show/Hide Token">
+                                <span class="eye-icon">👁️</span>
+                            </button>
+                            <button type="button" class="icon-button" id="regenerate-token" title="Regenerate Token">
+                                <span class="regenerate-icon">🔄</span>
+                            </button>
+                        </div>
+                        <span class="validation-error" id="mcp-auth-token-error"></span>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="secondary-button" id="reset-defaults">Use Defaults</button>
+                    <button type="submit" class="primary-button" id="save-config">Save Configuration</button>
+                </div>
+            </form>
+
+            <div class="config-status" id="config-status"></div>
+        </div>
+
+        <div class="docker-card">
+            <h2>Docker Control</h2>
+            <p style="margin-bottom: 20px; opacity: 0.9;">
+                Manage Docker Desktop - start, stop, restart, and monitor health status.
+            </p>
+
+            <div class="docker-status" id="docker-status">
+                Status: Checking...
+            </div>
+
+            <div class="docker-buttons">
+                <button id="start-docker">Start Docker</button>
+                <button id="stop-docker">Stop Docker</button>
+                <button id="restart-docker">Restart Docker</button>
+                <button id="check-docker-health">Check Health</button>
+            </div>
+
+            <div class="docker-progress" id="docker-progress">
+                <div class="docker-progress-bar-container">
+                    <div class="docker-progress-bar" id="docker-progress-bar"></div>
+                </div>
+                <div class="docker-progress-text" id="docker-progress-text">
+                    Starting Docker...
+                </div>
+            </div>
+
+            <div class="docker-health-info" id="docker-health-info"></div>
         </div>
 
         <div class="diagnostics-card">

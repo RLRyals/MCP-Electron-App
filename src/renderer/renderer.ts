@@ -4,6 +4,8 @@
  * It communicates with the main process via IPC through the preload script
  */
 
+import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers';
+
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
   installed: boolean;
@@ -44,6 +46,80 @@ interface DiagnosticReportResult {
   error?: string;
 }
 
+interface EnvConfig {
+  POSTGRES_DB: string;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_PORT: number;
+  MCP_CONNECTOR_PORT: number;
+  MCP_AUTH_TOKEN: string;
+  TYPING_MIND_PORT: number;
+}
+
+interface ConfigValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+interface SaveConfigResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
+
+interface DockerStatus {
+  running: boolean;
+  healthy: boolean;
+  message: string;
+  error?: string;
+}
+
+interface DockerOperationResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+interface DockerProgress {
+  message: string;
+  percent: number;
+  step: string;
+}
+
+interface InstallationStep {
+  stepNumber: number;
+  title: string;
+  description: string;
+  command?: string;
+  requiresAdmin?: boolean;
+  requiresRestart?: boolean;
+  estimatedTime?: string;
+}
+
+interface InstallationInstructions {
+  platform: string;
+  platformName: string;
+  architecture: string;
+  downloadUrl: string;
+  totalSteps: number;
+  steps: InstallationStep[];
+  notes: string[];
+  additionalInfo?: string;
+}
+
+interface DockerContainer {
+  id: string;
+  name: string;
+  status: string;
+  health?: string;
+}
+
+interface DockerContainersResult {
+  success: boolean;
+  containers: DockerContainer[];
+  error?: string;
+}
+
 interface ElectronAPI {
   ping: () => Promise<string>;
   getAppVersion: () => Promise<string>;
@@ -70,6 +146,36 @@ interface ElectronAPI {
     generateIssueTemplate: (title: string, message: string, stack?: string) => Promise<string>;
     openGitHubIssue: (title: string, message: string, stack?: string) => Promise<void>;
     onSystemTestResults: (callback: (results: SystemTestResult) => void) => void;
+  };
+  envConfig: {
+    getConfig: () => Promise<EnvConfig>;
+    saveConfig: (config: EnvConfig) => Promise<SaveConfigResult>;
+    generatePassword: (length?: number) => Promise<string>;
+    generateToken: () => Promise<string>;
+    checkPort: (port: number) => Promise<boolean>;
+    resetDefaults: () => Promise<EnvConfig>;
+    validateConfig: (config: EnvConfig) => Promise<ConfigValidationResult>;
+    calculatePasswordStrength: (password: string) => Promise<'weak' | 'medium' | 'strong'>;
+    getEnvFilePath: () => Promise<string>;
+  };
+  docker: {
+    start: () => Promise<DockerOperationResult>;
+    waitReady: () => Promise<DockerOperationResult>;
+    startAndWait: () => Promise<DockerOperationResult>;
+    stop: () => Promise<DockerOperationResult>;
+    restart: () => Promise<DockerOperationResult>;
+    healthCheck: () => Promise<DockerStatus>;
+    getContainersStatus: () => Promise<DockerContainersResult>;
+    onProgress: (callback: (progress: DockerProgress) => void) => void;
+    removeProgressListener: () => void;
+  };
+  wizard: {
+    getInstructions: () => Promise<InstallationInstructions>;
+    getDownloadUrl: () => Promise<string>;
+    openDownloadPage: () => Promise<void>;
+    copyCommand: (command: string) => Promise<boolean>;
+    getStep: (stepNumber: number) => Promise<InstallationStep | null>;
+    getExplanation: () => Promise<string>;
   };
 }
 
@@ -489,6 +595,31 @@ function init(): void {
     displaySystemTestResults(results);
   });
 
+  // Setup environment configuration listeners and load config
+  setupEnvConfigListeners();
+  loadEnvConfig();
+
+  // Set up Docker control event listeners
+  const startButton = document.getElementById('start-docker');
+  if (startButton) {
+    startButton.addEventListener('click', startDocker);
+  }
+
+  const stopButton = document.getElementById('stop-docker');
+  if (stopButton) {
+    stopButton.addEventListener('click', stopDocker);
+  }
+
+  const restartButton = document.getElementById('restart-docker');
+  if (restartButton) {
+    restartButton.addEventListener('click', restartDocker);
+  }
+
+  const healthButton = document.getElementById('check-docker-health');
+  if (healthButton) {
+    healthButton.addEventListener('click', checkDockerHealth);
+  }
+
   // Automatically check prerequisites on load
   checkPrerequisites();
 }
@@ -500,5 +631,210 @@ if (document.readyState === 'loading') {
   init();
 }
 
+
 // Export to make this a module (required for global augmentation)
+
+
+/**
+ * Start Docker Desktop
+ */
+async function startDocker(): Promise<void> {
+  const button = document.getElementById('start-docker') as HTMLButtonElement;
+  const statusDiv = document.getElementById('docker-status');
+  const progressDiv = document.getElementById('docker-progress');
+  const progressBar = document.getElementById('docker-progress-bar') as HTMLDivElement;
+  const progressText = document.getElementById('docker-progress-text');
+
+  if (!button) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Starting...';
+
+    if (progressDiv) progressDiv.classList.add('show');
+    if (progressText) progressText.textContent = 'Starting Docker Desktop...';
+    if (progressBar) progressBar.style.width = '0%';
+
+    // Listen for progress updates
+    window.electronAPI.docker.onProgress((progress) => {
+      if (progressText) progressText.textContent = progress.message;
+      if (progressBar) progressBar.style.width = `${progress.percent}%`;
+    });
+
+    const result = await window.electronAPI.docker.startAndWait();
+
+    if (result.success) {
+      showNotification(result.message, 'success');
+      if (statusDiv) {
+        statusDiv.textContent = 'Status: Running';
+        statusDiv.classList.add('success');
+        statusDiv.classList.remove('error');
+      }
+      // Update Docker status in prerequisites
+      await checkPrerequisites();
+    } else {
+      showNotification(`Failed to start Docker: ${result.error || result.message}`, 'error');
+      if (statusDiv) {
+        statusDiv.textContent = 'Status: Not Running';
+        statusDiv.classList.add('error');
+        statusDiv.classList.remove('success');
+      }
+    }
+  } catch (error) {
+    console.error('Error starting Docker:', error);
+    showNotification('Failed to start Docker', 'error');
+    if (statusDiv) {
+      statusDiv.textContent = 'Status: Error';
+      statusDiv.classList.add('error');
+      statusDiv.classList.remove('success');
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Start Docker';
+    if (progressDiv) progressDiv.classList.remove('show');
+    window.electronAPI.docker.removeProgressListener();
+  }
+}
+
+/**
+ * Stop Docker Desktop
+ */
+async function stopDocker(): Promise<void> {
+  const button = document.getElementById('stop-docker') as HTMLButtonElement;
+  const statusDiv = document.getElementById('docker-status');
+
+  if (!button) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Stopping...';
+
+    const result = await window.electronAPI.docker.stop();
+
+    if (result.success) {
+      showNotification(result.message, 'success');
+      if (statusDiv) {
+        statusDiv.textContent = 'Status: Stopped';
+        statusDiv.classList.remove('success', 'error');
+      }
+      // Update Docker status in prerequisites
+      await checkPrerequisites();
+    } else {
+      showNotification(`Failed to stop Docker: ${result.error || result.message}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error stopping Docker:', error);
+    showNotification('Failed to stop Docker', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Stop Docker';
+  }
+}
+
+/**
+ * Restart Docker Desktop
+ */
+async function restartDocker(): Promise<void> {
+  const button = document.getElementById('restart-docker') as HTMLButtonElement;
+  const statusDiv = document.getElementById('docker-status');
+  const progressDiv = document.getElementById('docker-progress');
+  const progressBar = document.getElementById('docker-progress-bar') as HTMLDivElement;
+  const progressText = document.getElementById('docker-progress-text');
+
+  if (!button) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Restarting...';
+
+    if (progressDiv) progressDiv.classList.add('show');
+    if (progressText) progressText.textContent = 'Restarting Docker Desktop...';
+    if (progressBar) progressBar.style.width = '0%';
+
+    // Listen for progress updates
+    window.electronAPI.docker.onProgress((progress) => {
+      if (progressText) progressText.textContent = progress.message;
+      if (progressBar) progressBar.style.width = `${progress.percent}%`;
+    });
+
+    const result = await window.electronAPI.docker.restart();
+
+    if (result.success) {
+      showNotification(result.message, 'success');
+      if (statusDiv) {
+        statusDiv.textContent = 'Status: Running';
+        statusDiv.classList.add('success');
+        statusDiv.classList.remove('error');
+      }
+      // Update Docker status in prerequisites
+      await checkPrerequisites();
+    } else {
+      showNotification(`Failed to restart Docker: ${result.error || result.message}`, 'error');
+      if (statusDiv) {
+        statusDiv.textContent = 'Status: Error';
+        statusDiv.classList.add('error');
+        statusDiv.classList.remove('success');
+      }
+    }
+  } catch (error) {
+    console.error('Error restarting Docker:', error);
+    showNotification('Failed to restart Docker', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Restart Docker';
+    if (progressDiv) progressDiv.classList.remove('show');
+    window.electronAPI.docker.removeProgressListener();
+  }
+}
+
+/**
+ * Check Docker health status
+ */
+async function checkDockerHealth(): Promise<void> {
+  const button = document.getElementById('check-docker-health') as HTMLButtonElement;
+  const statusDiv = document.getElementById('docker-status');
+  const healthDiv = document.getElementById('docker-health-info');
+
+  if (!button) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Checking...';
+
+    const health = await window.electronAPI.docker.healthCheck();
+
+    if (healthDiv) {
+      if (health.healthy) {
+        healthDiv.innerHTML = `<span class="success">✓ ${health.message}</span>`;
+      } else if (health.running) {
+        healthDiv.innerHTML = `<span class="warning">⚠ ${health.message}</span>`;
+      } else {
+        healthDiv.innerHTML = `<span class="error">✗ ${health.message}</span>`;
+      }
+      healthDiv.classList.add('show');
+    }
+
+    if (statusDiv) {
+      if (health.running && health.healthy) {
+        statusDiv.textContent = 'Status: Running & Healthy';
+        statusDiv.classList.add('success');
+        statusDiv.classList.remove('error');
+      } else if (health.running) {
+        statusDiv.textContent = 'Status: Running (Unhealthy)';
+        statusDiv.classList.remove('success', 'error');
+      } else {
+        statusDiv.textContent = 'Status: Not Running';
+        statusDiv.classList.add('error');
+        statusDiv.classList.remove('success');
+      }
+    }
+  } catch (error) {
+    console.error('Error checking Docker health:', error);
+    showNotification('Failed to check Docker health', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Check Health';
+  }
+}
+
 export {};

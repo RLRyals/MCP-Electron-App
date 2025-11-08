@@ -10,6 +10,9 @@ import {
   generateGitHubIssueTemplate,
   openGitHubIssue,
 } from './diagnostics';
+import * as docker from './docker';
+import * as envConfig from './env-config';
+import * as installationWizard from './installation-wizard';
 
 // Initialize logging system
 initializeLogger();
@@ -263,6 +266,159 @@ function setupIPC(): void {
 
   ipcMain.handle('logger:open-github-issue', async (_, title: string, message: string, stack?: string) => {
     return await openGitHubIssue(title, message, stack);
+  });
+
+  // Environment configuration IPC handlers
+  ipcMain.handle('env:get-config', async () => {
+    logger.info('Getting environment configuration...');
+    return await envConfig.loadEnvConfig();
+  });
+
+  ipcMain.handle('env:save-config', async (_, config: envConfig.EnvConfig) => {
+    logger.info('Saving environment configuration...');
+    const validation = envConfig.validateConfig(config);
+    if (!validation.valid) {
+      return { success: false, error: 'Validation failed: ' + validation.errors.join(', ') };
+    }
+    return await envConfig.saveEnvConfig(config);
+  });
+
+  ipcMain.handle('env:generate-password', async (_, length?: number) => {
+    logger.info('Generating password...');
+    return envConfig.generatePassword(length);
+  });
+
+  ipcMain.handle('env:generate-token', async () => {
+    logger.info('Generating auth token...');
+    return envConfig.generateAuthToken();
+  });
+
+  ipcMain.handle('env:check-port', async (_, port: number) => {
+    logger.info(`Checking if port ${port} is available...`);
+    return await envConfig.checkPortAvailable(port);
+  });
+
+  ipcMain.handle('env:reset-defaults', async () => {
+    logger.info('Resetting to default configuration...');
+    return {
+      ...envConfig.DEFAULT_CONFIG,
+      POSTGRES_PASSWORD: envConfig.generatePassword(),
+      MCP_AUTH_TOKEN: envConfig.generateAuthToken(),
+    };
+  });
+
+  ipcMain.handle('env:validate-config', async (_, config: envConfig.EnvConfig) => {
+    return envConfig.validateConfig(config);
+  });
+
+  ipcMain.handle('env:calculate-password-strength', async (_, password: string) => {
+    return envConfig.calculatePasswordStrength(password);
+  });
+
+  ipcMain.handle('env:get-env-file-path', async () => {
+    return envConfig.getEnvFilePath();
+  });
+
+  
+  // Docker IPC handlers
+  ipcMain.handle('docker:start', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting Docker Desktop...');
+
+    // Send progress updates to renderer
+    const progressCallback: docker.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker:progress', progress);
+      }
+    };
+
+    const result = await docker.startDockerDesktop(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker:wait-ready', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Waiting for Docker to be ready...');
+
+    // Send progress updates to renderer
+    const progressCallback: docker.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker:progress', progress);
+      }
+    };
+
+    const result = await docker.waitForDockerReady(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker:start-and-wait', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting Docker and waiting for it to be ready...');
+
+    // Send progress updates to renderer
+    const progressCallback: docker.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker:progress', progress);
+      }
+    };
+
+    const result = await docker.startAndWaitForDocker(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker:stop', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Stopping Docker Desktop...');
+    return await docker.stopDocker();
+  });
+
+  ipcMain.handle('docker:restart', async (_event) => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Restarting Docker Desktop...');
+
+    // Send progress updates to renderer
+    const progressCallback: docker.ProgressCallback = (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('docker:progress', progress);
+      }
+    };
+
+    const result = await docker.restartDocker(progressCallback);
+    return result;
+  });
+
+  ipcMain.handle('docker:health-check', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Checking Docker health...');
+    return await docker.checkDockerHealth();
+  });
+
+  ipcMain.handle('docker:containers-status', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting containers status...');
+    return await docker.getContainersStatus();
+  });
+
+  // Installation wizard IPC handlers
+  ipcMain.handle('wizard:get-instructions', async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Getting installation instructions...');
+    return installationWizard.getInstallationInstructions();
+  });
+
+  ipcMain.handle('wizard:get-download-url', async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Getting Docker download URL...');
+    return installationWizard.getDockerDownloadUrl();
+  });
+
+  ipcMain.handle('wizard:open-download', async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Docker download page...');
+    return await installationWizard.openDownloadPage();
+  });
+
+  ipcMain.handle('wizard:copy-command', async (_, command: string) => {
+    logWithCategory('info', LogCategory.PREREQUISITES, `Copying command to clipboard: ${command}`);
+    return installationWizard.copyCommandToClipboard(command);
+  });
+
+  ipcMain.handle('wizard:get-step', async (_, stepNumber: number) => {
+    return installationWizard.getStep(stepNumber);
+  });
+
+  ipcMain.handle('wizard:get-explanation', async () => {
+    return installationWizard.getWhyDockerExplanation();
   });
 
   logger.info('IPC handlers registered');

@@ -64,6 +64,110 @@ interface DiagnosticReportResult {
 }
 
 /**
+ * Environment configuration interface
+ */
+interface EnvConfig {
+  POSTGRES_DB: string;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_PORT: number;
+  MCP_CONNECTOR_PORT: number;
+  MCP_AUTH_TOKEN: string;
+  TYPING_MIND_PORT: number;
+}
+
+/**
+ * Configuration validation result
+ */
+interface ConfigValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/**
+ * Save configuration result
+ */
+interface SaveConfigResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
+
+/**
+ * Docker status interface
+ */
+interface DockerStatus {
+  running: boolean;
+  healthy: boolean;
+  message: string;
+  error?: string;
+}
+
+/**
+ * Docker operation result
+ */
+interface DockerOperationResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+/**
+ * Docker progress update
+ */
+interface DockerProgress {
+  message: string;
+  percent: number;
+  step: string;
+}
+
+/**
+ * Docker container info
+ */
+interface DockerContainer {
+  id: string;
+  name: string;
+  status: string;
+  health?: string;
+}
+
+/**
+ * Docker containers status result
+ */
+interface DockerContainersResult {
+  success: boolean;
+  containers: DockerContainer[];
+  error?: string;
+}
+
+/**
+ * Installation step interface
+ */
+interface InstallationStep {
+  stepNumber: number;
+  title: string;
+  description: string;
+  command?: string;
+  requiresAdmin?: boolean;
+  requiresRestart?: boolean;
+  estimatedTime?: string;
+}
+
+/**
+ * Installation instructions interface
+ */
+interface InstallationInstructions {
+  platform: string;
+  platformName: string;
+  architecture: string;
+  downloadUrl: string;
+  totalSteps: number;
+  steps: InstallationStep[];
+  notes: string[];
+  additionalInfo?: string;
+}
+
+/**
  * Expose a secure API to the renderer process
  * This API is the only way the renderer can communicate with the main process
  */
@@ -213,6 +317,189 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     onSystemTestResults: (callback: (results: SystemTestResult) => void): void => {
       ipcRenderer.on('system-test-results', (_, results) => callback(results));
+    },
+  },
+
+  /**
+   * Environment configuration API
+   */
+  envConfig: {
+    /**
+     * Get current or default environment configuration
+     */
+    getConfig: (): Promise<EnvConfig> => {
+      return ipcRenderer.invoke('env:get-config');
+    },
+
+    /**
+     * Save configuration to .env file
+     */
+    saveConfig: (config: EnvConfig): Promise<SaveConfigResult> => {
+      return ipcRenderer.invoke('env:save-config', config);
+    },
+
+    /**
+     * Generate a new secure password
+     */
+    generatePassword: (length?: number): Promise<string> => {
+      return ipcRenderer.invoke('env:generate-password', length);
+    },
+
+    /**
+     * Generate a new auth token
+     */
+    generateToken: (): Promise<string> => {
+      return ipcRenderer.invoke('env:generate-token');
+    },
+
+    /**
+     * Check if a port is available
+     */
+    checkPort: (port: number): Promise<boolean> => {
+      return ipcRenderer.invoke('env:check-port', port);
+    },
+
+    /**
+     * Reset configuration to defaults
+     */
+    resetDefaults: (): Promise<EnvConfig> => {
+      return ipcRenderer.invoke('env:reset-defaults');
+    },
+
+    /**
+     * Validate configuration
+     */
+    validateConfig: (config: EnvConfig): Promise<ConfigValidationResult> => {
+      return ipcRenderer.invoke('env:validate-config', config);
+    },
+
+    /**
+     * Calculate password strength
+     */
+    calculatePasswordStrength: (password: string): Promise<'weak' | 'medium' | 'strong'> => {
+      return ipcRenderer.invoke('env:calculate-password-strength', password);
+    },
+
+    /**
+     * Get the path where .env file will be saved
+     */
+    getEnvFilePath: (): Promise<string> => {
+      return ipcRenderer.invoke('env:get-env-file-path');
+    },
+  },
+
+  /**
+   * Docker API
+   */
+  docker: {
+    /**
+     * Start Docker Desktop
+     */
+    start: (): Promise<DockerOperationResult> => {
+      return ipcRenderer.invoke('docker:start');
+    },
+
+    /**
+     * Wait for Docker to be ready
+     */
+    waitReady: (): Promise<DockerOperationResult> => {
+      return ipcRenderer.invoke('docker:wait-ready');
+    },
+
+    /**
+     * Start Docker Desktop and wait for it to be ready
+     */
+    startAndWait: (): Promise<DockerOperationResult> => {
+      return ipcRenderer.invoke('docker:start-and-wait');
+    },
+
+    /**
+     * Stop Docker Desktop
+     */
+    stop: (): Promise<DockerOperationResult> => {
+      return ipcRenderer.invoke('docker:stop');
+    },
+
+    /**
+     * Restart Docker Desktop
+     */
+    restart: (): Promise<DockerOperationResult> => {
+      return ipcRenderer.invoke('docker:restart');
+    },
+
+    /**
+     * Check Docker health status
+     */
+    healthCheck: (): Promise<DockerStatus> => {
+      return ipcRenderer.invoke('docker:health-check');
+    },
+
+    /**
+     * Get Docker containers status
+     */
+    getContainersStatus: (): Promise<DockerContainersResult> => {
+      return ipcRenderer.invoke('docker:containers-status');
+    },
+
+    /**
+     * Listen for Docker progress updates
+     */
+    onProgress: (callback: (progress: DockerProgress) => void): void => {
+      ipcRenderer.on('docker:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove Docker progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('docker:progress');
+    },
+  },
+
+  /**
+   * Installation Wizard API
+   */
+  wizard: {
+    /**
+     * Get platform-specific installation instructions
+     */
+    getInstructions: (): Promise<InstallationInstructions> => {
+      return ipcRenderer.invoke('wizard:get-instructions');
+    },
+
+    /**
+     * Get the Docker download URL for current platform
+     */
+    getDownloadUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-download-url');
+    },
+
+    /**
+     * Open the Docker download page in default browser
+     */
+    openDownloadPage: (): Promise<void> => {
+      return ipcRenderer.invoke('wizard:open-download');
+    },
+
+    /**
+     * Copy a command to the clipboard
+     */
+    copyCommand: (command: string): Promise<boolean> => {
+      return ipcRenderer.invoke('wizard:copy-command', command);
+    },
+
+    /**
+     * Get a specific installation step
+     */
+    getStep: (stepNumber: number): Promise<InstallationStep | null> => {
+      return ipcRenderer.invoke('wizard:get-step', stepNumber);
+    },
+
+    /**
+     * Get explanation of why Docker is needed
+     */
+    getExplanation: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-explanation');
     },
   },
 });
