@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>MCP Writing System - Setup Wizard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar navigation */
+        .wizard-sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 40px 30px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wizard-logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .wizard-steps {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .wizard-step-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.6;
+        }
+
+        .wizard-step-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .wizard-step-item.active {
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 1;
+        }
+
+        .wizard-step-item.completed {
+            opacity: 1;
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .wizard-step-item.active .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .wizard-step-item.completed .step-number {
+            background: #4caf50;
+        }
+
+        .step-info {
+            flex: 1;
+        }
+
+        .step-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .step-description {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        .wizard-progress-bar {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        .progress-percentage {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Main content area */
+        .wizard-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .wizard-header {
+            padding: 30px 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .wizard-title {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .wizard-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .wizard-body {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .wizard-step-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .wizard-step-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .wizard-footer {
+            padding: 20px 40px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .wizard-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .wizard-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .wizard-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .wizard-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .wizard-btn.primary {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .wizard-btn.primary:hover:not(:disabled) {
+            background: rgba(76, 175, 80, 0.5);
+            border-color: rgba(76, 175, 80, 0.7);
+        }
+
+        .wizard-btn.secondary {
+            background: transparent;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Welcome step */
+        .welcome-content {
+            max-width: 700px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            font-size: 5rem;
+            margin-bottom: 30px;
+        }
+
+        .welcome-title {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        .welcome-description {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .welcome-features {
+            text-align: left;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .welcome-features h3 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+        }
+
+        .welcome-features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .welcome-features li {
+            padding: 12px 0;
+            padding-left: 35px;
+            position: relative;
+            font-size: 1rem;
+        }
+
+        .welcome-features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4caf50;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .welcome-info {
+            background: rgba(33, 150, 243, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #2196f3;
+            text-align: left;
+        }
+
+        /* Prerequisites step */
+        .prereq-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .prereq-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .prereq-card.success {
+            border-color: rgba(76, 175, 80, 0.5);
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .prereq-card.error {
+            border-color: rgba(244, 67, 54, 0.5);
+            background: rgba(244, 67, 54, 0.1);
+        }
+
+        .prereq-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .prereq-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+        }
+
+        .prereq-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .prereq-status {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .prereq-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .prereq-actions button {
+            flex: 1;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Alert messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .alert.info {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 4px solid #2196f3;
+        }
+
+        .alert.success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4caf50;
+        }
+
+        .alert.warning {
+            background: rgba(255, 152, 0, 0.2);
+            border-left: 4px solid #ff9800;
+        }
+
+        .alert.error {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid #f44336;
+        }
+
+        /* Progress indicator for async operations */
+        .operation-progress {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .operation-progress.show {
+            display: block;
+        }
+
+        .operation-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .operation-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .operation-message {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.95rem;
+        }
+
+        /* Service URLs display */
+        .service-urls {
+            margin-top: 30px;
+        }
+
+        .service-url-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-url-info {
+            flex: 1;
+        }
+
+        .service-url-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .service-url-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+
+        .service-url-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .wizard-sidebar {
+                width: 250px;
+                padding: 30px 20px;
+            }
+
+            .wizard-header,
+            .wizard-body,
+            .wizard-footer {
+                padding-left: 30px;
+                padding-right: 30px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            .wizard-sidebar {
+                width: 100%;
+                height: auto;
+                padding: 20px;
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .wizard-steps {
+                display: flex;
+                overflow-x: auto;
+                gap: 10px;
+            }
+
+            .wizard-step-item {
+                flex-direction: column;
+                min-width: 100px;
+                text-align: center;
+                padding: 10px;
+            }
+
+            .step-number {
+                margin-right: 0;
+                margin-bottom: 8px;
+            }
+
+            .step-description {
+                display: none;
+            }
+
+            .wizard-progress-bar {
+                display: none;
+            }
+        }
+
+        /* Hide scrollbar but keep functionality */
+        .wizard-body::-webkit-scrollbar,
+        .wizard-steps::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .wizard-body::-webkit-scrollbar-track,
+        .wizard-steps::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .wizard-body::-webkit-scrollbar-thumb,
+        .wizard-steps::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .wizard-body::-webkit-scrollbar-thumb:hover,
+        .wizard-steps::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="wizard-sidebar">
+        <div class="wizard-logo">MCP Writing System</div>
+
+        <div class="wizard-steps" id="wizard-steps">
+            <!-- Steps will be dynamically populated -->
+        </div>
+
+        <div class="wizard-progress-bar">
+            <div class="progress-label">Overall Progress</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="overall-progress-bar"></div>
+            </div>
+            <div class="progress-percentage" id="overall-progress-percentage">0%</div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="wizard-content">
+        <div class="wizard-header">
+            <div class="wizard-title" id="wizard-title">Loading...</div>
+            <div class="wizard-subtitle" id="wizard-subtitle">Please wait...</div>
+        </div>
+
+        <div class="wizard-body">
+            <!-- Step 1: Welcome -->
+            <div class="wizard-step-content" id="step-1" data-step="1">
+                <div class="welcome-content">
+                    <div class="welcome-icon">🚀</div>
+                    <h1 class="welcome-title">Welcome to MCP Writing System</h1>
+                    <p class="welcome-description">
+                        This setup wizard will guide you through the installation and configuration
+                        of the MCP Writing System. We'll help you set up all the necessary components
+                        to get started in just 10-15 minutes.
+                    </p>
+
+                    <div class="welcome-features">
+                        <h3>What we'll set up:</h3>
+                        <ul>
+                            <li>Check system prerequisites (Docker, Git)</li>
+                            <li>Configure database and services</li>
+                            <li>Install your preferred MCP clients</li>
+                            <li>Download and prepare Docker images</li>
+                            <li>Start and verify the MCP system</li>
+                        </ul>
+                    </div>
+
+                    <div class="welcome-info">
+                        <strong>Estimated time:</strong> 10-15 minutes<br>
+                        <strong>What you'll need:</strong> Internet connection, Docker Desktop, Git
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Prerequisites -->
+            <div class="wizard-step-content" id="step-2" data-step="2">
+                <h2 style="margin-bottom: 20px;">System Prerequisites</h2>
+                <p style="opacity: 0.9; margin-bottom: 30px;">
+                    Let's verify that your system has all the required software installed.
+                </p>
+
+                <div id="prereq-alert-container"></div>
+
+                <div class="prereq-grid" id="prereq-grid">
+                    <!-- Prerequisites cards will be dynamically populated -->
+                </div>
+
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="check-prerequisites-btn" onclick="checkPrerequisites()">
+                        Check Again
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Environment Configuration -->
+            <div class="wizard-step-content" id="step-3" data-step="3">
+                <h2 style="margin-bottom: 20px;">Environment Configuration</h2>
+                <p style="opacity: 0.9; margin-bottom: 30px;">
+                    Configure the environment variables for your MCP system. Default values have been
+                    generated for security.
+                </p>
+
+                <div id="env-config-container">
+                    <!-- Environment config UI will be loaded here -->
+                    <div id="env-config-placeholder" style="text-align: center; padding: 40px;">
+                        <div class="spinner" style="display: inline-block;"></div>
+                        <p style="margin-top: 20px;">Loading configuration...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Client Selection -->
+            <div class="wizard-step-content" id="step-4" data-step="4">
+                <h2 style="margin-bottom: 20px;">Choose Your MCP Clients</h2>
+                <p style="opacity: 0.9; margin-bottom: 30px;">
+                    Select which MCP clients you'd like to install. You can choose one or both based on your needs.
+                </p>
+
+                <div id="client-selection-container">
+                    <!-- Client selection UI will be loaded here -->
+                    <div id="client-selection-placeholder" style="text-align: center; padding: 40px;">
+                        <div class="spinner" style="display: inline-block;"></div>
+                        <p style="margin-top: 20px;">Loading clients...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Download & Setup -->
+            <div class="wizard-step-content" id="step-5" data-step="5">
+                <h2 style="margin-bottom: 20px;">Downloading Components</h2>
+                <p style="opacity: 0.9; margin-bottom: 30px;">
+                    Downloading and preparing required components. This may take several minutes depending
+                    on your internet connection.
+                </p>
+
+                <div id="download-status-container"></div>
+
+                <div class="operation-progress" id="download-progress">
+                    <div class="operation-progress-bar">
+                        <div class="operation-progress-fill" id="download-progress-fill"></div>
+                    </div>
+                    <div class="operation-message" id="download-progress-message">Initializing...</div>
+                </div>
+
+                <div id="download-details" style="margin-top: 20px;">
+                    <!-- Download details will be shown here -->
+                </div>
+            </div>
+
+            <!-- Step 6: System Startup -->
+            <div class="wizard-step-content" id="step-6" data-step="6">
+                <h2 style="margin-bottom: 20px;">Starting MCP System</h2>
+                <p style="opacity: 0.9; margin-bottom: 30px;">
+                    Initializing services and performing health checks...
+                </p>
+
+                <div id="startup-status-container"></div>
+
+                <div class="operation-progress" id="startup-progress">
+                    <div class="operation-progress-bar">
+                        <div class="operation-progress-fill" id="startup-progress-fill"></div>
+                    </div>
+                    <div class="operation-message" id="startup-progress-message">Starting services...</div>
+                </div>
+
+                <div id="startup-details" style="margin-top: 20px;">
+                    <!-- Startup details will be shown here -->
+                </div>
+            </div>
+
+            <!-- Step 7: Complete -->
+            <div class="wizard-step-content" id="step-7" data-step="7">
+                <div class="welcome-content">
+                    <div class="welcome-icon">🎉</div>
+                    <h1 class="welcome-title">Setup Complete!</h1>
+                    <p class="welcome-description">
+                        Congratulations! Your MCP Writing System is now ready to use.
+                    </p>
+
+                    <div class="welcome-features" style="margin-top: 40px;">
+                        <h3>System Summary</h3>
+                        <ul id="setup-summary-list">
+                            <!-- Summary items will be added dynamically -->
+                        </ul>
+                    </div>
+
+                    <div class="service-urls" id="service-urls">
+                        <h3 style="margin-bottom: 20px;">Access Your Services</h3>
+                        <!-- Service URLs will be added dynamically -->
+                    </div>
+
+                    <div class="welcome-info" style="margin-top: 30px;">
+                        <strong>Next Steps:</strong><br>
+                        Click "Launch Dashboard" below to access the main application and start using your MCP Writing System.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="wizard-footer">
+            <div>
+                <button class="wizard-btn secondary" id="cancel-btn" onclick="cancelWizard()">Cancel</button>
+                <button class="wizard-btn secondary" id="help-btn" style="display: none;">Help</button>
+            </div>
+            <div class="wizard-buttons">
+                <button class="wizard-btn secondary" id="prev-btn" onclick="previousStep()" disabled>Previous</button>
+                <button class="wizard-btn primary" id="next-btn" onclick="nextStep()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="setup-wizard-handlers.js"></script>
+</body>
+</html>

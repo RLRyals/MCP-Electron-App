@@ -449,6 +449,73 @@ interface UpdateProgress {
 }
 
 /**
+ * Wizard step enum
+ */
+enum WizardStep {
+  WELCOME = 1,
+  PREREQUISITES = 2,
+  ENVIRONMENT = 3,
+  CLIENT_SELECTION = 4,
+  DOWNLOAD_SETUP = 5,
+  SYSTEM_STARTUP = 6,
+  COMPLETE = 7
+}
+
+/**
+ * Wizard step data
+ */
+interface WizardStepData {
+  prerequisites?: {
+    docker: boolean;
+    git: boolean;
+    wsl?: boolean;
+  };
+  environment?: {
+    saved: boolean;
+    configPath?: string;
+  };
+  clients?: string[];
+  downloads?: {
+    typingMindCompleted: boolean;
+    dockerImagesCompleted: boolean;
+  };
+  systemStartup?: {
+    started: boolean;
+    healthy: boolean;
+  };
+}
+
+/**
+ * Wizard state
+ */
+interface WizardState {
+  completed: boolean;
+  currentStep: WizardStep;
+  stepsCompleted: WizardStep[];
+  data: WizardStepData;
+  startedAt?: string;
+  completedAt?: string;
+  version?: string;
+}
+
+/**
+ * Wizard operation result
+ */
+interface WizardOperationResult {
+  success: boolean;
+  error?: string;
+  nextStep?: WizardStep;
+}
+
+/**
+ * Can proceed result
+ */
+interface CanProceedResult {
+  canProceed: boolean;
+  reason?: string;
+}
+
+/**
  * Expose a secure API to the renderer process
  * This API is the only way the renderer can communicate with the main process
  */
@@ -1140,6 +1207,108 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('updater:check-complete');
       ipcRenderer.removeAllListeners('updater:auto-check-complete');
     },
+  },
+
+  /**
+   * Setup Wizard API
+   */
+  setupWizard: {
+    /**
+     * Check if this is the first run
+     */
+    isFirstRun: (): Promise<boolean> => {
+      return ipcRenderer.invoke('setup-wizard:is-first-run');
+    },
+
+    /**
+     * Get the current wizard state
+     */
+    getState: (): Promise<WizardState> => {
+      return ipcRenderer.invoke('setup-wizard:get-state');
+    },
+
+    /**
+     * Save wizard state
+     */
+    saveState: (step: WizardStep, data?: Partial<WizardStepData>): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:save-state', step, data);
+    },
+
+    /**
+     * Complete a step and move to the next
+     */
+    completeStep: (step: WizardStep, data?: Partial<WizardStepData>): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:complete-step', step, data);
+    },
+
+    /**
+     * Navigate to a specific step
+     */
+    goToStep: (step: WizardStep): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:go-to-step', step);
+    },
+
+    /**
+     * Mark the wizard as complete
+     */
+    markComplete: (): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:mark-complete');
+    },
+
+    /**
+     * Reset the wizard (start over)
+     */
+    reset: (): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:reset');
+    },
+
+    /**
+     * Get wizard progress percentage (0-100)
+     */
+    getProgress: (): Promise<number> => {
+      return ipcRenderer.invoke('setup-wizard:get-progress');
+    },
+
+    /**
+     * Check if a specific step is completed
+     */
+    isStepCompleted: (step: WizardStep): Promise<boolean> => {
+      return ipcRenderer.invoke('setup-wizard:is-step-completed', step);
+    },
+
+    /**
+     * Get step name for display
+     */
+    getStepName: (step: WizardStep): Promise<string> => {
+      return ipcRenderer.invoke('setup-wizard:get-step-name', step);
+    },
+
+    /**
+     * Get step description for display
+     */
+    getStepDescription: (step: WizardStep): Promise<string> => {
+      return ipcRenderer.invoke('setup-wizard:get-step-description', step);
+    },
+
+    /**
+     * Check if can proceed to next step
+     */
+    canProceed: (step: WizardStep): Promise<CanProceedResult> => {
+      return ipcRenderer.invoke('setup-wizard:can-proceed', step);
+    },
+
+    /**
+     * Wizard step enum for use in renderer
+     */
+    WizardStep: {
+      WELCOME: 1,
+      PREREQUISITES: 2,
+      ENVIRONMENT: 3,
+      CLIENT_SELECTION: 4,
+      DOWNLOAD_SETUP: 5,
+      SYSTEM_STARTUP: 6,
+      COMPLETE: 7
+    }
   },
 });
 

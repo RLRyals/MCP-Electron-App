@@ -18,6 +18,7 @@ import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
 import * as updater from './updater';
+import * as setupWizard from './setup-wizard';
 
 // Initialize logging system
 initializeLogger();
@@ -152,6 +153,49 @@ function createMenu(): void {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+}
+
+/**
+ * Create the setup wizard window
+ */
+function createWizardWindow(): void {
+  logger.info('Creating setup wizard window...');
+
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 768,
+    title: 'MCP Writing System - Setup Wizard',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+    show: false, // Don't show until ready
+  });
+
+  // Load the setup wizard HTML file
+  const wizardPath = path.join(__dirname, '../renderer/setup-wizard.html');
+  mainWindow.loadFile(wizardPath);
+
+  // Show window when ready to avoid visual flash
+  mainWindow.once('ready-to-show', () => {
+    logger.info('Wizard window ready to show');
+    mainWindow?.show();
+  });
+
+  // Open DevTools in development mode
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  logger.info('Setup wizard window created');
 }
 
 /**
@@ -693,6 +737,65 @@ function setupIPC(): void {
     return await updater.setUpdatePreferences(prefs);
   });
 
+  // Setup Wizard IPC handlers
+  ipcMain.handle('setup-wizard:is-first-run', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if first run...');
+    return await setupWizard.isFirstRun();
+  });
+
+  ipcMain.handle('setup-wizard:get-state', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting wizard state...');
+    return await setupWizard.getWizardState();
+  });
+
+  ipcMain.handle('setup-wizard:save-state', async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Saving wizard state for step ${step}...`);
+    return await setupWizard.saveWizardState(step, data);
+  });
+
+  ipcMain.handle('setup-wizard:complete-step', async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Completing wizard step ${step}...`);
+    return await setupWizard.completeStep(step, data);
+  });
+
+  ipcMain.handle('setup-wizard:go-to-step', async (_, step: setupWizard.WizardStep) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Navigating to wizard step ${step}...`);
+    return await setupWizard.goToStep(step);
+  });
+
+  ipcMain.handle('setup-wizard:mark-complete', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Marking wizard as complete...');
+    return await setupWizard.markWizardComplete();
+  });
+
+  ipcMain.handle('setup-wizard:reset', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting wizard...');
+    return await setupWizard.resetWizard();
+  });
+
+  ipcMain.handle('setup-wizard:get-progress', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting wizard progress...');
+    return await setupWizard.getWizardProgress();
+  });
+
+  ipcMain.handle('setup-wizard:is-step-completed', async (_, step: setupWizard.WizardStep) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Checking if step ${step} is completed...`);
+    return await setupWizard.isStepCompleted(step);
+  });
+
+  ipcMain.handle('setup-wizard:get-step-name', async (_, step: setupWizard.WizardStep) => {
+    return setupWizard.getStepName(step);
+  });
+
+  ipcMain.handle('setup-wizard:get-step-description', async (_, step: setupWizard.WizardStep) => {
+    return setupWizard.getStepDescription(step);
+  });
+
+  ipcMain.handle('setup-wizard:can-proceed', async (_, step: setupWizard.WizardStep) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Checking if can proceed from step ${step}...`);
+    return await setupWizard.canProceedToNextStep(step);
+  });
+
   logger.info('IPC handlers registered');
 }
 
@@ -701,34 +804,52 @@ app.whenReady().then(async () => {
   logger.info('App is ready');
   setupIPC();
   createMenu();
-  createWindow();
 
-  // Auto-check for updates on startup
-  try {
-    const shouldCheck = await updater.shouldAutoCheck();
-    if (shouldCheck) {
-      logWithCategory('info', LogCategory.SYSTEM, 'Auto-checking for updates...');
-      const updates = await updater.checkForAllUpdates();
+  // Check if this is the first run
+  const isFirst = await setupWizard.isFirstRun();
+  logger.info(`First run: ${isFirst}`);
 
-      if (updates.hasUpdates) {
-        logWithCategory('info', LogCategory.SYSTEM, 'Updates available!');
-        // Notify renderer if window is ready
-        if (mainWindow) {
-          mainWindow.webContents.send('updater:auto-check-complete', updates);
+  if (isFirst) {
+    // Show setup wizard
+    createWizardWindow();
+  } else {
+    // Show main application window
+    createWindow();
+
+    // Auto-check for updates on startup (only for non-first-run)
+    try {
+      const shouldCheck = await updater.shouldAutoCheck();
+      if (shouldCheck) {
+        logWithCategory('info', LogCategory.SYSTEM, 'Auto-checking for updates...');
+        const updates = await updater.checkForAllUpdates();
+
+        if (updates.hasUpdates) {
+          logWithCategory('info', LogCategory.SYSTEM, 'Updates available!');
+          // Notify renderer if window is ready
+          if (mainWindow) {
+            mainWindow.webContents.send('updater:auto-check-complete', updates);
+          }
+        } else {
+          logWithCategory('info', LogCategory.SYSTEM, 'All components are up to date');
         }
-      } else {
-        logWithCategory('info', LogCategory.SYSTEM, 'All components are up to date');
       }
+    } catch (error) {
+      logger.error('Error during auto-update check:', error);
+      // Non-fatal, just log and continue
     }
-  } catch (error) {
-    logger.error('Error during auto-update check:', error);
-    // Non-fatal, just log and continue
   }
 
   app.on('activate', () => {
     // On macOS, re-create window when dock icon is clicked and no windows are open
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      // Check again if first run when re-activating
+      setupWizard.isFirstRun().then(isFirst => {
+        if (isFirst) {
+          createWizardWindow();
+        } else {
+          createWindow();
+        }
+      });
     }
   });
 });
