@@ -13,11 +13,9 @@ import {
   CloneOptions,
   RepositoryProgress,
   RepoStatus,
-  RepositoryResult,
   RepositoryError,
   RepositoryErrorType,
   CommitInfo,
-  SparseCheckoutConfig,
 } from '../types/repository';
 
 const execAsync = promisify(exec);
