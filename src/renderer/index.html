@@ -1023,6 +1023,410 @@
             color: #ffcdd2;
             font-size: 1rem;
         }
+
+        /* Dashboard Styles */
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 30px;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .dashboard-header h2 {
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        .dashboard-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        .status-green .status-dot {
+            background: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-yellow .status-dot {
+            background: #ff9800;
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        .status-red .status-dot {
+            background: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        .dashboard-section {
+            margin-bottom: 30px;
+        }
+
+        .dashboard-section h3 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            opacity: 0.95;
+        }
+
+        .dashboard-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .action-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .action-button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .action-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-button.primary {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .action-button.primary:hover:not(:disabled) {
+            background: rgba(76, 175, 80, 0.5);
+            border-color: rgba(76, 175, 80, 0.7);
+        }
+
+        .action-button.secondary {
+            background: rgba(33, 150, 243, 0.3);
+            border-color: rgba(33, 150, 243, 0.5);
+        }
+
+        .action-button.secondary:hover:not(:disabled) {
+            background: rgba(33, 150, 243, 0.5);
+            border-color: rgba(33, 150, 243, 0.7);
+        }
+
+        .action-button.icon-only {
+            font-size: 1.2rem;
+            padding: 12px;
+        }
+
+        .dashboard-progress {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .dashboard-progress.show {
+            display: block;
+        }
+
+        .dashboard-progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .dashboard-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .dashboard-progress-text {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .service-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .service-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .service-card:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .service-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .service-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .service-name h4 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .service-status-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .service-status {
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 4px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+        }
+
+        .service-card-body {
+            margin-top: 10px;
+        }
+
+        .service-info {
+            margin-bottom: 10px;
+        }
+
+        .service-detail {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .service-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .service-action-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 15px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .service-action-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .dashboard-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: right;
+        }
+
+        .last-updated {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        /* Logs Dialog Styles */
+        .logs-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logs-dialog-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        .logs-dialog-content {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logs-dialog-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-dialog-header h3 {
+            color: #fff;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .logs-dialog-close {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .logs-dialog-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .logs-dialog-body {
+            padding: 20px 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .logs-dialog-body pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .logs-dialog-footer {
+            padding: 20px 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .logs-dialog-copy,
+        .logs-dialog-close-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logs-dialog-copy:hover,
+        .logs-dialog-close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-actions {
+                grid-template-columns: 1fr;
+            }
+
+            .service-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .dashboard-card {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1100,6 +1504,130 @@
             </div>
 
             <button class="test-button" id="check-prerequisites">Check Prerequisites</button>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div class="dashboard-card" id="dashboard-card">
+            <div class="dashboard-header">
+                <h2>MCP Writing System</h2>
+                <div class="dashboard-status">
+                    <div id="dashboard-status-indicator" class="status-indicator status-red">
+                        <span class="status-dot"></span>
+                    </div>
+                    <span id="dashboard-status-text">System Offline</span>
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Quick Actions</h3>
+                <div class="dashboard-actions">
+                    <button id="dashboard-start-system" class="action-button primary">Start System</button>
+                    <button id="dashboard-stop-system" class="action-button">Stop System</button>
+                    <button id="dashboard-restart-system" class="action-button">Restart System</button>
+                    <button id="dashboard-open-typing-mind" class="action-button secondary">Open Typing Mind</button>
+                    <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh Status">🔄</button>
+                </div>
+            </div>
+
+            <div class="dashboard-progress" id="dashboard-progress">
+                <div class="dashboard-progress-bar-container">
+                    <div class="dashboard-progress-bar" id="dashboard-progress-bar"></div>
+                </div>
+                <div class="dashboard-progress-text" id="dashboard-progress-text">
+                    Initializing...
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Services</h3>
+                <div class="service-cards">
+                    <!-- PostgreSQL Card -->
+                    <div class="service-card" id="postgres-card">
+                        <div class="service-card-header">
+                            <div class="service-name">
+                                <span id="postgres-status-icon" class="service-status-icon">
+                                    <span class="status-dot status-red"></span>
+                                </span>
+                                <h4>PostgreSQL</h4>
+                            </div>
+                            <span id="postgres-status-text" class="service-status">Offline</span>
+                        </div>
+                        <div class="service-card-body">
+                            <div class="service-info">
+                                <span id="postgres-port" class="service-detail">Port: 5432</span>
+                            </div>
+                            <button class="service-action-btn view-logs-btn" data-service="postgres">View Logs</button>
+                        </div>
+                    </div>
+
+                    <!-- MCP Servers Card -->
+                    <div class="service-card" id="mcp-servers-card">
+                        <div class="service-card-header">
+                            <div class="service-name">
+                                <span id="mcp-servers-status-icon" class="service-status-icon">
+                                    <span class="status-dot status-red"></span>
+                                </span>
+                                <h4>MCP Servers</h4>
+                            </div>
+                            <span id="mcp-servers-status-text" class="service-status">Offline</span>
+                        </div>
+                        <div class="service-card-body">
+                            <div class="service-info">
+                                <span class="service-detail">Version: latest</span>
+                            </div>
+                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers">View Logs</button>
+                        </div>
+                    </div>
+
+                    <!-- MCP Connector Card -->
+                    <div class="service-card" id="mcp-connector-card" style="display: none;">
+                        <div class="service-card-header">
+                            <div class="service-name">
+                                <span id="mcp-connector-status-icon" class="service-status-icon">
+                                    <span class="status-dot status-red"></span>
+                                </span>
+                                <h4>MCP Connector</h4>
+                            </div>
+                            <span id="mcp-connector-status-text" class="service-status">Offline</span>
+                        </div>
+                        <div class="service-card-body">
+                            <div class="service-info">
+                                <span id="mcp-connector-port" class="service-detail">Port: 50880</span>
+                            </div>
+                            <div class="service-actions">
+                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector">View Logs</button>
+                                <button class="service-action-btn copy-token-btn">Copy Token</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Typing Mind Card -->
+                    <div class="service-card" id="typing-mind-card" style="display: none;">
+                        <div class="service-card-header">
+                            <div class="service-name">
+                                <span id="typing-mind-status-icon" class="service-status-icon">
+                                    <span class="status-dot status-red"></span>
+                                </span>
+                                <h4>Typing Mind</h4>
+                            </div>
+                            <span id="typing-mind-status-text" class="service-status">Offline</span>
+                        </div>
+                        <div class="service-card-body">
+                            <div class="service-info">
+                                <span id="typing-mind-port" class="service-detail">Port: 3000</span>
+                            </div>
+                            <div class="service-actions">
+                                <button class="service-action-btn view-logs-btn" data-service="typing-mind">View Logs</button>
+                                <button class="service-action-btn open-browser-btn" data-url="">Open Browser</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-footer">
+                <span id="dashboard-last-updated" class="last-updated">Last updated: --:--:--</span>
+            </div>
         </div>
 
         <div class="client-selection-card" id="client-selection-card">

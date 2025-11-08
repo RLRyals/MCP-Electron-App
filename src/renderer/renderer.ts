@@ -6,6 +6,7 @@
 
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers';
+import { initializeDashboard } from './dashboard-handlers';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -152,6 +153,51 @@ interface SaveSelectionResult {
   error?: string;
 }
 
+interface MCPSystemProgress {
+  message: string;
+  percent: number;
+  step: string;
+  status: 'starting' | 'checking' | 'ready' | 'error';
+}
+
+interface MCPSystemOperationResult {
+  success: boolean;
+  message: string;
+  error?: string;
+  urls?: ServiceUrls;
+}
+
+interface ServiceUrls {
+  typingMind?: string;
+  mcpConnector?: string;
+  postgres?: string;
+}
+
+interface ContainerHealth {
+  name: string;
+  status: string;
+  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
+  running: boolean;
+}
+
+interface MCPSystemStatus {
+  running: boolean;
+  healthy: boolean;
+  containers: ContainerHealth[];
+  message: string;
+}
+
+interface ServiceLogsResult {
+  success: boolean;
+  logs: string;
+  error?: string;
+}
+
+interface PortConflictResult {
+  success: boolean;
+  conflicts: number[];
+}
+
 interface ElectronAPI {
   ping: () => Promise<string>;
   getAppVersion: () => Promise<string>;
@@ -217,6 +263,18 @@ interface ElectronAPI {
     clearSelection: () => Promise<SaveSelectionResult>;
     getById: (clientId: string) => Promise<ClientMetadata | null>;
     getSelectionFilePath: () => Promise<string>;
+  };
+  mcpSystem: {
+    start: () => Promise<MCPSystemOperationResult>;
+    stop: () => Promise<MCPSystemOperationResult>;
+    restart: () => Promise<MCPSystemOperationResult>;
+    getStatus: () => Promise<MCPSystemStatus>;
+    getUrls: () => Promise<ServiceUrls>;
+    getLogs: (serviceName: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => Promise<ServiceLogsResult>;
+    checkPorts: () => Promise<PortConflictResult>;
+    getWorkingDirectory: () => Promise<string>;
+    onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
+    removeProgressListener: () => void;
   };
 }
 
@@ -643,6 +701,9 @@ function init(): void {
   // Setup client selection listeners and load options
   setupClientSelectionListeners();
   loadClientOptions();
+
+  // Initialize dashboard (main control interface)
+  initializeDashboard();
 
   // Set up Docker control event listeners
   const startButton = document.getElementById('start-docker');
