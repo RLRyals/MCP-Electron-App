@@ -49,6 +49,27 @@ function copyAssets() {
       }
     }
 
+    // Copy config directory
+    console.log('Copying config directory...');
+    const srcConfig = path.join(__dirname, '..', 'config');
+    const distConfig = path.join(__dirname, '..', 'dist', 'config');
+
+    if (fs.existsSync(srcConfig)) {
+      ensureDirSync(distConfig);
+      const configFiles = fs.readdirSync(srcConfig);
+      for (const file of configFiles) {
+        const srcPath = path.join(srcConfig, file);
+        const destPath = path.join(distConfig, file);
+
+        // Check if it's a file (not a directory)
+        const stat = fs.statSync(srcPath);
+        if (stat.isFile()) {
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`  ✓ Copied config/${file}`);
+        }
+      }
+    }
+
     console.log('✓ Asset copying complete!');
   } catch (error) {
     console.error('Error copying assets:', error);
