@@ -19,6 +19,33 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
+import { repositoryManager } from './repository-manager';
+import { createBuildOrchestrator } from './build-orchestrator';
+import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
+import type {
+  RepositoryCloneRequest,
+  RepositoryCloneResponse,
+  RepositoryCheckoutRequest,
+  RepositoryCheckoutResponse,
+  RepositoryStatusRequest,
+  RepositoryStatusResponse,
+  RepositoryBranchRequest,
+  RepositoryBranchResponse,
+  RepositoryCommitRequest,
+  RepositoryCommitResponse,
+  RepositoryCancelResponse,
+  BuildNpmInstallRequest,
+  BuildNpmInstallResponse,
+  BuildNpmBuildRequest,
+  BuildNpmBuildResponse,
+  BuildDockerBuildRequest,
+  BuildDockerBuildResponse,
+  BuildExecuteChainRequest,
+  BuildExecuteChainResponse,
+  BuildExecuteCustomScriptRequest,
+  BuildExecuteCustomScriptResponse,
+  BuildCancelResponse,
+} from '../types/ipc';
 
 // Initialize logging system
 initializeLogger();
@@ -885,6 +912,494 @@ function setupIPC(): void {
     credentialManager.clearToken();
     return { success: true };
   });
+
+  // ========================================
+  // Repository IPC Handlers
+  // ========================================
+
+  /**
+   * Clone a Git repository with progress tracking
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.CLONE,
+    async (_event, request: RepositoryCloneRequest): Promise<RepositoryCloneResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Cloning repository ${request.url} to ${request.targetPath}`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        // Wrap the progress callback with throttling
+        const throttledOptions = {
+          ...request.options,
+          onProgress: request.options?.onProgress
+            ? (progress: any) => {
+                progressThrottler.emit(progress, (throttledProgress) => {
+                  if (mainWindow) {
+                    mainWindow.webContents.send(IPC_CHANNELS.REPOSITORY.PROGRESS, throttledProgress);
+                  }
+                });
+              }
+            : undefined,
+        };
+
+        await repositoryManager.cloneRepository(request.url, request.targetPath, throttledOptions);
+
+        // Flush any pending progress
+        if (throttledOptions.onProgress) {
+          progressThrottler.flush((finalProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.REPOSITORY.PROGRESS, finalProgress);
+            }
+          });
+        }
+
+        return {
+          success: true,
+          message: 'Repository cloned successfully',
+          path: request.targetPath,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error cloning repository', error);
+        return {
+          success: false,
+          message: 'Failed to clone repository',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Checkout a specific version (branch, tag, or commit)
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.CHECKOUT_VERSION,
+    async (_event, request: RepositoryCheckoutRequest): Promise<RepositoryCheckoutResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Checking out version ${request.version} in ${request.repoPath}`);
+
+      try {
+        await repositoryManager.checkoutVersion(request.repoPath, request.version);
+
+        return {
+          success: true,
+          message: `Checked out ${request.version}`,
+          version: request.version,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error checking out version', error);
+        return {
+          success: false,
+          message: 'Failed to checkout version',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Get repository status
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.GET_STATUS,
+    async (_event, request: RepositoryStatusRequest): Promise<RepositoryStatusResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Getting repository status for ${request.repoPath}`);
+
+      try {
+        const status = await repositoryManager.getRepoStatus(request.repoPath);
+
+        return {
+          success: true,
+          status,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error getting repository status', error);
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Get current branch name
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.GET_CURRENT_BRANCH,
+    async (_event, request: RepositoryBranchRequest): Promise<RepositoryBranchResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Getting current branch for ${request.repoPath}`);
+
+      try {
+        const status = await repositoryManager.getRepoStatus(request.repoPath);
+
+        if (!status.isGitRepo) {
+          return {
+            success: false,
+            error: 'Not a Git repository',
+          };
+        }
+
+        return {
+          success: true,
+          branch: status.currentBranch,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error getting current branch', error);
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * List all branches in repository
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.LIST_BRANCHES,
+    async (_event, request: RepositoryBranchRequest): Promise<RepositoryBranchResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Listing branches for ${request.repoPath}`);
+
+      try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execPromise = promisify(exec);
+
+        const { stdout } = await execPromise('git branch -a', {
+          cwd: request.repoPath,
+          timeout: 10000,
+        });
+
+        const branches = stdout
+          .split('\n')
+          .map((line: string) => line.trim().replace(/^\*\s+/, '').replace(/^remotes\/origin\//, ''))
+          .filter((line: string) => line.length > 0 && !line.includes('HEAD ->'));
+
+        // Remove duplicates
+        const uniqueBranches = Array.from(new Set(branches)) as string[];
+
+        return {
+          success: true,
+          branches: uniqueBranches,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error listing branches', error);
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Get latest commit information
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.GET_LATEST_COMMIT,
+    async (_event, request: RepositoryCommitRequest): Promise<RepositoryCommitResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Getting latest commit for ${request.repoPath}`);
+
+      try {
+        const status = await repositoryManager.getRepoStatus(request.repoPath);
+
+        if (!status.isGitRepo) {
+          return {
+            success: false,
+            error: 'Not a Git repository',
+          };
+        }
+
+        return {
+          success: true,
+          commit: status.latestCommit,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error getting latest commit', error);
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Cancel ongoing repository operation
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.REPOSITORY.CANCEL,
+    async (): Promise<RepositoryCancelResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling repository operation');
+
+      try {
+        const cancelled = await repositoryManager.cancelOperation();
+
+        return {
+          success: cancelled,
+          message: cancelled ? 'Operation cancelled' : 'No operation to cancel',
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error cancelling operation', error);
+        return {
+          success: false,
+          message: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  // ========================================
+  // Build IPC Handlers
+  // ========================================
+
+  /**
+   * Execute npm install
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.NPM_INSTALL,
+    async (_event, request: BuildNpmInstallRequest): Promise<BuildNpmInstallResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Running npm install in ${request.repoPath}`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        const buildOrchestrator = createBuildOrchestrator((progress) => {
+          progressThrottler.emit(progress, (throttledProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, throttledProgress);
+            }
+          });
+        });
+
+        await buildOrchestrator.npmInstall(request.repoPath, request.options);
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: true,
+          message: 'npm install completed successfully',
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error running npm install', error);
+        return {
+          success: false,
+          message: 'npm install failed',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Execute npm build
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.NPM_BUILD,
+    async (_event, request: BuildNpmBuildRequest): Promise<BuildNpmBuildResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Running npm build in ${request.repoPath}`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        const buildOrchestrator = createBuildOrchestrator((progress) => {
+          progressThrottler.emit(progress, (throttledProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, throttledProgress);
+            }
+          });
+        });
+
+        await buildOrchestrator.npmBuild(request.repoPath, request.buildScript, request.options);
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: true,
+          message: 'npm build completed successfully',
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error running npm build', error);
+        return {
+          success: false,
+          message: 'npm build failed',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Execute docker build
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.DOCKER_BUILD,
+    async (_event, request: BuildDockerBuildRequest): Promise<BuildDockerBuildResponse> => {
+      logWithCategory('info', LogCategory.DOCKER, `IPC: Building Docker image ${request.imageName}`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        const buildOrchestrator = createBuildOrchestrator((progress) => {
+          progressThrottler.emit(progress, (throttledProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, throttledProgress);
+            }
+          });
+        });
+
+        await buildOrchestrator.dockerBuild(request.dockerfile, request.imageName, request.options);
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: true,
+          message: 'Docker build completed successfully',
+          imageName: request.imageName,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.DOCKER, 'Error running docker build', error);
+        return {
+          success: false,
+          message: 'Docker build failed',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Execute build chain
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.EXECUTE_CHAIN,
+    async (_event, request: BuildExecuteChainRequest): Promise<BuildExecuteChainResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, `IPC: Executing build chain with ${request.steps.length} steps`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        const buildOrchestrator = createBuildOrchestrator((progress) => {
+          progressThrottler.emit(progress, (throttledProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, throttledProgress);
+            }
+          });
+        });
+
+        const result = await buildOrchestrator.executeBuildChain(request.steps, request.config);
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: result.success,
+          result,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error executing build chain', error);
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Execute custom script
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.EXECUTE_CUSTOM_SCRIPT,
+    async (_event, request: BuildExecuteCustomScriptRequest): Promise<BuildExecuteCustomScriptResponse> => {
+      logWithCategory('info', LogCategory.SCRIPT, `IPC: Executing custom script: ${request.command}`);
+
+      try {
+        // Create progress throttler (max 10 events per second)
+        const progressThrottler = new ProgressThrottler(10);
+
+        const buildOrchestrator = createBuildOrchestrator((progress) => {
+          progressThrottler.emit(progress, (throttledProgress) => {
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, throttledProgress);
+            }
+          });
+        });
+
+        await buildOrchestrator.executeCustomScript(request.command, request.options);
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.BUILD.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: true,
+          message: 'Custom script executed successfully',
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SCRIPT, 'Error executing custom script', error);
+        return {
+          success: false,
+          message: 'Custom script execution failed',
+          error: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Cancel ongoing build operation
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.BUILD.CANCEL,
+    async (): Promise<BuildCancelResponse> => {
+      logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling build operation');
+
+      try {
+        const buildOrchestrator = createBuildOrchestrator();
+        buildOrchestrator.cancel();
+
+        return {
+          success: true,
+          message: 'Build operation cancelled',
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error cancelling build operation', error);
+        return {
+          success: false,
+          message: error.message || String(error),
+        };
+      }
+    }
+  );
 
   logger.info('IPC handlers registered');
 }
