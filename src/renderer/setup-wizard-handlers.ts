@@ -834,20 +834,45 @@ async function initializeDownloadStep() {
         return;
     }
 
-    // If downloads state exists but build is not marked complete, show warning
-    if (wizardState.data.downloads && !wizardState.data.buildPipeline?.completed) {
-        console.log('WARNING: downloads state exists but build not marked complete');
+    // If downloads are complete but build pipeline is not marked complete, show warning
+    // This indicates a potential inconsistency in the state
+    if (wizardState.data.downloads?.typingMindCompleted &&
+        wizardState.data.downloads?.dockerImagesCompleted &&
+        !wizardState.data.buildPipeline?.completed) {
+        console.log('WARNING: downloads complete but build pipeline not marked complete - inconsistent state');
         statusContainer.innerHTML = `
             <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">⚠️</span>
                 <div>
-                    <strong>Build Status Unknown</strong><br>
-                    The build appears to have partially completed. Click Retry to resume or complete the build.
+                    <strong>Build Status Inconsistent</strong><br>
+                    Downloads appear complete but build pipeline is not marked finished. Click Retry to verify and complete the build.
                 </div>
             </div>
             ${createRetryButton('retry-build-status-btn', initializeDownloadStep, 'Retry')}
         `;
         return;
+    }
+
+    // Initialize the downloads object at the start of the build process if it doesn't exist
+    // This allows the validation to pass while the build is in progress
+    if (!wizardState.data.downloads) {
+        console.log('Initializing downloads state object...');
+        const initResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
+            downloads: {
+                typingMindCompleted: false,
+                dockerImagesCompleted: false
+            }
+        });
+
+        if (!initResult.success) {
+            throw new Error(`Failed to initialize downloads state: ${initResult.error}`);
+        }
+
+        // Refresh wizard state after initialization
+        wizardState = await (window as any).electronAPI.setupWizard.getState();
+        console.log('Downloads state initialized:', wizardState.data.downloads);
+    } else {
+        console.log('Downloads state already exists:', wizardState.data.downloads);
     }
 
     // Set a timeout to show manual build button if automatic initialization takes too long
