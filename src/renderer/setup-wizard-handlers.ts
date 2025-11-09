@@ -16,13 +16,6 @@ let currentStep = 1;
 let wizardState: any = null;
 const WizardStep = (window as any).electronAPI.setupWizard.WizardStep;
 
-// Step validation flags
-let prerequisitesValid = false;
-let environmentValid = false;
-let clientsSelected = false;
-let downloadsComplete = false;
-let systemStarted = false;
-
 // Progress tracker UI instance
 let progressTrackerUI: ProgressTrackerUI | null = null;
 
@@ -323,9 +316,6 @@ async function checkPrerequisites() {
 
         grid.innerHTML = cards.join('');
 
-        // Update prerequisitesValid flag
-        prerequisitesValid = allValid;
-
         // Show alert if not all prerequisites are met
         const alertContainer = document.getElementById('prereq-alert-container');
         if (alertContainer) {
@@ -438,7 +428,6 @@ async function initializeEnvironmentStep() {
 
         // Check if already configured
         if (wizardState.data.environment?.saved) {
-            environmentValid = true;
             showSuccessMessage('Configuration previously saved', 'env-config-container');
         }
 
@@ -549,8 +538,6 @@ async function saveEnvironmentConfig() {
         const result = await (window as any).electronAPI.envConfig.saveConfig(config);
 
         if (result.success) {
-            environmentValid = true;
-
             // Save wizard state
             await (window as any).electronAPI.setupWizard.saveState(WizardStep.ENVIRONMENT, {
                 environment: {
@@ -721,8 +708,6 @@ async function saveClientSelection() {
         const result = await (window as any).electronAPI.clientSelection.saveSelection(selectedClients);
 
         if (result.success) {
-            clientsSelected = true;
-
             // Save wizard state
             await (window as any).electronAPI.setupWizard.saveState(WizardStep.CLIENT_SELECTION, {
                 clients: selectedClients
@@ -776,7 +761,6 @@ async function initializeDownloadStep() {
 
     // Check if downloads already completed
     if (wizardState.data.downloads?.typingMindCompleted && wizardState.data.downloads?.dockerImagesCompleted) {
-        downloadsComplete = true;
         statusContainer.innerHTML = `
             <div class="alert success">
                 <span style="font-size: 1.5rem;">✓</span>
@@ -1009,8 +993,6 @@ async function initializeDownloadStep() {
         completedCount++;
 
         // All downloads complete
-        downloadsComplete = true;
-
         // Update overall progress to 100%
         progressTrackerUI.updateOverallProgress({
             overallPercent: 100,
@@ -1093,7 +1075,6 @@ async function initializeSystemStartupStep() {
 
     // Check if system already started
     if (wizardState.data.systemStartup?.started && wizardState.data.systemStartup?.healthy) {
-        systemStarted = true;
         statusContainer.innerHTML = `
             <div class="alert success">
                 <span style="font-size: 1.5rem;">✓</span>
@@ -1129,8 +1110,6 @@ async function initializeSystemStartupStep() {
         }
 
         // System started successfully
-        systemStarted = true;
-
         // Save wizard state
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.SYSTEM_STARTUP, {
             systemStartup: {
