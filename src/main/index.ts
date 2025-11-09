@@ -21,6 +21,7 @@ import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
+import { createBuildPipelineOrchestrator } from './build-pipeline-orchestrator';
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
 import type {
   RepositoryCloneRequest,
@@ -45,6 +46,10 @@ import type {
   BuildExecuteCustomScriptRequest,
   BuildExecuteCustomScriptResponse,
   BuildCancelResponse,
+  PipelineExecuteRequest,
+  PipelineExecuteResponse,
+  PipelineCancelResponse,
+  PipelineStatusResponse,
 } from '../types/ipc';
 
 // Initialize logging system
@@ -1395,6 +1400,137 @@ function setupIPC(): void {
         logWithCategory('error', LogCategory.ERROR, 'Error cancelling build operation', error);
         return {
           success: false,
+          message: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  // ====================
+  // Pipeline IPC Handlers
+  // ====================
+
+  let currentPipelineOrchestrator: ReturnType<typeof createBuildPipelineOrchestrator> | null = null;
+
+  /**
+   * Execute build pipeline
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.PIPELINE.EXECUTE,
+    async (_event, request: PipelineExecuteRequest): Promise<PipelineExecuteResponse> => {
+      logWithCategory('info', LogCategory.BUILD, 'IPC: Executing build pipeline', { configPath: request.configPath });
+
+      try {
+        // Create new pipeline orchestrator
+        currentPipelineOrchestrator = createBuildPipelineOrchestrator();
+
+        // Load configuration
+        await currentPipelineOrchestrator.loadConfig(request.configPath);
+
+        // Create progress throttler
+        const progressThrottler = new ProgressThrottler(10);
+
+        // Execute pipeline with progress tracking
+        const result = await currentPipelineOrchestrator.executePipeline(
+          request.options || {},
+          (progress) => {
+            progressThrottler.emit(progress, (throttledProgress) => {
+              if (mainWindow) {
+                mainWindow.webContents.send(IPC_CHANNELS.PIPELINE.PROGRESS, throttledProgress);
+              }
+            });
+          }
+        );
+
+        // Flush any pending progress
+        progressThrottler.flush((finalProgress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send(IPC_CHANNELS.PIPELINE.PROGRESS, finalProgress);
+          }
+        });
+
+        return {
+          success: result.success,
+          message: result.message,
+          result: {
+            phase: result.phase,
+            clonedRepositories: result.clonedRepositories,
+            builtRepositories: result.builtRepositories,
+            dockerImages: result.dockerImages,
+            verifiedArtifacts: result.verifiedArtifacts,
+            errors: result.errors,
+            duration: result.duration,
+          },
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.BUILD, 'Error executing build pipeline', error);
+        return {
+          success: false,
+          message: 'Pipeline execution failed',
+          error: error.message || String(error),
+        };
+      } finally {
+        currentPipelineOrchestrator = null;
+      }
+    }
+  );
+
+  /**
+   * Cancel ongoing pipeline operation
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.PIPELINE.CANCEL,
+    async (): Promise<PipelineCancelResponse> => {
+      logWithCategory('info', LogCategory.BUILD, 'IPC: Cancelling pipeline operation');
+
+      try {
+        if (currentPipelineOrchestrator) {
+          await currentPipelineOrchestrator.cancel();
+          return {
+            success: true,
+            message: 'Pipeline operation cancelled',
+          };
+        } else {
+          return {
+            success: false,
+            message: 'No active pipeline operation to cancel',
+          };
+        }
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.ERROR, 'Error cancelling pipeline operation', error);
+        return {
+          success: false,
+          message: error.message || String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * Get current pipeline status
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.PIPELINE.GET_STATUS,
+    async (): Promise<PipelineStatusResponse> => {
+      try {
+        if (currentPipelineOrchestrator) {
+          const phase = currentPipelineOrchestrator.getCurrentPhase();
+          return {
+            success: true,
+            phase,
+            message: `Pipeline is in ${phase} phase`,
+          };
+        } else {
+          return {
+            success: true,
+            phase: 'idle',
+            message: 'No active pipeline',
+          };
+        }
+      } catch (error: any) {
+        return {
+          success: false,
+          phase: 'error',
           message: error.message || String(error),
         };
       }

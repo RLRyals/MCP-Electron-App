@@ -745,7 +745,7 @@ async function saveClientSelection() {
 }
 
 /**
- * Step 5: Initialize Download & Setup
+ * Step 5: Initialize Build Pipeline
  */
 async function initializeDownloadStep() {
     const statusContainer = document.getElementById('download-status-container');
@@ -759,14 +759,14 @@ async function initializeDownloadStep() {
         progressTrackerUI.reset();
     }
 
-    // Check if downloads already completed
-    if (wizardState.data.downloads?.typingMindCompleted && wizardState.data.downloads?.dockerImagesCompleted) {
+    // Check if build already completed
+    if (wizardState.data.buildPipeline?.completed) {
         statusContainer.innerHTML = `
             <div class="alert success">
                 <span style="font-size: 1.5rem;">✓</span>
                 <div>
-                    <strong>Downloads Complete</strong><br>
-                    All components have been downloaded and prepared.
+                    <strong>Build Complete</strong><br>
+                    All components have been built and prepared.
                 </div>
             </div>
         `;
@@ -774,241 +774,149 @@ async function initializeDownloadStep() {
     }
 
     try {
-        // Get selected clients
+        // Get selected clients to determine which components to build
         const selection = await (window as any).electronAPI.clientSelection.getSelection();
-        const needsTypingMind = selection?.clients?.includes('typingmind');
+        const selectedComponents = ['core-system']; // Always include core system
 
-        const operations: Array<{id: string, type: OperationType, name: string}> = [];
-
-        // Build operation list
-        if (needsTypingMind) {
-            operations.push({
-                id: 'typingmind-download',
-                type: OperationType.DOWNLOAD,
-                name: 'Downloading Typing Mind'
-            });
+        // Add optional components based on client selection
+        if (selection?.clients?.includes('typingmind')) {
+            selectedComponents.push('typing-mind-component');
         }
 
-        operations.push({
-            id: 'docker-images-load',
-            type: OperationType.DOCKER_BUILD,
-            name: 'Loading Docker Images'
-        });
+        console.log('Starting build pipeline with components:', selectedComponents);
 
-        // Start operations
-        let completedCount = 0;
+        // Path to setup configuration
+        const configPath = './config/setup-config.json';
 
-        // Download Typing Mind if selected
-        if (needsTypingMind) {
-            const opId = 'typingmind-download';
+        // Map pipeline phases to operation types
+        const phaseToOperationType: Record<string, OperationType> = {
+            'cloning': OperationType.REPOSITORY_CLONE,
+            'building': OperationType.NPM_BUILD,
+            'docker': OperationType.DOCKER_BUILD,
+            'verifying': OperationType.CUSTOM_SCRIPT,
+        };
 
-            // Start operation
-            const startEvent: OperationStartEvent = {
-                operationId: opId,
-                operationType: OperationType.DOWNLOAD,
-                name: 'Downloading Typing Mind',
-                timestamp: new Date()
-            };
+        let currentOperationId: string | null = null;
+        const startTime = new Date();
 
-            progressTrackerUI.updateOperation({
-                operationId: opId,
-                operationType: OperationType.DOWNLOAD,
-                name: 'Downloading Typing Mind',
-                phase: ProgressPhase.IN_PROGRESS,
-                percent: 0,
-                message: 'Starting download...',
-                startTime: new Date()
-            });
+        // Listen for pipeline progress updates
+        (window as any).electronAPI.pipeline.onProgress((progress: any) => {
+            console.log('Pipeline progress:', progress);
 
-            progressTrackerUI.updateOverallProgress({
-                overallPercent: 0,
-                currentOperation: startEvent,
-                operations: [],
-                totalOperations: operations.length,
-                completedOperations: 0,
-                failedOperations: 0,
-                phase: ProgressPhase.IN_PROGRESS,
-                startTime: new Date()
-            });
+            const { phase, message, percent, currentOperation } = progress;
 
-            // Listen for progress updates
-            (window as any).electronAPI.typingMind.onProgress((progress: any) => {
-                console.log('Typing Mind progress:', progress);
+            // Determine operation type from phase
+            const operationType = phaseToOperationType[phase] || OperationType.CUSTOM_SCRIPT;
+
+            // Create or update operation
+            if (!currentOperationId || currentOperation !== currentOperationId) {
+                currentOperationId = `${phase}-${Date.now()}`;
 
                 progressTrackerUI?.updateOperation({
-                    operationId: opId,
-                    operationType: OperationType.DOWNLOAD,
-                    name: 'Downloading Typing Mind',
+                    operationId: currentOperationId,
+                    operationType,
+                    name: message || `Phase: ${phase}`,
                     phase: ProgressPhase.IN_PROGRESS,
-                    percent: progress.percent || 0,
-                    message: progress.message || 'Downloading...',
+                    percent: percent || 0,
+                    message: message || '',
                     startTime: new Date()
                 });
-
-                // Add console output
-                if (progress.message) {
-                    progressTrackerUI?.addConsoleOutput({
-                        operationId: opId,
-                        timestamp: new Date(),
-                        stream: 'stdout',
-                        content: progress.message
-                    });
-                }
-
-                // Update overall progress
-                const overallPercent = (completedCount / operations.length) * 100 +
-                                      ((progress.percent || 0) / operations.length);
-                progressTrackerUI?.updateOverallProgress({
-                    overallPercent: Math.round(overallPercent),
-                    currentOperation: startEvent,
-                    operations: [],
-                    totalOperations: operations.length,
-                    completedOperations: completedCount,
-                    failedOperations: 0,
+            } else {
+                progressTrackerUI?.updateOperation({
+                    operationId: currentOperationId,
+                    operationType,
+                    name: message || `Phase: ${phase}`,
                     phase: ProgressPhase.IN_PROGRESS,
+                    percent: percent || 0,
+                    message: message || '',
                     startTime: new Date()
                 });
-            });
-
-            const result = await (window as any).electronAPI.typingMind.download();
-
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to download Typing Mind');
             }
 
-            // Remove progress listener
-            (window as any).electronAPI.typingMind.removeProgressListener();
+            // Add console output
+            if (message) {
+                progressTrackerUI?.addConsoleOutput({
+                    operationId: currentOperationId,
+                    timestamp: new Date(),
+                    stream: 'stdout',
+                    content: message
+                });
+            }
 
-            // Complete operation
+            // Update overall progress
+            progressTrackerUI?.updateOverallProgress({
+                overallPercent: Math.round(percent || 0),
+                currentOperation: {
+                    operationId: currentOperationId,
+                    operationType,
+                    name: message || `Phase: ${phase}`,
+                    timestamp: new Date()
+                },
+                operations: [],
+                totalOperations: 4, // 4 phases: clone, build, docker, verify
+                completedOperations: Math.floor((percent || 0) / 25),
+                failedOperations: 0,
+                phase: ProgressPhase.IN_PROGRESS,
+                startTime
+            });
+        });
+
+        // Execute the build pipeline
+        const result = await (window as any).electronAPI.pipeline.execute(configPath, {
+            selectedComponents,
+            skipDocker: false,
+            skipVerification: false,
+            force: false
+        });
+
+        // Remove progress listener
+        (window as any).electronAPI.pipeline.removeProgressListener();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Build pipeline failed');
+        }
+
+        // Mark the final operation as complete
+        if (currentOperationId) {
             progressTrackerUI.updateOperation({
-                operationId: opId,
-                operationType: OperationType.DOWNLOAD,
-                name: 'Downloading Typing Mind',
+                operationId: currentOperationId,
+                operationType: OperationType.CUSTOM_SCRIPT,
+                name: 'Build pipeline complete',
                 phase: ProgressPhase.COMPLETE,
                 percent: 100,
-                message: 'Download complete',
-                startTime: new Date(),
+                message: 'All build steps completed successfully',
+                startTime,
                 endTime: new Date(),
                 success: true
             });
 
             progressTrackerUI.addConsoleOutput({
-                operationId: opId,
+                operationId: currentOperationId,
                 timestamp: new Date(),
                 stream: 'stdout',
-                content: 'Typing Mind download completed successfully'
+                content: `Pipeline completed in ${result.result?.duration || 0}ms`
             });
-
-            completedCount++;
         }
 
-        // Load Docker images
-        const dockerOpId = 'docker-images-load';
-
-        const dockerStartEvent: OperationStartEvent = {
-            operationId: dockerOpId,
-            operationType: OperationType.DOCKER_BUILD,
-            name: 'Loading Docker Images',
-            timestamp: new Date()
-        };
-
-        progressTrackerUI.updateOperation({
-            operationId: dockerOpId,
-            operationType: OperationType.DOCKER_BUILD,
-            name: 'Loading Docker Images',
-            phase: ProgressPhase.IN_PROGRESS,
-            percent: 0,
-            message: 'Starting Docker image load...',
-            startTime: new Date()
-        });
-
-        // Listen for progress updates
-        (window as any).electronAPI.dockerImages.onProgress((progress: any) => {
-            console.log('Docker images progress:', progress);
-
-            progressTrackerUI?.updateOperation({
-                operationId: dockerOpId,
-                operationType: OperationType.DOCKER_BUILD,
-                name: 'Loading Docker Images',
-                phase: ProgressPhase.IN_PROGRESS,
-                percent: progress.percent || 0,
-                message: progress.message || 'Loading images...',
-                startTime: new Date()
-            });
-
-            // Add console output
-            if (progress.message) {
-                progressTrackerUI?.addConsoleOutput({
-                    operationId: dockerOpId,
-                    timestamp: new Date(),
-                    stream: 'stdout',
-                    content: progress.message
-                });
-            }
-
-            // Update overall progress
-            const overallPercent = (completedCount / operations.length) * 100 +
-                                  ((progress.percent || 0) / operations.length);
-            progressTrackerUI?.updateOverallProgress({
-                overallPercent: Math.round(overallPercent),
-                currentOperation: dockerStartEvent,
-                operations: [],
-                totalOperations: operations.length,
-                completedOperations: completedCount,
-                failedOperations: 0,
-                phase: ProgressPhase.IN_PROGRESS,
-                startTime: new Date()
-            });
-        });
-
-        const imagesResult = await (window as any).electronAPI.dockerImages.loadAll();
-
-        // Remove progress listener
-        (window as any).electronAPI.dockerImages.removeProgressListener();
-
-        if (!imagesResult.success) {
-            throw new Error('Failed to load Docker images');
-        }
-
-        // Complete Docker operation
-        progressTrackerUI.updateOperation({
-            operationId: dockerOpId,
-            operationType: OperationType.DOCKER_BUILD,
-            name: 'Loading Docker Images',
-            phase: ProgressPhase.COMPLETE,
-            percent: 100,
-            message: 'Docker images loaded successfully',
-            startTime: new Date(),
-            endTime: new Date(),
-            success: true
-        });
-
-        progressTrackerUI.addConsoleOutput({
-            operationId: dockerOpId,
-            timestamp: new Date(),
-            stream: 'stdout',
-            content: 'Docker images loaded successfully'
-        });
-
-        completedCount++;
-
-        // All downloads complete
         // Update overall progress to 100%
         progressTrackerUI.updateOverallProgress({
             overallPercent: 100,
             operations: [],
-            totalOperations: operations.length,
-            completedOperations: completedCount,
+            totalOperations: 4,
+            completedOperations: 4,
             failedOperations: 0,
             phase: ProgressPhase.COMPLETE,
-            startTime: new Date()
+            startTime
         });
 
         // Save wizard state
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
-            downloads: {
-                typingMindCompleted: true,
-                dockerImagesCompleted: true
+            buildPipeline: {
+                completed: true,
+                clonedRepositories: result.result?.clonedRepositories || [],
+                builtRepositories: result.result?.builtRepositories || [],
+                dockerImages: result.result?.dockerImages || [],
+                verifiedArtifacts: result.result?.verifiedArtifacts || []
             }
         });
 
@@ -1016,19 +924,19 @@ async function initializeDownloadStep() {
             <div class="alert success" style="background: rgba(76, 175, 80, 0.2); border: 2px solid rgba(76, 175, 80, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">✓</span>
                 <div>
-                    <strong>All Operations Complete</strong><br>
-                    All components have been downloaded and prepared successfully.
+                    <strong>Build Pipeline Complete</strong><br>
+                    All components have been built and prepared successfully.
                 </div>
             </div>
         `;
 
     } catch (error) {
-        console.error('Error during downloads:', error);
+        console.error('Error during build pipeline:', error);
 
         // Show error in the progress tracker UI
         if (progressTrackerUI) {
             const errorEvent: ErrorEvent = {
-                operationId: 'download-error',
+                operationId: 'pipeline-error',
                 timestamp: new Date(),
                 message: error instanceof Error ? error.message : String(error),
                 error: error instanceof Error ? error : String(error),
