@@ -162,10 +162,20 @@ export class BuildPipelineOrchestrator {
    */
   async loadConfig(configPath: string): Promise<void> {
     try {
+      console.log(`Loading configuration from: ${configPath}`);
+
+      // Check if file exists
+      if (!await fs.pathExists(configPath)) {
+        throw new Error(`Configuration file not found at path: ${configPath}`);
+      }
+
       const configData = await fs.readFile(configPath, 'utf-8');
       this.config = JSON.parse(configData);
+      console.log('Configuration loaded successfully');
     } catch (error) {
-      throw new Error(`Failed to load configuration: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to load configuration: ${message}`);
+      throw new Error(`Failed to load configuration from ${configPath}: ${message}`);
     }
   }
 

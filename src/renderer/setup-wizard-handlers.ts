@@ -1005,7 +1005,9 @@ async function initializeDownloadStep() {
         (window as any).electronAPI.pipeline.removeProgressListener();
 
         if (!result.success) {
-            throw new Error(result.error || 'Build pipeline failed');
+            const errorMsg = result.error || result.message || 'Build pipeline failed';
+            console.error('Pipeline failed with error:', errorMsg);
+            throw new Error(errorMsg);
         }
 
         // Mark the final operation as complete
@@ -1064,14 +1066,16 @@ async function initializeDownloadStep() {
 
     } catch (error) {
         console.error('Error during build pipeline:', error);
+        console.error('Full error details:', error instanceof Error ? { message: error.message, stack: error.stack } : error);
 
         // Show error in the progress tracker UI
         if (progressTrackerUI) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             const errorEvent = {
                 operationId: 'pipeline-error',
                 timestamp: new Date(),
-                message: error instanceof Error ? error.message : String(error),
-                errorMessage: error instanceof Error ? error.message : String(error),
+                message: errorMessage,
+                errorMessage: errorMessage,
                 error: error instanceof Error ? error : String(error),
                 recoverable: true,
                 retryAction: 'Click Retry to try again'
@@ -1082,22 +1086,26 @@ async function initializeDownloadStep() {
                 operationId: 'download-error',
                 timestamp: new Date(),
                 stream: 'stderr',
-                content: `ERROR: ${error instanceof Error ? error.message : String(error)}`
+                content: `ERROR: ${errorMessage}`
             });
         }
 
+        const errorMsg = error instanceof Error ? error.message : String(error);
         statusContainer.innerHTML = `
             <div class="alert error" style="background: rgba(244, 67, 54, 0.2); border: 2px solid rgba(244, 67, 54, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">⚠️</span>
                 <div>
-                    <strong>Download Failed</strong><br>
-                    ${error instanceof Error ? error.message : String(error)}
+                    <strong>Build Pipeline Failed</strong><br>
+                    <code style="display: block; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 0.9rem; word-break: break-word;">${escapeHtml(errorMsg)}</code>
                     <div style="margin-top: 12px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
-                        <strong>Suggested Actions:</strong>
+                        <strong>Troubleshooting Steps:</strong>
                         <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Check your internet connection</li>
-                            <li>Ensure Docker is running</li>
-                            <li>Try again - the system will automatically retry failed operations</li>
+                            <li><strong>Check Docker:</strong> Ensure Docker Desktop is running</li>
+                            <li><strong>Network:</strong> Verify your internet connection and ability to reach GitHub</li>
+                            <li><strong>Disk Space:</strong> Ensure you have enough free disk space (at least 10GB recommended)</li>
+                            <li><strong>Git:</strong> Verify Git is installed and configured</li>
+                            <li><strong>Permissions:</strong> Check that you have read/write permissions in the installation directory</li>
+                            <li><strong>Logs:</strong> Check the application logs for more detailed error information</li>
                         </ul>
                     </div>
                 </div>

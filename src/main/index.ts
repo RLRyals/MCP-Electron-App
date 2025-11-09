@@ -1465,11 +1465,19 @@ function setupIPC(): void {
           },
         };
       } catch (error: any) {
-        logWithCategory('error', LogCategory.GENERAL, 'Error executing build pipeline', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '';
+        logWithCategory('error', LogCategory.GENERAL, 'Error executing build pipeline', { message: errorMessage, stack: errorStack });
+
+        // Log additional context
+        if (error.code) {
+          logWithCategory('error', LogCategory.GENERAL, `Error code: ${error.code}`);
+        }
+
         return {
           success: false,
-          message: 'Pipeline execution failed',
-          error: error.message || String(error),
+          message: 'Build pipeline execution failed',
+          error: errorMessage,
         };
       } finally {
         currentPipelineOrchestrator = null;
