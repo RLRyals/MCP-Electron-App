@@ -416,7 +416,7 @@ async function buildMCPServersImage(progressCallback?: ProgressCallback): Promis
 
     // Build the image
     const { stdout, stderr } = await execAsync(
-      'docker build -t mcp-servers:latest -t mcp-servers:backup .',
+      'docker build -t mcp-writing-servers:latest -t mcp-writing-servers:backup .',
       { cwd: repoDir, timeout: 300000 } // 5 minute timeout
     );
 
@@ -441,12 +441,12 @@ async function backupCurrentImage(): Promise<void> {
     logWithCategory('info', LogCategory.SYSTEM, 'Creating backup of current image...');
 
     // Check if current image exists
-    const { stdout } = await execAsync('docker images -q mcp-servers:latest');
+    const { stdout } = await execAsync('docker images -q mcp-writing-servers:latest');
 
     if (stdout.trim()) {
       // Tag current latest as backup
-      await execAsync('docker tag mcp-servers:latest mcp-servers:backup');
-      logWithCategory('info', LogCategory.SYSTEM, 'Backup created: mcp-servers:backup');
+      await execAsync('docker tag mcp-writing-servers:latest mcp-writing-servers:backup');
+      logWithCategory('info', LogCategory.SYSTEM, 'Backup created: mcp-writing-servers:backup');
     } else {
       logWithCategory('info', LogCategory.SYSTEM, 'No existing image to backup');
     }
@@ -465,11 +465,11 @@ async function rollbackToBackup(): Promise<void> {
     logWithCategory('info', LogCategory.SYSTEM, 'Rolling back to backup image...');
 
     // Check if backup exists
-    const { stdout } = await execAsync('docker images -q mcp-servers:backup');
+    const { stdout } = await execAsync('docker images -q mcp-writing-servers:backup');
 
     if (stdout.trim()) {
       // Tag backup as latest
-      await execAsync('docker tag mcp-servers:backup mcp-servers:latest');
+      await execAsync('docker tag mcp-writing-servers:backup mcp-writing-servers:latest');
       logWithCategory('info', LogCategory.SYSTEM, 'Rollback successful');
     } else {
       logWithCategory('warn', LogCategory.SYSTEM, 'No backup image found for rollback');

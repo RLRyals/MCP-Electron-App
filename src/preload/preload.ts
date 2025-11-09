@@ -1077,7 +1077,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * Get service logs
      */
     getLogs: (
-      serviceName: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind',
+      serviceName: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind',
       tail?: number
     ): Promise<ServiceLogsResult> => {
       return ipcRenderer.invoke('mcp-system:logs', serviceName, tail);

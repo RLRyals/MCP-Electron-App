@@ -81,10 +81,10 @@ const BUNDLED_IMAGES: Array<Omit<DockerImageInfo, 'exists'>> = [
     size: 150 * 1024 * 1024, // ~150MB
   },
   {
-    name: 'mcp-servers',
+    name: 'mcp-writing-servers',
     tag: 'latest',
-    fullName: 'mcp-servers:latest',
-    fileName: 'mcp-servers.tar.gz',
+    fullName: 'mcp-writing-servers:latest',
+    fileName: 'mcp-writing-servers.tar.gz',
     size: 200 * 1024 * 1024, // ~200MB
   },
 ];

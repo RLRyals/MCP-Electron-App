@@ -243,7 +243,7 @@ function updatePostgreSQLCard(status: MCPSystemStatus, config: EnvConfig): void 
  * Update MCP Servers service card
  */
 function updateMCPServersCard(status: MCPSystemStatus): void {
-  const container = status.containers.find(c => c.name.includes('mcp-servers'));
+  const container = status.containers.find(c => c.name.includes('mcp-writing-system'));
 
   const statusIcon = document.getElementById('mcp-servers-status-icon');
   const statusText = document.getElementById('mcp-servers-status-text');
@@ -536,9 +536,9 @@ async function handleOpenTypingMind(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind' } = {
       'postgres': 'postgres',
-      'mcp-servers': 'mcp-servers',
+      'mcp-servers': 'mcp-writing-system',
       'mcp-connector': 'mcp-connector',
       'typing-mind': 'typing-mind',
     };
