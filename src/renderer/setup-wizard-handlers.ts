@@ -371,6 +371,7 @@ async function checkPrerequisites() {
                     ${error instanceof Error ? error.message : String(error)}
                 </div>
             </div>
+            ${createRetryButton('retry-prereq-check-btn', checkPrerequisites, 'Check Again')}
         `;
     }
 }
@@ -745,6 +746,27 @@ async function saveClientSelection() {
 }
 
 /**
+ * Create retry button HTML
+ */
+function createRetryButton(buttonId: string, stepFunction: () => void, buttonText: string = 'Retry'): string {
+    // Schedule event listener attachment
+    setTimeout(() => {
+        const retryBtn = document.getElementById(buttonId);
+        if (retryBtn) {
+            retryBtn.addEventListener('click', stepFunction);
+        }
+    }, 0);
+
+    return `
+        <div style="margin-top: 20px; text-align: center;">
+            <button class="wizard-btn primary" id="${buttonId}" style="padding: 12px 24px; font-size: 1rem;">
+                <span style="margin-right: 8px;">↻</span> ${buttonText}
+            </button>
+        </div>
+    `;
+}
+
+/**
  * Step 5: Initialize Download & Setup
  */
 async function initializeDownloadStep() {
@@ -1051,8 +1073,17 @@ async function initializeDownloadStep() {
                 <div>
                     <strong>Download Failed</strong><br>
                     ${error instanceof Error ? error.message : String(error)}
+                    <div style="margin-top: 12px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                        <strong>Suggested Actions:</strong>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Check your internet connection</li>
+                            <li>Ensure Docker is running</li>
+                            <li>Try again - the system will automatically retry failed operations</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
+            ${createRetryButton('retry-download-btn', initializeDownloadStep, 'Retry Download')}
         `;
 
         // Listen for retry event
@@ -1139,18 +1170,19 @@ async function initializeSystemStartupStep() {
                 <div>
                     <strong>Startup Failed</strong><br>
                     ${error instanceof Error ? error.message : String(error)}
+                    <div style="margin-top: 12px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                        <strong>Suggested Actions:</strong>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Ensure Docker is running</li>
+                            <li>Check that all required ports are available</li>
+                            <li>Verify Docker containers can start</li>
+                            <li>Retry - the system will attempt to recover automatically</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-            <div style="margin-top: 20px;">
-                <button class="wizard-btn" id="retry-startup-btn">Retry Startup</button>
-            </div>
+            ${createRetryButton('retry-startup-btn', initializeSystemStartupStep, 'Retry Startup')}
         `;
-
-        // Attach retry button listener
-        const retryBtn = document.getElementById('retry-startup-btn');
-        if (retryBtn) {
-            retryBtn.addEventListener('click', initializeSystemStartupStep);
-        }
     }
 }
 
