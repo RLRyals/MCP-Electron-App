@@ -125,7 +125,7 @@ services:
       - mcp-network
     restart: unless-stopped
 
-   mcp-servers:
+  mcp-servers:
     build:
       context: ..
       dockerfile: docker/Dockerfile.mcp-connector
