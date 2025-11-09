@@ -72,9 +72,16 @@
       "workingDir": ".",
       "continueOnError": true,
       "timeout": 600
-    },
+    }
   ],
-  "dockerImages": {},
+  "dockerImages": {
+    "mcp-writing-servers": {
+      "repository": "mcp-servers",
+      "tag": "latest",
+      "buildContextPath": ".",
+      "dockerfilePath": "Dockerfile"
+    }
+  },
   "components": [
     {
       "id": "core-system",

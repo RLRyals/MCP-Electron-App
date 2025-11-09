@@ -126,33 +126,30 @@ services:
       - mcp-network
     restart: unless-stopped
 
-  # mcp-servers service commented out - not implemented yet
-  # Will be added in a future release when Docker images are ready
-  # mcp-servers:
-  #   image: mcp-servers:latest
-  #   container_name: mcp-servers
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   environment:
-  #     DATABASE_URL: postgres://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@postgres:5432/${config.POSTGRES_DB}
-  #   volumes:
-  #     - mcp-data:/data
-  #   networks:
-  #     - mcp-network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "echo 'healthy'"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
+  mcp-servers:
+    image: mcp-servers:latest
+    container_name: mcp-servers
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@postgres:5432/${config.POSTGRES_DB}
+    volumes:
+      - mcp-data:/data
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'healthy'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres-data:
     name: mcp-postgres-data
-  # mcp-data volume commented out until mcp-servers service is implemented
-  # mcp-data:
-  #   name: mcp-data
+  mcp-data:
+    name: mcp-data
 
 networks:
   mcp-network:
