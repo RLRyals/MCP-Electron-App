@@ -5,79 +5,78 @@
   "baseClonePath": "./repositories",
   "repositories": [
     {
-      "id": "mcp-electron-app",
-      "name": "MCP Electron App",
-      "url": "https://github.com/RLRyals/MCP-Electron-App.git",
-      "clonePath": "mcp-electron-app",
+      "id": "mcp-writing-servers",
+      "name": "MCP Writing Servers",
+      "url": "https://github.com/RLRyals/MCP-Writing-Servers.git",
+      "clonePath": "mcp-writing-servers",
       "branch": "main",
       "optional": false,
-      "description": "Main Electron application for MCP integration"
+      "description": "MCP servers for writing and text processing"
     },
     {
-      "id": "mcp-server-template",
-      "name": "MCP Server Template",
-      "url": "https://github.com/anthropics/mcp-server-template.git",
-      "clonePath": "mcp-server-template",
+      "id": "typingmind-mcp",
+      "name": "Typing Mind MCP Connector",
+      "url": "https://github.com/typingMind/typingmind-mcp.git",
+      "clonePath": "typingmind-mcp",
       "branch": "main",
       "optional": false,
-      "description": "Template repository for creating MCP servers"
+      "description": "MCP connector for Typing Mind integration"
     },
     {
       "id": "typing-mind",
-      "name": "Typing Mind",
-      "url": "https://github.com/RLRyals/typing-mind.git",
+      "name": "Typing Mind UI",
+      "url": "https://github.com/typingMind/typingmind.git",
       "clonePath": "typing-mind",
       "branch": "main",
       "optional": true,
-      "description": "Optional Typing Mind component"
+      "description": "Typing Mind web-based UI component"
     }
   ],
   "buildOrder": {
     "order": [
-      "mcp-server-template",
-      "mcp-electron-app",
+      "mcp-writing-servers",
+      "typingmind-mcp",
       "typing-mind"
     ],
     "dependencies": {
-      "mcp-electron-app": [
-        "mcp-server-template"
-      ],
+      "mcp-writing-servers": [],
+      "typingmind-mcp": ["mcp-writing-servers"],
       "typing-mind": []
     },
     "allowParallel": false
   },
   "buildSteps": [
     {
-      "id": "mcp-template-install",
-      "name": "MCP Template - Install Dependencies",
-      "repositoryId": "mcp-server-template",
-      "command": "npm install",
-      "workingDir": ".",
-      "continueOnError": false,
-      "timeout": 300
-    },
-    {
-      "id": "mcp-template-build",
-      "name": "MCP Template - Build",
-      "repositoryId": "mcp-server-template",
-      "command": "npm run build",
-      "workingDir": ".",
-      "continueOnError": false,
-      "timeout": 300
-    },
-    {
-      "id": "electron-app-install",
-      "name": "Electron App - Install Dependencies",
-      "repositoryId": "mcp-electron-app",
+      "id": "mcp-writing-servers-install",
+      "name": "MCP Writing Servers - Install Dependencies",
+      "repositoryId": "mcp-writing-servers",
       "command": "npm install",
       "workingDir": ".",
       "continueOnError": false,
       "timeout": 600
     },
     {
-      "id": "electron-app-build",
-      "name": "Electron App - Build",
-      "repositoryId": "mcp-electron-app",
+      "id": "mcp-writing-servers-build",
+      "name": "MCP Writing Servers - Build",
+      "repositoryId": "mcp-writing-servers",
+      "command": "npm run build",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 600
+    },
+    {
+      "id": "typingmind-mcp-install",
+      "name": "Typing Mind MCP - Install Dependencies",
+      "repositoryId": "typingmind-mcp",
+      "command": "npm install",
+      "workingDir": ".",
+      "continueOnError": false,
+      "timeout": 600
+    },
+    {
+      "id": "typingmind-mcp-build",
+      "name": "Typing Mind MCP - Build",
+      "repositoryId": "typingmind-mcp",
       "command": "npm run build",
       "workingDir": ".",
       "continueOnError": false,
@@ -85,43 +84,39 @@
     },
     {
       "id": "typing-mind-install",
-      "name": "Typing Mind - Install Dependencies",
+      "name": "Typing Mind UI - Install Dependencies",
       "repositoryId": "typing-mind",
       "command": "npm install",
       "workingDir": ".",
       "continueOnError": true,
-      "timeout": 300
+      "timeout": 600
+    },
+    {
+      "id": "typing-mind-build",
+      "name": "Typing Mind UI - Build",
+      "repositoryId": "typing-mind",
+      "command": "npm run build",
+      "workingDir": ".",
+      "continueOnError": true,
+      "timeout": 600
     }
   ],
-  "dockerImages": {
-    "mcp-electron-app": {
-      "repository": "mcp-electron-app",
-      "tag": "latest",
-      "buildContextPath": ".",
-      "dockerfilePath": "Dockerfile"
-    },
-    "mcp-server-template": {
-      "repository": "mcp-server",
-      "tag": "latest",
-      "buildContextPath": ".",
-      "dockerfilePath": "Dockerfile"
-    }
-  },
+  "dockerImages": {},
   "components": [
     {
       "id": "core-system",
       "name": "Core System",
-      "description": "Core MCP Electron application and required dependencies",
+      "description": "Core MCP system including Writing Servers and MCP Connector",
       "enabled": true,
       "repositoryIds": [
-        "mcp-server-template",
-        "mcp-electron-app"
+        "mcp-writing-servers",
+        "typingmind-mcp"
       ]
     },
     {
       "id": "typing-mind-component",
       "name": "Typing Mind Integration",
-      "description": "Optional Typing Mind integration component",
+      "description": "Optional Typing Mind UI component",
       "enabled": false,
       "repositoryIds": [
         "typing-mind"
