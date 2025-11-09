@@ -56,30 +56,12 @@
       "timeout": 600
     },
     {
-      "id": "mcp-writing-servers-build",
-      "name": "MCP Writing Servers - Build",
-      "repositoryId": "mcp-writing-servers",
-      "command": "npm run build",
-      "workingDir": ".",
-      "continueOnError": true,
-      "timeout": 600
-    },
-    {
       "id": "typingmind-mcp-install",
       "name": "Typing Mind MCP - Install Dependencies",
       "repositoryId": "typingmind-mcp",
       "command": "npm install",
       "workingDir": ".",
       "continueOnError": false,
-      "timeout": 600
-    },
-    {
-      "id": "typingmind-mcp-build",
-      "name": "Typing Mind MCP - Build",
-      "repositoryId": "typingmind-mcp",
-      "command": "npm run build",
-      "workingDir": ".",
-      "continueOnError": true,
       "timeout": 600
     },
     {
