@@ -834,12 +834,14 @@ async function initializeDownloadStep() {
         return;
     }
 
-    // If downloads are complete but build pipeline is not marked complete, show warning
+    // If Typing Mind downloads are complete but build pipeline is not marked complete, show warning
     // This indicates a potential inconsistency in the state
-    if (wizardState.data.downloads?.typingMindCompleted &&
-        wizardState.data.downloads?.dockerImagesCompleted &&
+    // Note: We only check typingMindCompleted since Docker images aren't used yet
+    const needsTypingMind = wizardState.data.clients?.includes('typingmind');
+    if (needsTypingMind &&
+        wizardState.data.downloads?.typingMindCompleted &&
         !wizardState.data.buildPipeline?.completed) {
-        console.log('WARNING: downloads complete but build pipeline not marked complete - inconsistent state');
+        console.log('WARNING: Typing Mind complete but build pipeline not marked complete - inconsistent state');
         statusContainer.innerHTML = `
             <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">⚠️</span>
@@ -855,12 +857,13 @@ async function initializeDownloadStep() {
 
     // Initialize the downloads object at the start of the build process if it doesn't exist
     // This allows the validation to pass while the build is in progress
+    // Note: dockerImagesCompleted is set to true since Docker images aren't used yet
     if (!wizardState.data.downloads) {
         console.log('Initializing downloads state object...');
         const initResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             downloads: {
                 typingMindCompleted: false,
-                dockerImagesCompleted: false
+                dockerImagesCompleted: true  // Set to true since Docker images aren't used yet
             }
         });
 

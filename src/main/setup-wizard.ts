@@ -406,6 +406,7 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
         };
       }
 
+      // Only check for Typing Mind if it was selected
       if (needsTypingMind && !state.data.downloads.typingMindCompleted) {
         logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Typing mind needed but not completed`);
         return {
@@ -413,13 +414,16 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
           reason: 'Typing Mind download is still in progress. Please wait for it to complete.'
         };
       }
-      if (!state.data.downloads.dockerImagesCompleted) {
-        logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Docker images not completed`);
-        return {
-          canProceed: false,
-          reason: 'Docker images are still being loaded. Please wait for this to complete.'
-        };
-      }
+
+      // Docker images are optional (future consideration) - skip validation for now
+      // if (!state.data.downloads.dockerImagesCompleted) {
+      //   logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Docker images not completed`);
+      //   return {
+      //     canProceed: false,
+      //     reason: 'Docker images are still being loaded. Please wait for this to complete.'
+      //   };
+      // }
+
       logWithCategory('debug', LogCategory.SYSTEM, `DOWNLOAD_SETUP validation passed`);
       return { canProceed: true };
 
