@@ -681,23 +681,87 @@
 
             <!-- Step 5: Download & Setup -->
             <div class="wizard-step-content" id="step-5" data-step="5">
-                <h2 style="margin-bottom: 20px;">Downloading Components</h2>
+                <h2 style="margin-bottom: 20px;">Build & Setup Progress</h2>
                 <p style="opacity: 0.9; margin-bottom: 30px;">
-                    Downloading and preparing required components. This may take several minutes depending
-                    on your internet connection.
+                    Building and preparing required components. This may take several minutes.
                 </p>
 
+                <!-- Overall Progress Section -->
+                <div class="progress-section" style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0; font-size: 1.1rem;">Overall Progress</h3>
+                        <span id="overall-progress-percent" style="font-size: 1.5rem; font-weight: 600;">0%</span>
+                    </div>
+                    <div class="operation-progress-bar" style="height: 12px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; overflow: hidden;">
+                        <div class="operation-progress-fill" id="overall-progress-fill" style="height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); transition: width 0.5s ease; width: 0%;"></div>
+                    </div>
+                    <div id="current-operation-info" style="margin-top: 15px; padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span id="operation-type-badge" style="padding: 4px 12px; background: rgba(102, 126, 234, 0.3); border-radius: 4px; font-size: 0.85rem; font-weight: 500;">Initializing</span>
+                            <span id="current-operation-message" style="flex: 1; font-size: 0.95rem;">Preparing to start...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Build Steps List -->
+                <div class="progress-section" style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 15px 0; font-size: 1.1rem;">Build Steps</h3>
+                    <div id="build-steps-list" style="max-height: 250px; overflow-y: auto;">
+                        <!-- Build steps will be dynamically added here -->
+                        <div style="text-align: center; opacity: 0.7; padding: 20px;">
+                            No operations started yet
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Output Panel -->
+                <div class="progress-section" style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; font-size: 1.1rem;">Console Output</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="wizard-btn secondary" id="clear-console-btn" style="padding: 6px 15px; font-size: 0.85rem;">Clear</button>
+                            <button class="wizard-btn secondary" id="export-logs-btn" style="padding: 6px 15px; font-size: 0.85rem;">Export Logs</button>
+                        </div>
+                    </div>
+                    <div id="console-output" style="
+                        background: rgba(0, 0, 0, 0.4);
+                        border-radius: 8px;
+                        padding: 15px;
+                        font-family: 'Courier New', monospace;
+                        font-size: 0.85rem;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        color: #e0e0e0;
+                    ">
+                        <div style="opacity: 0.6;">Console output will appear here...</div>
+                    </div>
+                </div>
+
+                <!-- Error Display (hidden by default) -->
+                <div id="error-display" style="display: none; background: rgba(244, 67, 54, 0.2); border: 2px solid rgba(244, 67, 54, 0.5); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: flex-start; gap: 15px;">
+                        <span style="font-size: 2rem;">⚠️</span>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0 0 10px 0; color: #ffcdd2;">Operation Failed</h3>
+                            <p id="error-message" style="margin: 0 0 15px 0; font-size: 0.95rem;"></p>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="wizard-btn" id="retry-operation-btn" style="padding: 8px 20px;">Retry</button>
+                                <button class="wizard-btn secondary" id="skip-operation-btn" style="padding: 8px 20px;">Skip</button>
+                                <button class="wizard-btn secondary" id="cancel-all-btn" style="padding: 8px 20px;">Cancel All</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Container for Completion Messages -->
                 <div id="download-status-container"></div>
 
-                <div class="operation-progress" id="download-progress">
+                <!-- Hidden legacy progress (for compatibility) -->
+                <div class="operation-progress" id="download-progress" style="display: none;">
                     <div class="operation-progress-bar">
                         <div class="operation-progress-fill" id="download-progress-fill"></div>
                     </div>
                     <div class="operation-message" id="download-progress-message">Initializing...</div>
-                </div>
-
-                <div id="download-details" style="margin-top: 20px;">
-                    <!-- Download details will be shown here -->
                 </div>
             </div>
 

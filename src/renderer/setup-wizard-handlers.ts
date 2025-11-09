@@ -3,6 +3,14 @@
  * Orchestrates the entire first-run setup wizard flow
  */
 
+import { ProgressTrackerUI } from './progress-tracker';
+import {
+  ProgressPhase,
+  OperationType,
+  ErrorEvent,
+  OperationStartEvent,
+} from '../types/progress';
+
 // Wizard state
 let currentStep = 1;
 let wizardState: any = null;
@@ -14,6 +22,9 @@ let environmentValid = false;
 let clientsSelected = false;
 let downloadsComplete = false;
 let systemStarted = false;
+
+// Progress tracker UI instance
+let progressTrackerUI: ProgressTrackerUI | null = null;
 
 /**
  * Initialize the wizard on page load
@@ -753,11 +764,15 @@ async function saveClientSelection() {
  */
 async function initializeDownloadStep() {
     const statusContainer = document.getElementById('download-status-container');
-    const progressEl = document.getElementById('download-progress');
-    const progressFill = document.getElementById('download-progress-fill') as HTMLElement;
-    const progressMessage = document.getElementById('download-progress-message');
 
-    if (!statusContainer || !progressEl || !progressFill || !progressMessage) return;
+    if (!statusContainer) return;
+
+    // Initialize progress tracker UI
+    if (!progressTrackerUI) {
+        progressTrackerUI = new ProgressTrackerUI();
+    } else {
+        progressTrackerUI.reset();
+    }
 
     // Check if downloads already completed
     if (wizardState.data.downloads?.typingMindCompleted && wizardState.data.downloads?.dockerImagesCompleted) {
@@ -771,7 +786,6 @@ async function initializeDownloadStep() {
                 </div>
             </div>
         `;
-        progressEl.classList.remove('show');
         return;
     }
 
@@ -780,17 +794,96 @@ async function initializeDownloadStep() {
         const selection = await (window as any).electronAPI.clientSelection.getSelection();
         const needsTypingMind = selection?.clients?.includes('typingmind');
 
-        progressEl.classList.add('show');
+        const operations: Array<{id: string, type: OperationType, name: string}> = [];
+
+        // Build operation list
+        if (needsTypingMind) {
+            operations.push({
+                id: 'typingmind-download',
+                type: OperationType.DOWNLOAD,
+                name: 'Downloading Typing Mind'
+            });
+        }
+
+        operations.push({
+            id: 'docker-images-load',
+            type: OperationType.DOCKER_BUILD,
+            name: 'Loading Docker Images'
+        });
+
+        // Start operations
+        let completedCount = 0;
 
         // Download Typing Mind if selected
         if (needsTypingMind) {
-            progressMessage.textContent = 'Downloading Typing Mind...';
+            const opId = 'typingmind-download';
+
+            // Start operation
+            const startEvent: OperationStartEvent = {
+                operationId: opId,
+                operationType: OperationType.DOWNLOAD,
+                name: 'Downloading Typing Mind',
+                timestamp: new Date()
+            };
+
+            progressTrackerUI.updateOperation({
+                operationId: opId,
+                operationType: OperationType.DOWNLOAD,
+                name: 'Downloading Typing Mind',
+                phase: ProgressPhase.IN_PROGRESS,
+                percent: 0,
+                message: 'Starting download...',
+                startTime: new Date()
+            });
+
+            progressTrackerUI.updateOverallProgress({
+                overallPercent: 0,
+                currentOperation: startEvent,
+                operations: [],
+                totalOperations: operations.length,
+                completedOperations: 0,
+                failedOperations: 0,
+                phase: ProgressPhase.IN_PROGRESS,
+                startTime: new Date()
+            });
 
             // Listen for progress updates
             (window as any).electronAPI.typingMind.onProgress((progress: any) => {
                 console.log('Typing Mind progress:', progress);
-                progressFill.style.width = `${progress.percent}%`;
-                progressMessage.textContent = progress.message;
+
+                progressTrackerUI?.updateOperation({
+                    operationId: opId,
+                    operationType: OperationType.DOWNLOAD,
+                    name: 'Downloading Typing Mind',
+                    phase: ProgressPhase.IN_PROGRESS,
+                    percent: progress.percent || 0,
+                    message: progress.message || 'Downloading...',
+                    startTime: new Date()
+                });
+
+                // Add console output
+                if (progress.message) {
+                    progressTrackerUI?.addConsoleOutput({
+                        operationId: opId,
+                        timestamp: new Date(),
+                        stream: 'stdout',
+                        content: progress.message
+                    });
+                }
+
+                // Update overall progress
+                const overallPercent = (completedCount / operations.length) * 100 +
+                                      ((progress.percent || 0) / operations.length);
+                progressTrackerUI?.updateOverallProgress({
+                    overallPercent: Math.round(overallPercent),
+                    currentOperation: startEvent,
+                    operations: [],
+                    totalOperations: operations.length,
+                    completedOperations: completedCount,
+                    failedOperations: 0,
+                    phase: ProgressPhase.IN_PROGRESS,
+                    startTime: new Date()
+                });
             });
 
             const result = await (window as any).electronAPI.typingMind.download();
@@ -801,16 +894,87 @@ async function initializeDownloadStep() {
 
             // Remove progress listener
             (window as any).electronAPI.typingMind.removeProgressListener();
+
+            // Complete operation
+            progressTrackerUI.updateOperation({
+                operationId: opId,
+                operationType: OperationType.DOWNLOAD,
+                name: 'Downloading Typing Mind',
+                phase: ProgressPhase.COMPLETE,
+                percent: 100,
+                message: 'Download complete',
+                startTime: new Date(),
+                endTime: new Date(),
+                success: true
+            });
+
+            progressTrackerUI.addConsoleOutput({
+                operationId: opId,
+                timestamp: new Date(),
+                stream: 'stdout',
+                content: 'Typing Mind download completed successfully'
+            });
+
+            completedCount++;
         }
 
         // Load Docker images
-        progressMessage.textContent = 'Loading Docker images...';
+        const dockerOpId = 'docker-images-load';
+
+        const dockerStartEvent: OperationStartEvent = {
+            operationId: dockerOpId,
+            operationType: OperationType.DOCKER_BUILD,
+            name: 'Loading Docker Images',
+            timestamp: new Date()
+        };
+
+        progressTrackerUI.updateOperation({
+            operationId: dockerOpId,
+            operationType: OperationType.DOCKER_BUILD,
+            name: 'Loading Docker Images',
+            phase: ProgressPhase.IN_PROGRESS,
+            percent: 0,
+            message: 'Starting Docker image load...',
+            startTime: new Date()
+        });
 
         // Listen for progress updates
         (window as any).electronAPI.dockerImages.onProgress((progress: any) => {
             console.log('Docker images progress:', progress);
-            progressFill.style.width = `${progress.percent}%`;
-            progressMessage.textContent = progress.message;
+
+            progressTrackerUI?.updateOperation({
+                operationId: dockerOpId,
+                operationType: OperationType.DOCKER_BUILD,
+                name: 'Loading Docker Images',
+                phase: ProgressPhase.IN_PROGRESS,
+                percent: progress.percent || 0,
+                message: progress.message || 'Loading images...',
+                startTime: new Date()
+            });
+
+            // Add console output
+            if (progress.message) {
+                progressTrackerUI?.addConsoleOutput({
+                    operationId: dockerOpId,
+                    timestamp: new Date(),
+                    stream: 'stdout',
+                    content: progress.message
+                });
+            }
+
+            // Update overall progress
+            const overallPercent = (completedCount / operations.length) * 100 +
+                                  ((progress.percent || 0) / operations.length);
+            progressTrackerUI?.updateOverallProgress({
+                overallPercent: Math.round(overallPercent),
+                currentOperation: dockerStartEvent,
+                operations: [],
+                totalOperations: operations.length,
+                completedOperations: completedCount,
+                failedOperations: 0,
+                phase: ProgressPhase.IN_PROGRESS,
+                startTime: new Date()
+            });
         });
 
         const imagesResult = await (window as any).electronAPI.dockerImages.loadAll();
@@ -822,8 +986,41 @@ async function initializeDownloadStep() {
             throw new Error('Failed to load Docker images');
         }
 
+        // Complete Docker operation
+        progressTrackerUI.updateOperation({
+            operationId: dockerOpId,
+            operationType: OperationType.DOCKER_BUILD,
+            name: 'Loading Docker Images',
+            phase: ProgressPhase.COMPLETE,
+            percent: 100,
+            message: 'Docker images loaded successfully',
+            startTime: new Date(),
+            endTime: new Date(),
+            success: true
+        });
+
+        progressTrackerUI.addConsoleOutput({
+            operationId: dockerOpId,
+            timestamp: new Date(),
+            stream: 'stdout',
+            content: 'Docker images loaded successfully'
+        });
+
+        completedCount++;
+
         // All downloads complete
         downloadsComplete = true;
+
+        // Update overall progress to 100%
+        progressTrackerUI.updateOverallProgress({
+            overallPercent: 100,
+            operations: [],
+            totalOperations: operations.length,
+            completedOperations: completedCount,
+            failedOperations: 0,
+            phase: ProgressPhase.COMPLETE,
+            startTime: new Date()
+        });
 
         // Save wizard state
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
@@ -834,38 +1031,52 @@ async function initializeDownloadStep() {
         });
 
         statusContainer.innerHTML = `
-            <div class="alert success">
+            <div class="alert success" style="background: rgba(76, 175, 80, 0.2); border: 2px solid rgba(76, 175, 80, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">✓</span>
                 <div>
-                    <strong>Downloads Complete</strong><br>
+                    <strong>All Operations Complete</strong><br>
                     All components have been downloaded and prepared successfully.
                 </div>
             </div>
         `;
 
-        progressEl.classList.remove('show');
-
     } catch (error) {
         console.error('Error during downloads:', error);
-        progressEl.classList.remove('show');
+
+        // Show error in the progress tracker UI
+        if (progressTrackerUI) {
+            const errorEvent: ErrorEvent = {
+                operationId: 'download-error',
+                timestamp: new Date(),
+                message: error instanceof Error ? error.message : String(error),
+                error: error instanceof Error ? error : String(error),
+                recoverable: true,
+                retryAction: 'Click Retry to try again'
+            };
+            progressTrackerUI.showError(errorEvent);
+
+            progressTrackerUI.addConsoleOutput({
+                operationId: 'download-error',
+                timestamp: new Date(),
+                stream: 'stderr',
+                content: `ERROR: ${error instanceof Error ? error.message : String(error)}`
+            });
+        }
+
         statusContainer.innerHTML = `
-            <div class="alert error">
+            <div class="alert error" style="background: rgba(244, 67, 54, 0.2); border: 2px solid rgba(244, 67, 54, 0.5); padding: 20px; border-radius: 12px;">
                 <span style="font-size: 1.5rem;">⚠️</span>
                 <div>
                     <strong>Download Failed</strong><br>
                     ${error instanceof Error ? error.message : String(error)}
                 </div>
             </div>
-            <div style="margin-top: 20px;">
-                <button class="wizard-btn" id="retry-download-btn">Retry Downloads</button>
-            </div>
         `;
 
-        // Attach retry button listener
-        const retryBtn = document.getElementById('retry-download-btn');
-        if (retryBtn) {
-            retryBtn.addEventListener('click', initializeDownloadStep);
-        }
+        // Listen for retry event
+        window.addEventListener('progress:retry', () => {
+            initializeDownloadStep();
+        }, { once: true });
     }
 }
 
