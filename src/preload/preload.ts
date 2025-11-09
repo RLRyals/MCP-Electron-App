@@ -1210,6 +1210,135 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Repository Manager API
+   */
+  repository: {
+    /**
+     * Clone a Git repository with progress tracking
+     */
+    clone: (url: string, targetPath: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('repository:clone', { url, targetPath, options });
+    },
+
+    /**
+     * Checkout a specific version (branch, tag, or commit)
+     */
+    checkoutVersion: (repoPath: string, version: string): Promise<any> => {
+      return ipcRenderer.invoke('repository:checkout-version', { repoPath, version });
+    },
+
+    /**
+     * Get repository status
+     */
+    getStatus: (repoPath: string): Promise<any> => {
+      return ipcRenderer.invoke('repository:get-status', { repoPath });
+    },
+
+    /**
+     * Get current branch name
+     */
+    getCurrentBranch: (repoPath: string): Promise<any> => {
+      return ipcRenderer.invoke('repository:get-current-branch', { repoPath });
+    },
+
+    /**
+     * List all branches in repository
+     */
+    listBranches: (repoPath: string): Promise<any> => {
+      return ipcRenderer.invoke('repository:list-branches', { repoPath });
+    },
+
+    /**
+     * Get latest commit information
+     */
+    getLatestCommit: (repoPath: string, ref?: string): Promise<any> => {
+      return ipcRenderer.invoke('repository:get-latest-commit', { repoPath, ref });
+    },
+
+    /**
+     * Cancel ongoing repository operation
+     */
+    cancel: (): Promise<any> => {
+      return ipcRenderer.invoke('repository:cancel');
+    },
+
+    /**
+     * Listen for repository progress updates
+     */
+    onProgress: (callback: (progress: any) => void): void => {
+      ipcRenderer.on('repository:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove repository progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('repository:progress');
+    },
+  },
+
+  /**
+   * Build Orchestrator API
+   */
+  build: {
+    /**
+     * Execute npm install
+     */
+    npmInstall: (repoPath: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('build:npm-install', { repoPath, options });
+    },
+
+    /**
+     * Execute npm build
+     */
+    npmBuild: (repoPath: string, buildScript?: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('build:npm-build', { repoPath, buildScript, options });
+    },
+
+    /**
+     * Execute docker build
+     */
+    dockerBuild: (dockerfile: string, imageName: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('build:docker-build', { dockerfile, imageName, options });
+    },
+
+    /**
+     * Execute build chain
+     */
+    executeChain: (steps: any[], config?: any): Promise<any> => {
+      return ipcRenderer.invoke('build:execute-chain', { steps, config });
+    },
+
+    /**
+     * Execute custom script
+     */
+    executeCustomScript: (command: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('build:execute-custom-script', { command, options });
+    },
+
+    /**
+     * Cancel ongoing build operation
+     */
+    cancel: (): Promise<any> => {
+      return ipcRenderer.invoke('build:cancel');
+    },
+
+    /**
+     * Listen for build progress updates
+     */
+    onProgress: (callback: (progress: any) => void): void => {
+      ipcRenderer.on('build:progress', (_, progress) => callback(progress));
+    },
+
+    /**
+     * Remove build progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('build:progress');
+    },
+  },
+
+  /**
    * Setup Wizard API
    */
   setupWizard: {
