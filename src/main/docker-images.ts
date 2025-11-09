@@ -10,6 +10,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
 import { LogCategory, logWithCategory } from './logger';
+import {
+  BuildError,
+  BuildErrorCode,
+  ErrorHandler,
+} from '../utils/error-handler';
+import { RetryStrategy } from '../utils/retry-strategy';
 
 const execAsync = promisify(exec);
 
@@ -124,24 +130,34 @@ function getFileSize(filePath: string): number {
 }
 
 /**
- * Check if a Docker image exists locally
+ * Check if a Docker image exists locally with retry logic
  */
 export async function checkImageExists(imageName: string): Promise<boolean> {
   logWithCategory('info', LogCategory.DOCKER_IMAGE, `Checking if image exists: ${imageName}`);
 
-  try {
-    const { stdout } = await execAsync(`docker images -q ${imageName}`, { timeout: 5000 });
-    const exists = stdout.trim().length > 0;
+  const retryStrategy = new RetryStrategy({
+    maxAttempts: 2,
+    initialDelay: 1000,
+    maxDelay: 5000,
+  });
 
-    logWithCategory('info', LogCategory.DOCKER_IMAGE, `Image ${imageName} exists: ${exists}`);
-    return exists;
+  const result = await retryStrategy.execute(
+    async () => {
+      const { stdout } = await execAsync(`docker images -q ${imageName}`, { timeout: 5000 });
+      return stdout.trim().length > 0;
+    },
+    { operation: 'check-image', imageName }
+  );
 
-  } catch (error: any) {
-    logWithCategory('error', LogCategory.DOCKER_IMAGE, `Error checking image ${imageName}`, {
-      error: error.message,
-    });
-    return false;
+  if (result.success) {
+    logWithCategory('info', LogCategory.DOCKER_IMAGE, `Image ${imageName} exists: ${result.result}`);
+    return result.result!;
   }
+
+  logWithCategory('error', LogCategory.DOCKER_IMAGE, `Error checking image ${imageName}`, {
+    error: result.error?.message,
+  });
+  return false;
 }
 
 /**
@@ -185,7 +201,7 @@ export async function getImageList(): Promise<ImageListResult> {
 }
 
 /**
- * Load a single Docker image from a tar.gz file
+ * Load a single Docker image from a tar.gz file with retry logic
  */
 export async function loadImage(
   imagePath: string,
@@ -194,18 +210,71 @@ export async function loadImage(
 ): Promise<ImageLoadResult> {
   logWithCategory('info', LogCategory.DOCKER_IMAGE, `Loading Docker image: ${imageName} from ${imagePath}`);
 
-  try {
-    // Check if file exists
-    if (!fs.existsSync(imagePath)) {
-      const error = `Image file not found: ${imagePath}`;
-      logWithCategory('error', LogCategory.DOCKER_IMAGE, error);
-      return {
-        success: false,
-        imageName,
-        message: 'Image file not found',
-        error,
-      };
-    }
+  const retryStrategy = new RetryStrategy({
+    maxAttempts: 3,
+    initialDelay: 2000,
+    maxDelay: 16000,
+    backoffMultiplier: 2,
+    onRetry: (error, attempt, delay) => {
+      logWithCategory(
+        'warn',
+        LogCategory.DOCKER_IMAGE,
+        `Retrying Docker image load (attempt ${attempt}) after ${delay}ms`,
+        { imageName, error: error instanceof Error ? error.message : String(error) }
+      );
+
+      if (progressCallback) {
+        progressCallback({
+          imageName,
+          currentImage: 1,
+          totalImages: 1,
+          percent: 0,
+          bytesLoaded: 0,
+          totalBytes: 0,
+          step: 'loading',
+          message: `Retrying... (attempt ${attempt})`,
+        });
+      }
+    },
+  });
+
+  const result = await retryStrategy.execute(
+    () => executeImageLoad(imagePath, imageName, progressCallback),
+    { operation: 'load-image', imagePath, imageName }
+  );
+
+  if (result.success) {
+    return {
+      success: true,
+      imageName,
+      message: `Successfully loaded ${imageName}`,
+    };
+  }
+
+  return {
+    success: false,
+    imageName,
+    message: 'Failed to load image',
+    error: result.error?.message || 'Unknown error',
+  };
+}
+
+/**
+ * Internal image load execution (wrapped by retry logic)
+ */
+async function executeImageLoad(
+  imagePath: string,
+  imageName: string,
+  progressCallback?: ImageProgressCallback
+): Promise<void> {
+  // Check if file exists
+  if (!fs.existsSync(imagePath)) {
+    throw ErrorHandler.createError(
+      BuildErrorCode.DOCKER_IMAGE_NOT_FOUND,
+      new Error(`Image file not found: ${imagePath}`),
+      { imagePath, imageName }
+    );
+  }
 
     // Get file size for progress tracking
     const fileSize = getFileSize(imagePath);
@@ -226,7 +295,7 @@ export async function loadImage(
 
     // Load the image using gunzip and docker load
     // We use spawn to have better control over the process
-    return await new Promise<ImageLoadResult>((resolve, reject) => {
+    return await new Promise<void>((resolve, reject) => {
       // Create gunzip process
       const gunzip = spawn('gunzip', ['-c', imagePath]);
 
@@ -296,14 +365,15 @@ export async function loadImage(
             });
           }
 
-          resolve({
-            success: true,
-            imageName,
-            message: `Successfully loaded ${imageName}`,
-          });
+          resolve();
         } else {
-          const error = `Docker load failed with code ${code}: ${errorOutput}`;
-          logWithCategory('error', LogCategory.DOCKER_IMAGE, error);
+          const error = ErrorHandler.createError(
+            BuildErrorCode.DOCKER_BUILD_FAILED,
+            new Error(`Docker load failed with code ${code}: ${errorOutput}`),
+            { imageName, code, errorOutput }
+          );
+
+          logWithCategory('error', LogCategory.DOCKER_IMAGE, error.getLogMessage());
 
           if (progressCallback) {
             progressCallback({
@@ -318,17 +388,17 @@ export async function loadImage(
             });
           }
 
-          resolve({
-            success: false,
-            imageName,
-            message: 'Failed to load image',
-            error,
-          });
+          reject(error);
         }
       });
 
       // Handle docker load errors
       dockerLoad.on('error', (error) => {
+        const buildError = ErrorHandler.classify(error, {
+          operation: 'docker-load',
+          imageName,
+        });
+
         logWithCategory('error', LogCategory.DOCKER_IMAGE, `Docker load error for ${imageName}`, { error: error.message });
 
         if (progressCallback) {
@@ -344,26 +414,9 @@ export async function loadImage(
           });
         }
 
-        resolve({
-          success: false,
-          imageName,
-          message: 'Failed to load image',
-          error: error.message,
-        });
+        reject(buildError);
       });
     });
-
-  } catch (error: any) {
-    const errorMessage = error.message || String(error);
-    logWithCategory('error', LogCategory.DOCKER_IMAGE, `Error loading image ${imageName}`, { error: errorMessage });
-
-    return {
-      success: false,
-      imageName,
-      message: 'Failed to load image',
-      error: errorMessage,
-    };
-  }
 }
 
 /**

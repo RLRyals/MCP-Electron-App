@@ -22,6 +22,12 @@ import {
   CustomScriptOptions,
   BuildConfig,
 } from '../types/build';
+import {
+  BuildError,
+  BuildErrorCode,
+  ErrorHandler,
+} from '../utils/error-handler';
+import { RetryStrategy, RetryOptions } from '../utils/retry-strategy';
 
 /**
  * Default timeout for build operations (30 minutes)
@@ -50,9 +56,35 @@ const DOCKER_BUILD_TIMEOUT = 20 * 60 * 1000;
 export class BuildOrchestrator {
   private progressCallback?: BuildProgressCallback;
   private currentProcess?: ChildProcess;
+  private retryStrategy: RetryStrategy;
 
-  constructor(progressCallback?: BuildProgressCallback) {
+  constructor(progressCallback?: BuildProgressCallback, retryOptions?: RetryOptions) {
     this.progressCallback = progressCallback;
+    this.retryStrategy = new RetryStrategy({
+      maxAttempts: 3,
+      initialDelay: 2000,
+      maxDelay: 16000,
+      backoffMultiplier: 2,
+      jitterFactor: 0.1,
+      ...retryOptions,
+      onRetry: (error, attempt, delay) => {
+        logWithCategory(
+          'warn',
+          LogCategory.GENERAL,
+          `Retrying build operation (attempt ${attempt}) after ${delay}ms`,
+          { error: error instanceof Error ? error.message : String(error) }
+        );
+
+        // Report retry to progress callback
+        if (this.progressCallback) {
+          this.progressCallback({
+            message: `Retrying... (attempt ${attempt})`,
+            percent: -1,
+            step: 'retrying',
+          });
+        }
+      },
+    });
   }
 
   /**
@@ -63,7 +95,7 @@ export class BuildOrchestrator {
   }
 
   /**
-   * Execute npm install command
+   * Execute npm install command with retry logic
    * @param repoPath Path to the repository containing package.json
    * @param options Options for npm install
    */
@@ -73,18 +105,39 @@ export class BuildOrchestrator {
   ): Promise<void> {
     logWithCategory('info', LogCategory.GENERAL, `Running npm install in ${repoPath}`);
 
+    const result = await this.retryStrategy.execute(
+      () => this.executeNpmInstall(repoPath, options),
+      { operation: 'npm-install', repoPath }
+    );
+
+    if (!result.success) {
+      throw result.error || new Error('npm install failed');
+    }
+  }
+
+  /**
+   * Internal npm install execution (wrapped by retry logic)
+   */
+  private async executeNpmInstall(
+    repoPath: string,
+    options?: NpmOptions
+  ): Promise<void> {
     // Validate repository path
     if (!fs.existsSync(repoPath)) {
-      const error = `Repository path does not exist: ${repoPath}`;
-      logWithCategory('error', LogCategory.GENERAL, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.SYSTEM_PERMISSION_DENIED,
+        new Error(`Repository path does not exist: ${repoPath}`),
+        { repoPath }
+      );
     }
 
     const packageJsonPath = path.join(repoPath, 'package.json');
     if (!fs.existsSync(packageJsonPath)) {
-      const error = `package.json not found in ${repoPath}`;
-      logWithCategory('error', LogCategory.GENERAL, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.NPM_INSTALL_FAILED,
+        new Error(`package.json not found in ${repoPath}`),
+        { repoPath }
+      );
     }
 
     // Clean node_modules if requested
@@ -117,20 +170,31 @@ export class BuildOrchestrator {
 
     this.reportProgress('Installing npm dependencies...', 10);
 
-    // Execute npm install with streaming output
-    await this.executeCommand(
-      command,
-      options?.cwd || repoPath,
-      options?.timeout || NPM_INSTALL_TIMEOUT,
-      options?.env
-    );
+    try {
+      // Execute npm install with streaming output
+      await this.executeCommand(
+        command,
+        options?.cwd || repoPath,
+        options?.timeout || NPM_INSTALL_TIMEOUT,
+        options?.env
+      );
 
-    this.reportProgress('npm install completed', 100);
-    logWithCategory('info', LogCategory.GENERAL, 'npm install completed successfully');
+      this.reportProgress('npm install completed', 100);
+      logWithCategory('info', LogCategory.GENERAL, 'npm install completed successfully');
+    } catch (error: any) {
+      const buildError = ErrorHandler.classify(error, {
+        operation: 'npm-install',
+        repoPath,
+        command,
+      });
+
+      ErrorHandler.logError(buildError);
+      throw buildError;
+    }
   }
 
   /**
-   * Execute npm build command
+   * Execute npm build command with retry logic
    * @param repoPath Path to the repository
    * @param buildScript Name of the build script (defaults to 'build')
    * @param options Options for npm build
@@ -142,18 +206,40 @@ export class BuildOrchestrator {
   ): Promise<void> {
     logWithCategory('info', LogCategory.GENERAL, `Running npm build in ${repoPath}`);
 
+    const result = await this.retryStrategy.execute(
+      () => this.executeNpmBuild(repoPath, buildScript, options),
+      { operation: 'npm-build', repoPath, buildScript }
+    );
+
+    if (!result.success) {
+      throw result.error || new Error('npm build failed');
+    }
+  }
+
+  /**
+   * Internal npm build execution (wrapped by retry logic)
+   */
+  private async executeNpmBuild(
+    repoPath: string,
+    buildScript: string = 'build',
+    options?: NpmBuildOptions
+  ): Promise<void> {
     // Validate repository path
     if (!fs.existsSync(repoPath)) {
-      const error = `Repository path does not exist: ${repoPath}`;
-      logWithCategory('error', LogCategory.GENERAL, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.SYSTEM_PERMISSION_DENIED,
+        new Error(`Repository path does not exist: ${repoPath}`),
+        { repoPath }
+      );
     }
 
     const packageJsonPath = path.join(repoPath, 'package.json');
     if (!fs.existsSync(packageJsonPath)) {
-      const error = `package.json not found in ${repoPath}`;
-      logWithCategory('error', LogCategory.GENERAL, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.NPM_BUILD_SCRIPT_FAILED,
+        new Error(`package.json not found in ${repoPath}`),
+        { repoPath }
+      );
     }
 
     // Verify build script exists in package.json
@@ -161,9 +247,11 @@ export class BuildOrchestrator {
     const scriptName = options?.script || buildScript;
 
     if (!packageJson.scripts || !packageJson.scripts[scriptName]) {
-      const error = `Build script '${scriptName}' not found in package.json`;
-      logWithCategory('error', LogCategory.GENERAL, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.NPM_BUILD_SCRIPT_FAILED,
+        new Error(`Build script '${scriptName}' not found in package.json`),
+        { repoPath, scriptName }
+      );
     }
 
     // Build npm run command
@@ -179,20 +267,32 @@ export class BuildOrchestrator {
 
     this.reportProgress(`Running build script: ${scriptName}...`, 10);
 
-    // Execute npm build with streaming output
-    await this.executeCommand(
-      command,
-      options?.cwd || repoPath,
-      options?.timeout || NPM_BUILD_TIMEOUT,
-      options?.env
-    );
+    try {
+      // Execute npm build with streaming output
+      await this.executeCommand(
+        command,
+        options?.cwd || repoPath,
+        options?.timeout || NPM_BUILD_TIMEOUT,
+        options?.env
+      );
 
-    this.reportProgress('npm build completed', 100);
-    logWithCategory('info', LogCategory.GENERAL, 'npm build completed successfully');
+      this.reportProgress('npm build completed', 100);
+      logWithCategory('info', LogCategory.GENERAL, 'npm build completed successfully');
+    } catch (error: any) {
+      const buildError = ErrorHandler.classify(error, {
+        operation: 'npm-build',
+        repoPath,
+        scriptName,
+        command,
+      });
+
+      ErrorHandler.logError(buildError);
+      throw buildError;
+    }
   }
 
   /**
-   * Execute docker build command
+   * Execute docker build command with retry logic
    * @param dockerfile Path to Dockerfile or directory containing Dockerfile
    * @param imageName Name and tag for the Docker image
    * @param options Options for docker build
@@ -204,6 +304,24 @@ export class BuildOrchestrator {
   ): Promise<void> {
     logWithCategory('info', LogCategory.DOCKER, `Building Docker image: ${imageName}`);
 
+    const result = await this.retryStrategy.execute(
+      () => this.executeDockerBuild(dockerfile, imageName, options),
+      { operation: 'docker-build', dockerfile, imageName }
+    );
+
+    if (!result.success) {
+      throw result.error || new Error('Docker build failed');
+    }
+  }
+
+  /**
+   * Internal docker build execution (wrapped by retry logic)
+   */
+  private async executeDockerBuild(
+    dockerfile: string,
+    imageName: string,
+    options?: DockerBuildOptions
+  ): Promise<void> {
     // Determine working directory and Dockerfile path
     let buildContext: string;
     let dockerfilePath: string;
@@ -218,17 +336,21 @@ export class BuildOrchestrator {
         dockerfilePath = path.basename(dockerfile);
       }
     } else {
-      const error = `Dockerfile or directory does not exist: ${dockerfile}`;
-      logWithCategory('error', LogCategory.DOCKER, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.DOCKER_BUILD_CONTEXT_ERROR,
+        new Error(`Dockerfile or directory does not exist: ${dockerfile}`),
+        { dockerfile }
+      );
     }
 
     // Verify Dockerfile exists
     const fullDockerfilePath = path.join(buildContext, dockerfilePath);
     if (!fs.existsSync(fullDockerfilePath)) {
-      const error = `Dockerfile not found: ${fullDockerfilePath}`;
-      logWithCategory('error', LogCategory.DOCKER, error);
-      throw new Error(error);
+      throw ErrorHandler.createError(
+        BuildErrorCode.DOCKER_INVALID_DOCKERFILE,
+        new Error(`Dockerfile not found: ${fullDockerfilePath}`),
+        { fullDockerfilePath }
+      );
     }
 
     // Build docker build command
@@ -283,16 +405,28 @@ export class BuildOrchestrator {
 
     this.reportProgress(`Building Docker image: ${imageName}...`, 10);
 
-    // Execute docker build with streaming output
-    await this.executeCommand(
-      command,
-      options?.cwd || buildContext,
-      options?.timeout || DOCKER_BUILD_TIMEOUT,
-      process.env as Record<string, string>
-    );
+    try {
+      // Execute docker build with streaming output
+      await this.executeCommand(
+        command,
+        options?.cwd || buildContext,
+        options?.timeout || DOCKER_BUILD_TIMEOUT,
+        process.env as Record<string, string>
+      );
 
-    this.reportProgress('Docker build completed', 100);
-    logWithCategory('info', LogCategory.DOCKER, 'Docker build completed successfully');
+      this.reportProgress('Docker build completed', 100);
+      logWithCategory('info', LogCategory.DOCKER, 'Docker build completed successfully');
+    } catch (error: any) {
+      const buildError = ErrorHandler.classify(error, {
+        operation: 'docker-build',
+        imageName,
+        buildContext,
+        command,
+      });
+
+      ErrorHandler.logError(buildError);
+      throw buildError;
+    }
   }
 
   /**

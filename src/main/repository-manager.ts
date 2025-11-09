@@ -18,6 +18,12 @@ import {
   RepositoryErrorType,
   CommitInfo,
 } from '../types/repository';
+import {
+  BuildError,
+  BuildErrorCode,
+  ErrorHandler,
+} from '../utils/error-handler';
+import { RetryStrategy, RetryOptions } from '../utils/retry-strategy';
 
 const execAsync = promisify(exec);
 
@@ -27,9 +33,32 @@ const execAsync = promisify(exec);
 export class RepositoryManager {
   private activeProcess: ChildProcess | null = null;
   private isCancelled = false;
+  private retryStrategy: RetryStrategy;
 
   /**
-   * Clone a Git repository to a target path
+   * Initialize retry strategy with custom options
+   */
+  constructor(retryOptions?: RetryOptions) {
+    this.retryStrategy = new RetryStrategy({
+      maxAttempts: 3,
+      initialDelay: 2000,
+      maxDelay: 16000,
+      backoffMultiplier: 2,
+      jitterFactor: 0.1,
+      ...retryOptions,
+      onRetry: (error, attempt, delay) => {
+        logWithCategory(
+          'warn',
+          LogCategory.GENERAL,
+          `Retrying git operation (attempt ${attempt}) after ${delay}ms`,
+          { error: error instanceof Error ? error.message : String(error) }
+        );
+      },
+    });
+  }
+
+  /**
+   * Clone a Git repository to a target path with retry logic
    * @param url - Repository URL (HTTPS or SSH)
    * @param targetPath - Local path where the repository should be cloned
    * @param options - Clone options
@@ -41,6 +70,26 @@ export class RepositoryManager {
   ): Promise<void> {
     logWithCategory('info', LogCategory.GENERAL, `Starting repository clone: ${url}`);
     this.isCancelled = false;
+
+    // Execute clone with retry logic
+    const result = await this.retryStrategy.execute(
+      () => this.executeClone(url, targetPath, options),
+      { url: sanitizeUrlForLogging(url), targetPath }
+    );
+
+    if (!result.success) {
+      throw result.error || new Error('Clone failed');
+    }
+  }
+
+  /**
+   * Internal clone execution (wrapped by retry logic)
+   */
+  private async executeClone(
+    url: string,
+    targetPath: string,
+    options: CloneOptions
+  ): Promise<void> {
 
     try {
       // Validate inputs
@@ -172,18 +221,40 @@ export class RepositoryManager {
         }
       }
 
-      throw this.handleError(error);
+      // Classify and re-throw error for retry logic
+      const buildError = ErrorHandler.classify(error, {
+        operation: 'git-clone',
+        url: sanitizeUrlForLogging(url),
+        targetPath,
+      });
+
+      ErrorHandler.logError(buildError);
+      throw buildError;
     }
   }
 
   /**
-   * Checkout a specific version (branch, tag, or commit) in a repository
+   * Checkout a specific version (branch, tag, or commit) in a repository with retry logic
    * @param repoPath - Path to the repository
    * @param version - Branch name, tag, or commit hash
    */
   async checkoutVersion(repoPath: string, version: string): Promise<void> {
     logWithCategory('info', LogCategory.GENERAL, `Checking out version: ${version}`);
 
+    const result = await this.retryStrategy.execute(
+      () => this.executeCheckout(repoPath, version),
+      { repoPath, version }
+    );
+
+    if (!result.success) {
+      throw result.error || new Error('Checkout failed');
+    }
+  }
+
+  /**
+   * Internal checkout execution (wrapped by retry logic)
+   */
+  private async executeCheckout(repoPath: string, version: string): Promise<void> {
     try {
       // Validate repository
       await this.validateRepository(repoPath);
@@ -205,13 +276,22 @@ export class RepositoryManager {
       logWithCategory('error', LogCategory.ERROR, 'Error checking out version', error);
 
       if (error.message.includes('did not match any file')) {
-        throw new RepositoryError(
-          RepositoryErrorType.INVALID_BRANCH,
-          `Invalid version: ${version}. Branch, tag, or commit does not exist.`
+        const branchError = ErrorHandler.createError(
+          BuildErrorCode.GIT_BRANCH_NOT_FOUND,
+          error,
+          { repoPath, version }
         );
+        throw branchError;
       }
 
-      throw this.handleError(error);
+      const buildError = ErrorHandler.classify(error, {
+        operation: 'git-checkout',
+        repoPath,
+        version,
+      });
+
+      ErrorHandler.logError(buildError);
+      throw buildError;
     }
   }
 
@@ -658,7 +738,7 @@ export class RepositoryManager {
   }
 }
 
-// Export a singleton instance
+// Export a singleton instance with default retry options
 export const repositoryManager = new RepositoryManager();
 
 // Export the class as default
