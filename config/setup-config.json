@@ -73,15 +73,6 @@
       "continueOnError": true,
       "timeout": 600
     },
-    {
-      "id": "typing-mind-build",
-      "name": "Typing Mind UI - Build",
-      "repositoryId": "typing-mind",
-      "command": "npm run build",
-      "workingDir": ".",
-      "continueOnError": true,
-      "timeout": 600
-    }
   ],
   "dockerImages": {},
   "components": [

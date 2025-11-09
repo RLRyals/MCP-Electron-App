@@ -1044,6 +1044,10 @@ async function initializeDownloadStep() {
         });
 
         // Save wizard state
+        // Get client selection to determine if typing mind was selected
+        const clientSelection = await (window as any).electronAPI.clientSelection.getSelection();
+        const needsTypingMind = clientSelection?.clients?.includes('typingmind') || false;
+
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             buildPipeline: {
                 completed: true,
@@ -1051,6 +1055,10 @@ async function initializeDownloadStep() {
                 builtRepositories: result.result?.builtRepositories || [],
                 dockerImages: result.result?.dockerImages || [],
                 verifiedArtifacts: result.result?.verifiedArtifacts || []
+            },
+            downloads: {
+                typingMindCompleted: needsTypingMind,
+                dockerImagesCompleted: true
             }
         });
 
