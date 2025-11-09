@@ -103,8 +103,7 @@ function getDockerComposeFilePath(type: 'core' | 'mcp-connector' | 'typing-mind'
  * Generate docker-compose.core.yml content
  */
 function generateCoreComposeFile(config: envConfig.EnvConfig): string {
-  return `version: '3.8'
-
+  return `
 services:
   postgres:
     image: postgres:15
@@ -126,9 +125,13 @@ services:
       - mcp-network
     restart: unless-stopped
 
-  mcp-servers:
-    image: mcp-servers:latest
+   mcp-servers:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp-connector
+    image: mcp-writing-servers:latest
     container_name: mcp-servers
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
