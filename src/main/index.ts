@@ -1063,9 +1063,9 @@ function setupIPC(): void {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Listing branches for ${request.repoPath}`);
 
       try {
-        const { execAsync } = await import('child_process');
+        const { exec } = await import('child_process');
         const { promisify } = await import('util');
-        const execPromise = promisify(execAsync);
+        const execPromise = promisify(exec);
 
         const { stdout } = await execPromise('git branch -a', {
           cwd: request.repoPath,
@@ -1074,11 +1074,11 @@ function setupIPC(): void {
 
         const branches = stdout
           .split('\n')
-          .map((line) => line.trim().replace(/^\*\s+/, '').replace(/^remotes\/origin\//, ''))
-          .filter((line) => line.length > 0 && !line.includes('HEAD ->'));
+          .map((line: string) => line.trim().replace(/^\*\s+/, '').replace(/^remotes\/origin\//, ''))
+          .filter((line: string) => line.length > 0 && !line.includes('HEAD ->'));
 
         // Remove duplicates
-        const uniqueBranches = Array.from(new Set(branches));
+        const uniqueBranches = Array.from(new Set(branches)) as string[];
 
         return {
           success: true,

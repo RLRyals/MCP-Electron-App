@@ -11,7 +11,6 @@ import {
 } from './repository';
 
 import {
-  BuildProgressCallback,
   NpmOptions,
   NpmBuildOptions,
   DockerBuildOptions,
