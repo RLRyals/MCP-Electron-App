@@ -42,6 +42,13 @@ export interface WizardStepData {
   clients?: string[];
 
   // Step 5: Download & setup
+  buildPipeline?: {
+    completed: boolean;
+    clonedRepositories?: string[];
+    builtRepositories?: string[];
+    dockerImages?: string[];
+    verifiedArtifacts?: string[];
+  };
   downloads?: {
     typingMindCompleted: boolean;
     dockerImagesCompleted: boolean;
@@ -393,10 +400,18 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
       return { canProceed: true };
 
     case WizardStep.DOWNLOAD_SETUP:
-      // Check that downloads are complete
+      // Check that build pipeline and downloads are complete
       const needsTypingMind = state.data.clients?.includes('typingmind');
-      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, downloads=${JSON.stringify(state.data.downloads)}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, buildPipeline=${JSON.stringify(state.data.buildPipeline)}, downloads=${JSON.stringify(state.data.downloads)}`);
 
+      // If build pipeline is marked as completed, allow proceeding
+      // This is the primary indicator that the build has finished successfully
+      if (state.data.buildPipeline?.completed) {
+        logWithCategory('debug', LogCategory.SYSTEM, `DOWNLOAD_SETUP validation passed: buildPipeline.completed=true`);
+        return { canProceed: true };
+      }
+
+      // Otherwise, check the downloads object for granular status
       // If downloads object doesn't exist, the build hasn't been run yet
       if (!state.data.downloads) {
         logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Downloads object not initialized - build may not have completed`);
