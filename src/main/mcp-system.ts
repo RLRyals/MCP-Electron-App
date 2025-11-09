@@ -141,7 +141,6 @@ services:
       - mcp-data:/data
     networks:
       - mcp-network
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "echo 'healthy'"]
       interval: 5s
