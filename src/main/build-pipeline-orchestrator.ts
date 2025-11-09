@@ -671,22 +671,48 @@ export function resolveConfigPath(relativePath: string): string {
   // In production, config files are in dist/config
   // In development, they're in config/
 
+  // Normalize the relative path (remove leading ./ if present)
+  const normalizedPath = relativePath.replace(/^\.\//, '');
+
   // Try production path first (from app.asar)
   if (app.isPackaged) {
     // When packaged, __dirname points to app.asar/dist/main
     // Config is in app.asar/dist/config
-    const productionPath = path.join(__dirname, '..', relativePath);
+    const productionPath = path.join(__dirname, '..', normalizedPath);
     if (fs.existsSync(productionPath)) {
       return productionPath;
+    }
+
+    // Also try relative to app path
+    const appResourcePath = path.join(process.resourcesPath, 'app.asar', 'dist', normalizedPath);
+    if (fs.existsSync(appResourcePath)) {
+      return appResourcePath;
+    }
+
+    // Try unpacked resources
+    const unpackedPath = path.join(process.resourcesPath, 'app', 'dist', normalizedPath);
+    if (fs.existsSync(unpackedPath)) {
+      return unpackedPath;
     }
   }
 
   // Development path (from project root)
-  const devPath = path.join(__dirname, '../../..', relativePath);
+  const devPath = path.join(__dirname, '../../..', normalizedPath);
   if (fs.existsSync(devPath)) {
     return devPath;
   }
 
-  // Fallback to relative path
-  return relativePath;
+  // Throw error instead of returning unresolved path
+  throw new Error(`Config file not found: ${relativePath}. Tried paths: ${JSON.stringify({
+    normalized: normalizedPath,
+    packaged: app.isPackaged,
+    dirname: __dirname,
+    resourcesPath: process.resourcesPath,
+    attempted: [
+      app.isPackaged ? path.join(__dirname, '..', normalizedPath) : null,
+      app.isPackaged ? path.join(process.resourcesPath, 'app.asar', 'dist', normalizedPath) : null,
+      app.isPackaged ? path.join(process.resourcesPath, 'app', 'dist', normalizedPath) : null,
+      path.join(__dirname, '../../..', normalizedPath)
+    ].filter(Boolean)
+  }, null, 2)}`);
 }
