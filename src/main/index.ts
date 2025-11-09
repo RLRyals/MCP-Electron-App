@@ -1418,7 +1418,7 @@ function setupIPC(): void {
   ipcMain.handle(
     IPC_CHANNELS.PIPELINE.EXECUTE,
     async (_event, request: PipelineExecuteRequest): Promise<PipelineExecuteResponse> => {
-      logWithCategory('info', LogCategory.BUILD, 'IPC: Executing build pipeline', { configPath: request.configPath });
+      logWithCategory('info', LogCategory.GENERAL, 'IPC: Executing build pipeline', { configPath: request.configPath });
 
       try {
         // Create new pipeline orchestrator
@@ -1463,7 +1463,7 @@ function setupIPC(): void {
           },
         };
       } catch (error: any) {
-        logWithCategory('error', LogCategory.BUILD, 'Error executing build pipeline', error);
+        logWithCategory('error', LogCategory.GENERAL, 'Error executing build pipeline', error);
         return {
           success: false,
           message: 'Pipeline execution failed',
@@ -1481,7 +1481,7 @@ function setupIPC(): void {
   ipcMain.handle(
     IPC_CHANNELS.PIPELINE.CANCEL,
     async (): Promise<PipelineCancelResponse> => {
-      logWithCategory('info', LogCategory.BUILD, 'IPC: Cancelling pipeline operation');
+      logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling pipeline operation');
 
       try {
         if (currentPipelineOrchestrator) {
