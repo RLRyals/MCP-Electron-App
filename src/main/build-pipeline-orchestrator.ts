@@ -8,10 +8,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
-import type { BuildStep, BuildStepType, BuildStepStatus } from '../types/build';
 import type { RepositoryProgress } from '../types/repository';
-// import { ProgressAggregator } from '../utils/progress-aggregator';
-import { ProgressPhase, OperationType, OperationStartEvent } from '../types/progress';
 
 /**
  * Repository configuration from setup-config.json
@@ -89,19 +86,12 @@ export interface SetupConfig {
  * Pipeline execution options
  */
 export interface PipelineOptions {
-  /** User-selected components to build */
   selectedComponents?: string[];
-  /** Skip repository cloning (use existing) */
   skipClone?: boolean;
-  /** Skip npm builds */
   skipBuild?: boolean;
-  /** Skip Docker image builds */
   skipDocker?: boolean;
-  /** Skip artifact verification */
   skipVerification?: boolean;
-  /** Force rebuild even if artifacts exist */
   force?: boolean;
-  /** Working directory for operations */
   workingDirectory?: string;
 }
 
@@ -159,17 +149,11 @@ export type PipelineProgressCallback = (progress: {
  */
 export class BuildPipelineOrchestrator {
   private config: SetupConfig | null = null;
-  // private progressAggregator: ProgressAggregator;
   private isCancelled = false;
   private currentPhase: PipelinePhase = PipelinePhase.INITIALIZING;
 
   constructor() {
-    // this.progressAggregator = new ProgressAggregator(undefined, {
-      throttleInterval: 100,
-      maxConsoleLines: 1000,
-      captureConsoleOutput: true,
-      enableTimeEstimation: true,
-    });
+    // No initialization needed
   }
 
   /**
@@ -200,12 +184,10 @@ export class BuildPipelineOrchestrator {
   private filterRepositories(selectedComponents?: string[]): RepositoryConfig[] {
     const config = this.getConfig();
 
-    // If no components selected, use all enabled components
     const componentsToInclude = selectedComponents && selectedComponents.length > 0
       ? selectedComponents
       : config.components.filter(c => c.enabled).map(c => c.id);
 
-    // Get all repository IDs from selected components
     const repositoryIds = new Set<string>();
     for (const componentId of componentsToInclude) {
       const component = config.components.find(c => c.id === componentId);
@@ -214,7 +196,6 @@ export class BuildPipelineOrchestrator {
       }
     }
 
-    // Filter repositories
     return config.repositories.filter(repo => repositoryIds.has(repo.id));
   }
 
@@ -236,7 +217,6 @@ export class BuildPipelineOrchestrator {
 
       visiting.add(repoId);
 
-      // Visit dependencies first
       const deps = config.buildOrder.dependencies[repoId] || [];
       for (const dep of deps) {
         if (repoIds.has(dep)) {
@@ -249,7 +229,6 @@ export class BuildPipelineOrchestrator {
       buildOrder.push(repoId);
     };
 
-    // Start with the configured order, filtered by selected repositories
     for (const repoId of config.buildOrder.order) {
       if (repoIds.has(repoId)) {
         visit(repoId);
@@ -271,7 +250,6 @@ export class BuildPipelineOrchestrator {
     const clonedRepos: string[] = [];
     const baseClonePath = path.resolve(options.workingDirectory || '.', config.baseClonePath);
 
-    // Ensure base clone path exists
     await fs.ensureDir(baseClonePath);
 
     for (let i = 0; i < repositories.length; i++) {
@@ -282,9 +260,8 @@ export class BuildPipelineOrchestrator {
       const repo = repositories[i];
       const repoPath = path.join(baseClonePath, repo.clonePath);
 
-      // Check if already cloned
       if (!options.force && await fs.pathExists(repoPath)) {
-        console.log(`Repository ${repo.name} already exists at ${repoPath}, skipping clone`);
+        console.log(`Repository ${repo.name} already exists, skipping`);
         clonedRepos.push(repo.id);
 
         if (onProgress) {
@@ -301,24 +278,10 @@ export class BuildPipelineOrchestrator {
         continue;
       }
 
-      // Register operation with progress aggregator
-      const operationId = // this.progressAggregator.startOperation({
-        id: `clone-${repo.id}`,
-        type: OperationType.REPOSITORY_CLONE,
-        name: `Cloning ${repo.name}`,
-        totalSteps: 100,
-      });
-
       try {
-        // Clone repository
-        const result = await repositoryManager.cloneRepository(repo.url, repoPath, {
+        await repositoryManager.cloneRepository(repo.url, repoPath, {
           branch: repo.branch,
           onProgress: (progress: RepositoryProgress) => {
-            // this.progressAggregator.updateProgress(operationId, {
-              currentStep: Math.floor(progress.percent),
-              message: progress.message,
-            });
-
             if (onProgress) {
               onProgress({
                 phase: PipelinePhase.CLONING,
@@ -333,30 +296,14 @@ export class BuildPipelineOrchestrator {
           },
         });
 
-        if (result.success) {
-          clonedRepos.push(repo.id);
-          // this.progressAggregator.completeOperation(operationId, {
-            success: true,
-            message: `Successfully cloned ${repo.name}`,
-          });
-        } else {
-          // this.progressAggregator.completeOperation(operationId, {
-            success: false,
-            error: result.error || 'Unknown error',
-          });
-
-          if (!repo.optional) {
-            throw new Error(`Failed to clone required repository ${repo.name}: ${result.error}`);
-          }
-        }
+        // If we get here, clone was successful
+        clonedRepos.push(repo.id);
       } catch (error) {
-        // this.progressAggregator.completeOperation(operationId, {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        if (!repo.optional) {
-          throw error;
+        // If optional, log and continue; otherwise re-throw
+        if (repo.optional) {
+          console.warn(`Failed to clone optional repository ${repo.name}:`, error);
+        } else {
+          throw new Error(`Failed to clone required repository ${repo.name}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
@@ -376,7 +323,6 @@ export class BuildPipelineOrchestrator {
     const builtRepos: string[] = [];
     const baseClonePath = path.resolve(options.workingDirectory || '.', config.baseClonePath);
 
-    // Filter build steps for selected repositories
     const buildSteps = config.buildSteps.filter(step =>
       buildOrder.includes(step.repositoryId)
     );
@@ -391,24 +337,6 @@ export class BuildPipelineOrchestrator {
       if (!repo) continue;
 
       const repoPath = path.join(baseClonePath, repo.clonePath, step.workingDir);
-      const operationId = `build-${step.id}`;
-
-      // Determine operation type based on command
-      let operationType: OperationType;
-      if (step.command.includes('npm install')) {
-        operationType = OperationType.NPM_INSTALL;
-      } else if (step.command.includes('npm run') || step.command.includes('npm build')) {
-        operationType = OperationType.NPM_BUILD;
-      } else {
-        operationType = OperationType.CUSTOM_SCRIPT;
-      }
-
-      // this.progressAggregator.startOperation({
-        id: operationId,
-        type: operationType,
-        name: step.name,
-        totalSteps: 100,
-      });
 
       if (onProgress) {
         onProgress({
@@ -425,86 +353,39 @@ export class BuildPipelineOrchestrator {
       try {
         const buildOrchestrator = createBuildOrchestrator();
 
-        // Execute build based on command type
-        let result;
         if (step.command.includes('npm install')) {
-          result = await buildOrchestrator.npmInstall(repoPath, {
+          await buildOrchestrator.npmInstall(repoPath, {
+            cwd: repoPath,
             timeout: step.timeout * 1000,
             env: config.globalEnv,
-            onProgress: (progress) => {
-              // this.progressAggregator.updateProgress(operationId, {
-                currentStep: Math.floor(progress.percent),
-                message: progress.message,
-              });
-              if (progress.stdout) {
-                // this.progressAggregator.addConsoleOutput(operationId, progress.stdout);
-              }
-            },
           });
         } else if (step.command.includes('npm run') || step.command.includes('npm build')) {
           const scriptMatch = step.command.match(/npm run (\S+)/);
           const script = scriptMatch ? scriptMatch[1] : 'build';
 
-          result = await buildOrchestrator.npmBuild(repoPath, {
+          await buildOrchestrator.npmBuild(repoPath, script, {
+            cwd: repoPath,
             script,
             timeout: step.timeout * 1000,
             env: config.globalEnv,
-            onProgress: (progress) => {
-              // this.progressAggregator.updateProgress(operationId, {
-                currentStep: Math.floor(progress.percent),
-                message: progress.message,
-              });
-              if (progress.stdout) {
-                // this.progressAggregator.addConsoleOutput(operationId, progress.stdout);
-              }
-            },
           });
         } else {
-          result = await buildOrchestrator.executeCustomScript(step.command, {
+          await buildOrchestrator.executeCustomScript(step.command, {
             cwd: repoPath,
             timeout: step.timeout * 1000,
             env: config.globalEnv,
-            onProgress: (progress) => {
-              // this.progressAggregator.updateProgress(operationId, {
-                currentStep: Math.floor(progress.percent),
-                message: progress.message,
-              });
-              if (progress.stdout) {
-                // this.progressAggregator.addConsoleOutput(operationId, progress.stdout);
-              }
-            },
           });
         }
 
-        if (result.success) {
-          builtRepos.push(step.repositoryId);
-          // this.progressAggregator.completeOperation(operationId, {
-            success: true,
-            message: `Successfully completed ${step.name}`,
-          });
-        } else {
-          // this.progressAggregator.completeOperation(operationId, {
-            success: false,
-            error: result.error || 'Build failed',
-          });
-
-          if (!step.continueOnError) {
-            throw new Error(`Build step failed: ${step.name} - ${result.error}`);
-          }
-        }
+        builtRepos.push(step.repositoryId);
       } catch (error) {
-        // this.progressAggregator.completeOperation(operationId, {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
         if (!step.continueOnError) {
           throw error;
         }
       }
     }
 
-    return [...new Set(builtRepos)]; // Remove duplicates
+    return [...new Set(builtRepos)];
   }
 
   /**
@@ -519,7 +400,6 @@ export class BuildPipelineOrchestrator {
     const dockerImages: string[] = [];
     const baseClonePath = path.resolve(options.workingDirectory || '.', config.baseClonePath);
 
-    // Filter Docker images for built repositories
     const imagesToBuild = Object.entries(config.dockerImages).filter(([key, _]) =>
       buildOrder.includes(key)
     );
@@ -537,19 +417,10 @@ export class BuildPipelineOrchestrator {
       const dockerfilePath = path.join(repoPath, imageConfig.dockerfilePath);
       const imageName = `${imageConfig.repository}:${imageConfig.tag}`;
 
-      // Check if Dockerfile exists
       if (!await fs.pathExists(dockerfilePath)) {
-        console.log(`Dockerfile not found at ${dockerfilePath}, skipping Docker build for ${imageName}`);
+        console.log(`Dockerfile not found, skipping Docker build for ${imageName}`);
         continue;
       }
-
-      const operationId = `docker-${repoId}`;
-      // this.progressAggregator.startOperation({
-        id: operationId,
-        type: OperationType.DOCKER_BUILD,
-        name: `Building Docker image ${imageName}`,
-        totalSteps: 100,
-      });
 
       if (onProgress) {
         onProgress({
@@ -567,42 +438,14 @@ export class BuildPipelineOrchestrator {
         const buildOrchestrator = createBuildOrchestrator();
         const buildContext = path.join(repoPath, imageConfig.buildContextPath);
 
-        const result = await buildOrchestrator.dockerBuild(buildContext, imageName, {
+        await buildOrchestrator.dockerBuild(buildContext, imageName, {
+          cwd: buildContext,
           dockerfile: imageConfig.dockerfilePath,
-          env: config.globalEnv,
-          onProgress: (progress) => {
-            // this.progressAggregator.updateProgress(operationId, {
-              currentStep: Math.floor(progress.percent),
-              message: progress.message,
-            });
-            if (progress.stdout) {
-              // this.progressAggregator.addConsoleOutput(operationId, progress.stdout);
-            }
-          },
         });
 
-        if (result.success) {
-          dockerImages.push(imageName);
-          // this.progressAggregator.completeOperation(operationId, {
-            success: true,
-            message: `Successfully built ${imageName}`,
-          });
-        } else {
-          // this.progressAggregator.completeOperation(operationId, {
-            success: false,
-            error: result.error || 'Docker build failed',
-          });
-
-          // Don't fail the entire pipeline for Docker build failures
-          console.warn(`Docker build failed for ${imageName}, but continuing pipeline`);
-        }
+        dockerImages.push(imageName);
       } catch (error) {
-        // this.progressAggregator.completeOperation(operationId, {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        console.warn(`Docker build error for ${imageName}:`, error);
+        console.warn(`Docker build failed for ${imageName}, continuing`);
       }
     }
 
@@ -644,14 +487,7 @@ export class BuildPipelineOrchestrator {
         });
       }
 
-      // Check common build artifacts
-      const artifactsToCheck = [
-        'dist',
-        'build',
-        'out',
-        'node_modules',
-        'package-lock.json',
-      ];
+      const artifactsToCheck = ['dist', 'build', 'out', 'node_modules', 'package-lock.json'];
 
       let hasArtifacts = false;
       for (const artifact of artifactsToCheck) {
@@ -696,11 +532,9 @@ export class BuildPipelineOrchestrator {
         });
       }
 
-      // Filter repositories based on selected components
       const repositories = this.filterRepositories(options.selectedComponents);
       const buildOrder = this.resolveBuildOrder(repositories);
 
-      // Phase 1: Clone repositories
       if (!options.skipClone) {
         this.currentPhase = PipelinePhase.CLONING;
         try {
@@ -715,7 +549,6 @@ export class BuildPipelineOrchestrator {
         }
       }
 
-      // Phase 2: Build repositories
       if (!options.skipBuild) {
         this.currentPhase = PipelinePhase.BUILDING;
         try {
@@ -730,7 +563,6 @@ export class BuildPipelineOrchestrator {
         }
       }
 
-      // Phase 3: Build Docker images
       if (!options.skipDocker) {
         this.currentPhase = PipelinePhase.DOCKER;
         try {
@@ -741,11 +573,9 @@ export class BuildPipelineOrchestrator {
             component: 'docker',
             error: error instanceof Error ? error.message : String(error),
           });
-          // Don't throw - Docker failures are not fatal
         }
       }
 
-      // Phase 4: Verify artifacts
       if (!options.skipVerification) {
         this.currentPhase = PipelinePhase.VERIFYING;
         try {
@@ -756,11 +586,9 @@ export class BuildPipelineOrchestrator {
             component: 'verification',
             error: error instanceof Error ? error.message : String(error),
           });
-          // Don't throw - verification failures are not fatal
         }
       }
 
-      // Complete
       this.currentPhase = PipelinePhase.COMPLETE;
       if (onProgress) {
         onProgress({
@@ -818,15 +646,6 @@ export class BuildPipelineOrchestrator {
   async cancel(): Promise<void> {
     this.isCancelled = true;
     await repositoryManager.cancelOperation();
-    // BuildOrchestrator instances will need to be cancelled individually
-    // This is handled in the build phase
-  }
-
-  /**
-   * Get current progress aggregator
-   */
-  getProgressAggregator(): ProgressAggregator {
-    return // this.progressAggregator;
   }
 
   /**
