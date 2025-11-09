@@ -754,7 +754,12 @@
                 </div>
 
                 <!-- Status Container for Completion Messages -->
-                <div id="download-status-container"></div>
+                <div id="download-status-container">
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <p style="margin-bottom: 20px; opacity: 0.8;">Build initialization starting...</p>
+                        <button class="wizard-btn primary" id="manual-start-build-btn" style="display: none; padding: 12px 30px;">Start Build Manually</button>
+                    </div>
+                </div>
 
                 <!-- Hidden legacy progress (for compatibility) -->
                 <div class="operation-progress" id="download-progress" style="display: none;">

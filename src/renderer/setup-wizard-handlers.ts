@@ -71,6 +71,7 @@ function attachEventListeners() {
     const prevBtn = document.getElementById('prev-btn');
     const cancelBtn = document.getElementById('cancel-btn');
     const checkPrereqBtn = document.getElementById('check-prerequisites-btn');
+    const manualBuildBtn = document.getElementById('manual-start-build-btn');
 
     if (nextBtn) {
         nextBtn.addEventListener('click', nextStep);
@@ -86,6 +87,13 @@ function attachEventListeners() {
 
     if (checkPrereqBtn) {
         checkPrereqBtn.addEventListener('click', checkPrerequisites);
+    }
+
+    if (manualBuildBtn) {
+        manualBuildBtn.addEventListener('click', () => {
+            console.log('Manual build button clicked');
+            initializeDownloadStep();
+        });
     }
 }
 
@@ -788,11 +796,18 @@ function createRetryButton(buttonId: string, stepFunction: () => void, buttonTex
 async function initializeDownloadStep() {
     console.log('initializeDownloadStep called');
     const statusContainer = document.getElementById('download-status-container');
+    const manualBuildBtn = document.getElementById('manual-start-build-btn');
     console.log('statusContainer:', statusContainer);
+    console.log('manualBuildBtn:', manualBuildBtn);
 
     if (!statusContainer) {
         console.log('ERROR: statusContainer not found!');
         return;
+    }
+
+    // Hide the manual build button initially
+    if (manualBuildBtn) {
+        manualBuildBtn.style.display = 'none';
     }
 
     console.log('Initializing progress tracker UI');
@@ -835,7 +850,18 @@ async function initializeDownloadStep() {
         return;
     }
 
+    // Set a timeout to show manual build button if automatic initialization takes too long
+    let manualBuildTimeout: NodeJS.Timeout | null = null;
+
     try {
+        manualBuildTimeout = setTimeout(() => {
+            console.log('Build initialization timeout - showing manual start button');
+            if (manualBuildBtn) {
+                manualBuildBtn.style.display = 'block';
+                manualBuildBtn.textContent = 'Build appears to be stuck. Click here to try again.';
+            }
+        }, 10000); // 10 second timeout
+
         // Check Docker status before starting the build pipeline
         console.log('Checking Docker status before build pipeline...');
         console.log('electronAPI available:', !!(window as any).electronAPI);
@@ -1101,6 +1127,9 @@ async function initializeDownloadStep() {
             throw new Error(`Failed to save wizard state: ${saveResult.error}`);
         }
 
+        // Clear the manual build timeout since we successfully completed
+        clearTimeout(manualBuildTimeout);
+
         // Refresh wizard state to ensure it's up to date
         wizardState = await (window as any).electronAPI.setupWizard.getState();
 
@@ -1115,6 +1144,11 @@ async function initializeDownloadStep() {
         `;
 
     } catch (error) {
+        // Clear the timeout since we hit an error
+        if (manualBuildTimeout) {
+            clearTimeout(manualBuildTimeout);
+        }
+
         console.error('Error during build pipeline:', error);
         console.error('Full error details:', error instanceof Error ? { message: error.message, stack: error.stack } : error);
 
