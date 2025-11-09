@@ -428,7 +428,6 @@ async function initializeEnvironmentStep() {
     try {
         // Load current configuration
         const config = await (window as any).electronAPI.envConfig.getConfig();
-        console.log('Current environment config:', config);
 
         // Create environment configuration form
         container.innerHTML = createEnvironmentConfigForm(config);
@@ -1044,10 +1043,6 @@ async function initializeDownloadStep() {
         });
 
         // Save wizard state
-        // Get client selection to determine if typing mind was selected
-        const clientSelection = await (window as any).electronAPI.clientSelection.getSelection();
-        const needsTypingMind = clientSelection?.clients?.includes('typingmind') || false;
-
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             buildPipeline: {
                 completed: true,
@@ -1057,7 +1052,7 @@ async function initializeDownloadStep() {
                 verifiedArtifacts: result.result?.verifiedArtifacts || []
             },
             downloads: {
-                typingMindCompleted: needsTypingMind,
+                typingMindCompleted: true,
                 dockerImagesCompleted: true
             }
         });
