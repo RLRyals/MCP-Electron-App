@@ -21,7 +21,7 @@ import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
-import { createBuildPipelineOrchestrator } from './build-pipeline-orchestrator';
+import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipeline-orchestrator';
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
 import type {
   RepositoryCloneRequest,
@@ -1424,8 +1424,10 @@ function setupIPC(): void {
         // Create new pipeline orchestrator
         currentPipelineOrchestrator = createBuildPipelineOrchestrator();
 
-        // Load configuration
-        await currentPipelineOrchestrator.loadConfig(request.configPath);
+        // Resolve and load configuration
+        const resolvedConfigPath = resolveConfigPath(request.configPath);
+        logWithCategory('info', LogCategory.GENERAL, 'Resolved config path', { resolvedConfigPath });
+        await currentPipelineOrchestrator.loadConfig(resolvedConfigPath);
 
         // Create progress throttler
         const progressThrottler = new ProgressThrottler(10);

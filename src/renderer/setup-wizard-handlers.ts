@@ -806,6 +806,106 @@ async function initializeDownloadStep() {
     }
 
     try {
+        // Check Docker status before starting the build pipeline
+        console.log('Checking Docker status before build pipeline...');
+        const dockerStatus = await (window as any).electronAPI.docker.healthCheck();
+        console.log('Docker status:', dockerStatus);
+
+        // If Docker is not installed
+        if (!dockerStatus.running && !dockerStatus.healthy) {
+            // Check if Docker is installed but not running
+            const prereqResults = await (window as any).electronAPI.prerequisites.checkAll();
+
+            if (!prereqResults.docker.installed) {
+                // Docker is not installed - show download link
+                statusContainer.innerHTML = `
+                    <div class="alert error" style="background: rgba(244, 67, 54, 0.2); border: 2px solid rgba(244, 67, 54, 0.5); padding: 20px; border-radius: 12px;">
+                        <span style="font-size: 1.5rem;">⚠️</span>
+                        <div>
+                            <strong>Docker Desktop Not Installed</strong><br>
+                            Docker Desktop is required to run the MCP system. Please install Docker Desktop and restart the setup wizard.
+                            <div style="margin-top: 20px;">
+                                <a href="https://www.docker.com/products/docker-desktop/"
+                                   target="_blank"
+                                   class="wizard-btn primary"
+                                   style="display: inline-block; padding: 12px 24px; text-decoration: none;">
+                                    Download Docker Desktop
+                                </a>
+                            </div>
+                            <div style="margin-top: 12px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 0.9rem;">
+                                <strong>After installing Docker Desktop:</strong>
+                                <ol style="margin: 8px 0; padding-left: 20px;">
+                                    <li>Install Docker Desktop for your operating system</li>
+                                    <li>Start Docker Desktop</li>
+                                    <li>Return to this wizard and click "Retry"</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    ${createRetryButton('retry-docker-check-btn', initializeDownloadStep, 'Retry')}
+                `;
+                return;
+            }
+
+            // Docker is installed but not running - try to start it
+            statusContainer.innerHTML = `
+                <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
+                    <span style="font-size: 1.5rem;">⚠️</span>
+                    <div>
+                        <strong>Docker Desktop Not Running</strong><br>
+                        Docker Desktop is installed but not running. Starting Docker Desktop...
+                    </div>
+                </div>
+            `;
+
+            console.log('Starting Docker Desktop...');
+
+            // Listen for Docker progress updates
+            (window as any).electronAPI.docker.onProgress((progress: any) => {
+                console.log('Docker startup progress:', progress);
+                statusContainer.innerHTML = `
+                    <div class="alert info" style="background: rgba(33, 150, 243, 0.2); border: 2px solid rgba(33, 150, 243, 0.5); padding: 20px; border-radius: 12px;">
+                        <span style="font-size: 1.5rem;">🐳</span>
+                        <div>
+                            <strong>Starting Docker Desktop</strong><br>
+                            ${progress.message}
+                            <div style="margin-top: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; overflow: hidden;">
+                                <div style="height: 8px; background: linear-gradient(90deg, #4CAF50, #8BC34A); width: ${progress.percent}%; transition: width 0.3s;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Try to start Docker and wait for it to be ready
+            const startResult = await (window as any).electronAPI.docker.startAndWait();
+
+            if (!startResult.success) {
+                statusContainer.innerHTML = `
+                    <div class="alert error" style="background: rgba(244, 67, 54, 0.2); border: 2px solid rgba(244, 67, 54, 0.5); padding: 20px; border-radius: 12px;">
+                        <span style="font-size: 1.5rem;">⚠️</span>
+                        <div>
+                            <strong>Failed to Start Docker Desktop</strong><br>
+                            ${startResult.error || 'Could not start Docker Desktop automatically.'}
+                            <div style="margin-top: 12px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                                <strong>Please try the following:</strong>
+                                <ol style="margin: 8px 0; padding-left: 20px;">
+                                    <li>Start Docker Desktop manually</li>
+                                    <li>Wait for Docker to finish starting</li>
+                                    <li>Click "Retry" below</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    ${createRetryButton('retry-docker-start-btn', initializeDownloadStep, 'Retry')}
+                `;
+                return;
+            }
+
+            console.log('Docker Desktop started successfully');
+        }
+
+        // Docker is now running, proceed with the build pipeline
         // Get selected clients to determine which components to build
         const selection = await (window as any).electronAPI.clientSelection.getSelection();
         const selectedComponents = ['core-system']; // Always include core system

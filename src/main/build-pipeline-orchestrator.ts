@@ -6,6 +6,7 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { app } from 'electron';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
 import type { RepositoryProgress } from '../types/repository';
@@ -661,4 +662,31 @@ export class BuildPipelineOrchestrator {
  */
 export function createBuildPipelineOrchestrator(): BuildPipelineOrchestrator {
   return new BuildPipelineOrchestrator();
+}
+
+/**
+ * Resolve the config path for both development and production
+ */
+export function resolveConfigPath(relativePath: string): string {
+  // In production, config files are in dist/config
+  // In development, they're in config/
+
+  // Try production path first (from app.asar)
+  if (app.isPackaged) {
+    // When packaged, __dirname points to app.asar/dist/main
+    // Config is in app.asar/dist/config
+    const productionPath = path.join(__dirname, '..', relativePath);
+    if (fs.existsSync(productionPath)) {
+      return productionPath;
+    }
+  }
+
+  // Development path (from project root)
+  const devPath = path.join(__dirname, '../../..', relativePath);
+  if (fs.existsSync(devPath)) {
+    return devPath;
+  }
+
+  // Fallback to relative path
+  return relativePath;
 }
