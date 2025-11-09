@@ -3,21 +3,30 @@
  * Orchestrates the entire first-run setup wizard flow
  */
 
-import { ProgressTrackerUI } from './progress-tracker';
-import {
-  ProgressPhase,
-  OperationType,
-  ErrorEvent,
-  OperationStartEvent,
-} from '../types/progress';
+// Note: ProgressTrackerUI and types are expected to be available from progress-tracker.js
+// which should be loaded before this script
 
 // Wizard state
 let currentStep = 1;
 let wizardState: any = null;
 const WizardStep = (window as any).electronAPI.setupWizard.WizardStep;
 
+// Get ProgressPhase and OperationType from global scope
+const ProgressPhase = (window as any).ProgressPhase || {
+  IN_PROGRESS: 'in_progress',
+  COMPLETE: 'complete',
+  ERROR: 'error'
+};
+
+const OperationType = (window as any).OperationType || {
+  REPOSITORY_CLONE: 'repository_clone',
+  NPM_BUILD: 'npm_build',
+  DOCKER_BUILD: 'docker_build',
+  CUSTOM_SCRIPT: 'custom_script'
+};
+
 // Progress tracker UI instance
-let progressTrackerUI: ProgressTrackerUI | null = null;
+let progressTrackerUI: any = null;
 
 /**
  * Initialize the wizard on page load
@@ -812,11 +821,11 @@ async function initializeDownloadStep() {
         const configPath = './config/setup-config.json';
 
         // Map pipeline phases to operation types
-        const phaseToOperationType: Record<string, OperationType> = {
-            'cloning': OperationType.REPOSITORY_CLONE,
-            'building': OperationType.NPM_BUILD,
-            'docker': OperationType.DOCKER_BUILD,
-            'verifying': OperationType.CUSTOM_SCRIPT,
+        const phaseToOperationType: Record<string, string> = {
+            'cloning': 'repository_clone',
+            'building': 'npm_build',
+            'docker': 'docker_build',
+            'verifying': 'custom_script',
         };
 
         let currentOperationId: string | null = null;
@@ -958,10 +967,11 @@ async function initializeDownloadStep() {
 
         // Show error in the progress tracker UI
         if (progressTrackerUI) {
-            const errorEvent: ErrorEvent = {
+            const errorEvent = {
                 operationId: 'pipeline-error',
                 timestamp: new Date(),
                 message: error instanceof Error ? error.message : String(error),
+                errorMessage: error instanceof Error ? error.message : String(error),
                 error: error instanceof Error ? error : String(error),
                 recoverable: true,
                 retryAction: 'Click Retry to try again'
@@ -1347,7 +1357,7 @@ function openBrowser(url: string) {
     window.open(url, '_blank');
 }
 
-// Export functions for HTML onclick handlers
+// Assign functions to window for use in HTML event handlers
 (window as any).checkPrerequisites = checkPrerequisites;
 (window as any).nextStep = nextStep;
 (window as any).previousStep = previousStep;

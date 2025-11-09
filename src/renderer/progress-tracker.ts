@@ -3,20 +3,67 @@
  * Handles the UI updates for Step 5 progress tracking
  */
 
-import {
-  ProgressPhase,
-  OperationType,
-  ConsoleOutputEvent,
-  ErrorEvent,
-  OperationStartEvent,
-  AggregatedProgress,
-  OperationProgress,
-} from '../types/progress';
+// Type definitions for Progress Tracker
+type ProgressPhaseType = 'initializing' | 'in_progress' | 'completing' | 'complete' | 'failed' | 'cancelled';
+type OperationTypeString = 'repository_clone' | 'npm_install' | 'npm_build' | 'docker_build' | 'custom_script' | 'download' | 'environment_setup';
+
+interface ConsoleOutputEvent {
+  operationId: string;
+  timestamp: Date;
+  stream: 'stdout' | 'stderr';
+  content: string;
+}
+
+interface ProgressErrorEvent {
+  operationId: string;
+  timestamp: Date;
+  message?: string;
+  errorMessage?: string;
+  error?: any;
+  recoverable: boolean;
+  retryAction?: string;
+}
+
+interface OperationStartEvent {
+  operationId: string;
+  operationType: OperationTypeString;
+  name: string;
+  timestamp: Date;
+}
+
+interface AggregatedProgress {
+  overallPercent: number;
+  currentOperation?: {
+    operationId: string;
+    operationType: OperationTypeString;
+    name: string;
+    timestamp: Date;
+  };
+  operations: any[];
+  totalOperations: number;
+  completedOperations: number;
+  failedOperations: number;
+  phase: ProgressPhaseType;
+  startTime: Date;
+}
+
+interface OperationProgress {
+  operationId: string;
+  operationType: OperationTypeString;
+  name: string;
+  phase: ProgressPhaseType;
+  percent: number;
+  message?: string;
+  startTime: Date;
+  endTime?: Date;
+  success?: boolean;
+  errorMessage?: string;
+}
 
 /**
  * Progress Tracker UI Manager
  */
-export class ProgressTrackerUI {
+class ProgressTrackerUI {
   private overallProgressFill: HTMLElement | null = null;
   private overallProgressPercent: HTMLElement | null = null;
   private operationTypeBadge: HTMLElement | null = null;
@@ -99,7 +146,12 @@ export class ProgressTrackerUI {
   /**
    * Update current operation display
    */
-  private updateCurrentOperation(operation: OperationStartEvent): void {
+  private updateCurrentOperation(operation: {
+    operationId: string;
+    operationType: OperationTypeString;
+    name: string;
+    timestamp: Date;
+  }): void {
     if (this.operationTypeBadge) {
       this.operationTypeBadge.textContent = this.formatOperationType(operation.operationType);
     }
@@ -163,15 +215,15 @@ export class ProgressTrackerUI {
             <span style="font-weight: 500; font-size: 0.95rem;">${this.escapeHtml(operation.name)}</span>
             <span style="font-size: 0.85rem; opacity: 0.8;">${operation.percent}%</span>
           </div>
-          <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 8px;">${this.escapeHtml(operation.message)}</div>
-          ${operation.percent < 100 && operation.phase === ProgressPhase.IN_PROGRESS ? `
+          <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 8px;">${this.escapeHtml(operation.message || '')}</div>
+          ${operation.percent < 100 && operation.phase === 'in_progress' ? `
             <div style="height: 4px; background: rgba(0, 0, 0, 0.3); border-radius: 2px; overflow: hidden;">
               <div style="height: 100%; background: ${statusColor}; width: ${operation.percent}%; transition: width 0.3s ease;"></div>
             </div>
           ` : ''}
-          ${operation.error ? `
+          ${operation.errorMessage ? `
             <div style="margin-top: 8px; padding: 8px; background: rgba(244, 67, 54, 0.2); border-radius: 4px; font-size: 0.85rem; color: #ffcdd2;">
-              ${this.escapeHtml(operation.error)}
+              ${this.escapeHtml(operation.errorMessage)}
             </div>
           ` : ''}
         </div>
@@ -206,10 +258,10 @@ export class ProgressTrackerUI {
   /**
    * Show error display
    */
-  public showError(event: ErrorEvent): void {
+  public showError(event: ProgressErrorEvent): void {
     if (!this.errorDisplay || !this.errorMessage) return;
 
-    this.errorMessage.textContent = event.message;
+    this.errorMessage.textContent = event.message || event.errorMessage || 'An error occurred';
     this.errorDisplay.style.display = 'block';
 
     // Store error context for retry
@@ -357,39 +409,39 @@ export class ProgressTrackerUI {
 
   // Helper methods
 
-  private formatOperationType(type: OperationType): string {
-    const typeMap: Record<OperationType, string> = {
-      [OperationType.REPOSITORY_CLONE]: 'Repository Clone',
-      [OperationType.NPM_INSTALL]: 'NPM Install',
-      [OperationType.NPM_BUILD]: 'NPM Build',
-      [OperationType.DOCKER_BUILD]: 'Docker Build',
-      [OperationType.CUSTOM_SCRIPT]: 'Custom Script',
-      [OperationType.DOWNLOAD]: 'Download',
-      [OperationType.ENVIRONMENT_SETUP]: 'Environment Setup',
+  private formatOperationType(type: OperationTypeString): string {
+    const typeMap: Record<OperationTypeString, string> = {
+      'repository_clone': 'Repository Clone',
+      'npm_install': 'NPM Install',
+      'npm_build': 'NPM Build',
+      'docker_build': 'Docker Build',
+      'custom_script': 'Custom Script',
+      'download': 'Download',
+      'environment_setup': 'Environment Setup',
     };
     return typeMap[type] || 'Operation';
   }
 
-  private getStatusIcon(phase: ProgressPhase): string {
-    const iconMap: Record<ProgressPhase, string> = {
-      [ProgressPhase.INITIALIZING]: '⏳',
-      [ProgressPhase.IN_PROGRESS]: '▶️',
-      [ProgressPhase.COMPLETING]: '🔄',
-      [ProgressPhase.COMPLETE]: '✅',
-      [ProgressPhase.FAILED]: '❌',
-      [ProgressPhase.CANCELLED]: '🚫',
+  private getStatusIcon(phase: ProgressPhaseType): string {
+    const iconMap: Record<ProgressPhaseType, string> = {
+      'initializing': '⏳',
+      'in_progress': '▶️',
+      'completing': '🔄',
+      'complete': '✅',
+      'failed': '❌',
+      'cancelled': '🚫',
     };
     return iconMap[phase] || '⏳';
   }
 
-  private getStatusColor(phase: ProgressPhase): string {
-    const colorMap: Record<ProgressPhase, string> = {
-      [ProgressPhase.INITIALIZING]: '#667eea',
-      [ProgressPhase.IN_PROGRESS]: '#2196f3',
-      [ProgressPhase.COMPLETING]: '#ff9800',
-      [ProgressPhase.COMPLETE]: '#4caf50',
-      [ProgressPhase.FAILED]: '#f44336',
-      [ProgressPhase.CANCELLED]: '#9e9e9e',
+  private getStatusColor(phase: ProgressPhaseType): string {
+    const colorMap: Record<ProgressPhaseType, string> = {
+      'initializing': '#667eea',
+      'in_progress': '#2196f3',
+      'completing': '#ff9800',
+      'complete': '#4caf50',
+      'failed': '#f44336',
+      'cancelled': '#9e9e9e',
     };
     return colorMap[phase] || '#667eea';
   }
@@ -404,3 +456,26 @@ export class ProgressTrackerUI {
     return div.innerHTML;
   }
 }
+
+// Make ProgressTrackerUI available globally
+(window as any).ProgressTrackerUI = ProgressTrackerUI;
+
+// Define global ProgressPhase and OperationType objects
+(window as any).ProgressPhase = {
+  INITIALIZING: 'initializing',
+  IN_PROGRESS: 'in_progress',
+  COMPLETING: 'completing',
+  COMPLETE: 'complete',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+};
+
+(window as any).OperationType = {
+  REPOSITORY_CLONE: 'repository_clone',
+  NPM_INSTALL: 'npm_install',
+  NPM_BUILD: 'npm_build',
+  DOCKER_BUILD: 'docker_build',
+  CUSTOM_SCRIPT: 'custom_script',
+  DOWNLOAD: 'download',
+  ENVIRONMENT_SETUP: 'environment_setup'
+};
