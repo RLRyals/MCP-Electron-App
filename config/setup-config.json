@@ -61,7 +61,7 @@
       "repositoryId": "mcp-writing-servers",
       "command": "npm run build",
       "workingDir": ".",
-      "continueOnError": false,
+      "continueOnError": true,
       "timeout": 600
     },
     {
@@ -79,7 +79,7 @@
       "repositoryId": "typingmind-mcp",
       "command": "npm run build",
       "workingDir": ".",
-      "continueOnError": false,
+      "continueOnError": true,
       "timeout": 600
     },
     {

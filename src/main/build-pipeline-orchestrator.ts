@@ -390,8 +390,24 @@ export class BuildPipelineOrchestrator {
 
         builtRepos.push(step.repositoryId);
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         if (!step.continueOnError) {
+          console.error(`Build step failed and continueOnError is false: ${step.name}`, errorMsg);
           throw error;
+        } else {
+          console.warn(`Build step failed but continueOnError is true, continuing: ${step.name}`, errorMsg);
+          // Log the warning for the user to see
+          if (onProgress) {
+            onProgress({
+              phase: PipelinePhase.BUILDING,
+              message: `⚠️ Warning: Build step "${step.name}" failed but continuing: ${errorMsg}`,
+              percent: ((i + 0.5) / buildSteps.length) * 100,
+              currentOperation: step.name,
+              totalOperations: buildSteps.length,
+              currentStep: i + 1,
+              totalSteps: buildSteps.length,
+            });
+          }
         }
       }
     }
