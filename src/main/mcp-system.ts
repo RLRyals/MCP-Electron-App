@@ -125,12 +125,12 @@ services:
       - mcp-network
     restart: unless-stopped
 
-  mcp-servers:
+  mcp-writing-system:
     build:
       context: ..
       dockerfile: docker/Dockerfile.mcp-connector
     image: mcp-writing-servers:latest
-    container_name: mcp-servers
+    container_name: mcp-writing-system
     restart: unless-stopped
     depends_on:
       postgres:
@@ -576,21 +576,45 @@ export async function startMCPSystem(
     // Start services
     const composeFiles: string[] = [];
 
-    // 1. Start core services
+    // 1. Build and start core services
+    const coreFile = getDockerComposeFilePath('core');
+    composeFiles.push(coreFile);
+
+    // Build the mcp-writing-system image first
     if (progressCallback) {
       progressCallback({
-        message: 'Starting core services (PostgreSQL, MCP Servers)...',
+        message: 'Building MCP Writing System image (this may take a few minutes on first run)...',
         percent: 20,
+        step: 'building-image',
+        status: 'starting',
+      });
+    }
+
+    try {
+      logWithCategory('info', LogCategory.DOCKER, 'Building mcp-writing-system image...');
+      await execDockerCompose(coreFile, 'build', ['mcp-writing-system']);
+      logWithCategory('info', LogCategory.DOCKER, 'mcp-writing-system image built successfully');
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.DOCKER, 'Failed to build mcp-writing-system image', error);
+      return {
+        success: false,
+        message: 'Failed to build MCP Writing System image. Check logs for details.',
+        error: error.message,
+      };
+    }
+
+    // Start core services
+    if (progressCallback) {
+      progressCallback({
+        message: 'Starting core services (PostgreSQL, MCP Writing System)...',
+        percent: 40,
         step: 'starting-core',
         status: 'starting',
       });
     }
 
-    const coreFile = getDockerComposeFilePath('core');
-    composeFiles.push(coreFile);
-
     try {
-      await execDockerCompose(coreFile, 'up', ['-d']);
+      await execDockerCompose(coreFile, 'up', ['-d', 'mcp-writing-system']);
       logWithCategory('info', LogCategory.DOCKER, 'Core services started');
     } catch (error: any) {
       logWithCategory('error', LogCategory.DOCKER, 'Failed to start core services', error);
@@ -618,7 +642,7 @@ export async function startMCPSystem(
       if (progressCallback) {
         progressCallback({
           message: 'Starting MCP Connector...',
-          percent: 40,
+          percent: 55,
           step: 'starting-connector',
           status: 'starting',
         });
@@ -641,7 +665,7 @@ export async function startMCPSystem(
       if (progressCallback) {
         progressCallback({
           message: 'Starting Typing Mind...',
-          percent: 60,
+          percent: 65,
           step: 'starting-typing-mind',
           status: 'starting',
         });
@@ -868,7 +892,7 @@ export async function getServiceUrls(): Promise<ServiceUrls> {
  * View service logs
  */
 export async function viewServiceLogs(
-  serviceName: 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind',
+  serviceName: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind',
   tail: number = 100
 ): Promise<ServiceLogsResult> {
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
@@ -876,7 +900,7 @@ export async function viewServiceLogs(
   try {
     // Determine which compose file to use
     let composeFile: string;
-    if (serviceName === 'postgres' || serviceName === 'mcp-servers') {
+    if (serviceName === 'postgres' || serviceName === 'mcp-writing-system') {
       composeFile = getDockerComposeFilePath('core');
     } else if (serviceName === 'mcp-connector') {
       composeFile = getDockerComposeFilePath('mcp-connector');
