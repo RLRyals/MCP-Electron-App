@@ -46,6 +46,13 @@ export const IPC_CHANNELS = {
     CANCEL: 'build:cancel',
     PROGRESS: 'build:progress',
   },
+  // Pipeline channels
+  PIPELINE: {
+    EXECUTE: 'pipeline:execute',
+    CANCEL: 'pipeline:cancel',
+    GET_STATUS: 'pipeline:get-status',
+    PROGRESS: 'pipeline:progress',
+  },
 } as const;
 
 /**
@@ -179,6 +186,57 @@ export interface BuildExecuteCustomScriptResponse {
 export interface BuildCancelResponse {
   success: boolean;
   message: string;
+}
+
+/**
+ * Pipeline IPC Request/Response Types
+ */
+
+export interface PipelineExecuteRequest {
+  configPath: string;
+  options?: {
+    selectedComponents?: string[];
+    skipClone?: boolean;
+    skipBuild?: boolean;
+    skipDocker?: boolean;
+    skipVerification?: boolean;
+    force?: boolean;
+    workingDirectory?: string;
+  };
+}
+
+export interface PipelineExecuteResponse {
+  success: boolean;
+  message: string;
+  result?: {
+    phase: string;
+    clonedRepositories: string[];
+    builtRepositories: string[];
+    dockerImages: string[];
+    verifiedArtifacts: string[];
+    errors: Array<{
+      phase: string;
+      component: string;
+      error: string;
+    }>;
+    duration: number;
+  };
+  error?: string;
+}
+
+export interface PipelineCancelResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface PipelineStatusRequest {
+  // No parameters needed
+}
+
+export interface PipelineStatusResponse {
+  success: boolean;
+  phase: string;
+  message?: string;
 }
 
 /**

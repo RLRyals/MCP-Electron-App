@@ -1439,6 +1439,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
       COMPLETE: 7
     }
   },
+
+  /**
+   * Build Pipeline API
+   */
+  pipeline: {
+    /**
+     * Execute the build pipeline
+     */
+    execute: (configPath: string, options?: any): Promise<any> => {
+      return ipcRenderer.invoke('pipeline:execute', { configPath, options });
+    },
+
+    /**
+     * Cancel ongoing pipeline operation
+     */
+    cancel: (): Promise<any> => {
+      return ipcRenderer.invoke('pipeline:cancel');
+    },
+
+    /**
+     * Get current pipeline status
+     */
+    getStatus: (): Promise<any> => {
+      return ipcRenderer.invoke('pipeline:get-status');
+    },
+
+    /**
+     * Listen for pipeline progress updates
+     */
+    onProgress: (callback: (progress: any) => void): void => {
+      ipcRenderer.on('pipeline:progress', (_event, progress) => callback(progress));
+    },
+
+    /**
+     * Remove pipeline progress listener
+     */
+    removeProgressListener: (): void => {
+      ipcRenderer.removeAllListeners('pipeline:progress');
+    },
+  },
 });
 
 console.log('Preload script loaded successfully');
