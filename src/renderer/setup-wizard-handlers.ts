@@ -1043,7 +1043,7 @@ async function initializeDownloadStep() {
         });
 
         // Save wizard state
-        await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
+        const saveResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             buildPipeline: {
                 completed: true,
                 clonedRepositories: result.result?.clonedRepositories || [],
@@ -1056,6 +1056,13 @@ async function initializeDownloadStep() {
                 dockerImagesCompleted: true
             }
         });
+
+        if (!saveResult.success) {
+            throw new Error(`Failed to save wizard state: ${saveResult.error}`);
+        }
+
+        // Refresh wizard state to ensure it's up to date
+        wizardState = await (window as any).electronAPI.setupWizard.getState();
 
         statusContainer.innerHTML = `
             <div class="alert success" style="background: rgba(76, 175, 80, 0.2); border: 2px solid rgba(76, 175, 80, 0.5); padding: 20px; border-radius: 12px;">
