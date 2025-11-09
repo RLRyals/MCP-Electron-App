@@ -395,18 +395,23 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
     case WizardStep.DOWNLOAD_SETUP:
       // Check that downloads are complete
       const needsTypingMind = state.data.clients?.includes('typingmind');
+      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, typingMindCompleted=${state.data.downloads?.typingMindCompleted}, dockerImagesCompleted=${state.data.downloads?.dockerImagesCompleted}`);
+
       if (needsTypingMind && !state.data.downloads?.typingMindCompleted) {
+        logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Typing mind needed but not completed`);
         return {
           canProceed: false,
           reason: 'Downloads must complete successfully'
         };
       }
       if (!state.data.downloads?.dockerImagesCompleted) {
+        logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Docker images not completed`);
         return {
           canProceed: false,
           reason: 'Docker images must be loaded'
         };
       }
+      logWithCategory('debug', LogCategory.SYSTEM, `DOWNLOAD_SETUP validation passed`);
       return { canProceed: true };
 
     case WizardStep.SYSTEM_STARTUP:

@@ -696,7 +696,7 @@ function setupClientSelectionListeners() {
 /**
  * Save client selection
  */
-async function saveClientSelection() {
+async function saveClientSelection(): Promise<boolean> {
     const statusEl = document.getElementById('client-selection-status');
 
     try {
@@ -718,9 +718,13 @@ async function saveClientSelection() {
 
         if (result.success) {
             // Save wizard state
-            await (window as any).electronAPI.setupWizard.saveState(WizardStep.CLIENT_SELECTION, {
+            const saveStateResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.CLIENT_SELECTION, {
                 clients: selectedClients
             });
+
+            if (!saveStateResult.success) {
+                throw new Error(`Failed to save wizard state: ${saveStateResult.error}`);
+            }
 
             if (statusEl) {
                 statusEl.innerHTML = `
@@ -733,6 +737,8 @@ async function saveClientSelection() {
                     </div>
                 `;
             }
+
+            return true;
         } else {
             throw new Error(result.error || 'Failed to save selection');
         }
@@ -750,6 +756,7 @@ async function saveClientSelection() {
                 </div>
             `;
         }
+        return false;
     }
 }
 
@@ -1343,6 +1350,35 @@ function escapeHtml(text: string): string {
  * Navigation functions
  */
 async function nextStep() {
+    // For CLIENT_SELECTION step, automatically save selection before proceeding
+    if (currentStep === WizardStep.CLIENT_SELECTION) {
+        const saved = await saveClientSelection();
+        if (!saved) {
+            // Save failed, don't proceed
+            return;
+        }
+
+        // Now complete the step and move to next
+        const result = await (window as any).electronAPI.setupWizard.completeStep(currentStep);
+        if (result.success && result.nextStep) {
+            // Update wizard state
+            wizardState = await (window as any).electronAPI.setupWizard.getState();
+
+            // Show next step
+            showStep(result.nextStep);
+
+            // Initialize next step
+            await initializeCurrentStep();
+
+            // Update progress
+            await updateProgress();
+
+            // Update sidebar
+            initializeSidebarSteps();
+        }
+        return;
+    }
+
     // Validate current step before proceeding
     const canProceed = await validateCurrentStep();
 
