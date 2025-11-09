@@ -786,10 +786,16 @@ function createRetryButton(buttonId: string, stepFunction: () => void, buttonTex
  * Step 5: Initialize Download & Setup
  */
 async function initializeDownloadStep() {
+    console.log('initializeDownloadStep called');
     const statusContainer = document.getElementById('download-status-container');
+    console.log('statusContainer:', statusContainer);
 
-    if (!statusContainer) return;
+    if (!statusContainer) {
+        console.log('ERROR: statusContainer not found!');
+        return;
+    }
 
+    console.log('Initializing progress tracker UI');
     // Initialize progress tracker UI
     if (!progressTrackerUI) {
         progressTrackerUI = new ProgressTrackerUI();
@@ -798,7 +804,9 @@ async function initializeDownloadStep() {
     }
 
     // Check if build already completed
+    console.log('buildPipeline.completed:', wizardState.data.buildPipeline?.completed);
     if (wizardState.data.buildPipeline?.completed) {
+        console.log('Build already completed, showing success message');
         statusContainer.innerHTML = `
             <div class="alert success">
                 <span style="font-size: 1.5rem;">✓</span>
@@ -811,11 +819,31 @@ async function initializeDownloadStep() {
         return;
     }
 
+    // If downloads state exists but build is not marked complete, show warning
+    if (wizardState.data.downloads && !wizardState.data.buildPipeline?.completed) {
+        console.log('WARNING: downloads state exists but build not marked complete');
+        statusContainer.innerHTML = `
+            <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
+                <span style="font-size: 1.5rem;">⚠️</span>
+                <div>
+                    <strong>Build Status Unknown</strong><br>
+                    The build appears to have partially completed. Click Retry to resume or complete the build.
+                </div>
+            </div>
+            ${createRetryButton('retry-build-status-btn', initializeDownloadStep, 'Retry')}
+        `;
+        return;
+    }
+
     try {
         // Check Docker status before starting the build pipeline
         console.log('Checking Docker status before build pipeline...');
+        console.log('electronAPI available:', !!(window as any).electronAPI);
+        console.log('docker available:', !!(window as any).electronAPI?.docker);
+
         const dockerStatus = await (window as any).electronAPI.docker.healthCheck();
         console.log('Docker status:', dockerStatus);
+        console.log('Docker running:', dockerStatus.running, 'Docker healthy:', dockerStatus.healthy);
 
         // If Docker is not installed
         if (!dockerStatus.running && !dockerStatus.healthy) {
@@ -1000,12 +1028,15 @@ async function initializeDownloadStep() {
         });
 
         // Execute the build pipeline
+        console.log('Executing build pipeline with components:', selectedComponents);
         const result = await (window as any).electronAPI.pipeline.execute(configPath, {
             selectedComponents,
             skipDocker: false,
             skipVerification: false,
             force: false
         });
+
+        console.log('Build pipeline execution result:', result);
 
         // Remove progress listener
         (window as any).electronAPI.pipeline.removeProgressListener();
@@ -1015,6 +1046,8 @@ async function initializeDownloadStep() {
             console.error('Pipeline failed with error:', errorMsg);
             throw new Error(errorMsg);
         }
+
+        console.log('Build pipeline succeeded, will now save state');
 
         // Mark the final operation as complete
         if (currentOperationId) {

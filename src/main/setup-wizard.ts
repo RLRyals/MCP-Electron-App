@@ -395,20 +395,29 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
     case WizardStep.DOWNLOAD_SETUP:
       // Check that downloads are complete
       const needsTypingMind = state.data.clients?.includes('typingmind');
-      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, typingMindCompleted=${state.data.downloads?.typingMindCompleted}, dockerImagesCompleted=${state.data.downloads?.dockerImagesCompleted}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, downloads=${JSON.stringify(state.data.downloads)}`);
 
-      if (needsTypingMind && !state.data.downloads?.typingMindCompleted) {
+      // If downloads object doesn't exist, the build hasn't been run yet
+      if (!state.data.downloads) {
+        logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Downloads object not initialized - build may not have completed`);
+        return {
+          canProceed: false,
+          reason: 'Build pipeline has not completed. Please wait for the build to finish.'
+        };
+      }
+
+      if (needsTypingMind && !state.data.downloads.typingMindCompleted) {
         logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Typing mind needed but not completed`);
         return {
           canProceed: false,
-          reason: 'Downloads must complete successfully'
+          reason: 'Typing Mind download is still in progress. Please wait for it to complete.'
         };
       }
-      if (!state.data.downloads?.dockerImagesCompleted) {
+      if (!state.data.downloads.dockerImagesCompleted) {
         logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Docker images not completed`);
         return {
           canProceed: false,
-          reason: 'Docker images must be loaded'
+          reason: 'Docker images are still being loaded. Please wait for this to complete.'
         };
       }
       logWithCategory('debug', LogCategory.SYSTEM, `DOWNLOAD_SETUP validation passed`);
