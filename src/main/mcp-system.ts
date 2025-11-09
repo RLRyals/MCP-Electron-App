@@ -85,171 +85,53 @@ const HEALTH_CHECK_TIMEOUT = 120000;
 const HEALTH_CHECK_INTERVAL = 2000;
 
 /**
- * Get the MCP working directory
+ * Get the MCP working directory (base directory for all MCP data)
  */
 export function getMCPWorkingDirectory(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system');
+  return userDataPath;
 }
 
 /**
- * Get docker-compose file path
+ * Get the cloned MCP-Writing-Servers repository path
+ */
+export function getMCPRepositoryDirectory(): string {
+  return path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
+}
+
+/**
+ * Get docker-compose file path from the cloned MCP-Writing-Servers repository
  */
 function getDockerComposeFilePath(type: 'core' | 'mcp-connector' | 'typing-mind'): string {
-  return path.join(getMCPWorkingDirectory(), `docker-compose.${type}.yml`);
+  const repoPath = getMCPRepositoryDirectory();
+  return path.join(repoPath, 'docker', `docker-compose.${type}.yml`);
 }
 
 /**
- * Generate docker-compose.core.yml content
- */
-function generateCoreComposeFile(config: envConfig.EnvConfig): string {
-  return `
-services:
-  postgres:
-    image: postgres:15
-    container_name: mcp-postgres
-    environment:
-      POSTGRES_DB: ${config.POSTGRES_DB}
-      POSTGRES_USER: ${config.POSTGRES_USER}
-      POSTGRES_PASSWORD: ${config.POSTGRES_PASSWORD}
-    ports:
-      - "${config.POSTGRES_PORT}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${config.POSTGRES_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - mcp-network
-    restart: unless-stopped
-
-  mcp-writing-system:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.mcp-connector
-    image: mcp-writing-servers:latest
-    container_name: mcp-writing-system
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@postgres:5432/${config.POSTGRES_DB}
-    volumes:
-      - mcp-data:/data
-    networks:
-      - mcp-network
-    healthcheck:
-      test: ["CMD-SHELL", "echo 'healthy'"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres-data:
-    name: mcp-postgres-data
-  mcp-data:
-    name: mcp-data
-
-networks:
-  mcp-network:
-    name: mcp-network
-    driver: bridge
-`;
-}
-
-/**
- * Generate docker-compose.mcp-connector.yml content
- */
-function generateMCPConnectorComposeFile(config: envConfig.EnvConfig): string {
-  return `version: '3.8'
-
-services:
-  mcp-connector:
-    image: mcp-connector:latest
-    container_name: mcp-connector
-    ports:
-      - "${config.MCP_CONNECTOR_PORT}:50880"
-    environment:
-      MCP_AUTH_TOKEN: ${config.MCP_AUTH_TOKEN}
-      DATABASE_URL: postgres://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@postgres:5432/${config.POSTGRES_DB}
-    networks:
-      - mcp-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:50880/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-networks:
-  mcp-network:
-    name: mcp-network
-    external: true
-`;
-}
-
-/**
- * Generate docker-compose.typing-mind.yml content
- */
-function generateTypingMindComposeFile(config: envConfig.EnvConfig): string {
-  const typingMindPath = typingMindDownloader.getTypingMindDirectory();
-
-  return `version: '3.8'
-
-services:
-  typing-mind:
-    image: nginx:alpine
-    container_name: typing-mind
-    ports:
-      - "${config.TYPING_MIND_PORT}:80"
-    volumes:
-      - ${typingMindPath}:/usr/share/nginx/html:ro
-    networks:
-      - mcp-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-networks:
-  mcp-network:
-    name: mcp-network
-    external: true
-`;
-}
-
-/**
- * Ensure docker-compose files exist with current configuration
+ * Ensure docker-compose files exist in the cloned MCP-Writing-Servers repository
  */
 async function ensureDockerComposeFiles(): Promise<void> {
-  logWithCategory('info', LogCategory.DOCKER, 'Ensuring docker-compose files exist...');
+  logWithCategory('info', LogCategory.DOCKER, 'Checking docker-compose files from repository...');
 
-  // Load current configuration
-  const config = await envConfig.loadEnvConfig();
+  // Check that the MCP-Writing-Servers repository exists
+  const repoPath = getMCPRepositoryDirectory();
+  if (!await fs.pathExists(repoPath)) {
+    throw new Error(
+      `MCP-Writing-Servers repository not found at ${repoPath}. ` +
+      'Please ensure the repository was cloned during installation.'
+    );
+  }
 
-  // Ensure MCP working directory exists
-  const mcpDir = getMCPWorkingDirectory();
-  await fs.ensureDir(mcpDir);
+  // Check that required docker-compose files exist
+  const coreComposePath = getDockerComposeFilePath('core');
+  if (!await fs.pathExists(coreComposePath)) {
+    throw new Error(
+      `docker-compose.core.yml not found at ${coreComposePath}. ` +
+      'The MCP-Writing-Servers repository may be incomplete or corrupted.'
+    );
+  }
 
-  // Generate and save core compose file
-  const coreContent = generateCoreComposeFile(config);
-  await fs.writeFile(getDockerComposeFilePath('core'), coreContent, 'utf-8');
-  logWithCategory('info', LogCategory.DOCKER, 'Created docker-compose.core.yml');
-
-  // Generate and save MCP connector compose file
-  const connectorContent = generateMCPConnectorComposeFile(config);
-  await fs.writeFile(getDockerComposeFilePath('mcp-connector'), connectorContent, 'utf-8');
-  logWithCategory('info', LogCategory.DOCKER, 'Created docker-compose.mcp-connector.yml');
-
-  // Generate and save Typing Mind compose file
-  const typingMindContent = generateTypingMindComposeFile(config);
-  await fs.writeFile(getDockerComposeFilePath('typing-mind'), typingMindContent, 'utf-8');
-  logWithCategory('info', LogCategory.DOCKER, 'Created docker-compose.typing-mind.yml');
+  logWithCategory('info', LogCategory.DOCKER, 'Docker-compose files verified from repository');
 }
 
 /**
@@ -341,13 +223,15 @@ async function execDockerCompose(
   command: string,
   args: string[] = []
 ): Promise<{ stdout: string; stderr: string }> {
-  const mcpDir = getMCPWorkingDirectory();
+  // Use the repository directory as the working directory so Docker can find build contexts
+  const repoDir = getMCPRepositoryDirectory();
   const fullCommand = `docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
 
   logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
+  logWithCategory('info', LogCategory.DOCKER, `Working directory: ${repoDir}`);
 
   try {
-    const result = await execAsync(fullCommand, { cwd: mcpDir });
+    const result = await execAsync(fullCommand, { cwd: repoDir });
     return result;
   } catch (error: any) {
     logWithCategory('error', LogCategory.DOCKER, `Docker-compose command failed: ${fullCommand}`, error);
