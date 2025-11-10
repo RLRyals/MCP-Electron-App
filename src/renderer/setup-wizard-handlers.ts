@@ -1638,11 +1638,10 @@ function cancelWizard() {
  */
 async function launchDashboard() {
     try {
-        // Mark wizard as complete
+        // Mark wizard as complete - main process will close wizard and open dashboard
         await (window as any).electronAPI.setupWizard.markComplete();
 
-        // Close wizard window - main process will open dashboard
-        window.close();
+        // Window will be closed by main process after successful completion
 
     } catch (error) {
         console.error('Error launching dashboard:', error);

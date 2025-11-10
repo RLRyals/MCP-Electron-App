@@ -61,6 +61,9 @@ export async function initializeDashboard(): Promise<void> {
     // Load initial status
     await updateSystemStatus();
 
+    // Check if system needs to be auto-started after wizard completion
+    await checkAndAutoStartSystem();
+
     // Start polling
     startStatusPolling();
   } catch (error) {
@@ -149,6 +152,60 @@ function stopStatusPolling(): void {
     clearInterval(statusPollingInterval);
     statusPollingInterval = null;
     console.log('Stopped status polling');
+  }
+}
+
+/**
+ * Check if system should be auto-started after wizard completion
+ * This handles the case where the wizard started containers but they stopped or weren't detected
+ */
+async function checkAndAutoStartSystem(): Promise<void> {
+  try {
+    // Check if electronAPI is available
+    if (!window.electronAPI || !window.electronAPI.mcpSystem) {
+      return;
+    }
+
+    // Get current system status
+    const status = await window.electronAPI.mcpSystem.getStatus();
+
+    // If system is already running, no action needed
+    if (status.running) {
+      console.log('System is already running, no auto-start needed');
+      return;
+    }
+
+    // Check if wizard was just completed (not first run anymore)
+    const isFirstRun = await (window as any).electronAPI.setupWizard.isFirstRun();
+    if (isFirstRun) {
+      console.log('First run detected, not auto-starting (wizard should handle this)');
+      return;
+    }
+
+    // Check wizard state to see if system startup was completed
+    const wizardState = await (window as any).electronAPI.setupWizard.getState();
+    if (wizardState?.data?.systemStartup?.healthy) {
+      console.log('System was marked healthy during wizard but is now offline - auto-starting...');
+      showNotification('Starting MCP system...', 'info');
+
+      // Auto-start the system
+      const result = await window.electronAPI.mcpSystem.start();
+
+      if (result.success) {
+        console.log('System auto-started successfully');
+        showNotification('MCP system started successfully!', 'success');
+        // Update status to reflect the change
+        await updateSystemStatus();
+      } else {
+        console.error('Auto-start failed:', result.message || result.error);
+        showNotification(`Failed to start system: ${result.message || result.error}`, 'error');
+      }
+    } else {
+      console.log('System startup not completed during wizard, manual start required');
+    }
+  } catch (error) {
+    console.error('Error checking auto-start conditions:', error);
+    // Don't show notification for this error - just log it
   }
 }
 
