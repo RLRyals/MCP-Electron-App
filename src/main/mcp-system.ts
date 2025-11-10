@@ -226,26 +226,31 @@ async function execDockerCompose(
   // Use the repository directory as the working directory so Docker can find build contexts
   const repoDir = getMCPRepositoryDirectory();
 
-  // Load environment variables and build env string for docker-compose
+  // Load environment variables for docker-compose
   const config = await envConfig.loadEnvConfig();
-  const envVars = [
-    `POSTGRES_DB=${config.POSTGRES_DB}`,
-    `POSTGRES_USER=${config.POSTGRES_USER}`,
-    `POSTGRES_PASSWORD=${config.POSTGRES_PASSWORD}`,
-    `POSTGRES_PORT=${config.POSTGRES_PORT}`,
-    `MCP_CONNECTOR_PORT=${config.MCP_CONNECTOR_PORT}`,
-    `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
-    `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
-  ].join(' ');
 
-  const fullCommand = `${envVars} docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
+  // Build the command without inline environment variables
+  const fullCommand = `docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
 
-  logWithCategory('info', LogCategory.DOCKER, `Executing: docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`);
+  logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
   logWithCategory('info', LogCategory.DOCKER, `Working directory: ${repoDir}`);
   logWithCategory('info', LogCategory.DOCKER, `Environment variables: MCP_AUTH_TOKEN=****, POSTGRES_PASSWORD=****`);
 
   try {
-    const result = await execAsync(fullCommand, { cwd: repoDir });
+    // Pass environment variables through the env option (cross-platform compatible)
+    const result = await execAsync(fullCommand, {
+      cwd: repoDir,
+      env: {
+        ...process.env, // Include existing environment variables
+        POSTGRES_DB: config.POSTGRES_DB,
+        POSTGRES_USER: config.POSTGRES_USER,
+        POSTGRES_PASSWORD: config.POSTGRES_PASSWORD,
+        POSTGRES_PORT: String(config.POSTGRES_PORT),
+        MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
+        MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
+        TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
+      }
+    });
     return result;
   } catch (error: any) {
     logWithCategory('error', LogCategory.DOCKER, `Docker-compose command failed: ${fullCommand}`, error);
