@@ -904,7 +904,21 @@ function setupIPC(): void {
 
   ipcMain.handle('setup-wizard:mark-complete', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Marking wizard as complete...');
-    return await setupWizard.markWizardComplete();
+    const result = await setupWizard.markWizardComplete();
+
+    // Close the wizard window and open the dashboard
+    if (mainWindow) {
+      logWithCategory('info', LogCategory.SYSTEM, 'Closing wizard and opening dashboard...');
+      mainWindow.close();
+      mainWindow = null;
+
+      // Small delay to ensure window closes cleanly
+      setTimeout(() => {
+        createWindow();
+      }, 100);
+    }
+
+    return result;
   });
 
   ipcMain.handle('setup-wizard:reset', async () => {
