@@ -561,9 +561,24 @@ async function saveEnvironmentConfig() {
             config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
         }
 
+        // Final validation: ensure credentials are NEVER empty
+        if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+            throw new Error('POSTGRES_PASSWORD is empty - this should never happen. Please report this bug.');
+        }
+        if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+            throw new Error('MCP_AUTH_TOKEN is empty - this should never happen. Please report this bug.');
+        }
+
         if (statusEl) {
             statusEl.innerHTML = '<div class="spinner" style="display: inline-block;"></div> Saving configuration...';
         }
+
+        console.log('Saving configuration with credentials:', {
+            hasPassword: !!config.POSTGRES_PASSWORD,
+            hasToken: !!config.MCP_AUTH_TOKEN,
+            passwordLength: config.POSTGRES_PASSWORD?.length,
+            tokenLength: config.MCP_AUTH_TOKEN?.length
+        });
 
         // Save configuration
         const result = await (window as any).electronAPI.envConfig.saveConfig(config);

@@ -457,10 +457,20 @@ function setupIPC(): void {
 
   ipcMain.handle('env:save-config', async (_, config: envConfig.EnvConfig) => {
     logger.info('Saving environment configuration...');
+    logger.info('Config credentials check:', {
+      hasPassword: !!config.POSTGRES_PASSWORD,
+      hasToken: !!config.MCP_AUTH_TOKEN,
+      passwordLength: config.POSTGRES_PASSWORD?.length || 0,
+      tokenLength: config.MCP_AUTH_TOKEN?.length || 0
+    });
+
     const validation = envConfig.validateConfig(config);
     if (!validation.valid) {
+      logger.error('Config validation failed:', validation.errors);
       return { success: false, error: 'Validation failed: ' + validation.errors.join(', ') };
     }
+
+    logger.info('Config validation passed, proceeding to save');
     const result = await envConfig.saveEnvConfig(config);
 
     // Update GitHub credentials if token changed
