@@ -270,6 +270,13 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
 
 /**
  * Load configuration from .env file
+ *
+ * If no .env file exists, this function will:
+ * 1. Generate secure random values for POSTGRES_PASSWORD and MCP_AUTH_TOKEN
+ * 2. Automatically save the generated config to ensure consistency across app restarts
+ * 3. Return the newly generated config
+ *
+ * This ensures the dashboard and docker-compose always see the same environment variables.
  */
 export async function loadEnvConfig(): Promise<EnvConfig> {
   const envPath = getEnvFilePath();
@@ -301,17 +308,33 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
 
       return config;
     } else {
-      logger.info('No .env file found, using defaults with generated secrets');
+      logger.info('No .env file found, generating new configuration with secure defaults');
 
       // Check for GitHub token in environment variables even if no .env file exists
       const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
 
-      return {
+      // Generate new config with secure random values
+      const newConfig: EnvConfig = {
         ...DEFAULT_CONFIG,
         POSTGRES_PASSWORD: generatePassword(),
         MCP_AUTH_TOKEN: generateAuthToken(),
         GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
       };
+
+      // Auto-save the generated config so it persists across restarts
+      logger.info('Auto-saving generated configuration to ensure consistency');
+      try {
+        const saveResult = await saveEnvConfig(newConfig);
+        if (saveResult.success) {
+          logger.info('Generated configuration saved successfully');
+        } else {
+          logger.warn('Failed to auto-save generated configuration:', saveResult.error);
+        }
+      } catch (saveError) {
+        logger.error('Error auto-saving generated configuration:', saveError);
+      }
+
+      return newConfig;
     }
   } catch (error) {
     logger.error('Error loading .env file:', error);
@@ -319,12 +342,28 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
     // Check for GitHub token in environment variables even on error
     const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
 
-    return {
+    // Generate new config with secure random values
+    const newConfig: EnvConfig = {
       ...DEFAULT_CONFIG,
       POSTGRES_PASSWORD: generatePassword(),
       MCP_AUTH_TOKEN: generateAuthToken(),
       GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
     };
+
+    // Try to save the generated config even after error
+    logger.info('Attempting to save generated configuration after error');
+    try {
+      const saveResult = await saveEnvConfig(newConfig);
+      if (saveResult.success) {
+        logger.info('Generated configuration saved successfully after error recovery');
+      } else {
+        logger.warn('Failed to save generated configuration after error:', saveResult.error);
+      }
+    } catch (saveError) {
+      logger.error('Error saving generated configuration during error recovery:', saveError);
+    }
+
+    return newConfig;
   }
 }
 
