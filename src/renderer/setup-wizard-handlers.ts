@@ -542,10 +542,24 @@ async function saveEnvironmentConfig() {
             TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value)
         };
 
-        // Generate password and token if not set
+        // Get current config and ensure password and token are set
         const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
-        config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
-        config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
+
+        // If current config has empty or missing credentials, generate new ones
+        // This ensures credentials are never empty when saving
+        if (!currentConfig.POSTGRES_PASSWORD || currentConfig.POSTGRES_PASSWORD.trim() === '') {
+            console.log('Generating new database password for first-time setup...');
+            config.POSTGRES_PASSWORD = await (window as any).electronAPI.envConfig.generatePassword(16);
+        } else {
+            config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
+        }
+
+        if (!currentConfig.MCP_AUTH_TOKEN || currentConfig.MCP_AUTH_TOKEN.trim() === '') {
+            console.log('Generating new MCP auth token for first-time setup...');
+            config.MCP_AUTH_TOKEN = await (window as any).electronAPI.envConfig.generateToken();
+        } else {
+            config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
+        }
 
         if (statusEl) {
             statusEl.innerHTML = '<div class="spinner" style="display: inline-block;"></div> Saving configuration...';

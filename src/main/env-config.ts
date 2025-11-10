@@ -271,12 +271,8 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
 /**
  * Load configuration from .env file
  *
- * If no .env file exists, this function will:
- * 1. Generate secure random values for POSTGRES_PASSWORD and MCP_AUTH_TOKEN
- * 2. Automatically save the generated config to ensure consistency across app restarts
- * 3. Return the newly generated config
- *
- * This ensures the dashboard and docker-compose always see the same environment variables.
+ * WARNING: This function generates random credentials if no .env exists, but does NOT save them.
+ * The setup wizard must explicitly save the configuration to persist it.
  */
 export async function loadEnvConfig(): Promise<EnvConfig> {
   const envPath = getEnvFilePath();
@@ -301,6 +297,14 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         }
       }
 
+      // Validate that critical fields are not empty
+      if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+        logger.warn('MCP_AUTH_TOKEN is empty in .env file - this will cause docker container errors');
+      }
+      if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+        logger.warn('POSTGRES_PASSWORD is empty in .env file - this will cause database connection errors');
+      }
+
       // Log with sanitized content
       const sanitized = sanitizeEnvFileContent(content);
       logger.info('Loaded .env configuration from:', envPath);
@@ -308,62 +312,33 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
 
       return config;
     } else {
-      logger.info('No .env file found, generating new configuration with secure defaults');
+      logger.warn('No .env file found at:', envPath);
+      logger.warn('Returning temporary config with generated credentials - these will NOT persist!');
+      logger.warn('The setup wizard must be completed to save the configuration.');
 
       // Check for GitHub token in environment variables even if no .env file exists
       const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
 
-      // Generate new config with secure random values
-      const newConfig: EnvConfig = {
+      return {
         ...DEFAULT_CONFIG,
         POSTGRES_PASSWORD: generatePassword(),
         MCP_AUTH_TOKEN: generateAuthToken(),
         GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
       };
-
-      // Auto-save the generated config so it persists across restarts
-      logger.info('Auto-saving generated configuration to ensure consistency');
-      try {
-        const saveResult = await saveEnvConfig(newConfig);
-        if (saveResult.success) {
-          logger.info('Generated configuration saved successfully');
-        } else {
-          logger.warn('Failed to auto-save generated configuration:', saveResult.error);
-        }
-      } catch (saveError) {
-        logger.error('Error auto-saving generated configuration:', saveError);
-      }
-
-      return newConfig;
     }
   } catch (error) {
     logger.error('Error loading .env file:', error);
+    logger.warn('Returning temporary config with generated credentials - these will NOT persist!');
 
     // Check for GitHub token in environment variables even on error
     const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
 
-    // Generate new config with secure random values
-    const newConfig: EnvConfig = {
+    return {
       ...DEFAULT_CONFIG,
       POSTGRES_PASSWORD: generatePassword(),
       MCP_AUTH_TOKEN: generateAuthToken(),
       GITHUB_TOKEN: envToken && envToken.trim().length > 0 ? envToken.trim() : '',
     };
-
-    // Try to save the generated config even after error
-    logger.info('Attempting to save generated configuration after error');
-    try {
-      const saveResult = await saveEnvConfig(newConfig);
-      if (saveResult.success) {
-        logger.info('Generated configuration saved successfully after error recovery');
-      } else {
-        logger.warn('Failed to save generated configuration after error:', saveResult.error);
-      }
-    } catch (saveError) {
-      logger.error('Error saving generated configuration during error recovery:', saveError);
-    }
-
-    return newConfig;
   }
 }
 

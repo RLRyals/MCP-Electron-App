@@ -448,6 +448,25 @@ export async function startMCPSystem(
       };
     }
 
+    // Verify environment configuration is valid before starting
+    const config = await envConfig.loadEnvConfig();
+    if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+      logWithCategory('error', LogCategory.DOCKER, 'MCP_AUTH_TOKEN is not configured');
+      return {
+        success: false,
+        message: 'Environment configuration is incomplete. Please complete the setup wizard and configure the environment settings before starting the system.',
+        error: 'INVALID_CONFIG',
+      };
+    }
+    if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+      logWithCategory('error', LogCategory.DOCKER, 'POSTGRES_PASSWORD is not configured');
+      return {
+        success: false,
+        message: 'Database password is not configured. Please complete the setup wizard and configure the environment settings before starting the system.',
+        error: 'INVALID_CONFIG',
+      };
+    }
+
     // Ensure docker-compose files exist
     if (progressCallback) {
       progressCallback({
