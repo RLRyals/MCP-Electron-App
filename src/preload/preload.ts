@@ -529,6 +529,47 @@ interface CanProceedResult {
 }
 
 /**
+ * Migration definition interface
+ */
+interface Migration {
+  version: string;
+  description: string;
+  steps: WizardStep[];
+  skipIfFresh?: boolean;
+  critical?: boolean;
+  fromVersion?: string;
+}
+
+/**
+ * Migration result interface
+ */
+interface MigrationResult {
+  version: string;
+  success: boolean;
+  appliedAt: string;
+  stepsRerun: WizardStep[];
+  error?: string;
+}
+
+/**
+ * Pending migrations status
+ */
+interface PendingMigrationsStatus {
+  hasPending: boolean;
+  migrations: Migration[];
+  criticalCount: number;
+  optionalCount: number;
+}
+
+/**
+ * Migration validation result
+ */
+interface MigrationValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/**
  * Expose a secure API to the renderer process
  * This API is the only way the renderer can communicate with the main process
  */
@@ -1479,6 +1520,53 @@ contextBridge.exposeInMainWorld('electronAPI', {
       SYSTEM_STARTUP: 6,
       COMPLETE: 7
     }
+  },
+
+  /**
+   * Migrations API
+   */
+  migrations: {
+    /**
+     * Check for pending migrations at startup
+     */
+    checkPending: (): Promise<PendingMigrationsStatus> => {
+      return ipcRenderer.invoke('migrations:check-pending');
+    },
+
+    /**
+     * Run migrations
+     */
+    run: (migrations: Migration[]): Promise<MigrationResult[]> => {
+      return ipcRenderer.invoke('migrations:run', migrations);
+    },
+
+    /**
+     * Get all registered migrations
+     */
+    getAll: (): Promise<Migration[]> => {
+      return ipcRenderer.invoke('migrations:get-all');
+    },
+
+    /**
+     * Get migrations for upgrade between two versions
+     */
+    getForUpgrade: (fromVersion: string, toVersion: string): Promise<Migration[]> => {
+      return ipcRenderer.invoke('migrations:get-for-upgrade', fromVersion, toVersion);
+    },
+
+    /**
+     * Get steps to rerun for pending migrations
+     */
+    getStepsToRerun: (pendingMigrations: Migration[]): Promise<WizardStep[]> => {
+      return ipcRenderer.invoke('migrations:get-steps-to-rerun', pendingMigrations);
+    },
+
+    /**
+     * Validate migration registry
+     */
+    validate: (): Promise<MigrationValidationResult> => {
+      return ipcRenderer.invoke('migrations:validate');
+    },
   },
 
   /**

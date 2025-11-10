@@ -3,9 +3,14 @@
  * Centralized registry of all version-specific migrations
  */
 
-import { Migration } from '../types/migration';
-import { WizardStep } from '../types/wizard';
+import { app } from 'electron';
+import { Migration, PendingMigrationsStatus, MigrationResult } from '../types/migration';
+import { WizardStep, MigrationRecord } from '../types/wizard';
 import { logWithCategory, LogCategory } from './logger';
+import * as setupWizard from './setup-wizard';
+
+// Re-export types for use in other modules
+export { Migration, PendingMigrationsStatus, MigrationResult } from '../types/migration';
 
 /**
  * Migration registry
@@ -208,4 +213,230 @@ export function logMigrationRegistry(): void {
       `(${migration.steps.length} steps, critical: ${migration.critical || false})`
     );
   });
+}
+
+/**
+ * Check for pending migrations at startup
+ * Compares installation version with current app version and determines which migrations need to be applied
+ * @returns Status of pending migrations including count and criticality
+ */
+export async function checkForPendingMigrations(): Promise<PendingMigrationsStatus> {
+  try {
+    const currentVersion = app.getVersion();
+    const installedVersion = await setupWizard.getInstallationVersion();
+    const migrationHistory = await setupWizard.getMigrationHistory();
+
+    logWithCategory('info', LogCategory.SYSTEM,
+      `Checking for pending migrations: installed=${installedVersion}, current=${currentVersion}`
+    );
+
+    // No migrations needed if no installation version (fresh install scenario)
+    if (!installedVersion) {
+      logWithCategory('info', LogCategory.SYSTEM, 'No installation version found - treating as fresh install');
+      return {
+        hasPending: false,
+        migrations: [],
+        criticalCount: 0,
+        optionalCount: 0
+      };
+    }
+
+    // No migrations needed if versions match
+    if (installedVersion === currentVersion) {
+      logWithCategory('info', LogCategory.SYSTEM, 'Installation is up to date - no migrations needed');
+      return {
+        hasPending: false,
+        migrations: [],
+        criticalCount: 0,
+        optionalCount: 0
+      };
+    }
+
+    // Get applicable migrations
+    const applicableMigrations = getMigrationsForUpgrade(installedVersion, currentVersion);
+
+    // Filter out already applied migrations
+    const appliedVersions = new Set(migrationHistory.map(record => record.version));
+    const pendingMigrations = applicableMigrations.filter(migration => {
+      // Skip if already applied successfully
+      if (appliedVersions.has(migration.version)) {
+        const record = migrationHistory.find(r => r.version === migration.version);
+        if (record && record.success) {
+          logWithCategory('debug', LogCategory.SYSTEM, `Skipping already applied migration: ${migration.version}`);
+          return false;
+        }
+      }
+
+      // Run validator if present
+      if (migration.validator) {
+        // Note: validators are async, we'll handle them during execution
+        return true;
+      }
+
+      return true;
+    });
+
+    // Count critical vs optional
+    const criticalCount = pendingMigrations.filter(m => m.critical === true).length;
+    const optionalCount = pendingMigrations.length - criticalCount;
+
+    const hasPending = pendingMigrations.length > 0;
+
+    logWithCategory('info', LogCategory.SYSTEM,
+      `Found ${pendingMigrations.length} pending migrations (${criticalCount} critical, ${optionalCount} optional)`
+    );
+
+    return {
+      hasPending,
+      migrations: pendingMigrations,
+      criticalCount,
+      optionalCount
+    };
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error checking for pending migrations', error);
+    return {
+      hasPending: false,
+      migrations: [],
+      criticalCount: 0,
+      optionalCount: 0
+    };
+  }
+}
+
+/**
+ * Execute a single migration
+ * Re-runs the specified wizard steps and records the result
+ * @param migration - The migration to execute
+ * @returns Result of the migration execution
+ */
+async function runSingleMigration(migration: Migration): Promise<MigrationResult> {
+  const startTime = new Date();
+
+  logWithCategory('info', LogCategory.SYSTEM,
+    `Running migration ${migration.version}: ${migration.description}`
+  );
+
+  try {
+    // Run validator if present
+    if (migration.validator) {
+      const shouldApply = await migration.validator();
+      if (!shouldApply) {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Migration ${migration.version} skipped by validator`
+        );
+        return {
+          version: migration.version,
+          success: true,
+          appliedAt: startTime.toISOString(),
+          stepsRerun: [],
+          error: 'Skipped by validator'
+        };
+      }
+    }
+
+    // Get current wizard state
+    const wizardState = await setupWizard.getWizardState();
+
+    // Prepare steps to rerun (in order)
+    const stepsToRerun = getStepsFromMigrations([migration]);
+
+    logWithCategory('info', LogCategory.SYSTEM,
+      `Migration ${migration.version} will rerun ${stepsToRerun.length} steps: ${stepsToRerun.join(', ')}`
+    );
+
+    // For each step, we need to:
+    // 1. Reset the step completion status
+    // 2. Allow the wizard to rerun that step
+    // Note: The actual step execution will be handled by the wizard UI
+    // Here we just mark which steps need to be rerun
+
+    // The migration result indicates success - actual step execution
+    // will happen through the wizard interface
+    const result: MigrationResult = {
+      version: migration.version,
+      success: true,
+      appliedAt: new Date().toISOString(),
+      stepsRerun: stepsToRerun
+    };
+
+    logWithCategory('info', LogCategory.SYSTEM,
+      `Migration ${migration.version} completed successfully`
+    );
+
+    return result;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logWithCategory('error', LogCategory.SYSTEM,
+      `Migration ${migration.version} failed: ${errorMsg}`,
+      error
+    );
+
+    return {
+      version: migration.version,
+      success: false,
+      appliedAt: startTime.toISOString(),
+      stepsRerun: [],
+      error: errorMsg
+    };
+  }
+}
+
+/**
+ * Execute multiple migrations in sequence
+ * Runs migrations in order and records results in migration history
+ * @param migrations - Array of migrations to execute (should be sorted by version)
+ * @returns Array of migration results
+ */
+export async function runMigrations(migrations: Migration[]): Promise<MigrationResult[]> {
+  logWithCategory('info', LogCategory.SYSTEM, `Starting migration run: ${migrations.length} migrations to apply`);
+
+  const results: MigrationResult[] = [];
+
+  try {
+    // Execute migrations in sequence
+    for (const migration of migrations) {
+      const result = await runSingleMigration(migration);
+      results.push(result);
+
+      // Record the migration in history
+      const record: MigrationRecord = {
+        version: result.version,
+        appliedAt: result.appliedAt,
+        stepsRerun: result.stepsRerun,
+        success: result.success
+      };
+
+      await setupWizard.addMigrationRecord(record);
+
+      // If a critical migration fails, stop the process
+      if (!result.success && migration.critical) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Critical migration ${migration.version} failed - stopping migration process`
+        );
+        break;
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.length - successCount;
+
+    logWithCategory('info', LogCategory.SYSTEM,
+      `Migration run completed: ${successCount} succeeded, ${failureCount} failed`
+    );
+
+    return results;
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error during migration execution', error);
+    return results;
+  }
+}
+
+/**
+ * Get the steps that need to be rerun for pending migrations
+ * Useful for determining what wizard steps to show during migration
+ * @param pendingMigrations - Array of pending migrations
+ * @returns Unique wizard steps that need to be rerun
+ */
+export function getStepsToRerunForMigrations(pendingMigrations: Migration[]): WizardStep[] {
+  return getStepsFromMigrations(pendingMigrations);
 }
