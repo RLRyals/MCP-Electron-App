@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>MCP Writing System - Migration Wizard</title>
+    <link rel="stylesheet" href="migration-wizard.css">
+</head>
+<body>
+    <!-- Main Content Area -->
+    <div class="migration-container">
+        <div class="migration-header">
+            <div class="migration-icon">🔄</div>
+            <h1 class="migration-title">System Update Required</h1>
+            <p class="migration-subtitle">Your MCP Writing System needs to apply some updates</p>
+        </div>
+
+        <div class="migration-body">
+            <!-- Step 1: Review Migrations -->
+            <div class="migration-step active" id="review-step">
+                <div class="step-header">
+                    <h2>Pending Migrations</h2>
+                    <p class="step-description">The following updates need to be applied to your system</p>
+                </div>
+
+                <div id="migration-summary" class="migration-summary">
+                    <div class="summary-stats">
+                        <div class="stat-card critical">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="critical-count">0</div>
+                                <div class="stat-label">Critical Updates</div>
+                            </div>
+                        </div>
+                        <div class="stat-card optional">
+                            <div class="stat-icon">ℹ️</div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="optional-count">0</div>
+                                <div class="stat-label">Optional Updates</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="critical-migrations" class="migrations-section">
+                    <!-- Critical migrations will be added here -->
+                </div>
+
+                <div id="optional-migrations" class="migrations-section">
+                    <!-- Optional migrations will be added here -->
+                </div>
+
+                <div class="alert info">
+                    <span class="alert-icon">ℹ️</span>
+                    <div class="alert-content">
+                        <strong>What happens during migration?</strong><br>
+                        The system will rerun specific setup steps to update your configuration.
+                        This process is automatic and your existing data will be preserved.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Running Migrations -->
+            <div class="migration-step" id="running-step">
+                <div class="step-header">
+                    <h2>Applying Updates</h2>
+                    <p class="step-description">Please wait while we update your system...</p>
+                </div>
+
+                <div class="progress-section">
+                    <div class="overall-progress">
+                        <div class="progress-header">
+                            <span class="progress-label">Overall Progress</span>
+                            <span class="progress-percent" id="overall-percent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="overall-progress-fill"></div>
+                        </div>
+                        <div class="current-operation" id="current-operation">
+                            Preparing to start...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="migrations-progress" id="migrations-progress">
+                    <!-- Migration progress items will be added here -->
+                </div>
+
+                <div class="console-section" id="console-section">
+                    <div class="console-header">
+                        <h3>Details</h3>
+                        <button class="btn-small" id="toggle-console">
+                            <span id="console-toggle-text">Show Details</span>
+                        </button>
+                    </div>
+                    <div class="console-output collapsed" id="console-output">
+                        <div class="console-placeholder">Migration details will appear here...</div>
+                    </div>
+                </div>
+
+                <!-- Error Display (hidden by default) -->
+                <div id="error-display" class="error-panel" style="display: none;">
+                    <div class="error-header">
+                        <span class="error-icon">⚠️</span>
+                        <h3>Migration Failed</h3>
+                    </div>
+                    <p id="error-message" class="error-message"></p>
+                    <div class="error-actions">
+                        <button class="wizard-btn" id="retry-btn">Retry Migration</button>
+                        <button class="wizard-btn secondary" id="skip-btn">Skip This Update</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Complete -->
+            <div class="migration-step" id="complete-step">
+                <div class="step-header centered">
+                    <div class="success-icon">✅</div>
+                    <h2>Updates Complete!</h2>
+                    <p class="step-description">Your system has been successfully updated</p>
+                </div>
+
+                <div class="migration-results" id="migration-results">
+                    <!-- Results will be added here -->
+                </div>
+
+                <div class="alert success">
+                    <span class="alert-icon">✅</span>
+                    <div class="alert-content">
+                        <strong>All updates have been applied successfully!</strong><br>
+                        Click "Continue" below to launch the application.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="migration-footer">
+            <div class="footer-info" id="footer-info">
+                <span id="version-info"></span>
+            </div>
+            <div class="footer-actions">
+                <button class="wizard-btn secondary" id="cancel-btn">Cancel</button>
+                <button class="wizard-btn primary" id="action-btn">Apply Updates</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="migration-wizard-handlers.js"></script>
+</body>
+</html>
