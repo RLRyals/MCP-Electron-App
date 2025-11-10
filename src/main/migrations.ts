@@ -9,6 +9,9 @@ import { WizardStep, MigrationRecord } from '../types/wizard';
 import { logWithCategory, LogCategory } from './logger';
 import * as setupWizard from './setup-wizard';
 
+// Re-export types for use in other modules
+export { Migration, PendingMigrationsStatus, MigrationResult } from '../types/migration';
+
 /**
  * Migration registry
  * Add new migrations here when setup logic changes
