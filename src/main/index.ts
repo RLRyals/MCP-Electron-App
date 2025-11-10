@@ -1481,12 +1481,20 @@ function setupIPC(): void {
         logWithCategory('info', LogCategory.GENERAL, 'Resolved config path', { resolvedConfigPath });
         await currentPipelineOrchestrator.loadConfig(resolvedConfigPath);
 
+        // Ensure workingDirectory is set to userData if not provided
+        // This ensures repositories are cloned to the same location where the system expects to find them
+        const options = request.options || {};
+        if (!options.workingDirectory) {
+          options.workingDirectory = app.getPath('userData');
+          logWithCategory('info', LogCategory.GENERAL, 'Using userData as working directory', { workingDirectory: options.workingDirectory });
+        }
+
         // Create progress throttler
         const progressThrottler = new ProgressThrottler(10);
 
         // Execute pipeline with progress tracking
         const result = await currentPipelineOrchestrator.executePipeline(
-          request.options || {},
+          options,
           (progress) => {
             progressThrottler.emit(progress, (throttledProgress) => {
               if (mainWindow) {
