@@ -1274,6 +1274,55 @@ async function initializeSystemStartupStep() {
 
     try {
         progressEl.classList.add('show');
+        progressMessage.textContent = 'Checking Docker...';
+
+        // Check if Docker is running
+        const dockerCheck = await (window as any).electronAPI.prerequisites.checkDocker();
+        console.log('Docker check result:', dockerCheck);
+
+        if (!dockerCheck.running) {
+            if (!dockerCheck.installed) {
+                throw new Error('Docker Desktop is not installed. Please install Docker Desktop and restart the wizard.');
+            }
+
+            // Docker is installed but not running - attempt to start it
+            progressMessage.textContent = 'Starting Docker Desktop...';
+            console.log('Docker is not running, attempting to start...');
+
+            const startResult = await (window as any).electronAPI.docker.start();
+            console.log('Docker start result:', startResult);
+
+            if (!startResult.success) {
+                throw new Error(`Failed to start Docker Desktop: ${startResult.message || startResult.error}. Please start Docker Desktop manually.`);
+            }
+
+            // Wait for Docker to be ready (with timeout)
+            progressMessage.textContent = 'Waiting for Docker to be ready...';
+            console.log('Waiting for Docker to become ready...');
+
+            const maxWaitTime = 60000; // 60 seconds
+            const checkInterval = 2000; // 2 seconds
+            const startTime = Date.now();
+            let dockerReady = false;
+
+            while (Date.now() - startTime < maxWaitTime) {
+                const recheckDocker = await (window as any).electronAPI.prerequisites.checkDocker();
+                console.log('Docker recheck:', recheckDocker);
+
+                if (recheckDocker.running) {
+                    dockerReady = true;
+                    console.log('Docker is now running!');
+                    break;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+
+            if (!dockerReady) {
+                throw new Error('Docker Desktop took too long to start. Please ensure Docker Desktop is running and retry.');
+            }
+        }
+
         progressMessage.textContent = 'Starting MCP system...';
 
         // Listen for progress updates
