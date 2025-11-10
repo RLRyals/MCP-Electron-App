@@ -486,6 +486,16 @@ interface WizardStepData {
 }
 
 /**
+ * Migration record
+ */
+interface MigrationRecord {
+  version: string;
+  appliedAt: string;  // ISO timestamp
+  stepsRerun: WizardStep[];
+  success: boolean;
+}
+
+/**
  * Wizard state
  */
 interface WizardState {
@@ -496,6 +506,9 @@ interface WizardState {
   startedAt?: string;
   completedAt?: string;
   version?: string;
+  installationVersion?: string;     // Version when wizard was completed
+  lastMigrationVersion?: string;    // Last migration that was applied
+  migrationHistory?: MigrationRecord[];  // History of applied migrations
 }
 
 /**
@@ -1424,6 +1437,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     canProceed: (step: WizardStep): Promise<CanProceedResult> => {
       return ipcRenderer.invoke('setup-wizard:can-proceed', step);
+    },
+
+    /**
+     * Get the installation version from wizard state
+     */
+    getInstallationVersion: (): Promise<string | null> => {
+      return ipcRenderer.invoke('setup-wizard:get-installation-version');
+    },
+
+    /**
+     * Check if installation version is outdated
+     */
+    isInstallationOutdated: (): Promise<boolean> => {
+      return ipcRenderer.invoke('setup-wizard:is-installation-outdated');
+    },
+
+    /**
+     * Get migration history from wizard state
+     */
+    getMigrationHistory: (): Promise<MigrationRecord[]> => {
+      return ipcRenderer.invoke('setup-wizard:get-migration-history');
+    },
+
+    /**
+     * Add a migration record to the migration history
+     */
+    addMigrationRecord: (record: MigrationRecord): Promise<WizardOperationResult> => {
+      return ipcRenderer.invoke('setup-wizard:add-migration-record', record);
     },
 
     /**

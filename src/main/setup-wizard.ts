@@ -62,6 +62,16 @@ export interface WizardStepData {
 }
 
 /**
+ * Migration record interface for tracking applied migrations
+ */
+export interface MigrationRecord {
+  version: string;
+  appliedAt: string;  // ISO timestamp
+  stepsRerun: WizardStep[];
+  success: boolean;
+}
+
+/**
  * Wizard state interface
  */
 export interface WizardState {
@@ -72,6 +82,9 @@ export interface WizardState {
   startedAt?: string;
   completedAt?: string;
   version?: string;
+  installationVersion?: string;     // Version when wizard was completed
+  lastMigrationVersion?: string;    // Last migration that was applied
+  migrationHistory?: MigrationRecord[];  // History of applied migrations
 }
 
 /**
@@ -249,7 +262,8 @@ export async function markWizardComplete(): Promise<{ success: boolean; error?: 
       ...currentState,
       completed: true,
       currentStep: WizardStep.COMPLETE,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
+      installationVersion: app.getVersion()  // Capture version at completion
     };
 
     // Mark all steps as completed
@@ -458,5 +472,60 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
 
     default:
       return { canProceed: false, reason: 'Invalid step' };
+  }
+}
+
+/**
+ * Get the installation version from wizard state
+ */
+export async function getInstallationVersion(): Promise<string | null> {
+  const state = await getWizardState();
+  return state.installationVersion || null;
+}
+
+/**
+ * Check if installation version is outdated
+ */
+export async function isInstallationOutdated(): Promise<boolean> {
+  const installedVersion = await getInstallationVersion();
+  if (!installedVersion) return false;
+
+  const currentVersion = app.getVersion();
+  return installedVersion !== currentVersion;
+}
+
+/**
+ * Get migration history from wizard state
+ */
+export async function getMigrationHistory(): Promise<MigrationRecord[]> {
+  const state = await getWizardState();
+  return state.migrationHistory || [];
+}
+
+/**
+ * Add a migration record to the migration history
+ */
+export async function addMigrationRecord(
+  record: MigrationRecord
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const state = await getWizardState();
+
+    if (!state.migrationHistory) {
+      state.migrationHistory = [];
+    }
+
+    state.migrationHistory.push(record);
+    state.lastMigrationVersion = record.version;
+
+    const statePath = getWizardStatePath();
+    await fs.writeJson(statePath, state, { spaces: 2 });
+
+    logWithCategory('info', LogCategory.SYSTEM, `Added migration record for version ${record.version}`);
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to add migration record', error);
+    return { success: false, error: errorMsg };
   }
 }
