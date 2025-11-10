@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "dev": "npm run build && electron .",
-    "build": "tsc && node scripts/copy-assets.js",
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && node scripts/copy-assets.js",
     "build:watch": "tsc --watch",
     "start": "electron .",
     "export-docker-images": "bash scripts/export-docker-images.sh",
