@@ -270,6 +270,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
 
 /**
  * Load configuration from .env file
+ *
+ * WARNING: This function generates random credentials if no .env exists, but does NOT save them.
+ * The setup wizard must explicitly save the configuration to persist it.
  */
 export async function loadEnvConfig(): Promise<EnvConfig> {
   const envPath = getEnvFilePath();
@@ -294,6 +297,14 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         }
       }
 
+      // Validate that critical fields are not empty
+      if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+        logger.warn('MCP_AUTH_TOKEN is empty in .env file - this will cause docker container errors');
+      }
+      if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+        logger.warn('POSTGRES_PASSWORD is empty in .env file - this will cause database connection errors');
+      }
+
       // Log with sanitized content
       const sanitized = sanitizeEnvFileContent(content);
       logger.info('Loaded .env configuration from:', envPath);
@@ -301,7 +312,9 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
 
       return config;
     } else {
-      logger.info('No .env file found, using defaults with generated secrets');
+      logger.warn('No .env file found at:', envPath);
+      logger.warn('Returning temporary config with generated credentials - these will NOT persist!');
+      logger.warn('The setup wizard must be completed to save the configuration.');
 
       // Check for GitHub token in environment variables even if no .env file exists
       const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;
@@ -315,6 +328,7 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
     }
   } catch (error) {
     logger.error('Error loading .env file:', error);
+    logger.warn('Returning temporary config with generated credentials - these will NOT persist!');
 
     // Check for GitHub token in environment variables even on error
     const envToken = process.env.GITHUB_AUTH_TOKEN || process.env.GITHUB_TOKEN;

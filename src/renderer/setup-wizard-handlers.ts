@@ -542,14 +542,43 @@ async function saveEnvironmentConfig() {
             TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value)
         };
 
-        // Generate password and token if not set
+        // Get current config and ensure password and token are set
         const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
-        config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
-        config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
+
+        // If current config has empty or missing credentials, generate new ones
+        // This ensures credentials are never empty when saving
+        if (!currentConfig.POSTGRES_PASSWORD || currentConfig.POSTGRES_PASSWORD.trim() === '') {
+            console.log('Generating new database password for first-time setup...');
+            config.POSTGRES_PASSWORD = await (window as any).electronAPI.envConfig.generatePassword(16);
+        } else {
+            config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
+        }
+
+        if (!currentConfig.MCP_AUTH_TOKEN || currentConfig.MCP_AUTH_TOKEN.trim() === '') {
+            console.log('Generating new MCP auth token for first-time setup...');
+            config.MCP_AUTH_TOKEN = await (window as any).electronAPI.envConfig.generateToken();
+        } else {
+            config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
+        }
+
+        // Final validation: ensure credentials are NEVER empty
+        if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+            throw new Error('POSTGRES_PASSWORD is empty - this should never happen. Please report this bug.');
+        }
+        if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+            throw new Error('MCP_AUTH_TOKEN is empty - this should never happen. Please report this bug.');
+        }
 
         if (statusEl) {
             statusEl.innerHTML = '<div class="spinner" style="display: inline-block;"></div> Saving configuration...';
         }
+
+        console.log('Saving configuration with credentials:', {
+            hasPassword: !!config.POSTGRES_PASSWORD,
+            hasToken: !!config.MCP_AUTH_TOKEN,
+            passwordLength: config.POSTGRES_PASSWORD?.length,
+            tokenLength: config.MCP_AUTH_TOKEN?.length
+        });
 
         // Save configuration
         const result = await (window as any).electronAPI.envConfig.saveConfig(config);
@@ -1260,6 +1289,55 @@ async function initializeSystemStartupStep() {
 
     try {
         progressEl.classList.add('show');
+        progressMessage.textContent = 'Checking Docker...';
+
+        // Check if Docker is running
+        const dockerCheck = await (window as any).electronAPI.prerequisites.checkDocker();
+        console.log('Docker check result:', dockerCheck);
+
+        if (!dockerCheck.running) {
+            if (!dockerCheck.installed) {
+                throw new Error('Docker Desktop is not installed. Please install Docker Desktop and restart the wizard.');
+            }
+
+            // Docker is installed but not running - attempt to start it
+            progressMessage.textContent = 'Starting Docker Desktop...';
+            console.log('Docker is not running, attempting to start...');
+
+            const startResult = await (window as any).electronAPI.docker.start();
+            console.log('Docker start result:', startResult);
+
+            if (!startResult.success) {
+                throw new Error(`Failed to start Docker Desktop: ${startResult.message || startResult.error}. Please start Docker Desktop manually.`);
+            }
+
+            // Wait for Docker to be ready (with timeout)
+            progressMessage.textContent = 'Waiting for Docker to be ready...';
+            console.log('Waiting for Docker to become ready...');
+
+            const maxWaitTime = 60000; // 60 seconds
+            const checkInterval = 2000; // 2 seconds
+            const startTime = Date.now();
+            let dockerReady = false;
+
+            while (Date.now() - startTime < maxWaitTime) {
+                const recheckDocker = await (window as any).electronAPI.prerequisites.checkDocker();
+                console.log('Docker recheck:', recheckDocker);
+
+                if (recheckDocker.running) {
+                    dockerReady = true;
+                    console.log('Docker is now running!');
+                    break;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+
+            if (!dockerReady) {
+                throw new Error('Docker Desktop took too long to start. Please ensure Docker Desktop is running and retry.');
+            }
+        }
+
         progressMessage.textContent = 'Starting MCP system...';
 
         // Listen for progress updates
