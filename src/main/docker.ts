@@ -363,8 +363,9 @@ export async function checkDockerHealth(): Promise<DockerStatus> {
     }
 
     // Docker is running, check if it's healthy by running a simple command
+    // Use a longer timeout (15s) to account for Docker Desktop initialization
     try {
-      await execAsync('docker ps', { timeout: 5000 });
+      await execAsync('docker ps', { timeout: 15000 });
 
       logWithCategory('info', LogCategory.DOCKER, 'Docker is healthy');
 

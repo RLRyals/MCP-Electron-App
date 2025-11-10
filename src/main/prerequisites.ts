@@ -109,6 +109,7 @@ export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
 
 /**
  * Check if Docker daemon is running
+ * Uses a longer timeout to account for Docker Desktop initialization time
  */
 export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
   log.info('Checking if Docker daemon is running...');
@@ -125,7 +126,9 @@ export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
     }
 
     // Try to execute docker ps to check if daemon is running
-    await executeCommand('docker ps', 3000);
+    // Use a longer timeout (15s) because Docker Desktop can take time to fully initialize
+    // especially right after system boot or when the app is just starting
+    await executeCommand('docker ps', 15000);
 
     log.info('Docker daemon is running');
     return {
@@ -136,15 +139,26 @@ export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
   } catch (error: any) {
     log.warn('Docker daemon is not running:', error.message);
 
-    // Check if it's a daemon connection error
+    // Check if it's a daemon connection error or if Docker is still initializing
     const errorStr = error.stderr || error.stdout || error.message || '';
     const isDaemonError =
       errorStr.includes('daemon') ||
       errorStr.includes('not running') ||
       errorStr.includes('cannot connect') ||
-      errorStr.includes('connection refused');
+      errorStr.includes('connection refused') ||
+      errorStr.includes('starting') ||
+      errorStr.includes('initializing');
 
     if (isDaemonError) {
+      // Provide more specific error message if Docker appears to be starting
+      if (errorStr.includes('starting') || errorStr.includes('initializing')) {
+        return {
+          installed: true,
+          running: false,
+          error: 'Docker Desktop is starting up. Please wait a moment and try again.',
+        };
+      }
+
       return {
         installed: true,
         running: false,
