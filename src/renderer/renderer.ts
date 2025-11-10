@@ -4,9 +4,9 @@
  * It communicates with the main process via IPC through the preload script
  */
 
-import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers';
-import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers';
-import { initializeDashboard } from './dashboard-handlers';
+import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
+import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
+import { initializeDashboard } from './dashboard-handlers.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {

@@ -53,9 +53,6 @@ import type {
   PipelineStatusResponse,
 } from '../types/ipc';
 
-// Initialize logging system
-initializeLogger();
-
 let mainWindow: BrowserWindow | null = null;
 
 /**
@@ -1705,6 +1702,8 @@ function setupIPC(): void {
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
+  // Initialize logging system after app is ready
+  initializeLogger();
   logger.info('App is ready');
   setupIPC();
   createMenu();
