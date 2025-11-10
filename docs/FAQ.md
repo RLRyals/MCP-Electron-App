@@ -90,7 +90,7 @@ That's it! The app helps you install both if needed.
 **First-time setup:** 15-30 minutes
 - Docker Desktop installation: 10-15 minutes
 - MCP App setup wizard: 5-10 minutes
-- Downloading Docker images: 5-10 minutes
+- Preparing Docker images: 5-10 minutes (pulling Postgres, building MCP servers)
 
 **Subsequent starts:** 30-60 seconds
 - Services start much faster after initial setup!
@@ -346,7 +346,8 @@ All ports can be changed in Environment Configuration if there are conflicts.
 **What's transmitted:**
 - AI client to AI service communication (OpenAI, Claude, etc.)
 - Update checks to GitHub
-- Docker image downloads
+- Docker image pulls (Postgres from Docker Hub)
+- Repository cloning for MCP servers (via Git)
 
 **The MCP Electron App never sends your data anywhere!**
 

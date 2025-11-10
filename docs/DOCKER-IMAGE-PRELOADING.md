@@ -1,6 +1,16 @@
 # Docker Image Pre-loading System
 
-This document describes the Docker image pre-loading system implemented for the MCP Electron App. This feature allows bundling pre-built Docker images with the application to provide a faster, more reliable installation experience.
+> **⚠️ FUTURE ENHANCEMENT - NOT CURRENTLY IMPLEMENTED**
+>
+> This document describes a planned future feature for pre-loading bundled Docker images with the application installer.
+>
+> **Current Behavior:** The app currently pulls the PostgreSQL image from Docker Hub and builds MCP server images from source code during setup.
+>
+> **Future Enhancement:** This document outlines the design for bundling pre-built Docker images as tar.gz files with the application to provide faster, offline installation.
+
+---
+
+This document describes the Docker image pre-loading system planned for the MCP Electron App. This feature will allow bundling pre-built Docker images with the application to provide a faster, more reliable installation experience.
 
 ## Overview
 
@@ -36,19 +46,21 @@ The Docker image pre-loading system enables the application to:
 5. **Export Script** - Generates image files for bundling
    - `/scripts/export-docker-images.sh`
 
-## Bundled Images
+## Bundled Images (Planned)
 
-### postgres:15
-- **File**: `postgres-15.tar.gz`
+### postgres:15 (or postgres:16-alpine)
+- **File**: `postgres-15.tar.gz` (or `postgres-16-alpine.tar.gz`)
 - **Size**: ~150MB compressed
 - **Purpose**: PostgreSQL database for MCP servers
-- **Source**: Official PostgreSQL 15 image from Docker Hub
+- **Current**: Pulled from Docker Hub during setup
+- **Future**: Pre-bundled in application installer
 
 ### mcp-servers:latest
 - **File**: `mcp-servers.tar.gz`
 - **Size**: ~200MB compressed
 - **Purpose**: Custom MCP servers container
-- **Source**: Built from local Dockerfile
+- **Current**: Built from cloned source code during setup
+- **Future**: Pre-built and bundled in application installer
 
 ## Usage
 
@@ -91,9 +103,9 @@ window.electronAPI.dockerImages.onProgress((progress) => {
    npm run package
    ```
 
-#### Manual Image Export
+#### Manual Image Export (For Future Implementation)
 
-If you prefer manual control:
+If you prefer manual control when implementing this feature:
 
 ```bash
 # Export PostgreSQL image
@@ -101,6 +113,7 @@ docker pull postgres:15
 docker save postgres:15 | gzip > resources/docker-images/postgres-15.tar.gz
 
 # Build and export MCP servers
+# Note: Current implementation builds from source, not from local Dockerfile
 docker build -t mcp-servers:latest .
 docker save mcp-servers:latest | gzip > resources/docker-images/mcp-servers.tar.gz
 ```
@@ -434,7 +447,19 @@ docker save test-image:latest | gzip > resources/docker-images/test-image.tar.gz
 2. Check network if pulling images
 3. Monitor system resources during load
 
-## Future Enhancements
+## Implementation Status
+
+**Current Status:** Planning/Design Phase
+
+This entire document describes a future enhancement. The current application:
+- ✅ Pulls PostgreSQL from Docker Hub automatically
+- ✅ Clones MCP server repositories and builds images from source
+- ❌ Does NOT bundle pre-built images with the installer
+- ❌ Does NOT include tar.gz image files in the application package
+
+## Future Enhancements (After Base Feature Implementation)
+
+Once the base pre-loading feature is implemented, these additional enhancements could be added:
 
 1. **Delta updates** - Only download image changes
 2. **Parallel loading** - Load independent images simultaneously

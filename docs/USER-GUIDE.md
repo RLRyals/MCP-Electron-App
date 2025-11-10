@@ -180,14 +180,16 @@ Choose which AI client(s) you want to use.
 - Check the box next to your preferred client(s)
 - Click "Save Selection"
 
-### Step 5: Download Docker Images
+### Step 5: Prepare Docker Images
 
-The app will download necessary Docker images (PostgreSQL, MCP Servers).
+The app will prepare necessary Docker images (PostgreSQL is pulled from Docker Hub, MCP Servers are built from source).
 
 **What happens:**
-- Progress bar shows download status
+- Progress bar shows preparation status
+- PostgreSQL image is pulled from Docker Hub
+- MCP Server code is downloaded and image is built locally
 - This may take 5-15 minutes depending on your internet speed
-- You can see which image is currently downloading
+- You can see which image is currently being prepared
 
 **Note:** This only happens once! The images are saved on your computer for future use.
 
@@ -473,7 +475,7 @@ No! This app is designed for non-technical users. Everything is done through but
 
 Yes, the MCP Electron App is free and open-source. However, you may need:
 - API credits for AI services (Claude, ChatGPT, etc.) depending on your client
-- A free Docker Hub account for Docker Desktop
+- Docker Desktop (free for personal use; a Docker Hub account is optional)
 
 ### What is Docker and why do I need it?
 

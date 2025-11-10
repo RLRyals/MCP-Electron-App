@@ -165,18 +165,18 @@
 - Show selection summary: "1 client selected"
 - Click "Save Selection"
 
-#### Step 5: Docker Images Download (45 seconds)
+#### Step 5: Prepare Docker Images (45 seconds)
 
-**[Screen: Docker Images download screen]**
+**[Screen: Docker Images preparation screen]**
 
 **Narration:**
-> "The app now downloads necessary Docker images - these are the database and server components. This only happens once and takes about 5 to 15 minutes depending on your internet speed. I'll speed this up for the video."
+> "The app now prepares the necessary Docker images. It pulls the PostgreSQL database from Docker Hub and downloads the MCP server code to build locally. This only happens once and takes about 5 to 15 minutes depending on your internet speed. I'll speed this up for the video."
 
 **Actions:**
 - Show progress bar
-- Show which image is being downloaded
+- Show which image is being prepared (pulled or built)
 - [Fast-forward in editing to completion]
-- Show "All images loaded successfully" message
+- Show "All images prepared successfully" message
 
 #### Step 6: Typing Mind Installation (30 seconds)
 
