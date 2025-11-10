@@ -115,7 +115,7 @@ const DEFAULT_PREFERENCES: UpdatePreferences = {
  */
 function getMetadataPath(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system', '.system-metadata.json');
+  return path.join(userDataPath, '.system-metadata.json');
 }
 
 /**
@@ -328,14 +328,15 @@ export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
  */
 function getMCPWorkingDirectory(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system');
+  return userDataPath;
 }
 
 /**
  * Get the MCP repository directory
+ * This matches the path used by mcp-system.ts
  */
 function getMCPRepoDirectory(): string {
-  return path.join(getMCPWorkingDirectory(), 'mcp-servers-repo');
+  return path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
 }
 
 /**
@@ -667,13 +668,9 @@ export async function updateTypingMind(progressCallback?: ProgressCallback): Pro
         status: 'updating',
       });
 
-      // Stop just the typing-mind service
-      const mcpDir = mcpSystem.getMCPWorkingDirectoryPath();
-      const composeFile = path.join(mcpDir, 'docker-compose.typing-mind.yml');
-
-      if (await fs.pathExists(composeFile)) {
-        await execAsync(`docker-compose -f "${composeFile}" down`, { cwd: mcpDir });
-      }
+      // Stop just the typing-mind service using mcp-system's stopMCPSystem
+      // which will stop all services - we'll restart core services after update
+      await mcpSystem.stopMCPSystem();
 
       // Wait for shutdown
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -715,12 +712,8 @@ export async function updateTypingMind(progressCallback?: ProgressCallback): Pro
         status: 'updating',
       });
 
-      const mcpDir = mcpSystem.getMCPWorkingDirectoryPath();
-      const composeFile = path.join(mcpDir, 'docker-compose.typing-mind.yml');
-
-      if (await fs.pathExists(composeFile)) {
-        await execAsync(`docker-compose -f "${composeFile}" up -d`, { cwd: mcpDir });
-      }
+      // Restart the full MCP system which will include Typing Mind if configured
+      await mcpSystem.startMCPSystem();
     }
 
     // 6. Complete
