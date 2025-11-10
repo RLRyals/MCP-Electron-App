@@ -1292,7 +1292,7 @@ async function initializeSystemStartupStep() {
         progressMessage.textContent = 'Checking Docker...';
 
         // Check if Docker is running
-        const dockerCheck = await (window as any).electronAPI.prerequisites.checkDocker();
+        const dockerCheck = await (window as any).electronAPI.prerequisites.checkDockerRunning();
         console.log('Docker check result:', dockerCheck);
 
         if (!dockerCheck.running) {
@@ -1321,7 +1321,7 @@ async function initializeSystemStartupStep() {
             let dockerReady = false;
 
             while (Date.now() - startTime < maxWaitTime) {
-                const recheckDocker = await (window as any).electronAPI.prerequisites.checkDocker();
+                const recheckDocker = await (window as any).electronAPI.prerequisites.checkDockerRunning();
                 console.log('Docker recheck:', recheckDocker);
 
                 if (recheckDocker.running) {
