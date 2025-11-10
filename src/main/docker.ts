@@ -344,6 +344,12 @@ export async function checkDockerHealth(): Promise<DockerStatus> {
     // First check if Docker is installed and running
     const runningStatus = await checkDockerRunning();
 
+    logWithCategory('info', LogCategory.DOCKER, 'Docker running status:', {
+      installed: runningStatus.installed,
+      running: runningStatus.running,
+      error: runningStatus.error,
+    });
+
     if (!runningStatus.installed) {
       return {
         running: false,
@@ -363,10 +369,11 @@ export async function checkDockerHealth(): Promise<DockerStatus> {
     }
 
     // Docker is running, check if it's healthy by running a simple command
+    // Use a longer timeout (20s) to account for Docker Desktop initialization
     try {
-      await execAsync('docker ps', { timeout: 5000 });
-
-      logWithCategory('info', LogCategory.DOCKER, 'Docker is healthy');
+      const result = await execAsync('docker info', { timeout: 20000 });
+      logWithCategory('info', LogCategory.DOCKER, 'Docker is healthy (verified with docker info)');
+      logWithCategory('debug', LogCategory.DOCKER, 'Docker info output:', result.stdout.substring(0, 200));
 
       return {
         running: true,
@@ -375,7 +382,11 @@ export async function checkDockerHealth(): Promise<DockerStatus> {
       };
 
     } catch (error: any) {
-      logWithCategory('warn', LogCategory.DOCKER, 'Docker is running but not healthy', { error: error.message });
+      logWithCategory('warn', LogCategory.DOCKER, 'Docker health check failed', {
+        error: error.message,
+        stderr: error.stderr,
+        stdout: error.stdout,
+      });
 
       return {
         running: true,

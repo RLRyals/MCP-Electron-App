@@ -109,6 +109,8 @@ export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
 
 /**
  * Check if Docker daemon is running
+ * Uses a longer timeout to account for Docker Desktop initialization time
+ * Tries multiple detection methods for better reliability
  */
 export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
   log.info('Checking if Docker daemon is running...');
@@ -117,6 +119,7 @@ export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
     // First check if Docker is installed
     const installedCheck = await checkDockerInstalled();
     if (!installedCheck.installed) {
+      log.warn('Docker is not installed');
       return {
         installed: false,
         running: false,
@@ -124,34 +127,78 @@ export async function checkDockerRunning(): Promise<PrerequisiteStatus> {
       };
     }
 
-    // Try to execute docker ps to check if daemon is running
-    await executeCommand('docker ps', 3000);
+    log.info('Docker is installed, checking if daemon is running...');
 
-    log.info('Docker daemon is running');
-    return {
-      installed: true,
-      running: true,
-      version: installedCheck.version,
-    };
+    // Try multiple methods to check if Docker is running
+    // Method 1: Try 'docker info' first (more reliable than 'docker ps')
+    try {
+      const infoResult = await executeCommand('docker info', 20000);
+      log.info('Docker daemon is running (verified with docker info)');
+      log.info('Docker info output:', infoResult.stdout.substring(0, 200));
+
+      return {
+        installed: true,
+        running: true,
+        version: installedCheck.version,
+      };
+    } catch (infoError: any) {
+      log.warn('docker info failed, trying docker ps...');
+      log.warn('docker info error:', infoError.stderr || infoError.message);
+
+      // Method 2: Fall back to 'docker ps'
+      try {
+        await executeCommand('docker ps', 20000);
+        log.info('Docker daemon is running (verified with docker ps)');
+
+        return {
+          installed: true,
+          running: true,
+          version: installedCheck.version,
+        };
+      } catch (psError: any) {
+        log.error('docker ps also failed');
+        log.error('docker ps error:', psError.stderr || psError.message);
+        throw psError; // Re-throw to be caught by outer catch
+      }
+    }
   } catch (error: any) {
-    log.warn('Docker daemon is not running:', error.message);
+    log.warn('All Docker daemon checks failed');
+    log.warn('Final error:', error);
 
-    // Check if it's a daemon connection error
+    // Check if it's a daemon connection error or if Docker is still initializing
     const errorStr = error.stderr || error.stdout || error.message || '';
+    log.info('Error string for analysis:', errorStr.substring(0, 200));
+
     const isDaemonError =
       errorStr.includes('daemon') ||
       errorStr.includes('not running') ||
       errorStr.includes('cannot connect') ||
-      errorStr.includes('connection refused');
+      errorStr.includes('connection refused') ||
+      errorStr.includes('Connection refused') ||
+      errorStr.includes('starting') ||
+      errorStr.includes('initializing') ||
+      errorStr.toLowerCase().includes('is not running');
 
     if (isDaemonError) {
+      // Provide more specific error message if Docker appears to be starting
+      if (errorStr.includes('starting') || errorStr.includes('initializing')) {
+        log.warn('Docker appears to be starting up');
+        return {
+          installed: true,
+          running: false,
+          error: 'Docker Desktop is starting up. Please wait a moment and try again.',
+        };
+      }
+
+      log.warn('Docker daemon is not running');
       return {
         installed: true,
         running: false,
-        error: 'Docker is installed but the daemon is not running',
+        error: 'Docker is installed but the daemon is not running. Please start Docker Desktop.',
       };
     }
 
+    log.error('Unable to determine Docker status, error:', errorStr.substring(0, 200));
     return {
       installed: true,
       running: false,
