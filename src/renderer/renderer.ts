@@ -703,7 +703,10 @@ function init(): void {
   loadClientOptions();
 
   // Initialize dashboard (main control interface)
-  initializeDashboard();
+  initializeDashboard().catch(err => {
+    console.error('Critical error initializing dashboard:', err);
+    showNotification('Failed to initialize dashboard. Please check the console for details.', 'error');
+  });
 
   // Set up Docker control event listeners
   const startButton = document.getElementById('start-docker');

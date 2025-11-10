@@ -700,6 +700,20 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   logWithCategory('info', LogCategory.DOCKER, 'Getting system status...');
 
   try {
+    // Check if repository directory exists
+    const repoPath = getMCPRepositoryDirectory();
+    const repoExists = await fs.pathExists(repoPath);
+
+    if (!repoExists) {
+      logWithCategory('warn', LogCategory.DOCKER, `MCP-Writing-Servers repository not found at ${repoPath}`);
+      return {
+        running: false,
+        healthy: false,
+        containers: [],
+        message: 'MCP repository not found. Please complete setup.',
+      };
+    }
+
     const composeFiles = [
       getDockerComposeFilePath('core'),
       getDockerComposeFilePath('mcp-connector'),

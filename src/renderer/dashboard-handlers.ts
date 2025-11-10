@@ -45,20 +45,30 @@ interface EnvConfig {
 let statusPollingInterval: NodeJS.Timeout | null = null;
 const POLL_INTERVAL = 5000; // 5 seconds
 
+// Track if we've already shown the offline notification
+let hasShownOfflineNotification = false;
+
 /**
  * Initialize the dashboard
  */
 export async function initializeDashboard(): Promise<void> {
   console.log('Initializing dashboard...');
 
-  // Load initial status
-  await updateSystemStatus();
+  try {
+    // Setup event listeners first (so buttons work even if status fails)
+    setupDashboardListeners();
 
-  // Start polling
-  startStatusPolling();
+    // Load initial status
+    await updateSystemStatus();
 
-  // Setup event listeners
-  setupDashboardListeners();
+    // Start polling
+    startStatusPolling();
+  } catch (error) {
+    console.error('Failed to initialize dashboard:', error);
+    showNotification(`Dashboard initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    // Still set up event listeners in case of error
+    setupDashboardListeners();
+  }
 }
 
 /**
@@ -147,6 +157,11 @@ function stopStatusPolling(): void {
  */
 export async function updateSystemStatus(): Promise<void> {
   try {
+    // Check if electronAPI is available
+    if (!window.electronAPI || !window.electronAPI.mcpSystem) {
+      throw new Error('Electron API not available');
+    }
+
     // Get system status
     const status = await window.electronAPI.mcpSystem.getStatus();
 
@@ -161,7 +176,9 @@ export async function updateSystemStatus(): Promise<void> {
 
   } catch (error) {
     console.error('Error updating system status:', error);
-    showErrorStatus();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error details:', errorMessage);
+    showErrorStatus(errorMessage);
   }
 }
 
@@ -181,14 +198,32 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
     // System offline - red
     statusElement.classList.add('status-red');
     statusTextElement.textContent = 'System Offline';
+
+    // Show helpful message if system is offline (only once)
+    if (status.message && !hasShownOfflineNotification) {
+      console.log('System status message:', status.message);
+      // If it's just "No containers running", that's normal - user needs to start the system
+      if (status.message === 'No containers running') {
+        showNotification('System is offline. Click "Start System" to begin.', 'info');
+        hasShownOfflineNotification = true;
+      } else if (status.message.includes('repository not found') || status.message.includes('complete setup')) {
+        // Critical issue - repository missing
+        showNotification(`Setup incomplete: ${status.message}`, 'error');
+        hasShownOfflineNotification = true;
+      }
+    }
   } else if (!status.healthy) {
     // System degraded - yellow
     statusElement.classList.add('status-yellow');
     statusTextElement.textContent = 'System Degraded';
+    // Reset notification flag when system comes back online
+    hasShownOfflineNotification = false;
   } else {
     // All systems operational - green
     statusElement.classList.add('status-green');
     statusTextElement.textContent = 'System Ready';
+    // Reset notification flag when system is healthy
+    hasShownOfflineNotification = false;
   }
 }
 
@@ -196,21 +231,27 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
  * Update service cards with current status
  */
 async function updateServiceCards(status: MCPSystemStatus): Promise<void> {
-  // Get config for port information
-  const config = await window.electronAPI.envConfig.getConfig();
-  const urls = await window.electronAPI.mcpSystem.getUrls();
+  try {
+    // Get config for port information
+    const config = await window.electronAPI.envConfig.getConfig();
+    const urls = await window.electronAPI.mcpSystem.getUrls();
 
-  // Update PostgreSQL card
-  updatePostgreSQLCard(status, config);
+    // Update PostgreSQL card
+    updatePostgreSQLCard(status, config);
 
-  // Update MCP Servers card
-  updateMCPServersCard(status);
+    // Update MCP Servers card
+    updateMCPServersCard(status);
 
-  // Update MCP Connector card
-  updateMCPConnectorCard(status, config, urls);
+    // Update MCP Connector card
+    updateMCPConnectorCard(status, config, urls);
 
-  // Update Typing Mind card
-  updateTypingMindCard(status, config, urls);
+    // Update Typing Mind card
+    updateTypingMindCard(status, config, urls);
+  } catch (error) {
+    console.error('Error updating service cards:', error);
+    // Don't throw - let dashboard continue to function even if card updates fail
+    showNotification(`Failed to update service information: ${error instanceof Error ? error.message : String(error)}`, 'error');
+  }
 }
 
 /**
@@ -337,7 +378,7 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
 /**
  * Show error status when status update fails
  */
-function showErrorStatus(): void {
+function showErrorStatus(errorMessage?: string): void {
   const statusElement = document.getElementById('dashboard-status-indicator');
   const statusTextElement = document.getElementById('dashboard-status-text');
 
@@ -345,6 +386,11 @@ function showErrorStatus(): void {
     statusElement.classList.remove('status-green', 'status-yellow', 'status-red');
     statusElement.classList.add('status-red');
     statusTextElement.textContent = 'Status Unknown';
+
+    // Show error notification with details
+    if (errorMessage) {
+      showNotification(`Failed to get system status: ${errorMessage}`, 'error');
+    }
   }
 }
 
