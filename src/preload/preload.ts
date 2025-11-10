@@ -1567,6 +1567,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     validate: (): Promise<MigrationValidationResult> => {
       return ipcRenderer.invoke('migrations:validate');
     },
+
+    /**
+     * Mark migration wizard as complete and transition to main app
+     */
+    complete: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('migrations:complete');
+    },
+  },
+
+  /**
+   * Close the current window
+   */
+  closeWindow: (): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('closeWindow');
   },
 
   /**

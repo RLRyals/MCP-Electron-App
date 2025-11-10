@@ -272,6 +272,49 @@ function createWizardWindow(): void {
 }
 
 /**
+ * Create the migration wizard window
+ */
+function createMigrationWizardWindow(): void {
+  logger.info('Creating migration wizard window...');
+
+  mainWindow = new BrowserWindow({
+    width: 1000,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    title: 'MCP Writing System - Migration Wizard',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+    show: false, // Don't show until ready
+  });
+
+  // Load the migration wizard HTML file
+  const migrationWizardPath = path.join(__dirname, '../renderer/migration-wizard.html');
+  mainWindow.loadFile(migrationWizardPath);
+
+  // Show window when ready to avoid visual flash
+  mainWindow.once('ready-to-show', () => {
+    logger.info('Migration wizard window ready to show');
+    mainWindow?.show();
+  });
+
+  // Open DevTools in development mode
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  logger.info('Migration wizard window created');
+}
+
+/**
  * Create the main application window
  */
 function createWindow(): void {
@@ -931,6 +974,32 @@ function setupIPC(): void {
   ipcMain.handle('migrations:validate', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Validating migration registry...');
     return migrations.validateMigrations();
+  });
+
+  // Migration Wizard IPC handlers
+  ipcMain.handle('migrations:complete', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Migration wizard completed, transitioning to main app...');
+
+    // Close the current migration wizard window
+    if (mainWindow) {
+      mainWindow.close();
+      mainWindow = null;
+    }
+
+    // Create the main application window
+    createWindow();
+
+    return { success: true };
+  });
+
+  ipcMain.handle('closeWindow', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Closing current window...');
+
+    if (mainWindow) {
+      mainWindow.close();
+    }
+
+    return { success: true };
   });
 
   // GitHub Credentials IPC handlers
@@ -1656,13 +1725,15 @@ app.whenReady().then(async () => {
         });
 
         // If there are critical migrations, they should be handled
-        // For now, we log them and let the UI handle them
-        // Future: Could show a migration wizard or run them automatically
         if (pendingMigrations.criticalCount > 0) {
           logWithCategory('warn', LogCategory.SYSTEM,
-            'Critical migrations detected! These should be run before normal operation.'
+            'Critical migrations detected! Showing migration wizard.'
           );
         }
+
+        // Show migration wizard instead of main window
+        createMigrationWizardWindow();
+        return; // Don't continue to create main window
       } else {
         logWithCategory('info', LogCategory.SYSTEM, 'No pending migrations found');
       }
