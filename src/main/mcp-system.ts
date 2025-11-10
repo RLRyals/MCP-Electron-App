@@ -249,6 +249,7 @@ async function execDockerCompose(
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
+        TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
       }
     });
     return result;
