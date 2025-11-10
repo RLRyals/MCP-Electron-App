@@ -19,6 +19,7 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
+import * as migrations from './migrations';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
 import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipeline-orchestrator';
@@ -901,6 +902,37 @@ function setupIPC(): void {
     return await setupWizard.addMigrationRecord(record);
   });
 
+  // Migration IPC handlers
+  ipcMain.handle('migrations:check-pending', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for pending migrations...');
+    return await migrations.checkForPendingMigrations();
+  });
+
+  ipcMain.handle('migrations:run', async (_, migrationsToRun: migrations.Migration[]) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Running ${migrationsToRun.length} migrations...`);
+    return await migrations.runMigrations(migrationsToRun);
+  });
+
+  ipcMain.handle('migrations:get-all', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting all registered migrations...');
+    return migrations.getAllMigrations();
+  });
+
+  ipcMain.handle('migrations:get-for-upgrade', async (_, fromVersion: string, toVersion: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting migrations for upgrade ${fromVersion} -> ${toVersion}...`);
+    return migrations.getMigrationsForUpgrade(fromVersion, toVersion);
+  });
+
+  ipcMain.handle('migrations:get-steps-to-rerun', async (_, pendingMigrations: migrations.Migration[]) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting steps to rerun for pending migrations...');
+    return migrations.getStepsToRerunForMigrations(pendingMigrations);
+  });
+
+  ipcMain.handle('migrations:validate', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Validating migration registry...');
+    return migrations.validateMigrations();
+  });
+
   // GitHub Credentials IPC handlers
   ipcMain.handle('github-credentials:set-token', async (_, token: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting GitHub token...');
@@ -1596,6 +1628,41 @@ app.whenReady().then(async () => {
     // Show setup wizard
     createWizardWindow();
   } else {
+    // Check for pending migrations before showing main window
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, 'Checking for pending migrations...');
+      const pendingMigrations = await migrations.checkForPendingMigrations();
+
+      if (pendingMigrations.hasPending) {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Found ${pendingMigrations.migrations.length} pending migrations ` +
+          `(${pendingMigrations.criticalCount} critical, ${pendingMigrations.optionalCount} optional)`
+        );
+
+        // Log each pending migration
+        pendingMigrations.migrations.forEach(migration => {
+          logWithCategory('info', LogCategory.SYSTEM,
+            `  - Migration ${migration.version}: ${migration.description} ` +
+            `(${migration.steps.length} steps, critical: ${migration.critical || false})`
+          );
+        });
+
+        // If there are critical migrations, they should be handled
+        // For now, we log them and let the UI handle them
+        // Future: Could show a migration wizard or run them automatically
+        if (pendingMigrations.criticalCount > 0) {
+          logWithCategory('warn', LogCategory.SYSTEM,
+            'Critical migrations detected! These should be run before normal operation.'
+          );
+        }
+      } else {
+        logWithCategory('info', LogCategory.SYSTEM, 'No pending migrations found');
+      }
+    } catch (error) {
+      logger.error('Error checking for pending migrations:', error);
+      // Non-fatal, just log and continue
+    }
+
     // Show main application window
     createWindow();
 
