@@ -225,10 +225,24 @@ async function execDockerCompose(
 ): Promise<{ stdout: string; stderr: string }> {
   // Use the repository directory as the working directory so Docker can find build contexts
   const repoDir = getMCPRepositoryDirectory();
-  const fullCommand = `docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
 
-  logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
+  // Load environment variables and build env string for docker-compose
+  const config = await envConfig.loadEnvConfig();
+  const envVars = [
+    `POSTGRES_DB=${config.POSTGRES_DB}`,
+    `POSTGRES_USER=${config.POSTGRES_USER}`,
+    `POSTGRES_PASSWORD=${config.POSTGRES_PASSWORD}`,
+    `POSTGRES_PORT=${config.POSTGRES_PORT}`,
+    `MCP_CONNECTOR_PORT=${config.MCP_CONNECTOR_PORT}`,
+    `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
+    `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
+  ].join(' ');
+
+  const fullCommand = `${envVars} docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
+
+  logWithCategory('info', LogCategory.DOCKER, `Executing: docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`);
   logWithCategory('info', LogCategory.DOCKER, `Working directory: ${repoDir}`);
+  logWithCategory('info', LogCategory.DOCKER, `Environment variables: MCP_AUTH_TOKEN=****, POSTGRES_PASSWORD=****`);
 
   try {
     const result = await execAsync(fullCommand, { cwd: repoDir });
