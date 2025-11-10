@@ -1,24 +1,35 @@
 # Docker Images Directory
 
-This directory contains pre-built Docker images that are bundled with the application to avoid building on the user's machine.
+> **⚠️ FUTURE ENHANCEMENT - NOT CURRENTLY USED**
+>
+> This directory is reserved for a planned future feature to bundle pre-built Docker images with the application.
+>
+> **Current Behavior:** The app currently pulls the PostgreSQL image from Docker Hub and builds MCP server images from source code during setup. This directory is not currently used by the application.
 
-## Expected Files
+---
 
-The following Docker images should be placed in this directory before packaging the application:
+This directory will contain pre-built Docker images that will be bundled with the application to provide faster, offline installation (planned future enhancement).
 
-1. **postgres-15.tar.gz** (~150MB)
-   - PostgreSQL 15 database image
-   - Source: `postgres:15`
+## Expected Files (For Future Implementation)
+
+When this feature is implemented, the following Docker images should be placed in this directory before packaging the application:
+
+1. **postgres-15.tar.gz** (or **postgres-16-alpine.tar.gz**) (~150MB)
+   - PostgreSQL database image
+   - **Current**: Pulled from Docker Hub during setup
+   - **Future**: Pre-bundled with installer
 
 2. **mcp-servers.tar.gz** (~200MB)
    - MCP servers custom image
-   - Source: `mcp-servers:latest`
+   - **Current**: Built from cloned source code during setup
+   - **Future**: Pre-built and bundled with installer
 
-## How to Export Docker Images
+## How to Export Docker Images (For Future Implementation)
 
-To create these image files for bundling, run the export script:
+When implementing this feature, these image files can be created using:
 
 ```bash
+# This script is prepared for the future feature
 npm run export-docker-images
 ```
 
@@ -29,45 +40,42 @@ Or manually export using Docker:
 docker pull postgres:15
 docker save postgres:15 | gzip > postgres-15.tar.gz
 
-# Export MCP servers image (after building)
+# Export MCP servers image
+# Note: Current implementation builds from cloned source, not local Dockerfile
 docker build -t mcp-servers:latest .
 docker save mcp-servers:latest | gzip > mcp-servers.tar.gz
 ```
 
-## Build Process
+## Build Process (Future Implementation)
 
-During the application packaging process (`npm run package`), these images will be:
+When this feature is implemented, during the application packaging process (`npm run package`), these images will be:
 
 1. Verified for existence (warning if missing)
 2. Included in the app's resources directory
 3. Loaded on first run or when requested by the user
 
-## File Sizes
+**Current Process:**
+- Images are NOT bundled with the installer
+- PostgreSQL is pulled from Docker Hub during setup
+- MCP servers are built from source during setup
+
+## File Sizes (Future)
 
 The bundled images will add approximately 350MB to the application package size. Users will benefit from:
 
 - Faster installation (no image building required)
 - Offline installation support
 - Consistent versions across all deployments
-- No need for Docker Hub access
+- Reduced dependency on external services
 
-## Development
+## Current Behavior
 
-During development, if these files are not present:
+Currently, this directory is not used. The application:
 
-- The application will still run
-- Image loading will fail gracefully
-- Users will need to pull/build images manually
-- Warnings will be logged
-
-## Production
-
-For production builds:
-
-1. Ensure both image files exist in this directory
-2. Verify file sizes are reasonable
-3. Test image loading after packaging
-4. Consider hosting images separately for very large deployments
+- ✅ Pulls PostgreSQL from Docker Hub automatically
+- ✅ Clones MCP server repositories and builds images
+- ✅ Works without any pre-bundled images
+- ✅ Provides progress feedback during image preparation
 
 ## Notes
 

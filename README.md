@@ -143,7 +143,7 @@ A: The app will detect this and show you a step-by-step guide to install Docker 
 
 **Q: How much does this cost?**
 A: The MCP Electron App is free and open-source. However, you may need:
-- A free Docker Hub account (for Docker Desktop)
+- Docker Desktop (free for personal use; a Docker Hub account is optional)
 - API credits for AI services (Claude, ChatGPT, etc.) depending on your chosen client
 
 **Q: Can I uninstall it later?**

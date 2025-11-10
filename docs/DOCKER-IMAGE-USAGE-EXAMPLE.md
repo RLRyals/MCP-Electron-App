@@ -1,6 +1,16 @@
 # Docker Image Pre-loading - Usage Examples
 
-This document provides practical examples of using the Docker image pre-loading system in the MCP Electron App.
+> **⚠️ FUTURE ENHANCEMENT - NOT CURRENTLY IMPLEMENTED**
+>
+> This document describes usage examples for a planned future feature.
+>
+> **Current Behavior:** The app currently pulls the PostgreSQL image from Docker Hub and builds MCP server images from source code during setup.
+>
+> **Future Enhancement:** This document provides examples for when pre-loading bundled Docker images is implemented.
+
+---
+
+This document provides practical examples of using the Docker image pre-loading system planned for the MCP Electron App.
 
 ## Basic Usage
 
