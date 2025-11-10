@@ -881,6 +881,26 @@ function setupIPC(): void {
     return await setupWizard.canProceedToNextStep(step);
   });
 
+  ipcMain.handle('setup-wizard:get-installation-version', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting installation version...');
+    return await setupWizard.getInstallationVersion();
+  });
+
+  ipcMain.handle('setup-wizard:is-installation-outdated', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if installation is outdated...');
+    return await setupWizard.isInstallationOutdated();
+  });
+
+  ipcMain.handle('setup-wizard:get-migration-history', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting migration history...');
+    return await setupWizard.getMigrationHistory();
+  });
+
+  ipcMain.handle('setup-wizard:add-migration-record', async (_, record: setupWizard.MigrationRecord) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Adding migration record for version ${record.version}...`);
+    return await setupWizard.addMigrationRecord(record);
+  });
+
   // GitHub Credentials IPC handlers
   ipcMain.handle('github-credentials:set-token', async (_, token: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting GitHub token...');
