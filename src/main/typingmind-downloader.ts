@@ -148,13 +148,19 @@ export async function saveMetadata(typingMindData: TypingMindMetadata): Promise<
 
 /**
  * Check if Typing Mind is already installed
+ * Checks for the presence of required files, not just metadata
  */
 export async function isInstalled(): Promise<boolean> {
-  const metadata = await loadMetadata();
   const installDir = getTypingMindDirectory();
 
-  // Check both metadata and actual directory
-  return metadata.installed && fs.existsSync(installDir);
+  // Check if directory exists
+  if (!fs.existsSync(installDir)) {
+    return false;
+  }
+
+  // Check for essential files that indicate a valid installation
+  const indexPath = path.join(installDir, 'index.html');
+  return fs.existsSync(indexPath);
 }
 
 /**

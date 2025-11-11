@@ -734,37 +734,55 @@ export async function restartMCPSystem(
 
 /**
  * Get current system status
+ * Uses docker ps to get all MCP-related containers regardless of how they were started
  */
 export async function getSystemStatus(): Promise<SystemStatus> {
   logWithCategory('info', LogCategory.DOCKER, 'Getting system status...');
 
   try {
-    // Check if repository directory exists
-    const repoPath = getMCPRepositoryDirectory();
-    const repoExists = await fs.pathExists(repoPath);
+    // Use docker ps to find all MCP-related containers
+    // This works regardless of which compose file was used to start them
+    const { stdout } = await execAsync('docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" --format "{{json .}}"');
 
-    if (!repoExists) {
-      logWithCategory('warn', LogCategory.DOCKER, `MCP-Writing-Servers repository not found at ${repoPath}`);
+    if (!stdout.trim()) {
       return {
         running: false,
         healthy: false,
         containers: [],
-        message: 'MCP repository not found. Please complete setup.',
+        message: 'No containers running',
       };
     }
 
-    const composeFiles = [
-      getDockerComposeFilePath('core'),
-      getDockerComposeFilePath('mcp-connector'),
-      getDockerComposeFilePath('typing-mind'),
-    ];
-
     const allContainers: ContainerHealth[] = [];
+    const lines = stdout.trim().split('\n');
 
-    for (const composeFile of composeFiles) {
-      if (await fs.pathExists(composeFile)) {
-        const containers = await getContainerHealth(composeFile);
-        allContainers.push(...containers);
+    for (const line of lines) {
+      try {
+        const container = JSON.parse(line);
+
+        // Parse health status
+        let health: ContainerHealth['health'] = 'none';
+        const status = container.Status || '';
+
+        if (status.includes('(healthy)')) {
+          health = 'healthy';
+        } else if (status.includes('(unhealthy)')) {
+          health = 'unhealthy';
+        } else if (status.includes('(starting)') || status.includes('(health: starting)')) {
+          health = 'starting';
+        } else if (container.State === 'running') {
+          // If no health check defined, consider it healthy if running
+          health = 'healthy';
+        }
+
+        allContainers.push({
+          name: container.Names,
+          status: container.State,
+          health: health,
+          running: container.State === 'running',
+        });
+      } catch (parseError) {
+        logWithCategory('warn', LogCategory.DOCKER, `Failed to parse container JSON: ${line}`);
       }
     }
 
