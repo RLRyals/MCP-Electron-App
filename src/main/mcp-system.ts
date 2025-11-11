@@ -13,6 +13,7 @@ import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
 import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
+import * as typingMindAutoConfig from './typingmind-auto-config';
 import { checkDockerRunning } from './prerequisites';
 
 const execAsync = promisify(exec);
@@ -632,6 +633,26 @@ export async function startMCPSystem(
 
     // Get service URLs
     const urls = await getServiceUrls();
+
+    // Auto-configure TypingMind and start MCP servers if TypingMind is enabled
+    if (services.typingMind) {
+      logWithCategory('info', LogCategory.DOCKER, 'Auto-configuring TypingMind with MCP servers...');
+
+      // Wait a bit for the MCP connector to be fully ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      try {
+        const autoConfigResult = await typingMindAutoConfig.autoConfigureTypingMind();
+        if (autoConfigResult.success) {
+          logWithCategory('info', LogCategory.DOCKER, 'TypingMind auto-configured successfully');
+        } else {
+          logWithCategory('warn', LogCategory.DOCKER, `TypingMind auto-configuration failed: ${autoConfigResult.message}`);
+        }
+      } catch (error) {
+        logWithCategory('error', LogCategory.DOCKER, 'Error during TypingMind auto-configuration', error);
+        // Don't fail the whole startup if auto-config fails
+      }
+    }
 
     logWithCategory('info', LogCategory.DOCKER, 'MCP system started successfully');
 
