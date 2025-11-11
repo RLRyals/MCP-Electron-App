@@ -219,7 +219,7 @@ async function determineServicesToStart(): Promise<{
  * Execute docker-compose command
  */
 async function execDockerCompose(
-  composeFile: string,
+  composeFile: string | string[],
   command: string,
   args: string[] = []
 ): Promise<{ stdout: string; stderr: string }> {
@@ -229,8 +229,12 @@ async function execDockerCompose(
   // Load environment variables for docker-compose
   const config = await envConfig.loadEnvConfig();
 
+  // Build the -f flags for all compose files
+  const composeFiles = Array.isArray(composeFile) ? composeFile : [composeFile];
+  const composeFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
+
   // Build the command without inline environment variables
-  const fullCommand = `docker-compose -f "${composeFile}" ${command} ${args.join(' ')}`;
+  const fullCommand = `docker-compose ${composeFlags} ${command} ${args.join(' ')}`;
 
   logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
   logWithCategory('info', LogCategory.DOCKER, `Working directory: ${repoDir}`);
@@ -262,7 +266,7 @@ async function execDockerCompose(
 /**
  * Parse docker-compose ps output to get container health
  */
-async function getContainerHealth(composeFile: string): Promise<ContainerHealth[]> {
+async function getContainerHealth(composeFile: string | string[]): Promise<ContainerHealth[]> {
   try {
     const { stdout } = await execDockerCompose(composeFile, 'ps', ['--format', 'json']);
 
@@ -317,13 +321,9 @@ async function waitForHealthy(
   let lastProgress = 0;
 
   while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT) {
-    // Get health status from all compose files
-    const allContainers: ContainerHealth[] = [];
-
-    for (const composeFile of composeFiles) {
-      const containers = await getContainerHealth(composeFile);
-      allContainers.push(...containers);
-    }
+    // Get health status from all compose files together
+    // This ensures dependencies between files are resolved
+    const allContainers = await getContainerHealth(composeFiles);
 
     if (allContainers.length === 0) {
       logWithCategory('warn', LogCategory.DOCKER, 'No containers found');
