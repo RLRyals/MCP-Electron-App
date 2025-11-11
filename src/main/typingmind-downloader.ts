@@ -63,11 +63,12 @@ let activeProcess: ChildProcess | null = null;
 let isCancelled = false;
 
 /**
- * Get the directory where Typing Mind files should be installed
+ * Get the directory where Typing Mind files are located
+ * Files are downloaded to repositories/typing-mind/src during the download process
  */
 export function getTypingMindDirectory(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system', 'typing-mind-static');
+  return path.join(userDataPath, 'repositories', 'typing-mind', 'src');
 }
 
 /**

@@ -835,25 +835,18 @@ export async function viewServiceLogs(
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
 
   try {
-    // Determine which compose file to use
-    let composeFile: string;
-    if (serviceName === 'postgres' || serviceName === 'mcp-writing-system') {
-      composeFile = getDockerComposeFilePath('core');
-    } else if (serviceName === 'mcp-connector') {
-      composeFile = getDockerComposeFilePath('mcp-connector');
-    } else {
-      composeFile = getDockerComposeFilePath('typing-mind');
-    }
+    // Map service names to actual container names
+    const containerNameMap: { [key: string]: string } = {
+      'postgres': 'mcp-writing-db',
+      'mcp-writing-system': 'mcp-writing-system',
+      'mcp-connector': 'mcp-connector',
+      'typing-mind': 'typing-mind-web',
+    };
 
-    if (!await fs.pathExists(composeFile)) {
-      return {
-        success: false,
-        logs: '',
-        error: 'Service not configured',
-      };
-    }
+    const containerName = containerNameMap[serviceName] || serviceName;
 
-    const { stdout } = await execDockerCompose(composeFile, 'logs', ['--tail', tail.toString(), serviceName]);
+    // Use docker logs directly instead of docker-compose since we just need to read logs
+    const { stdout } = await execAsync(`docker logs --tail ${tail} ${containerName}`);
 
     return {
       success: true,

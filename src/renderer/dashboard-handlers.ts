@@ -339,9 +339,10 @@ function updatePostgreSQLCard(status: MCPSystemStatus, config: EnvConfig): void 
 
 /**
  * Update MCP Servers service card
+ * Note: Looks for 'mcp-writing-system' (from core.yml) or 'mcp-connector' (from main compose file)
  */
 function updateMCPServersCard(status: MCPSystemStatus): void {
-  const container = status.containers.find(c => c.name.includes('mcp-writing-system'));
+  const container = status.containers.find(c => c.name.includes('mcp-writing-system') || c.name.includes('mcp-connector'));
 
   const statusIcon = document.getElementById('mcp-servers-status-icon');
   const statusText = document.getElementById('mcp-servers-status-text');
