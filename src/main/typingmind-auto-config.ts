@@ -151,6 +151,23 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
     logWithCategory('info', LogCategory.SYSTEM, `Added server config: ${serverName} -> node ${containerPath}`);
   }
 
+  // Add author-server (located in src/mcps/ instead of src/config-mcps/)
+  const authorServerPath = '/app/src/mcps/author-server/index.js';
+  config.mcpServers['author-server'] = {
+    command: 'node',
+    args: [authorServerPath, '--http'],
+    env: {
+      DATABASE_URL: databaseUrl,
+      POSTGRES_HOST: containerName,
+      POSTGRES_PORT: String(envConf.POSTGRES_PORT),
+      POSTGRES_DB: envConf.POSTGRES_DB,
+      POSTGRES_USER: envConf.POSTGRES_USER,
+      POSTGRES_PASSWORD: envConf.POSTGRES_PASSWORD,
+      NODE_ENV: 'development'
+    }
+  };
+  logWithCategory('info', LogCategory.SYSTEM, `Added server config: author-server -> node ${authorServerPath}`);
+
   return config;
 }
 
