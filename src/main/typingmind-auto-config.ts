@@ -127,11 +127,14 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
     // All MCP servers run inside the mcp-writing-system Docker container
     // The MCP Connector doesn't pass environment variables to child processes,
     // so we must explicitly provide them in the configuration
+    //
+    // IMPORTANT: Use forward slashes for Unix paths inside Docker container
+    // Do NOT use path.join() here as it will use Windows separators on Windows
     const containerPath = `/app/src/config-mcps/${serverName}/index.js`;
 
     config.mcpServers[serverName] = {
       command: 'node',
-      args: [containerPath],
+      args: [containerPath, '--http'],
       env: {
         // Database connection (using container's internal network)
         DATABASE_URL: databaseUrl,
