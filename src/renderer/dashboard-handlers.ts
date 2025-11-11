@@ -319,7 +319,7 @@ function updatePostgreSQLCard(status: MCPSystemStatus, config: EnvConfig): void 
 
   const statusIcon = document.getElementById('postgres-status-icon');
   const statusText = document.getElementById('postgres-status-text');
-  const portText = document.getElementById('postgres-port');
+  const portText = document.getElementById('postgres-port-display');
 
   if (statusIcon && statusText && portText) {
     portText.textContent = `Port: ${config.POSTGRES_PORT}`;
@@ -375,7 +375,7 @@ function updateMCPConnectorCard(status: MCPSystemStatus, config: EnvConfig, urls
 
       const statusIcon = document.getElementById('mcp-connector-status-icon');
       const statusText = document.getElementById('mcp-connector-status-text');
-      const portText = document.getElementById('mcp-connector-port');
+      const portText = document.getElementById('mcp-connector-port-display');
 
       if (statusIcon && statusText && portText) {
         portText.textContent = `Port: ${config.MCP_CONNECTOR_PORT}`;
@@ -411,7 +411,7 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
 
       const statusIcon = document.getElementById('typing-mind-status-icon');
       const statusText = document.getElementById('typing-mind-status-text');
-      const portText = document.getElementById('typing-mind-port');
+      const portText = document.getElementById('typing-mind-port-display');
 
       if (statusIcon && statusText && portText) {
         portText.textContent = `Port: ${config.TYPING_MIND_PORT}`;

@@ -91,15 +91,35 @@ export async function checkPortAvailability(port: number, indicatorId: string): 
  * Check all ports
  */
 export async function checkAllPorts(): Promise<void> {
-  const postgresPort = parseInt((document.getElementById('postgres-port') as HTMLInputElement).value, 10);
-  const mcpPort = parseInt((document.getElementById('mcp-connector-port') as HTMLInputElement).value, 10);
-  const typingMindPort = parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value, 10);
+  const postgresPortInput = document.getElementById('postgres-port') as HTMLInputElement;
+  const mcpPortInput = document.getElementById('mcp-connector-port') as HTMLInputElement;
+  const typingMindPortInput = document.getElementById('typing-mind-port') as HTMLInputElement;
 
-  await Promise.all([
-    checkPortAvailability(postgresPort, 'postgres-port-indicator'),
-    checkPortAvailability(mcpPort, 'mcp-connector-port-indicator'),
-    checkPortAvailability(typingMindPort, 'typing-mind-port-indicator'),
-  ]);
+  // Validate that we have valid input elements with values
+  if (!postgresPortInput || !mcpPortInput || !typingMindPortInput) {
+    console.error('One or more port input elements not found');
+    return;
+  }
+
+  const postgresPort = parseInt(postgresPortInput.value, 10);
+  const mcpPort = parseInt(mcpPortInput.value, 10);
+  const typingMindPort = parseInt(typingMindPortInput.value, 10);
+
+  // Only check ports that have valid values
+  const checks: Promise<void>[] = [];
+  if (!isNaN(postgresPort)) {
+    checks.push(checkPortAvailability(postgresPort, 'postgres-port-indicator'));
+  }
+  if (!isNaN(mcpPort)) {
+    checks.push(checkPortAvailability(mcpPort, 'mcp-connector-port-indicator'));
+  }
+  if (!isNaN(typingMindPort)) {
+    checks.push(checkPortAvailability(typingMindPort, 'typing-mind-port-indicator'));
+  }
+
+  if (checks.length > 0) {
+    await Promise.all(checks);
+  }
 }
 
 /**
