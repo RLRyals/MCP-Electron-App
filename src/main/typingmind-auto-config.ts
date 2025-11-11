@@ -18,6 +18,7 @@ export interface TypingMindMCPConfig {
   serverUrl: string;
   authToken: string;
   autoConnect: boolean;
+  mcpServers?: MCPServersConfig;
 }
 
 /**
@@ -266,12 +267,16 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
       };
     }
 
+    // Build MCP servers configuration
+    const serversConfig = await buildMCPServersConfig();
+
     // Create the TypingMind MCP configuration
     const mcpConfig: TypingMindMCPConfig = {
       enabled: true,
       serverUrl: `http://localhost:${config.MCP_CONNECTOR_PORT}`,
       authToken: config.MCP_AUTH_TOKEN,
       autoConnect: true,
+      mcpServers: serversConfig,
     };
 
     // Save the configuration
@@ -304,7 +309,7 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
 
     return {
       success: true,
-      message: `TypingMind successfully configured with MCP Connector and ${Object.keys((await buildMCPServersConfig()).mcpServers).length} MCP servers`,
+      message: `TypingMind successfully configured with MCP Connector and ${Object.keys(serversConfig.mcpServers).length} MCP servers`,
       config: mcpConfig,
     };
   } catch (error) {

@@ -283,6 +283,7 @@ interface ElectronAPI {
     getConfigInstructions: () => Promise<string>;
     isConfigured: () => Promise<boolean>;
     resetConfig: () => Promise<any>;
+    getMCPServersJSON: () => Promise<string>;
   };
 }
 

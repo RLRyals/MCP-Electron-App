@@ -1055,6 +1055,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Get MCP servers configuration as JSON string
+     */
+    getMCPServersJSON: (): Promise<string> => {
+      return ipcRenderer.invoke('typingmind:get-mcp-servers-json');
+    },
+
+    /**
      * Listen for Typing Mind download progress updates
      */
     onProgress: (callback: (progress: TypingMindProgress) => void): void => {

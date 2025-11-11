@@ -733,6 +733,12 @@ function setupIPC(): void {
     return await typingMindAutoConfig.resetTypingMindConfig();
   });
 
+  ipcMain.handle('typingmind:get-mcp-servers-json', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting MCP servers JSON configuration...');
+    const serversConfig = await typingMindAutoConfig.buildMCPServersConfig();
+    return JSON.stringify(serversConfig, null, 2);
+  });
+
   // Docker Images IPC handlers
   ipcMain.handle('docker-images:load-all', async (_event) => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Loading all Docker images...');
