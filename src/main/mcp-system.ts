@@ -598,7 +598,30 @@ export async function startMCPSystem(
       composeFiles.push(typingMindFile);
 
       try {
-        await execDockerCompose(typingMindFile, 'up', ['-d']);
+        // Use both core and typing-mind compose files together to resolve service dependencies
+        // But only start the typing-mind-web service
+        const repoDir = getMCPRepositoryDirectory();
+        const config = await envConfig.loadEnvConfig();
+
+        const fullCommand = `docker-compose -f "${coreFile}" -f "${typingMindFile}" up -d typing-mind-web`;
+
+        logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
+
+        await execAsync(fullCommand, {
+          cwd: repoDir,
+          env: {
+            ...process.env,
+            POSTGRES_DB: config.POSTGRES_DB,
+            POSTGRES_USER: config.POSTGRES_USER,
+            POSTGRES_PASSWORD: config.POSTGRES_PASSWORD,
+            POSTGRES_PORT: String(config.POSTGRES_PORT),
+            MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
+            MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
+            TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
+            TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
+          }
+        });
+
         logWithCategory('info', LogCategory.DOCKER, 'Typing Mind started');
       } catch (error: any) {
         logWithCategory('error', LogCategory.DOCKER, 'Failed to start Typing Mind', error);
