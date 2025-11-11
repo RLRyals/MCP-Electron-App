@@ -102,7 +102,7 @@ export function getMCPRepositoryDirectory(): string {
 /**
  * Get docker-compose file path from the cloned MCP-Writing-Servers repository
  */
-function getDockerComposeFilePath(type: 'core' | 'mcp-connector' | 'typing-mind'): string {
+function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
   const repoPath = getMCPRepositoryDirectory();
   return path.join(repoPath, 'docker', `docker-compose.${type}.yml`);
 }
@@ -560,30 +560,8 @@ export async function startMCPSystem(
       };
     }
 
-    // 2. Start MCP Connector if needed
-    if (services.mcpConnector) {
-      if (progressCallback) {
-        progressCallback({
-          message: 'Starting MCP Connector...',
-          percent: 55,
-          step: 'starting-connector',
-          status: 'starting',
-        });
-      }
-
-      const connectorFile = getDockerComposeFilePath('mcp-connector');
-      composeFiles.push(connectorFile);
-
-      try {
-        await execDockerCompose(connectorFile, 'up', ['-d']);
-        logWithCategory('info', LogCategory.DOCKER, 'MCP Connector started');
-      } catch (error: any) {
-        logWithCategory('error', LogCategory.DOCKER, 'Failed to start MCP Connector', error);
-        // Continue anyway - core services might still work
-      }
-    }
-
-    // 3. Start Typing Mind if needed
+    // 2. Start Typing Mind if needed
+    // Note: MCP Connector is now bundled in the core mcp-writing-system service
     if (services.typingMind) {
       if (progressCallback) {
         progressCallback({
@@ -682,7 +660,6 @@ export async function stopMCPSystem(): Promise<SystemOperationResult> {
   try {
     const composeFiles = [
       getDockerComposeFilePath('typing-mind'),
-      getDockerComposeFilePath('mcp-connector'),
       getDockerComposeFilePath('core'),
     ];
 
@@ -870,7 +847,7 @@ export async function getServiceUrls(): Promise<ServiceUrls> {
  * View service logs
  */
 export async function viewServiceLogs(
-  serviceName: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind',
+  serviceName: 'postgres' | 'mcp-writing-system' | 'typing-mind',
   tail: number = 100
 ): Promise<ServiceLogsResult> {
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
@@ -880,7 +857,6 @@ export async function viewServiceLogs(
     const containerNameMap: { [key: string]: string } = {
       'postgres': 'mcp-writing-db',
       'mcp-writing-system': 'mcp-writing-system',
-      'mcp-connector': 'mcp-connector',
       'typing-mind': 'typing-mind-web',
     };
 
