@@ -134,7 +134,7 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
 
     config.mcpServers[serverName] = {
       command: 'node',
-      args: [containerPath],
+      args: [containerPath, '--http'],
       env: {
         // Database connection (using container's internal network)
         DATABASE_URL: databaseUrl,
@@ -144,9 +144,7 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
         POSTGRES_USER: envConf.POSTGRES_USER,
         POSTGRES_PASSWORD: envConf.POSTGRES_PASSWORD,
         // Server configuration
-        NODE_ENV: 'development',
-        // MCP stdio mode - connector communicates via stdin/stdout
-        MCP_STDIO_MODE: 'true'
+        NODE_ENV: 'development'
       }
     };
 
