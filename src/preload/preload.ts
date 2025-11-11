@@ -1013,6 +1013,48 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Auto-configure Typing Mind with MCP Connector settings
+     */
+    autoConfigure: (): Promise<any> => {
+      return ipcRenderer.invoke('typingmind:auto-configure');
+    },
+
+    /**
+     * Set custom Typing Mind configuration
+     */
+    setCustomConfig: (serverUrl: string, authToken: string): Promise<any> => {
+      return ipcRenderer.invoke('typingmind:set-custom-config', serverUrl, authToken);
+    },
+
+    /**
+     * Get current Typing Mind configuration
+     */
+    getConfig: (): Promise<any> => {
+      return ipcRenderer.invoke('typingmind:get-config');
+    },
+
+    /**
+     * Get configuration instructions for manual setup
+     */
+    getConfigInstructions: (): Promise<string> => {
+      return ipcRenderer.invoke('typingmind:get-config-instructions');
+    },
+
+    /**
+     * Check if Typing Mind is configured
+     */
+    isConfigured: (): Promise<boolean> => {
+      return ipcRenderer.invoke('typingmind:is-configured');
+    },
+
+    /**
+     * Reset Typing Mind configuration
+     */
+    resetConfig: (): Promise<any> => {
+      return ipcRenderer.invoke('typingmind:reset-config');
+    },
+
+    /**
      * Listen for Typing Mind download progress updates
      */
     onProgress: (callback: (progress: TypingMindProgress) => void): void => {

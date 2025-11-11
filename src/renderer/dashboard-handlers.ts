@@ -83,6 +83,7 @@ function setupDashboardListeners(): void {
   const stopBtn = document.getElementById('dashboard-stop-system');
   const restartBtn = document.getElementById('dashboard-restart-system');
   const openTypingMindBtn = document.getElementById('dashboard-open-typing-mind');
+  const configureTypingMindBtn = document.getElementById('dashboard-configure-typing-mind');
   const refreshBtn = document.getElementById('dashboard-refresh-status');
 
   if (startBtn) {
@@ -99,6 +100,10 @@ function setupDashboardListeners(): void {
 
   if (openTypingMindBtn) {
     openTypingMindBtn.addEventListener('click', handleOpenTypingMind);
+  }
+
+  if (configureTypingMindBtn) {
+    configureTypingMindBtn.addEventListener('click', handleConfigureTypingMind);
   }
 
   if (refreshBtn) {
@@ -635,6 +640,35 @@ async function handleOpenTypingMind(): Promise<void> {
 }
 
 /**
+ * Handle Configure Typing Mind action
+ * Automatically configures Typing Mind with MCP Connector settings
+ */
+async function handleConfigureTypingMind(): Promise<void> {
+  try {
+    showNotification('Configuring Typing Mind...', 'info');
+
+    // Auto-configure Typing Mind with MCP Connector settings
+    const result = await window.electronAPI.typingMind.autoConfigure();
+
+    if (result.success) {
+      // Get configuration instructions
+      const instructions = await window.electronAPI.typingMind.getConfigInstructions();
+
+      // Show success notification
+      showNotification('Typing Mind configured successfully!', 'success');
+
+      // Display configuration details in a dialog
+      showConfigurationDialog(result.config, instructions);
+    } else {
+      showNotification(`Configuration failed: ${result.message}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error configuring Typing Mind:', error);
+    showNotification('Failed to configure Typing Mind', 'error');
+  }
+}
+
+/**
  * Handle View Logs action
  */
 async function handleViewLogs(serviceName: string): Promise<void> {
@@ -735,6 +769,79 @@ function showLogsDialog(serviceName: string, logs: string): void {
     copyButton.addEventListener('click', async () => {
       await navigator.clipboard.writeText(logs);
       showNotification('Logs copied to clipboard!', 'success');
+    });
+  }
+}
+
+/**
+ * Show configuration dialog
+ */
+function showConfigurationDialog(config: any, instructions: string): void {
+  const dialog = document.createElement('div');
+  dialog.className = 'logs-dialog'; // Reuse logs dialog styles
+
+  // Extract server count from instructions
+  const serverMatch = instructions.match(/MCP Servers discovered: (\d+)/);
+  const serverCount = serverMatch ? serverMatch[1] : '0';
+
+  // Extract server names from instructions
+  const serversMatch = instructions.match(/Available servers: ([^\n]+)/);
+  const serverNames = serversMatch ? serversMatch[1].split(', ') : [];
+
+  dialog.innerHTML = `
+    <div class="logs-dialog-backdrop"></div>
+    <div class="logs-dialog-content">
+      <div class="logs-dialog-header">
+        <h3>✓ Typing Mind Fully Configured!</h3>
+        <button class="logs-dialog-close">×</button>
+      </div>
+      <div class="logs-dialog-body">
+        <div style="margin-bottom: 20px;">
+          <h4>Configuration Details:</h4>
+          <p><strong>Server URL:</strong> ${escapeHtml(config.serverUrl)}</p>
+          <p><strong>Auth Token:</strong> ${escapeHtml(config.authToken.substring(0, 16))}...</p>
+          <p><strong>MCP Servers:</strong> <span style="color: #28a745;">${serverCount} servers configured</span></p>
+          ${serverNames.length > 0 ? `<p style="font-size: 0.9em; margin-left: 20px;">• ${serverNames.map((s: string) => escapeHtml(s.trim())).join('<br>• ')}</p>` : ''}
+          <p><strong>Status:</strong> <span style="color: #28a745;">✓ Ready to use</span></p>
+        </div>
+        <div>
+          <h4>Next Steps:</h4>
+          <ol style="line-height: 1.8;">
+            <li>Click "Open Typing Mind" to launch the web interface</li>
+            <li>The MCP Connector is already running with all ${serverCount} servers</li>
+            <li>In Typing Mind, go to Settings → MCP Integration</li>
+            <li>Enter the Server URL and Auth Token shown above</li>
+            <li>Click "Connect" and start using MCP tools!</li>
+          </ol>
+          <p style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-left: 3px solid #0284c7;">
+            <strong>Note:</strong> All MCP servers have been automatically started and are ready to use.
+            You should see tools from all ${serverCount} servers in Typing Mind once connected.
+          </p>
+        </div>
+      </div>
+      <div class="logs-dialog-footer">
+        <button class="config-dialog-copy">Copy Configuration</button>
+        <button class="logs-dialog-close-btn">Close</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Add event listeners
+  const closeButtons = dialog.querySelectorAll('.logs-dialog-close, .logs-dialog-close-btn');
+  closeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  });
+
+  const copyButton = dialog.querySelector('.config-dialog-copy');
+  if (copyButton) {
+    copyButton.addEventListener('click', async () => {
+      const configText = `Server URL: ${config.serverUrl}\nAuth Token: ${config.authToken}`;
+      await navigator.clipboard.writeText(configText);
+      showNotification('Configuration copied to clipboard!', 'success');
     });
   }
 }

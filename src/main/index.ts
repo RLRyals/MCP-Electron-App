@@ -16,6 +16,7 @@ import * as envConfig from './env-config';
 import * as installationWizard from './installation-wizard';
 import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
+import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
@@ -699,6 +700,37 @@ function setupIPC(): void {
 
   ipcMain.handle('typingmind:get-install-path', async () => {
     return typingMindDownloader.getTypingMindDirectory();
+  });
+
+  // TypingMind Auto-Configuration IPC handlers
+  ipcMain.handle('typingmind:auto-configure', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring TypingMind with MCP Connector...');
+    return await typingMindAutoConfig.autoConfigureTypingMind();
+  });
+
+  ipcMain.handle('typingmind:set-custom-config', async (_event, serverUrl: string, authToken: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting custom TypingMind configuration...');
+    return await typingMindAutoConfig.setCustomTypingMindConfig(serverUrl, authToken);
+  });
+
+  ipcMain.handle('typingmind:get-config', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting TypingMind configuration...');
+    return await typingMindAutoConfig.loadTypingMindConfig();
+  });
+
+  ipcMain.handle('typingmind:get-config-instructions', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting TypingMind configuration instructions...');
+    return await typingMindAutoConfig.getConfigurationInstructions();
+  });
+
+  ipcMain.handle('typingmind:is-configured', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if TypingMind is configured...');
+    return await typingMindAutoConfig.isTypingMindConfigured();
+  });
+
+  ipcMain.handle('typingmind:reset-config', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting TypingMind configuration...');
+    return await typingMindAutoConfig.resetTypingMindConfig();
   });
 
   // Docker Images IPC handlers

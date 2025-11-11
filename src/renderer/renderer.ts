@@ -276,6 +276,14 @@ interface ElectronAPI {
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
     removeProgressListener: () => void;
   };
+  typingMind: {
+    autoConfigure: () => Promise<any>;
+    setCustomConfig: (serverUrl: string, authToken: string) => Promise<any>;
+    getConfig: () => Promise<any>;
+    getConfigInstructions: () => Promise<string>;
+    isConfigured: () => Promise<boolean>;
+    resetConfig: () => Promise<any>;
+  };
 }
 
 // Access the API exposed through preload script
