@@ -27,9 +27,8 @@ export interface TypingMindMCPConfig {
 export interface MCPServerConfig {
   command: string;
   args: string[];
-  env: {
-    NODE_ENV: string;
-    MCP_STDIO_MODE: string;
+  env?: {
+    [key: string]: string;
   };
 }
 
@@ -111,28 +110,42 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
   logWithCategory('info', LogCategory.SYSTEM, 'Building MCP servers configuration...');
 
   const servers = await discoverMCPServers();
-  const mcpServersPath = path.join(getMCPWritingServersPath(), 'src', 'config-mcps');
+
+  // Load environment config to build DATABASE_URL for the container
+  const envConf = await envConfig.loadEnvConfig();
+
+  // Build the DATABASE_URL as it appears inside the Docker container
+  // The container uses the container name for the postgres host
+  const containerName = 'mcp-writing-db'; // Default from docker-compose
+  const databaseUrl = `postgresql://${envConf.POSTGRES_USER}:${envConf.POSTGRES_PASSWORD}@${containerName}:${envConf.POSTGRES_PORT}/${envConf.POSTGRES_DB}`;
 
   const config: MCPServersConfig = {
     mcpServers: {}
   };
 
   for (const serverName of servers) {
-    const serverPath = path.join(mcpServersPath, serverName, 'index.js');
+    // All MCP servers run inside the mcp-writing-system Docker container
+    // The MCP Connector doesn't pass environment variables to child processes,
+    // so we must explicitly provide them in the configuration
+    const containerPath = `/app/src/config-mcps/${serverName}/index.js`;
 
-    // Use the path as-is - Node.js handles paths correctly on all platforms
-    // path.join() automatically uses the correct separator for the current OS
-    // (backslashes on Windows, forward slashes on Mac/Linux)
     config.mcpServers[serverName] = {
       command: 'node',
-      args: [serverPath],
+      args: [containerPath],
       env: {
-        NODE_ENV: 'development',
-        MCP_STDIO_MODE: 'false'
+        // Database connection (using container's internal network)
+        DATABASE_URL: databaseUrl,
+        POSTGRES_HOST: containerName,
+        POSTGRES_PORT: String(envConf.POSTGRES_PORT),
+        POSTGRES_DB: envConf.POSTGRES_DB,
+        POSTGRES_USER: envConf.POSTGRES_USER,
+        POSTGRES_PASSWORD: envConf.POSTGRES_PASSWORD,
+        // Server configuration
+        NODE_ENV: 'development'
       }
     };
 
-    logWithCategory('info', LogCategory.SYSTEM, `Added server config: ${serverName} -> ${serverPath}`);
+    logWithCategory('info', LogCategory.SYSTEM, `Added server config: ${serverName} -> node ${containerPath}`);
   }
 
   return config;
