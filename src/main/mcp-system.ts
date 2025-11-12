@@ -696,7 +696,7 @@ export async function startMCPSystem(
         if (!retrySuccess) {
           return {
             success: false,
-            message: `Port ${port} conflict could not be resolved. Please run the cleanup script.`,
+            message: `Port ${port} conflict could not be resolved. Please restart Docker Desktop and try again.`,
             error: 'PORT_CONFLICT_PERSISTENT',
           };
         }
