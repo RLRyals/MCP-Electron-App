@@ -2,6 +2,10 @@
 
 This guide helps you diagnose and fix common issues with the MCP Electron App.
 
+## Quick Links to Specific Issues
+
+- **[404 Errors in Docker (SSE/HTTP errors)](./TROUBLESHOOTING_404_ERRORS.md)** - If you're seeing "Non-200 status code (404)" or "Failed to initialize client" errors
+
 ## Table of Contents
 
 - [General Troubleshooting Steps](#general-troubleshooting-steps)
