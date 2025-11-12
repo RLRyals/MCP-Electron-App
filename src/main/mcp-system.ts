@@ -547,18 +547,39 @@ export async function startMCPSystem(
       // We'll continue anyway - docker-compose will fail with a better error if there's a real conflict
     }
 
+    // Clean up any existing containers to prevent port conflicts
+    if (progressCallback) {
+      progressCallback({
+        message: 'Cleaning up old containers...',
+        percent: 15,
+        step: 'cleanup',
+        status: 'checking',
+      });
+    }
+
+    const coreFile = getDockerComposeFilePath('core');
+    try {
+      logWithCategory('info', LogCategory.DOCKER, 'Stopping and removing any existing containers...');
+      await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
+      logWithCategory('info', LogCategory.DOCKER, 'Cleanup completed');
+      // Wait a moment for ports to be fully released
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error: any) {
+      logWithCategory('warn', LogCategory.DOCKER, 'Cleanup encountered an issue (may be safe to ignore)', error);
+      // Continue anyway - containers might not exist yet
+    }
+
     // Start services
     const composeFiles: string[] = [];
 
     // 1. Build and start core services
-    const coreFile = getDockerComposeFilePath('core');
     composeFiles.push(coreFile);
 
     // Build the mcp-writing-system image first
     if (progressCallback) {
       progressCallback({
         message: 'Building MCP Writing System image (this may take a few minutes on first run)...',
-        percent: 20,
+        percent: 25,
         step: 'building-image',
         status: 'starting',
       });
@@ -593,22 +614,52 @@ export async function startMCPSystem(
     } catch (error: any) {
       logWithCategory('error', LogCategory.DOCKER, 'Failed to start core services', error);
 
+      const errorMessage = error.message || '';
+      const errorStderr = error.stderr || '';
+
       // Check if it's a port conflict
-      if (error.stderr && error.stderr.includes('port is already allocated')) {
-        const match = error.stderr.match(/port (\d+) is already allocated/);
+      if (errorStderr.includes('port is already allocated')) {
+        const match = errorStderr.match(/port (\d+) is already allocated/);
         const port = match ? match[1] : 'unknown';
         return {
           success: false,
-          message: `Port ${port} is already in use. Please change the port in environment configuration.`,
+          message: `Port ${port} is already in use. Please change the port in environment configuration or stop the conflicting service.`,
           error: 'PORT_CONFLICT',
         };
       }
 
-      return {
-        success: false,
-        message: 'Failed to start core services. Check logs for details.',
-        error: error.message,
-      };
+      // Check for EADDRINUSE error (port already in use inside container)
+      if (errorMessage.includes('EADDRINUSE') || errorStderr.includes('EADDRINUSE')) {
+        const portMatch = errorMessage.match(/EADDRINUSE.*:(\d+)/) || errorStderr.match(/EADDRINUSE.*:(\d+)/);
+        const port = portMatch ? portMatch[1] : 'unknown';
+
+        logWithCategory('error', LogCategory.DOCKER, `Port conflict detected inside container: ${port}`);
+
+        // Try to force cleanup and restart
+        try {
+          logWithCategory('info', LogCategory.DOCKER, 'Attempting force cleanup of containers...');
+          await execDockerCompose(coreFile, 'down', ['--remove-orphans', '-v']);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // Retry startup
+          logWithCategory('info', LogCategory.DOCKER, 'Retrying container startup...');
+          await execDockerCompose(coreFile, 'up', ['-d', 'mcp-writing-system']);
+          logWithCategory('info', LogCategory.DOCKER, 'Core services started after retry');
+        } catch (retryError: any) {
+          logWithCategory('error', LogCategory.DOCKER, 'Retry failed', retryError);
+          return {
+            success: false,
+            message: `Port ${port} is still in use after cleanup. Please run the cleanup script: ./scripts/cleanup-docker.sh (or .bat on Windows), or manually stop MCP containers using: docker stop $(docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q)`,
+            error: 'PORT_CONFLICT_PERSISTENT',
+          };
+        }
+      } else {
+        return {
+          success: false,
+          message: 'Failed to start core services. Check logs for details.',
+          error: error.message,
+        };
+      }
     }
 
     // 2. Start Typing Mind if needed
