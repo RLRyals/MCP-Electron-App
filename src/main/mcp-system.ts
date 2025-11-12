@@ -150,7 +150,7 @@ async function cloneMCPRepository(): Promise<void> {
 
 /**
  * Prepare MCP configuration for TypingMind Connector
- * Generates mcp-config.json and copies custom entrypoint script
+ * Generates mcp-config.json that will be mounted as a Docker volume
  */
 async function prepareMCPConfiguration(): Promise<void> {
   logWithCategory('info', LogCategory.SYSTEM, 'Preparing MCP configuration...');
@@ -165,54 +165,8 @@ async function prepareMCPConfiguration(): Promise<void> {
       // Continue anyway - system will fall back to default behavior
     } else {
       logWithCategory('info', LogCategory.SYSTEM, `MCP config generated at: ${configResult.configPath}`);
+      logWithCategory('info', LogCategory.SYSTEM, 'This file will be mounted in the Docker container via volume');
     }
-
-    // Copy custom entrypoint script to the Docker context
-    const repoPath = getMCPRepositoryDirectory();
-    const dockerDir = path.join(repoPath, 'docker');
-    const sourceEntrypoint = path.join(__dirname, '../../docker/connector-entrypoint.sh');
-    const destEntrypoint = path.join(dockerDir, 'connector-entrypoint.sh');
-
-    // Ensure docker directory exists
-    await fs.ensureDir(dockerDir);
-
-    // Copy the entrypoint script
-    if (await fs.pathExists(sourceEntrypoint)) {
-      await fs.copy(sourceEntrypoint, destEntrypoint);
-      // Set execute permissions (Unix/Linux/Mac)
-      try {
-        await fs.chmod(destEntrypoint, 0o755);
-        logWithCategory('info', LogCategory.SYSTEM, `Custom entrypoint script copied to: ${destEntrypoint}`);
-      } catch (chmodError) {
-        logWithCategory('warn', LogCategory.SYSTEM, 'Could not set execute permissions (may be on Windows)');
-      }
-    } else {
-      logWithCategory('warn', LogCategory.SYSTEM, `Custom entrypoint script not found at: ${sourceEntrypoint}`);
-    }
-
-    // Copy override file to the Docker context
-    const sourceOverride = path.join(__dirname, '../../docker/docker-compose.override.yml');
-    const destOverride = path.join(dockerDir, 'docker-compose.override.yml');
-
-    if (await fs.pathExists(sourceOverride)) {
-      await fs.copy(sourceOverride, destOverride);
-      logWithCategory('info', LogCategory.SYSTEM, `Override file copied to: ${destOverride}`);
-    } else {
-      logWithCategory('warn', LogCategory.SYSTEM, `Override file not found at: ${sourceOverride}`);
-    }
-
-    // Copy the generated mcp-config.json to the Docker context
-    const sourceMcpConfig = mcpConfigGenerator.getMCPConfigPath();
-    const destMcpConfig = path.join(dockerDir, 'mcp-config.json');
-
-    if (await fs.pathExists(sourceMcpConfig)) {
-      await fs.copy(sourceMcpConfig, destMcpConfig);
-      logWithCategory('info', LogCategory.SYSTEM, `MCP config copied to Docker context: ${destMcpConfig}`);
-    } else {
-      logWithCategory('warn', LogCategory.SYSTEM, `MCP config not found at: ${sourceMcpConfig}`);
-    }
-
-    logWithCategory('info', LogCategory.SYSTEM, 'MCP configuration preparation completed');
   } catch (error) {
     logWithCategory('error', LogCategory.SYSTEM, 'Error preparing MCP configuration', error);
     // Don't throw - allow system to continue with default configuration
@@ -363,10 +317,8 @@ async function execDockerCompose(
   logWithCategory('info', LogCategory.DOCKER, `Environment variables: MCP_AUTH_TOKEN=****, POSTGRES_PASSWORD=****`);
 
   try {
-    // Path to custom entrypoint script and MCP config file
-    const dockerDir = path.join(repoDir, 'docker');
-    const customEntrypointPath = path.join(dockerDir, 'connector-entrypoint.sh');
-    const mcpConfigPath = path.join(dockerDir, 'mcp-config.json');
+    // Get the path to the generated MCP config file
+    const mcpConfigPath = mcpConfigGenerator.getMCPConfigPath();
 
     // Pass environment variables through the env option (cross-platform compatible)
     const result = await execAsync(fullCommand, {
@@ -382,9 +334,8 @@ async function execDockerCompose(
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
         TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
-        // Custom entrypoint and MCP config paths for override file
-        CUSTOM_ENTRYPOINT_PATH: customEntrypointPath,
-        MCP_CONFIG_PATH: mcpConfigPath,
+        // Path to MCP config file for Docker volume mounting
+        MCP_CONFIG_FILE_PATH: mcpConfigPath,
       }
     });
     return result;
@@ -682,14 +633,6 @@ export async function startMCPSystem(
 
     // 1. Build and start core services
     composeFiles.push(coreFile);
-
-    // Add override file if it exists (for custom entrypoint and MCP config)
-    const repoPath = getMCPRepositoryDirectory();
-    const overrideFile = path.join(repoPath, 'docker', 'docker-compose.override.yml');
-    if (await fs.pathExists(overrideFile)) {
-      composeFiles.push(overrideFile);
-      logWithCategory('info', LogCategory.DOCKER, 'Using docker-compose override file for MCP configuration');
-    }
 
     // Build the mcp-writing-system image first
     if (progressCallback) {

@@ -4,10 +4,10 @@ This document explains the MCP (Model Context Protocol) configuration setup for 
 
 ## Overview
 
-The system now follows TypingMind's recommended approach for MCP configuration:
+The system follows TypingMind's recommended approach for MCP configuration:
 
-1. **MCP Config File (`mcp-config.json`)**: Lists all available MCP servers with their connection details
-2. **Custom Entrypoint**: Docker container uses a custom entrypoint script that launches the connector with the config file
+1. **MCP Config File (`mcp-config.json`)**: Auto-generated file that lists all available MCP servers
+2. **Volume Mounting**: Config file is mounted into the Docker container
 3. **Auto-Discovery**: MCP servers are automatically discovered from the repository and added to the config
 
 ## Architecture
@@ -17,7 +17,7 @@ TypingMind UI
     ↓
 MCP Connector (port 50880) + Auth Token
     ↓
-mcp-config.json (lists all servers)
+mcp-config.json (mounted as Docker volume)
     ↓
 HTTP/SSE Server (port 3000)
     ↓
@@ -47,9 +47,8 @@ The system automatically discovers MCP servers from the `mcp-writing-servers` re
 When the system starts, it:
 
 1. Discovers all available MCP servers
-2. Generates `mcp-config.json` with URL-based endpoints
-3. Copies the config to the Docker context
-4. Copies the custom entrypoint script to the Docker context
+2. Generates `mcp-config.json` with URL-based endpoints in `{userData}/config/`
+3. Passes the config file path to Docker as an environment variable (`MCP_CONFIG_FILE_PATH`)
 
 Example `mcp-config.json`:
 
@@ -69,40 +68,33 @@ Example `mcp-config.json`:
 
 ### 3. Docker Integration
 
-The Docker Compose setup uses:
+The Docker Compose setup will use a volume mount to access the config file:
 
 - **Base file**: `docker-compose.connector-http-sse.yml` (from mcp-writing-servers repo)
-- **Override file**: `docker-compose.override.yml` (custom)
+- **Future file**: `docker-compose.connector-config.yml` (to be added to mcp-writing-servers repo)
 
-The override file:
-- Mounts the custom entrypoint script (`connector-entrypoint.sh`)
-- Mounts the generated `mcp-config.json`
-- Overrides the container entrypoint to use the custom script
+The MCP-Writing-Servers repository will be updated to:
+- Add a custom entrypoint script that reads the config file
+- Add volume mounting for the config file using `${MCP_CONFIG_FILE_PATH}`
+- Launch the connector with `--config /app/mcp-config.json`
 
-### 4. Custom Entrypoint Script
-
-The `connector-entrypoint.sh` script:
-
-1. Waits for PostgreSQL to be ready
-2. Starts the HTTP/SSE server in the background
-3. Launches the MCP Connector with the config file:
-   ```bash
-   npx @typingmind/mcp@latest "$MCP_AUTH_TOKEN" --config /app/mcp-config.json
-   ```
+**Note**: The Docker integration is currently being refactored. The Electron app generates the config file, and the MCP-Writing-Servers repo will be updated to use it.
 
 ## Configuration Files
 
 ### Location Map
 
-| File | Development Location | Docker Context | Container Path |
-|------|---------------------|----------------|----------------|
-| `mcp-config.json` | `{userData}/mcp-config.json` | `{repo}/docker/mcp-config.json` | `/app/mcp-config.json` |
-| `connector-entrypoint.sh` | `MCP-Electron-App/docker/connector-entrypoint.sh` | `{repo}/docker/connector-entrypoint.sh` | `/custom-entrypoint.sh` |
-| `docker-compose.override.yml` | `MCP-Electron-App/docker/docker-compose.override.yml` | `{repo}/docker/docker-compose.override.yml` | N/A (compose file) |
+| File | Location | Purpose |
+|------|----------|---------|
+| `mcp-config.json` | `{userData}/config/mcp-config.json` | Generated config file (mounted as volume) |
+| `connector-entrypoint.sh` | `MCP-Electron-App/docker/connector-entrypoint.sh` | Reference implementation for MCP-Writing-Servers PR |
 
 Where:
 - `{userData}` = Electron app user data directory (e.g., `~/.config/MCP Electron App`)
-- `{repo}` = `{userData}/repositories/mcp-writing-servers`
+
+**Volume Mounting**:
+- The config file is passed to Docker via the `MCP_CONFIG_FILE_PATH` environment variable
+- Docker will mount it at `/app/mcp-config.json` (this will be configured in MCP-Writing-Servers repo)
 
 ## TypingMind Setup
 
@@ -174,12 +166,11 @@ Check these files for troubleshooting:
 1. startSystem()
 2. ├─ ensureDockerComposeFiles()
 3. ├─ prepareMCPConfiguration()
-4. │  ├─ generateMCPConfig()
-5. │  ├─ Copy connector-entrypoint.sh to Docker context
-6. │  ├─ Copy docker-compose.override.yml to Docker context
-7. │  └─ Copy mcp-config.json to Docker context
-8. ├─ execDockerCompose(composeFiles, 'build', ...)
-9. └─ execDockerCompose(composeFiles, 'up', ...)
+4. │  └─ generateMCPConfig() → creates {userData}/config/mcp-config.json
+5. ├─ execDockerCompose() with MCP_CONFIG_FILE_PATH env var
+6. │  ├─ Build Docker image
+7. │  └─ Start containers (config mounted via volume)
+8. └─ Container uses config file via MCP-Writing-Servers entrypoint
 ```
 
 ## Environment Variables
@@ -258,15 +249,37 @@ POSTGRES_PASSWORD=your_secure_password
 4. Check that HTTP/SSE server is running inside container
 5. Test endpoint manually: `curl http://localhost:3000/book-planning-server`
 
-### Custom Entrypoint Not Loading
+### Config File Not Mounted
 
-**Symptom**: Container starts with default behavior
+**Symptom**: Container starts but config file not found
 
 **Solution**:
-1. Check that `connector-entrypoint.sh` exists in Docker context
-2. Verify execute permissions: `ls -la {repo}/docker/connector-entrypoint.sh`
-3. Check override file is being used: Look for logs mentioning "Using docker-compose override file"
-4. Ensure Docker Compose is using both files: Check the compose command in logs
+1. Verify config was generated: Check `{userData}/config/mcp-config.json`
+2. Check environment variable is set: Look for `MCP_CONFIG_FILE_PATH` in logs
+3. Verify the MCP-Writing-Servers repo has been updated with volume mount support
+4. Check Docker logs for mount errors: `docker logs mcp-writing-system`
+
+**Note**: The Docker volume mounting requires updates to the MCP-Writing-Servers repository (see "Pending Changes" section below).
+
+## Pending Changes
+
+### MCP-Writing-Servers Repository Updates Required
+
+To complete the integration, the following changes need to be made to the [MCP-Writing-Servers](https://github.com/RLRyals/MCP-Writing-Servers) repository:
+
+1. **Add custom entrypoint script**: `docker/connector-config-entrypoint.sh`
+   - Waits for PostgreSQL
+   - Starts HTTP/SSE server
+   - Launches connector with `--config /app/mcp-config.json`
+
+2. **Add new Docker Compose file**: `docker/docker-compose.connector-config.yml`
+   - Based on `docker-compose.connector-http-sse.yml`
+   - Adds volume mount: `${MCP_CONFIG_FILE_PATH}:/app/mcp-config.json:ro`
+   - Uses the custom entrypoint script
+
+3. **Reference implementation**: See `MCP-Electron-App/docker/connector-entrypoint.sh` for the entrypoint script template
+
+Once these changes are merged in MCP-Writing-Servers, the Electron app will be able to use the config-based approach seamlessly.
 
 ## References
 

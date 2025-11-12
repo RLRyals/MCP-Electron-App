@@ -34,20 +34,13 @@ export interface MCPConfigFile {
 
 /**
  * Get the path to the generated mcp-config.json file
- * This file will be used by the TypingMind MCP Connector
+ * This file will be mounted as a volume in Docker
  */
 export function getMCPConfigPath(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-config.json');
-}
-
-/**
- * Get the path to the MCP config directory in the Docker context
- * This is where the config will be mounted in Docker
- */
-export function getDockerMCPConfigPath(): string {
-  const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'repositories', 'mcp-writing-servers', 'mcp-config.json');
+  // Store in a config directory for clarity
+  const configDir = path.join(userDataPath, 'config');
+  return path.join(configDir, 'mcp-config.json');
 }
 
 /**
@@ -98,21 +91,15 @@ export async function generateMCPConfig(): Promise<{ success: boolean; configPat
       logWithCategory('info', LogCategory.SYSTEM, `Added MCP server: author-server -> http://localhost:${httpSsePort}/author-server`);
     }
 
-    // Write the config file to the user data directory
+    // Ensure the config directory exists
     const configPath = getMCPConfigPath();
+    const configDir = path.dirname(configPath);
+    await fs.ensureDir(configDir);
+
+    // Write the config file
     await fs.writeJson(configPath, mcpConfig, { spaces: 2 });
     logWithCategory('info', LogCategory.SYSTEM, `MCP config file generated at: ${configPath}`);
-
-    // Also write to the Docker context path for container access
-    const dockerConfigPath = getDockerMCPConfigPath();
-    const dockerConfigDir = path.dirname(dockerConfigPath);
-
-    if (await fs.pathExists(dockerConfigDir)) {
-      await fs.writeJson(dockerConfigPath, mcpConfig, { spaces: 2 });
-      logWithCategory('info', LogCategory.SYSTEM, `MCP config file copied to Docker context: ${dockerConfigPath}`);
-    } else {
-      logWithCategory('warn', LogCategory.SYSTEM, `Docker context directory not found: ${dockerConfigDir}. Skipping Docker copy.`);
-    }
+    logWithCategory('info', LogCategory.SYSTEM, `This file will be mounted in Docker as a volume`);
 
     return {
       success: true,

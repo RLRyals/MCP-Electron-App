@@ -2,11 +2,37 @@
 
 ## Date: 2025-11-12
 
+## Status: Refactored (Clean Implementation)
+
 ## Overview
 
-Implemented the TypingMind recommended approach for MCP (Model Context Protocol) configuration using `mcp-config.json` and a custom Docker entrypoint script.
+Implemented the TypingMind recommended approach for MCP (Model Context Protocol) configuration using auto-generated `mcp-config.json` file. The implementation has been refactored to use volume mounting instead of file copying for a cleaner architecture.
 
-## Changes Made
+## Refactoring (Latest)
+
+**Date**: 2025-11-12
+**Reason**: Simplify architecture by separating concerns between repos
+
+### What Changed:
+1. **Removed**: `docker-compose.override.yml` file copying
+2. **Simplified**: `prepareMCPConfiguration()` now only generates the config file
+3. **Changed**: Config location from `{userData}/mcp-config.json` to `{userData}/config/mcp-config.json`
+4. **Updated**: Environment variable approach - now uses `MCP_CONFIG_FILE_PATH` for volume mounting
+5. **Kept**: `connector-entrypoint.sh` as reference for MCP-Writing-Servers PR
+
+### Benefits of Refactoring:
+- **Cleaner separation**: Electron app generates config, MCP-Writing-Servers handles Docker
+- **Less file copying**: No more copying files to Docker context
+- **Simpler maintenance**: Changes to entrypoint belong in MCP-Writing-Servers repo
+- **Better modularity**: Each repo owns its domain
+
+### Pending:
+- PR to MCP-Writing-Servers to add volume mounting and custom entrypoint
+- See "Pending Changes" section in MCP_CONFIGURATION.md
+
+## Initial Implementation
+
+### Changes Made
 
 ### 1. New Files Created
 
