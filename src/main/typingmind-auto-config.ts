@@ -9,6 +9,7 @@ import { app } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
 import * as typingMindDownloader from './typingmind-downloader';
+import * as mcpConfigGenerator from './mcp-config-generator';
 
 /**
  * TypingMind MCP configuration interface
@@ -252,6 +253,14 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
   logWithCategory('info', LogCategory.SYSTEM, 'Auto-configuring TypingMind with MCP Connector settings...');
 
   try {
+    // Generate MCP config file first
+    logWithCategory('info', LogCategory.SYSTEM, 'Generating MCP config file...');
+    const configGenResult = await mcpConfigGenerator.generateMCPConfig();
+    if (!configGenResult.success) {
+      logWithCategory('warn', LogCategory.SYSTEM, `Failed to generate MCP config: ${configGenResult.error}`);
+      // Continue anyway - we can still configure TypingMind
+    }
+
     // Check if TypingMind is installed
     const isInstalled = await typingMindDownloader.isInstalled();
     if (!isInstalled) {
