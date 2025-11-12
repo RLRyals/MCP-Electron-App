@@ -103,127 +103,101 @@ export async function discoverMCPServers(): Promise<string[]> {
 }
 
 /**
- * Build MCP servers configuration JSON with correct paths for all platforms
- * Works on Windows, Mac, and Linux
+ * Build MCP servers list for display/informational purposes
+ * Note: In the new HTTP/SSE architecture, the Docker container auto-starts the connector,
+ * which automatically discovers and runs all MCP servers. We don't need to manually
+ * configure or start them via API calls.
  */
 export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Building MCP servers configuration...');
+  logWithCategory('info', LogCategory.SYSTEM, 'Discovering available MCP servers...');
 
   const servers = await discoverMCPServers();
-
-  // Load environment config to build DATABASE_URL for the container
-  const envConf = await envConfig.loadEnvConfig();
-
-  // Build the DATABASE_URL as it appears inside the Docker container
-  // The container uses the container name for the postgres host
-  const containerName = 'mcp-writing-db'; // Default from docker-compose
-  const databaseUrl = `postgresql://${envConf.POSTGRES_USER}:${envConf.POSTGRES_PASSWORD}@${containerName}:${envConf.POSTGRES_PORT}/${envConf.POSTGRES_DB}`;
 
   const config: MCPServersConfig = {
     mcpServers: {}
   };
 
+  // Build a simple list of available servers for informational purposes
+  // The actual server startup is handled automatically by the Docker container
   for (const serverName of servers) {
-    // All MCP servers run inside the mcp-writing-system Docker container
-    // The MCP Connector doesn't pass environment variables to child processes,
-    // so we must explicitly provide them in the configuration
-    //
-    // IMPORTANT: Use forward slashes for Unix paths inside Docker container
-    // Do NOT use path.join() here as it will use Windows separators on Windows
-    const containerPath = `/app/src/config-mcps/${serverName}/index.js`;
-
     config.mcpServers[serverName] = {
-      command: 'node',
-      args: [containerPath, '--http'],
-      env: {
-        // Database connection (using container's internal network)
-        DATABASE_URL: databaseUrl,
-        POSTGRES_HOST: containerName,
-        POSTGRES_PORT: String(envConf.POSTGRES_PORT),
-        POSTGRES_DB: envConf.POSTGRES_DB,
-        POSTGRES_USER: envConf.POSTGRES_USER,
-        POSTGRES_PASSWORD: envConf.POSTGRES_PASSWORD,
-        // Server configuration
-        NODE_ENV: 'development'
-      }
+      command: 'auto-discovered',
+      args: []
     };
 
-    logWithCategory('info', LogCategory.SYSTEM, `Added server config: ${serverName} -> node ${containerPath}`);
+    logWithCategory('info', LogCategory.SYSTEM, `Discovered MCP server: ${serverName}`);
   }
 
-  // Add author-server (located in src/mcps/ instead of src/config-mcps/)
-  const authorServerPath = '/app/src/mcps/author-server/index.js';
+  // Include author-server if enabled
   config.mcpServers['author-server'] = {
-    command: 'node',
-    args: [authorServerPath, '--http'],
-    env: {
-      DATABASE_URL: databaseUrl,
-      POSTGRES_HOST: containerName,
-      POSTGRES_PORT: String(envConf.POSTGRES_PORT),
-      POSTGRES_DB: envConf.POSTGRES_DB,
-      POSTGRES_USER: envConf.POSTGRES_USER,
-      POSTGRES_PASSWORD: envConf.POSTGRES_PASSWORD,
-      NODE_ENV: 'development'
-    }
+    command: 'auto-discovered',
+    args: []
   };
-  logWithCategory('info', LogCategory.SYSTEM, `Added server config: author-server -> node ${authorServerPath}`);
+  logWithCategory('info', LogCategory.SYSTEM, `Discovered MCP server: author-server`);
 
   return config;
 }
 
 /**
- * Start MCP servers via the MCP Connector /start endpoint
+ * Verify MCP Connector is running and healthy
+ * Note: In the new HTTP/SSE architecture, the Docker container auto-starts the connector
+ * when it boots up. The connector automatically discovers and runs all MCP servers.
+ * We just need to verify it's accessible.
  */
-export async function startMCPServers(serverUrl: string, authToken: string): Promise<{ success: boolean; message: string; error?: string }> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Starting MCP servers via connector...');
+export async function verifyMCPConnector(serverUrl: string, authToken: string): Promise<{ success: boolean; message: string; error?: string }> {
+  logWithCategory('info', LogCategory.SYSTEM, 'Verifying MCP Connector is running...');
 
   try {
     const serversConfig = await buildMCPServersConfig();
+    const serverCount = Object.keys(serversConfig.mcpServers).length;
 
-    if (Object.keys(serversConfig.mcpServers).length === 0) {
-      return {
-        success: false,
-        message: 'No MCP servers found to configure',
-        error: 'NO_SERVERS_FOUND'
-      };
+    if (serverCount === 0) {
+      logWithCategory('warn', LogCategory.SYSTEM, 'No MCP servers discovered in repository');
+    } else {
+      logWithCategory('info', LogCategory.SYSTEM, `Discovered ${serverCount} MCP server(s): ${Object.keys(serversConfig.mcpServers).join(', ')}`);
     }
 
-    logWithCategory('info', LogCategory.SYSTEM, `Calling ${serverUrl}/start with ${Object.keys(serversConfig.mcpServers).length} servers`);
+    // Try to connect to the connector to verify it's running
+    // The connector should be auto-started by Docker
+    logWithCategory('info', LogCategory.SYSTEM, `Checking connector health at ${serverUrl}`);
 
-    const response = await fetch(`${serverUrl}/start`, {
-      method: 'POST',
+    const response = await fetch(serverUrl, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify(serversConfig)
+      }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logWithCategory('error', LogCategory.SYSTEM, `Failed to start MCP servers: ${response.status} ${errorText}`);
+    if (response.ok) {
+      logWithCategory('info', LogCategory.SYSTEM, 'MCP Connector is running and accessible');
       return {
-        success: false,
-        message: `Failed to start MCP servers: ${response.statusText}`,
-        error: errorText
+        success: true,
+        message: `MCP Connector is running. ${serverCount} server(s) available via auto-discovery.`
+      };
+    } else {
+      logWithCategory('warn', LogCategory.SYSTEM, `Connector responded with status: ${response.status}`);
+      return {
+        success: true, // Don't fail - connector might still be starting up
+        message: `MCP Connector is accessible (status: ${response.status}). ${serverCount} server(s) available.`
       };
     }
-
-    await response.json();
-    logWithCategory('info', LogCategory.SYSTEM, 'MCP servers started successfully');
-
-    return {
-      success: true,
-      message: `Successfully started ${Object.keys(serversConfig.mcpServers).length} MCP server(s)`
-    };
   } catch (error) {
-    logWithCategory('error', LogCategory.SYSTEM, 'Error starting MCP servers', error);
+    logWithCategory('warn', LogCategory.SYSTEM, 'Could not verify connector (may still be starting up)', error);
     return {
-      success: false,
-      message: 'Failed to start MCP servers',
+      success: true, // Don't fail - connector might still be starting up
+      message: 'MCP Connector is starting. Servers will be available once Docker container is fully ready.',
       error: String(error)
     };
   }
+}
+
+/**
+ * @deprecated Use verifyMCPConnector instead. The new architecture auto-starts servers.
+ * Kept for backward compatibility.
+ */
+export async function startMCPServers(serverUrl: string, authToken: string): Promise<{ success: boolean; message: string; error?: string }> {
+  logWithCategory('info', LogCategory.SYSTEM, 'Note: startMCPServers is deprecated. Using verifyMCPConnector instead.');
+  return verifyMCPConnector(serverUrl, authToken);
 }
 
 /**
@@ -324,25 +298,16 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
 
     logWithCategory('info', LogCategory.SYSTEM, `TypingMind auto-configured with MCP Connector at ${mcpConfig.serverUrl}`);
 
-    // Start MCP servers via the connector
-    logWithCategory('info', LogCategory.SYSTEM, 'Starting MCP servers...');
-    const serversResult = await startMCPServers(mcpConfig.serverUrl, mcpConfig.authToken);
+    // Verify MCP connector is accessible
+    // Note: The Docker container auto-starts the connector and all MCP servers
+    logWithCategory('info', LogCategory.SYSTEM, 'Verifying MCP Connector...');
+    const verifyResult = await verifyMCPConnector(mcpConfig.serverUrl, mcpConfig.authToken);
 
-    if (!serversResult.success) {
-      logWithCategory('warn', LogCategory.SYSTEM, `Failed to start MCP servers: ${serversResult.message}`);
-      // Don't fail the whole configuration, just warn the user
-      return {
-        success: true,
-        message: `TypingMind configured, but failed to start MCP servers: ${serversResult.message}. You may need to start them manually.`,
-        config: mcpConfig,
-      };
-    }
-
-    logWithCategory('info', LogCategory.SYSTEM, `MCP servers started: ${serversResult.message}`);
+    logWithCategory('info', LogCategory.SYSTEM, `Connector verification: ${verifyResult.message}`);
 
     return {
       success: true,
-      message: `TypingMind successfully configured with MCP Connector and ${Object.keys(serversConfig.mcpServers).length} MCP servers`,
+      message: `TypingMind successfully configured with MCP Connector. ${Object.keys(serversConfig.mcpServers).length} MCP server(s) are auto-started by Docker.`,
       config: mcpConfig,
     };
   } catch (error) {

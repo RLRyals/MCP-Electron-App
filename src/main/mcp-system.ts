@@ -634,9 +634,9 @@ export async function startMCPSystem(
     // Get service URLs
     const urls = await getServiceUrls();
 
-    // Auto-configure TypingMind and start MCP servers if TypingMind is enabled
+    // Auto-configure TypingMind if enabled (MCP servers are auto-started by Docker)
     if (services.typingMind) {
-      logWithCategory('info', LogCategory.DOCKER, 'Auto-configuring TypingMind with MCP servers...');
+      logWithCategory('info', LogCategory.DOCKER, 'Auto-configuring TypingMind connection to MCP Connector...');
 
       // Wait a bit for the MCP connector to be fully ready
       await new Promise(resolve => setTimeout(resolve, 2000));
