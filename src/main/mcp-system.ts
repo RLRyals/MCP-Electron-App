@@ -571,22 +571,9 @@ export async function startMCPSystem(
         logWithCategory('warn', LogCategory.DOCKER, 'Stop command encountered an issue (may be safe to ignore)', stopError);
       }
 
-      // Then remove containers and orphans
-      await execDockerCompose(coreFile, 'down', ['--remove-orphans', '--volumes']);
+      // Then remove containers and orphans (without removing volumes to preserve data)
+      await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
       logWithCategory('info', LogCategory.DOCKER, 'Cleanup completed');
-
-      // Kill any lingering processes that might be holding ports
-      try {
-        logWithCategory('info', LogCategory.DOCKER, 'Checking for lingering MCP containers...');
-        const { stdout } = await execAsync('docker ps -aq --filter "name=mcp-" --filter "name=typing-mind-"');
-        if (stdout.trim()) {
-          logWithCategory('info', LogCategory.DOCKER, 'Removing lingering containers...');
-          await execAsync(`docker rm -f ${stdout.trim().split('\n').join(' ')}`);
-          logWithCategory('info', LogCategory.DOCKER, 'Lingering containers removed');
-        }
-      } catch (killError: any) {
-        logWithCategory('warn', LogCategory.DOCKER, 'No lingering containers found or cleanup failed (may be safe to ignore)', killError);
-      }
 
       // Wait longer for ports to be fully released (increased from 1s to 3s)
       logWithCategory('info', LogCategory.DOCKER, 'Waiting for ports to be released...');
@@ -674,20 +661,9 @@ export async function startMCPSystem(
             await execDockerCompose(coreFile, 'stop', []);
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Remove all containers and volumes
-            await execDockerCompose(coreFile, 'down', ['--remove-orphans', '-v']);
+            // Remove all containers (without removing volumes to preserve data)
+            await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
             await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Force remove any lingering MCP containers
-            try {
-              const { stdout } = await execAsync('docker ps -aq --filter "name=mcp-" --filter "name=typing-mind-"');
-              if (stdout.trim()) {
-                logWithCategory('info', LogCategory.DOCKER, 'Force removing lingering containers...');
-                await execAsync(`docker rm -f ${stdout.trim().split('\n').join(' ')}`);
-              }
-            } catch (cleanupError: any) {
-              logWithCategory('warn', LogCategory.DOCKER, 'Lingering container cleanup failed (may be safe to ignore)', cleanupError);
-            }
 
             // Wait progressively longer on each attempt (3s, 5s, 7s)
             const waitTime = 3000 + (attempt - 1) * 2000;
@@ -707,7 +683,7 @@ export async function startMCPSystem(
               // All retries exhausted
               return {
                 success: false,
-                message: `Port ${port} is still in use after ${attempt} cleanup attempts. This may indicate a deeper Docker issue. Please try:\n1. Run the cleanup script: ./scripts/cleanup-docker.sh (or .bat on Windows)\n2. Restart Docker Desktop\n3. Manually stop all MCP containers: docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q | xargs docker rm -f`,
+                message: `Port ${port} is still in use after ${attempt} cleanup attempts. This may indicate a deeper Docker issue. Please try:\n1. Restart Docker Desktop\n2. Check for other services using port ${port}`,
                 error: 'PORT_CONFLICT_PERSISTENT',
               };
             }
