@@ -113,6 +113,41 @@ function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
 }
 
 /**
+ * Clone MCP-Writing-Servers repository if it doesn't exist
+ */
+async function cloneMCPRepository(): Promise<void> {
+  const repoPath = getMCPRepositoryDirectory();
+  const repoUrl = 'https://github.com/RLRyals/MCP-Writing-Servers.git';
+  const branch = 'main';
+
+  logWithCategory('info', LogCategory.DOCKER, `Cloning MCP-Writing-Servers repository to ${repoPath}...`);
+
+  try {
+    // Ensure parent directory exists
+    const parentDir = path.dirname(repoPath);
+    await fs.ensureDir(parentDir);
+
+    // Clone the repository
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    await execAsync(
+      `git clone --depth 1 --branch ${branch} ${repoUrl} "${repoPath}"`,
+      { cwd: parentDir, timeout: 300000 } // 5 minute timeout
+    );
+
+    logWithCategory('info', LogCategory.DOCKER, 'MCP-Writing-Servers repository cloned successfully');
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.DOCKER, 'Failed to clone MCP-Writing-Servers repository', error);
+    throw new Error(
+      `Failed to clone MCP-Writing-Servers repository: ${error.message}. ` +
+      'Please check your internet connection and try again.'
+    );
+  }
+}
+
+/**
  * Ensure docker-compose files exist in the cloned MCP-Writing-Servers repository
  */
 async function ensureDockerComposeFiles(): Promise<void> {
@@ -121,19 +156,29 @@ async function ensureDockerComposeFiles(): Promise<void> {
   // Check that the MCP-Writing-Servers repository exists
   const repoPath = getMCPRepositoryDirectory();
   if (!await fs.pathExists(repoPath)) {
-    throw new Error(
-      `MCP-Writing-Servers repository not found at ${repoPath}. ` +
-      'Please ensure the repository was cloned during installation.'
-    );
+    logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found, cloning...');
+    await cloneMCPRepository();
   }
 
   // Check that required docker-compose files exist
   const coreComposePath = getDockerComposeFilePath('core');
   if (!await fs.pathExists(coreComposePath)) {
-    throw new Error(
-      `docker-compose.connector-http-sse.yml not found at ${coreComposePath}. ` +
-      'The MCP-Writing-Servers repository may be incomplete or corrupted.'
-    );
+    // Repository exists but file is missing - try to re-clone
+    logWithCategory('warn', LogCategory.DOCKER, 'Docker-compose file missing, re-cloning repository...');
+
+    // Remove corrupted repository
+    await fs.remove(repoPath);
+
+    // Clone fresh
+    await cloneMCPRepository();
+
+    // Check again
+    if (!await fs.pathExists(coreComposePath)) {
+      throw new Error(
+        `docker-compose.connector-http-sse.yml not found at ${coreComposePath} even after cloning. ` +
+        'The MCP-Writing-Servers repository may not contain the required files.'
+      );
+    }
   }
 
   logWithCategory('info', LogCategory.DOCKER, 'Docker-compose files verified from repository (using connector-http-sse setup)');
