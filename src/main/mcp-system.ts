@@ -14,6 +14,7 @@ import * as envConfig from './env-config';
 import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
+import * as mcpConfigGenerator from './mcp-config-generator';
 import { checkDockerRunning } from './prerequisites';
 
 const execAsync = promisify(exec);
@@ -144,6 +145,31 @@ async function cloneMCPRepository(): Promise<void> {
       `Failed to clone MCP-Writing-Servers repository: ${error.message}. ` +
       'Please check your internet connection and try again.'
     );
+  }
+}
+
+/**
+ * Prepare MCP configuration for TypingMind Connector
+ * Generates mcp-config.json that will be mounted as a Docker volume
+ */
+async function prepareMCPConfiguration(): Promise<void> {
+  logWithCategory('info', LogCategory.SYSTEM, 'Preparing MCP configuration...');
+
+  try {
+    // Generate the mcp-config.json file
+    logWithCategory('info', LogCategory.SYSTEM, 'Generating mcp-config.json...');
+    const configResult = await mcpConfigGenerator.generateMCPConfig();
+
+    if (!configResult.success) {
+      logWithCategory('warn', LogCategory.SYSTEM, `Failed to generate MCP config: ${configResult.error}`);
+      // Continue anyway - system will fall back to default behavior
+    } else {
+      logWithCategory('info', LogCategory.SYSTEM, `MCP config generated at: ${configResult.configPath}`);
+      logWithCategory('info', LogCategory.SYSTEM, 'This file will be mounted in the Docker container via volume');
+    }
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error preparing MCP configuration', error);
+    // Don't throw - allow system to continue with default configuration
   }
 }
 
@@ -291,6 +317,9 @@ async function execDockerCompose(
   logWithCategory('info', LogCategory.DOCKER, `Environment variables: MCP_AUTH_TOKEN=****, POSTGRES_PASSWORD=****`);
 
   try {
+    // Get the path to the generated MCP config file
+    const mcpConfigPath = mcpConfigGenerator.getMCPConfigPath();
+
     // Pass environment variables through the env option (cross-platform compatible)
     const result = await execAsync(fullCommand, {
       cwd: repoDir,
@@ -305,6 +334,8 @@ async function execDockerCompose(
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
         TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
+        // Path to MCP config file for Docker volume mounting
+        MCP_CONFIG_FILE_PATH: mcpConfigPath,
       }
     });
     return result;
@@ -535,6 +566,18 @@ export async function startMCPSystem(
     }
 
     await ensureDockerComposeFiles();
+
+    // Prepare MCP configuration (generates mcp-config.json and copies custom entrypoint)
+    if (progressCallback) {
+      progressCallback({
+        message: 'Generating MCP configuration...',
+        percent: 12,
+        step: 'mcp-config',
+        status: 'checking',
+      });
+    }
+
+    await prepareMCPConfiguration();
 
     // Determine which services to start
     const services = await determineServicesToStart();

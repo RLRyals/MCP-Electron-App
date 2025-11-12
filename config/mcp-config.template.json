@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "book-planning-server": {
+      "url": "http://localhost:3000/book-planning-server"
+    },
+    "chapter-planning-server": {
+      "url": "http://localhost:3000/chapter-planning-server"
+    },
+    "character-planning-server": {
+      "url": "http://localhost:3000/charater-planning-server"
+    },
+    "core-continuity-server": {
+      "url": "http://localhost:3000/core-continuity-server"
+    },
+    "reporting-server": {
+      "url": "http://localhost:3000/reporting-server"
+    },
+    "review-server": {
+      "url": "http://localhost:3000/review-server"
+    },
+    "scene-server": {
+      "url": "http://localhost:3000/scene-server"
+    },
+    "series-planning-server": {
+      "url": "http://localhost:3000/series-planning-server"
+    },
+    "author-server": {
+      "url": "http://localhost:3000/author-server"
+    }
+  }
+}
