@@ -105,6 +105,10 @@ export function getMCPRepositoryDirectory(): string {
  */
 function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
   const repoPath = getMCPRepositoryDirectory();
+  // Use connector-http-sse setup for core (recommended for TypingMind URL-based config)
+  if (type === 'core') {
+    return path.join(repoPath, 'docker', 'docker-compose.connector-http-sse.yml');
+  }
   return path.join(repoPath, 'docker', `docker-compose.${type}.yml`);
 }
 
@@ -127,12 +131,12 @@ async function ensureDockerComposeFiles(): Promise<void> {
   const coreComposePath = getDockerComposeFilePath('core');
   if (!await fs.pathExists(coreComposePath)) {
     throw new Error(
-      `docker-compose.core.yml not found at ${coreComposePath}. ` +
+      `docker-compose.connector-http-sse.yml not found at ${coreComposePath}. ` +
       'The MCP-Writing-Servers repository may be incomplete or corrupted.'
     );
   }
 
-  logWithCategory('info', LogCategory.DOCKER, 'Docker-compose files verified from repository');
+  logWithCategory('info', LogCategory.DOCKER, 'Docker-compose files verified from repository (using connector-http-sse setup)');
 }
 
 /**
@@ -252,6 +256,7 @@ async function execDockerCompose(
         POSTGRES_PASSWORD: config.POSTGRES_PASSWORD,
         POSTGRES_PORT: String(config.POSTGRES_PORT),
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
+        HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
         TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
@@ -634,9 +639,9 @@ export async function startMCPSystem(
     // Get service URLs
     const urls = await getServiceUrls();
 
-    // Auto-configure TypingMind and start MCP servers if TypingMind is enabled
+    // Auto-configure TypingMind if enabled (MCP servers are auto-started by Docker)
     if (services.typingMind) {
-      logWithCategory('info', LogCategory.DOCKER, 'Auto-configuring TypingMind with MCP servers...');
+      logWithCategory('info', LogCategory.DOCKER, 'Auto-configuring TypingMind connection to MCP Connector...');
 
       // Wait a bit for the MCP connector to be fully ready
       await new Promise(resolve => setTimeout(resolve, 2000));
