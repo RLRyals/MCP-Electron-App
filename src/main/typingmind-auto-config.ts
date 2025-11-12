@@ -30,6 +30,7 @@ export interface MCPServerConfig {
   env?: {
     [key: string]: string;
   };
+  url?: string; // Optional URL for HTTP/SSE mode
 }
 
 /**
@@ -103,37 +104,39 @@ export async function discoverMCPServers(): Promise<string[]> {
 }
 
 /**
- * Build MCP servers list for display/informational purposes
- * Note: In the new HTTP/SSE architecture, the Docker container auto-starts the connector,
- * which automatically discovers and runs all MCP servers. We don't need to manually
- * configure or start them via API calls.
+ * Build MCP servers configuration for TypingMind with URL-based endpoints
+ * Uses HTTP/SSE architecture where each server has an endpoint at http://localhost:HTTP_SSE_PORT/<server-name>
+ * TypingMind connects to the connector which bridges to these HTTP/SSE endpoints
  */
 export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Discovering available MCP servers...');
+  logWithCategory('info', LogCategory.SYSTEM, 'Building MCP servers configuration for TypingMind...');
 
   const servers = await discoverMCPServers();
+  const envConf = await envConfig.loadEnvConfig();
 
   const config: MCPServersConfig = {
     mcpServers: {}
   };
 
-  // Build a simple list of available servers for informational purposes
-  // The actual server startup is handled automatically by the Docker container
+  // Build URL-based configuration for each server
+  // These URLs point to the HTTP/SSE server running inside the Docker container
   for (const serverName of servers) {
     config.mcpServers[serverName] = {
-      command: 'auto-discovered',
-      args: []
+      command: 'url',
+      args: [`http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`],
+      url: `http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`
     };
 
-    logWithCategory('info', LogCategory.SYSTEM, `Discovered MCP server: ${serverName}`);
+    logWithCategory('info', LogCategory.SYSTEM, `Configured MCP server: ${serverName} -> http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`);
   }
 
-  // Include author-server if enabled
+  // Include author-server (uses author-server endpoint)
   config.mcpServers['author-server'] = {
-    command: 'auto-discovered',
-    args: []
+    command: 'url',
+    args: [`http://localhost:${envConf.HTTP_SSE_PORT}/author-server`],
+    url: `http://localhost:${envConf.HTTP_SSE_PORT}/author-server`
   };
-  logWithCategory('info', LogCategory.SYSTEM, `Discovered MCP server: author-server`);
+  logWithCategory('info', LogCategory.SYSTEM, `Configured MCP server: author-server -> http://localhost:${envConf.HTTP_SSE_PORT}/author-server`);
 
   return config;
 }

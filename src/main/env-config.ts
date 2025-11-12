@@ -20,6 +20,7 @@ export interface EnvConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
+  HTTP_SSE_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
   GITHUB_TOKEN?: string;
@@ -34,6 +35,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   POSTGRES_PASSWORD: '',
   POSTGRES_PORT: 5432,
   MCP_CONNECTOR_PORT: 50880,
+  HTTP_SSE_PORT: 3000,
   MCP_AUTH_TOKEN: '',
   TYPING_MIND_PORT: 3000,
   GITHUB_TOKEN: '',
