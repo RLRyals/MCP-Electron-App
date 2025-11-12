@@ -25,8 +25,8 @@ export interface TypingMindMCPConfig {
  * MCP Server configuration for a single server
  */
 export interface MCPServerConfig {
-  command: string;
-  args: string[];
+  command?: string;
+  args?: string[];
   env?: {
     [key: string]: string;
   };
@@ -120,10 +120,9 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
 
   // Build URL-based configuration for each server
   // These URLs point to the HTTP/SSE server running inside the Docker container
+  // For HTTP/SSE mode, only the URL is needed (no command/args)
   for (const serverName of servers) {
     config.mcpServers[serverName] = {
-      command: 'url',
-      args: [`http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`],
       url: `http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`
     };
 
@@ -132,8 +131,6 @@ export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
 
   // Include author-server (uses author-server endpoint)
   config.mcpServers['author-server'] = {
-    command: 'url',
-    args: [`http://localhost:${envConf.HTTP_SSE_PORT}/author-server`],
     url: `http://localhost:${envConf.HTTP_SSE_PORT}/author-server`
   };
   logWithCategory('info', LogCategory.SYSTEM, `Configured MCP server: author-server -> http://localhost:${envConf.HTTP_SSE_PORT}/author-server`);
