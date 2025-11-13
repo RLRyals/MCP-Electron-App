@@ -35,7 +35,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   POSTGRES_PASSWORD: '',
   POSTGRES_PORT: 5432,
   MCP_CONNECTOR_PORT: 50880,
-  HTTP_SSE_PORT: 3000,
+  HTTP_SSE_PORT: 3001,
   MCP_AUTH_TOKEN: '',
   TYPING_MIND_PORT: 3000,
   GITHUB_TOKEN: '',
@@ -254,6 +254,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'MCP_CONNECTOR_PORT':
           config.MCP_CONNECTOR_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'HTTP_SSE_PORT':
+          config.HTTP_SSE_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'MCP_AUTH_TOKEN':
           config.MCP_AUTH_TOKEN = unquotedValue;
           break;
@@ -358,6 +361,7 @@ export function formatEnvFile(config: EnvConfig): string {
     `POSTGRES_PASSWORD=${config.POSTGRES_PASSWORD}`,
     `POSTGRES_PORT=${config.POSTGRES_PORT}`,
     `MCP_CONNECTOR_PORT=${config.MCP_CONNECTOR_PORT}`,
+    `HTTP_SSE_PORT=${config.HTTP_SSE_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
     `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
   ];
@@ -436,6 +440,11 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const mcpPortValidation = validatePort(config.MCP_CONNECTOR_PORT);
   if (!mcpPortValidation.valid) {
     errors.push(`MCP connector port: ${mcpPortValidation.error}`);
+  }
+
+  const httpSsePortValidation = validatePort(config.HTTP_SSE_PORT);
+  if (!httpSsePortValidation.valid) {
+    errors.push(`HTTP/SSE port: ${httpSsePortValidation.error}`);
   }
 
   const typingMindPortValidation = validatePort(config.TYPING_MIND_PORT);
