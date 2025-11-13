@@ -104,36 +104,23 @@ export async function discoverMCPServers(): Promise<string[]> {
 }
 
 /**
- * Build MCP servers configuration for TypingMind with URL-based endpoints
- * Uses HTTP/SSE architecture where each server has an endpoint at http://localhost:HTTP_SSE_PORT/<server-name>
- * TypingMind connects to the connector which bridges to these HTTP/SSE endpoints
+ * Build MCP servers configuration for TypingMind
+ * NOTE: With the @typingmind/mcp-connector using mcp-config.json in the Docker container,
+ * servers are auto-discovered by the connector. TypingMind only needs to connect to the connector.
+ * This function is kept for backward compatibility but returns an empty config.
+ *
+ * @deprecated The connector auto-discovers servers from docker/mcp-config.json
  */
 export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Building MCP servers configuration for TypingMind...');
+  logWithCategory('info', LogCategory.SYSTEM, 'Note: MCP servers are auto-discovered by the connector from docker/mcp-config.json');
 
   const servers = await discoverMCPServers();
-  const envConf = await envConfig.loadEnvConfig();
+  logWithCategory('info', LogCategory.SYSTEM, `Found ${servers.length} MCP servers (will be auto-discovered by connector)`);
 
+  // Return empty config - connector will auto-discover from docker/mcp-config.json
   const config: MCPServersConfig = {
     mcpServers: {}
   };
-
-  // Build URL-based configuration for each server
-  // These URLs point to the HTTP/SSE server running inside the Docker container
-  // For HTTP/SSE mode, only the URL is needed (no command/args)
-  for (const serverName of servers) {
-    config.mcpServers[serverName] = {
-      url: `http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`
-    };
-
-    logWithCategory('info', LogCategory.SYSTEM, `Configured MCP server: ${serverName} -> http://localhost:${envConf.HTTP_SSE_PORT}/${serverName}`);
-  }
-
-  // Include author-server (uses author-server endpoint)
-  config.mcpServers['author-server'] = {
-    url: `http://localhost:${envConf.HTTP_SSE_PORT}/author-server`
-  };
-  logWithCategory('info', LogCategory.SYSTEM, `Configured MCP server: author-server -> http://localhost:${envConf.HTTP_SSE_PORT}/author-server`);
 
   return config;
 }
@@ -148,13 +135,13 @@ export async function verifyMCPConnector(serverUrl: string, authToken: string): 
   logWithCategory('info', LogCategory.SYSTEM, 'Verifying MCP Connector is running...');
 
   try {
-    const serversConfig = await buildMCPServersConfig();
-    const serverCount = Object.keys(serversConfig.mcpServers).length;
+    const servers = await discoverMCPServers();
+    const serverCount = servers.length;
 
     if (serverCount === 0) {
       logWithCategory('warn', LogCategory.SYSTEM, 'No MCP servers discovered in repository');
     } else {
-      logWithCategory('info', LogCategory.SYSTEM, `Discovered ${serverCount} MCP server(s): ${Object.keys(serversConfig.mcpServers).join(', ')}`);
+      logWithCategory('info', LogCategory.SYSTEM, `Discovered ${serverCount} MCP server(s): ${servers.join(', ')}`);
     }
 
     // Try to connect to the connector to verify it's running
@@ -274,16 +261,19 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
       };
     }
 
-    // Build MCP servers configuration
-    const serversConfig = await buildMCPServersConfig();
+    // Get server count for informational purposes only
+    // Actual server configuration is handled by docker/mcp-config.json
+    const servers = await discoverMCPServers();
+    const serverCount = servers.length;
 
     // Create the TypingMind MCP configuration
+    // Note: mcpServers is NOT included - the connector auto-discovers from docker/mcp-config.json
     const mcpConfig: TypingMindMCPConfig = {
       enabled: true,
       serverUrl: `http://localhost:${config.MCP_CONNECTOR_PORT}`,
       authToken: config.MCP_AUTH_TOKEN,
       autoConnect: true,
-      mcpServers: serversConfig,
+      // mcpServers is omitted - connector auto-discovers from docker/mcp-config.json
     };
 
     // Save the configuration
@@ -307,7 +297,7 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
 
     return {
       success: true,
-      message: `TypingMind successfully configured with MCP Connector. ${Object.keys(serversConfig.mcpServers).length} MCP server(s) are auto-started by Docker.`,
+      message: `TypingMind successfully configured with MCP Connector. ${serverCount} MCP server(s) will be auto-discovered by the connector from docker/mcp-config.json.`,
       config: mcpConfig,
     };
   } catch (error) {
