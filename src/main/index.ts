@@ -837,7 +837,7 @@ function setupIPC(): void {
     return await mcpSystem.getServiceUrls();
   });
 
-  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-system' | 'typing-mind', tail?: number) => {
+  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => {
     logWithCategory('info', LogCategory.DOCKER, `IPC: Getting logs for ${serviceName}...`);
     return await mcpSystem.viewServiceLogs(serviceName, tail);
   });
