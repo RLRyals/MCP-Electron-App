@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - ./repositories/mcp-writing-servers:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -28,7 +28,7 @@ services:
     container_name: mcp-connector
     working_dir: /app
     command: >
-      sh -c "npm install -g @typingmind/mcp@latest && 
+      sh -c "npm install -g @typingmind/mcp@latest &&
              npx @typingmind/mcp@latest $${MCP_AUTH_TOKEN}"
     environment:
       PORT: 50880
@@ -36,7 +36,7 @@ services:
     ports:
       - "50880:50880"
     volumes:
-      - ./mcp-config:/config
+      - ./repositories/mcp-writing-servers/mcp-config:/config
       - mcp_workspace:/workspace
     depends_on:
       postgres:
@@ -51,7 +51,7 @@ services:
   # Each MCP server runs on its own port for isolation
   mcp-writing-servers:
     build:
-      context: ./mcp-writing-servers
+      context: ./repositories/mcp-writing-servers
       dockerfile: Dockerfile
     container_name: mcp-writing-servers
     environment:
@@ -71,7 +71,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./mcp-writing-servers:/app
+      - ./repositories/mcp-writing-servers:/app
       - /app/node_modules
     networks:
       - writing-network
@@ -84,7 +84,7 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./typingmind:/usr/share/nginx/html:ro
+      - ./repositories/typingmind:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       postgres:
