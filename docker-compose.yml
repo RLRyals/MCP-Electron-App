@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: writing-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - writing-network
+
+  # MCP Connector (Bridge between TypingMind and MCP Servers)
+  mcp-connector:
+    image: node:18-alpine
+    container_name: mcp-connector
+    working_dir: /app
+    command: >
+      sh -c "npm install -g @typingmind/mcp@latest && 
+             npx @typingmind/mcp@latest $${MCP_AUTH_TOKEN}"
+    environment:
+      PORT: 50880
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN}
+    ports:
+      - "50880:50880"
+    volumes:
+      - ./mcp-config:/config
+      - mcp_workspace:/workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - writing-network
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # MCP Writing Servers (Custom servers from your repo)
+  # Each MCP server runs on its own port for isolation
+  mcp-writing-servers:
+    build:
+      context: ./mcp-writing-servers
+      dockerfile: Dockerfile
+    container_name: mcp-writing-servers
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      NODE_ENV: production
+    ports:
+      - "3001:3001"  # book-planning
+      - "3002:3002"  # series-planning
+      - "3003:3003"  # chapter-planning
+      - "3004:3004"  # character-planning
+      - "3005:3005"  # scene
+      - "3006:3006"  # core-continuity
+      - "3007:3007"  # review
+      - "3008:3008"  # reporting
+      - "3009:3009"  # author
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./mcp-writing-servers:/app
+      - /app/node_modules
+    networks:
+      - writing-network
+    restart: unless-stopped
+
+  # TypingMind Web Server (Static Files)
+  typingmind:
+    image: nginx:alpine
+    container_name: typingmind
+    ports:
+      - "8080:80"
+    volumes:
+      - ./typingmind:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-connector:
+        condition: service_started
+    networks:
+      - writing-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  writing-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mcp_workspace:
