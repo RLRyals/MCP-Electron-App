@@ -54,6 +54,14 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "docker-compose.yml",
+        "to": "docker-compose.yml"
+      },
+      {
+        "from": "nginx.conf",
+        "to": "nginx.conf"
       }
     ],
     "win": {

@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./repositories/mcp-writing-servers:/docker-entrypoint-initdb.d:ro
+      - ${MCP_WRITING_SERVERS_DIR}:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -36,7 +36,7 @@ services:
     ports:
       - "50880:50880"
     volumes:
-      - ./repositories/mcp-writing-servers/mcp-config:/config
+      - ${MCP_WRITING_SERVERS_DIR}/mcp-config:/config
       - mcp_workspace:/workspace
     depends_on:
       postgres:
@@ -51,7 +51,7 @@ services:
   # Each MCP server runs on its own port for isolation
   mcp-writing-servers:
     build:
-      context: ./repositories/mcp-writing-servers
+      context: ${MCP_WRITING_SERVERS_DIR}
       dockerfile: Dockerfile
     container_name: mcp-writing-servers
     environment:
@@ -71,7 +71,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./repositories/mcp-writing-servers:/app
+      - ${MCP_WRITING_SERVERS_DIR}:/app
       - /app/node_modules
     networks:
       - writing-network
@@ -84,8 +84,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./repositories/typingmind:/usr/share/nginx/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TYPING_MIND_DIR}:/usr/share/nginx/html:ro
+      - ${NGINX_CONF_PATH}:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       postgres:
         condition: service_healthy
