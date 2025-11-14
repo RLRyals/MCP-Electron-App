@@ -5,7 +5,9 @@
       "Bash(gh auth:*)",
       "Bash(docker rm:*)",
       "Bash(docker network ls:*)",
-      "Bash(docker volume ls:*)"
+      "Bash(docker volume ls:*)",
+      "Bash(cat:*)",
+      "Bash(docker ps:*)"
     ],
     "deny": [],
     "ask": []
