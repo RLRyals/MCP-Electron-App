@@ -109,6 +109,9 @@ export async function generateMCPConfig(): Promise<{ success: boolean; configPat
         },
         'reporting': {
           url: 'http://mcp-writing-servers:3008/'
+        },
+        'author': {
+          url: 'http://mcp-writing-servers:3009/'
         }
       }
     };
