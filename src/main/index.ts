@@ -827,6 +827,11 @@ function setupIPC(): void {
     return await mcpSystem.getSystemStatus();
   });
 
+  ipcMain.handle('mcp-system:detailed-status', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting detailed MCP system status...');
+    return await mcpSystem.getDetailedServiceStatus();
+  });
+
   ipcMain.handle('mcp-system:urls', async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting service URLs...');
     return await mcpSystem.getServiceUrls();

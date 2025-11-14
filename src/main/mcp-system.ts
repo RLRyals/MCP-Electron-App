@@ -1029,6 +1029,151 @@ export async function getServiceUrls(): Promise<ServiceUrls> {
 }
 
 /**
+ * Detailed service status for monitoring
+ */
+export interface DetailedServiceStatus {
+  serviceName: string;
+  containerName: string;
+  status: 'starting' | 'running' | 'healthy' | 'unhealthy' | 'stopped' | 'missing';
+  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
+  url?: string;
+  port?: number;
+  message: string;
+}
+
+/**
+ * Comprehensive system status with detailed service information
+ */
+export interface DetailedSystemStatus {
+  overall: {
+    running: boolean;
+    healthy: boolean;
+    ready: boolean;
+    message: string;
+  };
+  services: DetailedServiceStatus[];
+  timestamp: Date;
+}
+
+/**
+ * Get detailed service status for real-time monitoring
+ * Provides comprehensive information about each service including URLs and health
+ */
+export async function getDetailedServiceStatus(): Promise<DetailedSystemStatus> {
+  logWithCategory('info', LogCategory.DOCKER, 'Getting detailed service status...');
+
+  try {
+    const [systemStatus, serviceUrls, config] = await Promise.all([
+      getSystemStatus(),
+      getServiceUrls(),
+      envConfig.loadEnvConfig(),
+    ]);
+
+    const serviceDefinitions = [
+      {
+        serviceName: 'PostgreSQL Database',
+        containerName: 'writing-postgres',
+        port: config.POSTGRES_PORT,
+        url: serviceUrls.postgres,
+      },
+      {
+        serviceName: 'MCP Connector',
+        containerName: 'mcp-connector',
+        port: config.MCP_CONNECTOR_PORT,
+        url: serviceUrls.mcpConnector,
+      },
+      {
+        serviceName: 'MCP Writing Servers',
+        containerName: 'mcp-writing-servers',
+        port: 3001, // Primary port
+        url: undefined, // Internal service
+      },
+      {
+        serviceName: 'TypingMind UI',
+        containerName: 'typingmind',
+        port: config.TYPING_MIND_PORT,
+        url: serviceUrls.typingMind,
+      },
+    ];
+
+    const services: DetailedServiceStatus[] = serviceDefinitions.map(def => {
+      const container = systemStatus.containers.find(c => c.name === def.containerName);
+
+      if (!container) {
+        return {
+          serviceName: def.serviceName,
+          containerName: def.containerName,
+          status: 'missing',
+          health: 'unknown',
+          url: def.url,
+          port: def.port,
+          message: 'Container not found',
+        };
+      }
+
+      let status: DetailedServiceStatus['status'];
+      let message: string;
+
+      if (container.health === 'healthy') {
+        status = 'healthy';
+        message = 'Service is healthy and ready';
+      } else if (container.health === 'starting') {
+        status = 'starting';
+        message = 'Service is starting...';
+      } else if (container.health === 'unhealthy') {
+        status = 'unhealthy';
+        message = 'Service is unhealthy';
+      } else if (container.running) {
+        status = 'running';
+        message = 'Service is running';
+      } else {
+        status = 'stopped';
+        message = 'Service is stopped';
+      }
+
+      return {
+        serviceName: def.serviceName,
+        containerName: def.containerName,
+        status,
+        health: container.health,
+        url: def.url,
+        port: def.port,
+        message,
+      };
+    });
+
+    const runningCount = services.filter(s => s.status !== 'stopped' && s.status !== 'missing').length;
+    const healthyCount = services.filter(s => s.status === 'healthy' || s.status === 'running').length;
+    const ready = healthyCount === services.length;
+
+    return {
+      overall: {
+        running: systemStatus.running,
+        healthy: systemStatus.healthy,
+        ready,
+        message: ready
+          ? 'All services are ready'
+          : `${healthyCount}/${services.length} services ready`,
+      },
+      services,
+      timestamp: new Date(),
+    };
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.DOCKER, 'Failed to get detailed service status', error);
+    return {
+      overall: {
+        running: false,
+        healthy: false,
+        ready: false,
+        message: 'Failed to get status',
+      },
+      services: [],
+      timestamp: new Date(),
+    };
+  }
+}
+
+/**
  * View service logs
  */
 export async function viewServiceLogs(
