@@ -1,31 +1,31 @@
 {
   "mcpServers": {
     "book-planning": {
-      "url": "http://localhost:3001/"
+      "url": "http://mcp-writing-servers:3001/"
     },
     "series-planning": {
-      "url": "http://localhost:3002/"
+      "url": "http://mcp-writing-servers:3002/"
     },
     "chapter-planning": {
-      "url": "http://localhost:3003/"
+      "url": "http://mcp-writing-servers:3003/"
     },
     "character-planning": {
-      "url": "http://localhost:3004/"
+      "url": "http://mcp-writing-servers:3004/"
     },
     "scene": {
-      "url": "http://localhost:3005/"
+      "url": "http://mcp-writing-servers:3005/"
     },
     "core-continuity": {
-      "url": "http://localhost:3006/"
+      "url": "http://mcp-writing-servers:3006/"
     },
     "review": {
-      "url": "http://localhost:3007/"
+      "url": "http://mcp-writing-servers:3007/"
     },
     "reporting": {
-      "url": "http://localhost:3008/"
+      "url": "http://mcp-writing-servers:3008/"
     },
     "author": {
-      "url": "http://localhost:3009/"
+      "url": "http://mcp-writing-servers:3009/"
     }
   }
 }
