@@ -7,7 +7,17 @@
       "Bash(docker network ls:*)",
       "Bash(docker volume ls:*)",
       "Bash(cat:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker restart:*)",
+      "Bash(curl:*)",
+      "Bash(for:*)",
+      "Bash(do echo \"Port $port:\")",
+      "Bash(done)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
