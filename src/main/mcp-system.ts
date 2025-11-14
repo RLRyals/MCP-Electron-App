@@ -95,22 +95,34 @@ export function getMCPWorkingDirectory(): string {
 }
 
 /**
- * Get the cloned MCP-Writing-Servers repository path
+ * Get the project root directory (where docker-compose.yml is located)
+ */
+export function getProjectRootDirectory(): string {
+  // In production (packaged app), __dirname is in app.asar/dist/main
+  // In development, __dirname is in src/main
+  // We need to go up to the project root where docker-compose.yml is located
+  if (app.isPackaged) {
+    // In packaged app, go from app.asar/dist/main -> app.asar -> resources -> app
+    return path.join(path.dirname(app.getAppPath()));
+  } else {
+    // In development, go from src/main -> project root
+    return path.join(__dirname, '..', '..');
+  }
+}
+
+/**
+ * Get the cloned MCP-Writing-Servers repository path (still needed for data files)
  */
 export function getMCPRepositoryDirectory(): string {
   return path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
 }
 
 /**
- * Get docker-compose file path from the cloned MCP-Writing-Servers repository
+ * Get docker-compose file path (now using the root docker-compose.yml)
  */
 function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
-  const repoPath = getMCPRepositoryDirectory();
-  // Use connector-http-sse setup for core (recommended for TypingMind URL-based config)
-  if (type === 'core') {
-    return path.join(repoPath, 'docker', 'docker-compose.connector-http-sse.yml');
-  }
-  return path.join(repoPath, 'docker', `docker-compose.${type}.yml`);
+  // All services are now in a single docker-compose.yml at the project root
+  return path.join(getProjectRootDirectory(), 'docker-compose.yml');
 }
 
 /**
@@ -174,40 +186,29 @@ async function prepareMCPConfiguration(): Promise<void> {
 }
 
 /**
- * Ensure docker-compose files exist in the cloned MCP-Writing-Servers repository
+ * Ensure docker-compose file exists in the project root
  */
 async function ensureDockerComposeFiles(): Promise<void> {
-  logWithCategory('info', LogCategory.DOCKER, 'Checking docker-compose files from repository...');
+  logWithCategory('info', LogCategory.DOCKER, 'Checking docker-compose file...');
 
-  // Check that the MCP-Writing-Servers repository exists
+  // Check that docker-compose.yml exists in the project root
+  const composePath = getDockerComposeFilePath('core');
+
+  if (!await fs.pathExists(composePath)) {
+    throw new Error(
+      `docker-compose.yml not found at ${composePath}. ` +
+      'The project may be corrupted or incomplete. Please ensure the docker-compose.yml file exists in the project root.'
+    );
+  }
+
+  logWithCategory('info', LogCategory.DOCKER, 'Docker-compose file verified at project root');
+
+  // Also ensure MCP-Writing-Servers repository exists for SQL init files and other data
   const repoPath = getMCPRepositoryDirectory();
   if (!await fs.pathExists(repoPath)) {
     logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found, cloning...');
     await cloneMCPRepository();
   }
-
-  // Check that required docker-compose files exist
-  const coreComposePath = getDockerComposeFilePath('core');
-  if (!await fs.pathExists(coreComposePath)) {
-    // Repository exists but file is missing - try to re-clone
-    logWithCategory('warn', LogCategory.DOCKER, 'Docker-compose file missing, re-cloning repository...');
-
-    // Remove corrupted repository
-    await fs.remove(repoPath);
-
-    // Clone fresh
-    await cloneMCPRepository();
-
-    // Check again
-    if (!await fs.pathExists(coreComposePath)) {
-      throw new Error(
-        `docker-compose.connector-http-sse.yml not found at ${coreComposePath} even after cloning. ` +
-        'The MCP-Writing-Servers repository may not contain the required files.'
-      );
-    }
-  }
-
-  logWithCategory('info', LogCategory.DOCKER, 'Docker-compose files verified from repository (using connector-http-sse setup)');
 }
 
 /**
@@ -299,8 +300,8 @@ async function execDockerCompose(
   command: string,
   args: string[] = []
 ): Promise<{ stdout: string; stderr: string }> {
-  // Use the repository directory as the working directory so Docker can find build contexts
-  const repoDir = getMCPRepositoryDirectory();
+  // Use the project root directory as the working directory so Docker can find build contexts
+  const workingDir = getProjectRootDirectory();
 
   // Load environment variables for docker-compose
   const config = await envConfig.loadEnvConfig();
@@ -313,7 +314,7 @@ async function execDockerCompose(
   const fullCommand = `docker-compose ${composeFlags} ${command} ${args.join(' ')}`;
 
   logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
-  logWithCategory('info', LogCategory.DOCKER, `Working directory: ${repoDir}`);
+  logWithCategory('info', LogCategory.DOCKER, `Working directory: ${workingDir}`);
   logWithCategory('info', LogCategory.DOCKER, `Environment variables: MCP_AUTH_TOKEN=****, POSTGRES_PASSWORD=****`);
 
   try {
@@ -322,7 +323,7 @@ async function execDockerCompose(
 
     // Pass environment variables through the env option (cross-platform compatible)
     const result = await execAsync(fullCommand, {
-      cwd: repoDir,
+      cwd: workingDir,
       env: {
         ...process.env, // Include existing environment variables
         POSTGRES_DB: config.POSTGRES_DB,
@@ -634,10 +635,10 @@ export async function startMCPSystem(
     // 1. Build and start core services
     composeFiles.push(coreFile);
 
-    // Build the mcp-writing-system image first
+    // Build the mcp-writing-servers image first
     if (progressCallback) {
       progressCallback({
-        message: 'Building MCP Writing System image (this may take a few minutes on first run)...',
+        message: 'Building MCP Writing Servers image (this may take a few minutes on first run)...',
         percent: 25,
         step: 'building-image',
         status: 'starting',
@@ -645,22 +646,22 @@ export async function startMCPSystem(
     }
 
     try {
-      logWithCategory('info', LogCategory.DOCKER, 'Building mcp-writing-system image...');
-      await execDockerCompose(coreFile, 'build', ['mcp-writing-system']);
-      logWithCategory('info', LogCategory.DOCKER, 'mcp-writing-system image built successfully');
+      logWithCategory('info', LogCategory.DOCKER, 'Building mcp-writing-servers image...');
+      await execDockerCompose(coreFile, 'build', ['mcp-writing-servers']);
+      logWithCategory('info', LogCategory.DOCKER, 'mcp-writing-servers image built successfully');
     } catch (error: any) {
-      logWithCategory('error', LogCategory.DOCKER, 'Failed to build mcp-writing-system image', error);
+      logWithCategory('error', LogCategory.DOCKER, 'Failed to build mcp-writing-servers image', error);
       return {
         success: false,
-        message: 'Failed to build MCP Writing System image. Check logs for details.',
+        message: 'Failed to build MCP Writing Servers image. Check logs for details.',
         error: error.message,
       };
     }
 
-    // Start core services
+    // Start core services (postgres, mcp-connector, mcp-writing-servers)
     if (progressCallback) {
       progressCallback({
-        message: 'Starting core services (PostgreSQL, MCP Writing System)...',
+        message: 'Starting core services (PostgreSQL, MCP Connector, MCP Writing Servers)...',
         percent: 40,
         step: 'starting-core',
         status: 'starting',
@@ -668,7 +669,9 @@ export async function startMCPSystem(
     }
 
     try {
-      await execDockerCompose(coreFile, 'up', ['-d', 'mcp-writing-system']);
+      // Start postgres, mcp-connector, and mcp-writing-servers
+      // Docker Compose will handle dependencies automatically
+      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'mcp-connector', 'mcp-writing-servers']);
       logWithCategory('info', LogCategory.DOCKER, 'Core services started');
     } catch (error: any) {
       logWithCategory('error', LogCategory.DOCKER, 'Failed to start core services', error);
@@ -715,7 +718,7 @@ export async function startMCPSystem(
 
             // Retry startup
             logWithCategory('info', LogCategory.DOCKER, `Retrying container startup (attempt ${attempt}/3)...`);
-            await execDockerCompose(coreFile, 'up', ['-d', 'mcp-writing-system']);
+            await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'mcp-connector', 'mcp-writing-servers']);
             logWithCategory('info', LogCategory.DOCKER, `Core services started successfully after retry ${attempt}`);
             retrySuccess = true;
             break;
@@ -753,7 +756,7 @@ export async function startMCPSystem(
     }
 
     // 2. Start Typing Mind if needed
-    // Note: MCP Connector is now bundled in the core mcp-writing-system service
+    // All services are now in a single docker-compose.yml
     if (services.typingMind) {
       if (progressCallback) {
         progressCallback({
@@ -764,34 +767,9 @@ export async function startMCPSystem(
         });
       }
 
-      const typingMindFile = getDockerComposeFilePath('typing-mind');
-      composeFiles.push(typingMindFile);
-
       try {
-        // Use both core and typing-mind compose files together to resolve service dependencies
-        // But only start the typing-mind-web service
-        const repoDir = getMCPRepositoryDirectory();
-        const config = await envConfig.loadEnvConfig();
-
-        const fullCommand = `docker-compose -f "${coreFile}" -f "${typingMindFile}" up -d typing-mind-web`;
-
-        logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
-
-        await execAsync(fullCommand, {
-          cwd: repoDir,
-          env: {
-            ...process.env,
-            POSTGRES_DB: config.POSTGRES_DB,
-            POSTGRES_USER: config.POSTGRES_USER,
-            POSTGRES_PASSWORD: config.POSTGRES_PASSWORD,
-            POSTGRES_PORT: String(config.POSTGRES_PORT),
-            MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
-            MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
-            TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
-            TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
-          }
-        });
-
+        // Start the typingmind service from the single docker-compose.yml
+        await execDockerCompose(coreFile, 'up', ['-d', 'typingmind']);
         logWithCategory('info', LogCategory.DOCKER, 'Typing Mind started');
       } catch (error: any) {
         logWithCategory('error', LogCategory.DOCKER, 'Failed to start Typing Mind', error);
@@ -870,22 +848,17 @@ export async function stopMCPSystem(): Promise<SystemOperationResult> {
   logWithCategory('info', LogCategory.DOCKER, 'Stopping MCP system...');
 
   try {
-    const composeFiles = [
-      getDockerComposeFilePath('typing-mind'),
-      getDockerComposeFilePath('core'),
-    ];
+    const composeFile = getDockerComposeFilePath('core');
 
-    // Stop all services in reverse order
-    for (const composeFile of composeFiles) {
-      try {
-        if (await fs.pathExists(composeFile)) {
-          await execDockerCompose(composeFile, 'down');
-          logWithCategory('info', LogCategory.DOCKER, `Stopped services from ${path.basename(composeFile)}`);
-        }
-      } catch (error) {
-        logWithCategory('warn', LogCategory.DOCKER, `Failed to stop services from ${path.basename(composeFile)}`, error);
-        // Continue stopping other services
+    // Stop all services from the single docker-compose.yml
+    try {
+      if (await fs.pathExists(composeFile)) {
+        await execDockerCompose(composeFile, 'down');
+        logWithCategory('info', LogCategory.DOCKER, `Stopped all services from ${path.basename(composeFile)}`);
       }
+    } catch (error) {
+      logWithCategory('warn', LogCategory.DOCKER, `Failed to stop services from ${path.basename(composeFile)}`, error);
+      throw error; // Re-throw since this is the only compose file
     }
 
     logWithCategory('info', LogCategory.DOCKER, 'MCP system stopped');
@@ -954,7 +927,7 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   try {
     // Use docker ps to find all MCP-related containers
     // This works regardless of which compose file was used to start them
-    const { stdout } = await execAsync('docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" --format "{{json .}}"');
+    const { stdout } = await execAsync('docker ps -a --filter "name=mcp-" --filter "name=writing-" --filter "name=typing" --format "{{json .}}"');
 
     if (!stdout.trim()) {
       return {
@@ -1059,17 +1032,18 @@ export async function getServiceUrls(): Promise<ServiceUrls> {
  * View service logs
  */
 export async function viewServiceLogs(
-  serviceName: 'postgres' | 'mcp-writing-system' | 'typing-mind',
+  serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind',
   tail: number = 100
 ): Promise<ServiceLogsResult> {
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
 
   try {
-    // Map service names to actual container names
+    // Map service names to actual container names (from docker-compose.yml)
     const containerNameMap: { [key: string]: string } = {
-      'postgres': 'mcp-writing-db',
-      'mcp-writing-system': 'mcp-writing-system',
-      'typing-mind': 'typing-mind-web',
+      'postgres': 'writing-postgres',
+      'mcp-writing-servers': 'mcp-writing-servers',
+      'mcp-connector': 'mcp-connector',
+      'typing-mind': 'typingmind',
     };
 
     const containerName = containerNameMap[serviceName] || serviceName;
