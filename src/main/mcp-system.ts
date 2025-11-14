@@ -337,6 +337,10 @@ async function execDockerCompose(
         TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
         // Path to MCP config file for Docker volume mounting
         MCP_CONFIG_FILE_PATH: mcpConfigPath,
+        // Repository paths for Docker volume mounting
+        MCP_WRITING_SERVERS_DIR: getMCPRepositoryDirectory(),
+        // nginx.conf path for TypingMind container
+        NGINX_CONF_PATH: path.join(workingDir, 'nginx.conf'),
       }
     });
     return result;
