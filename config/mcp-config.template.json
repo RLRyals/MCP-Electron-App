@@ -1,31 +1,31 @@
 {
   "mcpServers": {
-    "book-planning-server": {
-      "url": "http://localhost:3000/book-planning-server"
+    "book-planning": {
+      "url": "http://localhost:3001/"
     },
-    "chapter-planning-server": {
-      "url": "http://localhost:3000/chapter-planning-server"
+    "series-planning": {
+      "url": "http://localhost:3002/"
     },
-    "character-planning-server": {
-      "url": "http://localhost:3000/charater-planning-server"
+    "chapter-planning": {
+      "url": "http://localhost:3003/"
     },
-    "core-continuity-server": {
-      "url": "http://localhost:3000/core-continuity-server"
+    "character-planning": {
+      "url": "http://localhost:3004/"
     },
-    "reporting-server": {
-      "url": "http://localhost:3000/reporting-server"
+    "scene": {
+      "url": "http://localhost:3005/"
     },
-    "review-server": {
-      "url": "http://localhost:3000/review-server"
+    "core-continuity": {
+      "url": "http://localhost:3006/"
     },
-    "scene-server": {
-      "url": "http://localhost:3000/scene-server"
+    "review": {
+      "url": "http://localhost:3007/"
     },
-    "series-planning-server": {
-      "url": "http://localhost:3000/series-planning-server"
+    "reporting": {
+      "url": "http://localhost:3008/"
     },
-    "author-server": {
-      "url": "http://localhost:3000/author-server"
+    "author": {
+      "url": "http://localhost:3009/"
     }
   }
 }
