@@ -26,7 +26,7 @@
       "id": "typing-mind",
       "name": "Typing Mind UI",
       "url": "https://github.com/typingMind/typingmind.git",
-      "clonePath": "typing-mind",
+      "clonePath": "typingmind",
       "branch": "main",
       "optional": true,
       "description": "Typing Mind web-based UI component"

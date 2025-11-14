@@ -1262,6 +1262,92 @@ async function initializeDownloadStep() {
 }
 
 /**
+ * Monitor service status and update UI
+ */
+let serviceMonitoringInterval: NodeJS.Timeout | null = null;
+
+function stopServiceMonitoring() {
+    if (serviceMonitoringInterval) {
+        clearInterval(serviceMonitoringInterval);
+        serviceMonitoringInterval = null;
+    }
+}
+
+async function startServiceMonitoring() {
+    const monitoringContainer = document.getElementById('service-monitoring-container');
+    const serviceStatusList = document.getElementById('service-status-list');
+
+    if (!monitoringContainer || !serviceStatusList) return;
+
+    monitoringContainer.style.display = 'block';
+
+    const updateServiceStatus = async () => {
+        try {
+            const detailedStatus = await (window as any).electronAPI.mcpSystem.getDetailedStatus();
+
+            // Update service status list
+            serviceStatusList.innerHTML = detailedStatus.services.map((service: any) => {
+                const statusIcon = service.status === 'healthy' ? '✅' :
+                                 service.status === 'running' ? '🟢' :
+                                 service.status === 'starting' ? '🟡' :
+                                 service.status === 'unhealthy' ? '❌' :
+                                 service.status === 'stopped' ? '⭕' : '❓';
+
+                const statusColor = service.status === 'healthy' ? '#4CAF50' :
+                                  service.status === 'running' ? '#8BC34A' :
+                                  service.status === 'starting' ? '#FFC107' :
+                                  service.status === 'unhealthy' ? '#F44336' :
+                                  service.status === 'stopped' ? '#9E9E9E' : '#757575';
+
+                const urlHtml = service.url
+                    ? `<a href="${service.url}" target="_blank" style="color: #64B5F6; text-decoration: none; margin-left: 8px; font-size: 0.85rem;">🔗 Open</a>`
+                    : '';
+
+                return `
+                    <div style="padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 3px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">${statusIcon}</span>
+                                <div>
+                                    <div style="font-weight: 500;">${service.serviceName}</div>
+                                    <div style="font-size: 0.85rem; opacity: 0.7;">${service.message}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                ${service.port ? `<div style="font-size: 0.85rem; opacity: 0.7;">Port ${service.port}</div>` : ''}
+                                ${urlHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Check if all services are ready
+            if (detailedStatus.overall.ready) {
+                stopServiceMonitoring();
+                return true;
+            }
+        } catch (error) {
+            console.error('Error updating service status:', error);
+        }
+        return false;
+    };
+
+    // Initial update
+    const allReady = await updateServiceStatus();
+
+    if (!allReady) {
+        // Poll every 2 seconds
+        serviceMonitoringInterval = setInterval(async () => {
+            const ready = await updateServiceStatus();
+            if (ready) {
+                stopServiceMonitoring();
+            }
+        }, 2000);
+    }
+}
+
+/**
  * Step 6: Initialize System Startup
  */
 async function initializeSystemStartupStep() {
@@ -1271,6 +1357,9 @@ async function initializeSystemStartupStep() {
     const progressMessage = document.getElementById('startup-progress-message');
 
     if (!statusContainer || !progressEl || !progressFill || !progressMessage) return;
+
+    // Stop any existing monitoring
+    stopServiceMonitoring();
 
     // Check if system already started
     if (wizardState.data.systemStartup?.started && wizardState.data.systemStartup?.healthy) {
@@ -1358,6 +1447,21 @@ async function initializeSystemStartupStep() {
         }
 
         // System started successfully
+        progressEl.classList.remove('show');
+
+        statusContainer.innerHTML = `
+            <div class="alert success">
+                <span style="font-size: 1.5rem;">✓</span>
+                <div>
+                    <strong>System Started Successfully</strong><br>
+                    Monitoring service health...
+                </div>
+            </div>
+        `;
+
+        // Start monitoring services
+        await startServiceMonitoring();
+
         // Save wizard state
         await (window as any).electronAPI.setupWizard.saveState(WizardStep.SYSTEM_STARTUP, {
             systemStartup: {
@@ -1365,18 +1469,6 @@ async function initializeSystemStartupStep() {
                 healthy: true
             }
         });
-
-        statusContainer.innerHTML = `
-            <div class="alert success">
-                <span style="font-size: 1.5rem;">✓</span>
-                <div>
-                    <strong>System Started Successfully</strong><br>
-                    All services are running and healthy.
-                </div>
-            </div>
-        `;
-
-        progressEl.classList.remove('show');
 
     } catch (error) {
         console.error('Error starting system:', error);

@@ -827,12 +827,17 @@ function setupIPC(): void {
     return await mcpSystem.getSystemStatus();
   });
 
+  ipcMain.handle('mcp-system:detailed-status', async () => {
+    logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting detailed MCP system status...');
+    return await mcpSystem.getDetailedServiceStatus();
+  });
+
   ipcMain.handle('mcp-system:urls', async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting service URLs...');
     return await mcpSystem.getServiceUrls();
   });
 
-  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-system' | 'typing-mind', tail?: number) => {
+  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => {
     logWithCategory('info', LogCategory.DOCKER, `IPC: Getting logs for ${serviceName}...`);
     return await mcpSystem.viewServiceLogs(serviceName, tail);
   });
@@ -1609,12 +1614,13 @@ function setupIPC(): void {
         logWithCategory('info', LogCategory.GENERAL, 'Resolved config path', { resolvedConfigPath });
         await currentPipelineOrchestrator.loadConfig(resolvedConfigPath);
 
-        // Ensure workingDirectory is set to userData if not provided
-        // This ensures repositories are cloned to the same location where the system expects to find them
+        // Ensure workingDirectory is set to project root if not provided
+        // This ensures repositories are cloned to ./repositories/ relative to project root
+        // where Docker Compose can find them for volume mounts
         const options = request.options || {};
         if (!options.workingDirectory) {
-          options.workingDirectory = app.getPath('userData');
-          logWithCategory('info', LogCategory.GENERAL, 'Using userData as working directory', { workingDirectory: options.workingDirectory });
+          options.workingDirectory = mcpSystem.getProjectRootDirectory();
+          logWithCategory('info', LogCategory.GENERAL, 'Using project root as working directory', { workingDirectory: options.workingDirectory });
         }
 
         // Create progress throttler

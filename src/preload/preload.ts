@@ -1170,6 +1170,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Get detailed service status for monitoring
+     */
+    getDetailedStatus: (): Promise<any> => {
+      return ipcRenderer.invoke('mcp-system:detailed-status');
+    },
+
+    /**
      * Get service URLs
      */
     getUrls: (): Promise<ServiceUrls> => {
