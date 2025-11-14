@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-writing-servers
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
     ports:
       - "3001:3001"  # book-planning
