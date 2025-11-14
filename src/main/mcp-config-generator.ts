@@ -33,63 +33,95 @@ export interface MCPConfigFile {
 }
 
 /**
+ * Get the MCP Writing Servers repository path
+ */
+function getMCPWritingServersPath(): string {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'repositories', 'mcp-writing-servers');
+}
+
+/**
  * Get the path to the generated mcp-config.json file
  * This file will be mounted as a volume in Docker
+ * Path: ${MCP_WRITING_SERVERS_DIR}/mcp-config/mcp-config.json
  */
 export function getMCPConfigPath(): string {
-  const userDataPath = app.getPath('userData');
-  // Store in a config directory for clarity
-  const configDir = path.join(userDataPath, 'config');
+  const mcpServersDir = getMCPWritingServersPath();
+  // Docker mounts ${MCP_WRITING_SERVERS_DIR}/mcp-config:/config
+  const configDir = path.join(mcpServersDir, 'mcp-config');
   return path.join(configDir, 'mcp-config.json');
 }
+
+/**
+ * MCP server port mappings
+ * These ports match the docker-compose.yml configuration
+ */
+const MCP_SERVER_PORTS: { [key: string]: number } = {
+  'book-planning': 3001,
+  'series-planning': 3002,
+  'chapter-planning': 3003,
+  'character-planning': 3004,
+  'scene': 3005,
+  'core-continuity': 3006,
+  'review': 3007,
+  'reporting': 3008,
+  'author': 3009
+};
 
 /**
  * Generate MCP config file for TypingMind Connector
  * This creates a configuration file that lists all MCP servers with their endpoints
  *
- * The current architecture uses HTTP/SSE where each MCP server is accessed via
- * a URL endpoint (e.g., http://localhost:3000/book-planning-server)
+ * The architecture uses Docker networking where each MCP server runs on its own port
+ * within the mcp-writing-servers container. The MCP Connector accesses them via
+ * http://mcp-writing-servers:${port}/ using the internal Docker network.
  *
- * This function generates a config file compatible with TypingMind's recommendation
- * while maintaining compatibility with the existing HTTP/SSE architecture.
+ * This function generates a config file compatible with TypingMind's recommendation.
  */
 export async function generateMCPConfig(): Promise<{ success: boolean; configPath?: string; error?: string }> {
   logWithCategory('info', LogCategory.SYSTEM, 'Generating MCP configuration file...');
 
   try {
-    // Discover all available MCP servers
-    const servers = await discoverMCPServers();
-
-    if (servers.length === 0) {
-      logWithCategory('warn', LogCategory.SYSTEM, 'No MCP servers discovered. Config file will be empty.');
-    }
-
-    // Load environment configuration to get the HTTP/SSE port
-    const config = await envConfig.loadEnvConfig();
-    const httpSsePort = config.HTTP_SSE_PORT || 3000;
-
-    // Build the configuration object
+    // Build the configuration object with predefined servers
+    // Using the Docker container hostname for internal network access
     const mcpConfig: MCPConfigFile = {
-      mcpServers: {}
+      mcpServers: {
+        'book-planning': {
+          url: 'http://mcp-writing-servers:3001/'
+        },
+        'series-planning': {
+          url: 'http://mcp-writing-servers:3002/'
+        },
+        'chapter-planning': {
+          url: 'http://mcp-writing-servers:3003/'
+        },
+        'character-planning': {
+          url: 'http://mcp-writing-servers:3004/'
+        },
+        'scene': {
+          url: 'http://mcp-writing-servers:3005/'
+        },
+        'core-continuity': {
+          url: 'http://mcp-writing-servers:3006/'
+        },
+        'review': {
+          url: 'http://mcp-writing-servers:3007/'
+        },
+        'reporting': {
+          url: 'http://mcp-writing-servers:3008/'
+        },
+        'author': {
+          url: 'http://mcp-writing-servers:3009/'
+        }
+      }
     };
 
-    // Add each discovered server with its URL endpoint
-    // In the HTTP/SSE architecture, all servers are accessed through the same port
-    // with different path endpoints (e.g., /book-planning-server)
-    for (const serverName of servers) {
-      mcpConfig.mcpServers[serverName] = {
-        url: `http://localhost:${httpSsePort}/${serverName}`
-      };
-      logWithCategory('info', LogCategory.SYSTEM, `Added MCP server: ${serverName} -> http://localhost:${httpSsePort}/${serverName}`);
+    // Log each configured server
+    for (const [serverName, config] of Object.entries(mcpConfig.mcpServers)) {
+      logWithCategory('info', LogCategory.SYSTEM, `Added MCP server: ${serverName} -> ${config.url}`);
     }
 
-    // Always include author-server (it has a special endpoint)
-    if (!mcpConfig.mcpServers['author-server']) {
-      mcpConfig.mcpServers['author-server'] = {
-        url: `http://localhost:${httpSsePort}/author-server`
-      };
-      logWithCategory('info', LogCategory.SYSTEM, `Added MCP server: author-server -> http://localhost:${httpSsePort}/author-server`);
-    }
+    logWithCategory('info', LogCategory.SYSTEM, `Configured ${Object.keys(mcpConfig.mcpServers).length} MCP server(s)`);
 
     // Ensure the config directory exists
     const configPath = getMCPConfigPath();
