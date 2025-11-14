@@ -62,20 +62,14 @@ function getTypingMindConfigPath(): string {
 }
 
 /**
- * Get the MCP Writing Servers repository path
- */
-function getMCPWritingServersPath(): string {
-  const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'repositories', 'mcp-writing-servers');
-}
-
-/**
  * Discover all available MCP servers in the config-mcps directory
  */
 export async function discoverMCPServers(): Promise<string[]> {
   logWithCategory('info', LogCategory.SYSTEM, 'Discovering MCP servers...');
 
-  const mcpServersPath = path.join(getMCPWritingServersPath(), 'src', 'config-mcps');
+  const userDataPath = app.getPath('userData');
+  const mcpWritingServersPath = path.join(userDataPath, 'repositories', 'mcp-writing-servers');
+  const mcpServersPath = path.join(mcpWritingServersPath, 'src', 'config-mcps');
   const servers: string[] = [];
 
   try {
@@ -106,24 +100,28 @@ export async function discoverMCPServers(): Promise<string[]> {
 
 /**
  * Build MCP servers configuration for TypingMind
- * NOTE: With the @typingmind/mcp-connector using mcp-config.json in the Docker container,
- * servers are auto-discovered by the connector. TypingMind only needs to connect to the connector.
- * This function is kept for backward compatibility but returns an empty config.
- *
- * @deprecated The connector auto-discovers servers from docker/mcp-config.json
+ * Reads the generated mcp-config.json file which contains all MCP server configurations
+ * This is used to display the configuration in the UI for manual setup if needed
  */
 export async function buildMCPServersConfig(): Promise<MCPServersConfig> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Note: MCP servers are auto-discovered by the connector from docker/mcp-config.json');
+  logWithCategory('info', LogCategory.SYSTEM, 'Loading MCP servers configuration from mcp-config.json...');
 
-  const servers = await discoverMCPServers();
-  logWithCategory('info', LogCategory.SYSTEM, `Found ${servers.length} MCP servers (will be auto-discovered by connector)`);
+  try {
+    // Load the configuration from the generated file
+    const mcpConfig = await mcpConfigGenerator.loadMCPConfig();
 
-  // Return empty config - connector will auto-discover from docker/mcp-config.json
-  const config: MCPServersConfig = {
-    mcpServers: {}
-  };
-
-  return config;
+    if (mcpConfig && mcpConfig.mcpServers) {
+      const serverCount = Object.keys(mcpConfig.mcpServers).length;
+      logWithCategory('info', LogCategory.SYSTEM, `Loaded ${serverCount} MCP server(s) from config file`);
+      return mcpConfig;
+    } else {
+      logWithCategory('warn', LogCategory.SYSTEM, 'No MCP config found, returning empty configuration');
+      return { mcpServers: {} };
+    }
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error loading MCP servers config', error);
+    return { mcpServers: {} };
+  }
 }
 
 /**
