@@ -21,6 +21,7 @@ export enum LogCategory {
   NETWORK = 'NETWORK',
   SYSTEM = 'SYSTEM',
   ERROR = 'ERROR',
+  CONFIG = 'CONFIG',
 }
 
 /**

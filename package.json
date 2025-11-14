@@ -21,11 +21,15 @@
     "clean": "rm -rf dist out"
   },
   "dependencies": {
+    "dockerode": "^4.0.9",
+    "dotenv": "^16.3.1",
     "electron-log": "^5.1.2",
-    "fs-extra": "^11.2.0"
+    "fs-extra": "^11.2.0",
+    "simple-git": "^3.21.0"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
+    "@types/dockerode": "^3.3.45",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.19.24",
     "electron": "^28.2.3",

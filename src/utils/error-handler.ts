@@ -18,6 +18,7 @@ export enum ErrorCategory {
   DEPENDENCY = 'DEPENDENCY',
   TIMEOUT = 'TIMEOUT',
   UNKNOWN = 'UNKNOWN',
+  CONFIG = "CONFIG",
 }
 
 /**
@@ -766,6 +767,8 @@ export class ErrorHandler {
         return LogCategory.GENERAL;
       case ErrorCategory.TIMEOUT:
         return LogCategory.ERROR;
+      case ErrorCategory.CONFIG:
+        return LogCategory.CONFIG;
       default:
         return LogCategory.ERROR;
     }

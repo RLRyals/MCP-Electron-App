@@ -736,6 +736,230 @@ export class RepositoryManager {
       error
     );
   }
+
+  /**
+   * Setup TypingMind environment by cloning required repositories
+   * @param basePath - Base path where repositories will be cloned
+   * @param onProgress - Optional progress callback
+   */
+  async setupTypingMindEnvironment(
+    basePath: string,
+    onProgress?: (progress: RepositoryProgress) => void
+  ): Promise<void> {
+    logWithCategory('info', LogCategory.GENERAL, 'Setting up TypingMind environment');
+
+    try {
+      // 1. Clone MCP-Writing-Servers (Dockerfile is included in the repo!)
+      onProgress?.({
+        message: 'Cloning MCP-Writing-Servers repository...',
+        percent: 10,
+        step: 'cloning-mcp-servers',
+        status: 'cloning',
+      });
+
+      const mcpServersPath = path.join(basePath, 'mcp-writing-servers');
+      if (!fs.existsSync(mcpServersPath)) {
+        await this.cloneRepository(
+          'https://github.com/RLRyals/MCP-Writing-Servers.git',
+          mcpServersPath,
+          {
+            branch: 'main',
+            onProgress: (progress) => {
+              // Forward progress with adjusted percent (10-50%)
+              onProgress?.({
+                ...progress,
+                percent: 10 + (progress.percent || 0) * 0.4,
+              });
+            },
+          }
+        );
+      } else {
+        logWithCategory('info', LogCategory.GENERAL, 'MCP-Writing-Servers already exists, skipping clone');
+      }
+
+      // 2. Clone TypingMind
+      onProgress?.({
+        message: 'Cloning TypingMind repository...',
+        percent: 50,
+        step: 'cloning-typingmind',
+        status: 'cloning',
+      });
+
+      const typingmindPath = path.join(basePath, 'typingmind');
+      if (!fs.existsSync(typingmindPath)) {
+        await this.cloneRepository(
+          'https://github.com/typingMind/typingmind.git',
+          typingmindPath,
+          {
+            branch: 'main',
+            onProgress: (progress) => {
+              // Forward progress with adjusted percent (50-90%)
+              onProgress?.({
+                ...progress,
+                percent: 50 + (progress.percent || 0) * 0.4,
+              });
+            },
+          }
+        );
+      } else {
+        logWithCategory('info', LogCategory.GENERAL, 'TypingMind already exists, skipping clone');
+      }
+
+      onProgress?.({
+        message: 'Repository setup complete',
+        percent: 100,
+        step: 'complete',
+        status: 'complete',
+      });
+
+      logWithCategory('info', LogCategory.GENERAL, 'TypingMind environment setup complete');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logWithCategory('error', LogCategory.GENERAL, `Failed to setup TypingMind environment: ${errorMsg}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if repositories have updates available
+   * @param repoPath - Path to repository to check
+   */
+  async checkForUpdates(repoPath: string): Promise<{
+    hasUpdate: boolean;
+    currentCommit: string;
+    latestCommit: string;
+    commitsBehind: number;
+    changes?: string[];
+  }> {
+    await this.validateRepository(repoPath);
+
+    try {
+      // Fetch latest from remote
+      await execAsync('git fetch origin', { cwd: repoPath, timeout: 30000 });
+
+      // Get current commit
+      const { stdout: currentCommit } = await execAsync('git rev-parse HEAD', { cwd: repoPath });
+
+      // Get latest commit on remote
+      const { stdout: latestCommit } = await execAsync('git rev-parse origin/HEAD', { cwd: repoPath });
+
+      const current = currentCommit.trim();
+      const latest = latestCommit.trim();
+
+      if (current === latest) {
+        return {
+          hasUpdate: false,
+          currentCommit: current,
+          latestCommit: latest,
+          commitsBehind: 0,
+        };
+      }
+
+      // Count commits behind
+      const { stdout: behindCount } = await execAsync(
+        `git rev-list --count ${current}..${latest}`,
+        { cwd: repoPath }
+      );
+
+      // Get list of changes
+      const { stdout: changes } = await execAsync(
+        `git log --oneline ${current}..${latest}`,
+        { cwd: repoPath }
+      );
+
+      return {
+        hasUpdate: true,
+        currentCommit: current,
+        latestCommit: latest,
+        commitsBehind: parseInt(behindCount.trim()),
+        changes: changes.trim().split('\n').filter(line => line.length > 0),
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logWithCategory('error', LogCategory.GENERAL, `Failed to check for updates: ${errorMsg}`);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Update repository by pulling latest changes
+   * @param repoPath - Path to repository to update
+   */
+  async updateRepository(repoPath: string): Promise<void> {
+    await this.validateRepository(repoPath);
+
+    try {
+      logWithCategory('info', LogCategory.GENERAL, `Updating repository at ${repoPath}`);
+
+      // Stash any local changes
+      try {
+        await execAsync('git stash', { cwd: repoPath, timeout: 10000 });
+      } catch {
+        // Ignore if nothing to stash
+      }
+
+      // Pull latest changes
+      await execAsync('git pull origin', { cwd: repoPath, timeout: 60000 });
+
+      logWithCategory('info', LogCategory.GENERAL, `Successfully updated repository at ${repoPath}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logWithCategory('error', LogCategory.GENERAL, `Failed to update repository: ${errorMsg}`);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Create backup of repository
+   * @param repoPath - Path to repository to backup
+   */
+  async createBackup(repoPath: string): Promise<string> {
+    if (!fs.existsSync(repoPath)) {
+      throw new RepositoryError(
+        RepositoryErrorType.PATH_NOT_FOUND,
+        `Repository path does not exist: ${repoPath}`
+      );
+    }
+
+    const backupPath = `${repoPath}.backup.${Date.now()}`;
+
+    logWithCategory('info', LogCategory.GENERAL, `Creating backup at ${backupPath}`);
+
+    await fs.promises.cp(repoPath, backupPath, { recursive: true });
+
+    logWithCategory('info', LogCategory.GENERAL, `Backup created successfully at ${backupPath}`);
+
+    return backupPath;
+  }
+
+  /**
+   * Restore repository from backup
+   * @param backupPath - Path to backup
+   * @param targetPath - Path where to restore
+   */
+  async restoreBackup(backupPath: string, targetPath: string): Promise<void> {
+    if (!fs.existsSync(backupPath)) {
+      throw new RepositoryError(
+        RepositoryErrorType.PATH_NOT_FOUND,
+        `Backup path does not exist: ${backupPath}`
+      );
+    }
+
+    logWithCategory('info', LogCategory.GENERAL, `Restoring backup from ${backupPath} to ${targetPath}`);
+
+    // Remove current version if it exists
+    if (fs.existsSync(targetPath)) {
+      await fs.promises.rm(targetPath, { recursive: true, force: true });
+    }
+
+    // Copy backup to target
+    await fs.promises.cp(backupPath, targetPath, { recursive: true });
+
+    // Clean up backup
+    await fs.promises.rm(backupPath, { recursive: true, force: true });
+
+    logWithCategory('info', LogCategory.GENERAL, `Successfully restored backup to ${targetPath}`);
+  }
 }
 
 // Export a singleton instance with default retry options
