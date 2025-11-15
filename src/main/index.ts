@@ -18,6 +18,7 @@ import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
+import * as dockerMCPGateway from './docker-mcp-gateway';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import * as migrations from './migrations';
@@ -656,6 +657,51 @@ function setupIPC(): void {
 
   ipcMain.handle('client:get-selection-file-path', async () => {
     return clientSelection.getSelectionFilePath();
+  });
+
+  // Docker MCP Gateway IPC handlers
+  ipcMain.handle('gateway:check-available', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Checking if Docker MCP Gateway is available...');
+    return await dockerMCPGateway.isDockerMCPAvailable();
+  });
+
+  ipcMain.handle('gateway:check-running', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Checking if Docker MCP Gateway is running...');
+    return await dockerMCPGateway.isGatewayRunning();
+  });
+
+  ipcMain.handle('gateway:get-status', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting Docker MCP Gateway status...');
+    return await dockerMCPGateway.getGatewayStatus();
+  });
+
+  ipcMain.handle('gateway:get-config', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting Docker MCP Gateway configuration...');
+    return await dockerMCPGateway.getGatewayConfig();
+  });
+
+  ipcMain.handle('gateway:start', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Starting Docker MCP Gateway...');
+    return await dockerMCPGateway.startGateway();
+  });
+
+  ipcMain.handle('gateway:stop', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Stopping Docker MCP Gateway...');
+    return await dockerMCPGateway.stopGateway();
+  });
+
+  ipcMain.handle('gateway:get-instructions', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Getting Docker MCP Gateway setup instructions...');
+    return dockerMCPGateway.getSetupInstructions();
+  });
+
+  ipcMain.handle('gateway:get-claude-config-path', async () => {
+    return dockerMCPGateway.getClaudeDesktopConfigPath();
+  });
+
+  ipcMain.handle('gateway:check-claude-configured', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Checking if Claude Desktop is configured...');
+    return await dockerMCPGateway.isClaudeDesktopConfigured();
   });
 
   // Typing Mind downloader IPC handlers

@@ -79,7 +79,9 @@ All of this happens through the app's graphical interface - no configuration fil
 
 **Option 2: Claude Desktop**
 - Native desktop application
-- Manual installation with guided instructions from the app
+- Two connection methods:
+  - **Docker MCP Gateway** (recommended) - Automatic setup via Docker Desktop's MCP Toolkit
+  - **Manual Configuration** - Guided instructions from the app
 - Requires separate download from Anthropic
 - The app helps you configure it correctly
 
@@ -164,7 +166,7 @@ Monitor the health of your MCP system at a glance:
 - Quick start/stop controls
 
 ### Client Selection
-Choose between Typing Mind (automatic setup) or Claude Desktop (guided manual setup), or install both to try different interfaces.
+Choose between Typing Mind (automatic setup) or Claude Desktop (Docker MCP Gateway or manual setup), or install both to try different interfaces. Claude Desktop can connect via Docker Desktop's MCP Toolkit for streamlined setup.
 
 ### Docker Installation Guide
 If Docker Desktop isn't installed, the app provides a comprehensive step-by-step wizard with download links and installation instructions.
@@ -178,6 +180,7 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 **For End Users:**
 - **[User Guide](docs/USER-GUIDE.md)** - Complete installation and usage guide
 - **[Quick Start](docs/QUICK-START.md)** - Fast setup for experienced users
+- **[Docker MCP Gateway Setup](docs/DOCKER_MCP_GATEWAY_SETUP.md)** - Connect Claude Desktop via Docker MCP Toolkit
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Solutions to common problems
 - **[FAQ](docs/FAQ.md)** - Frequently asked questions
 
