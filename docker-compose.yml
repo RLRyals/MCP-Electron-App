@@ -5,7 +5,7 @@ services:
   postgres:
     image: postgres:16
     container_name: writing-postgres
-    command: postgres -c max_connections=200
+    command: postgres -c max_connections=200 -c shared_buffers=256MB -c effective_cache_size=1GB -c work_mem=10MB -c random_page_cost=1.1
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
