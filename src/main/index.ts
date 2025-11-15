@@ -739,6 +739,50 @@ function setupIPC(): void {
     return JSON.stringify(serversConfig, null, 2);
   });
 
+  // Claude Desktop Auto-Configuration IPC handlers
+  ipcMain.handle('claude-desktop:auto-configure', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring Claude Desktop...');
+    const { autoConfigureClaudeDesktop } = await import('./claude-desktop-auto-config');
+    return await autoConfigureClaudeDesktop();
+  });
+
+  ipcMain.handle('claude-desktop:is-configured', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if Claude Desktop is configured...');
+    const { isClaudeDesktopConfigured } = await import('./claude-desktop-auto-config');
+    return await isClaudeDesktopConfigured();
+  });
+
+  ipcMain.handle('claude-desktop:get-config', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop configuration...');
+    const { getClaudeDesktopConfig } = await import('./claude-desktop-auto-config');
+    return await getClaudeDesktopConfig();
+  });
+
+  ipcMain.handle('claude-desktop:reset-config', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting Claude Desktop configuration...');
+    const { resetClaudeDesktopConfig } = await import('./claude-desktop-auto-config');
+    return await resetClaudeDesktopConfig();
+  });
+
+  ipcMain.handle('claude-desktop:get-config-path', () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop config path...');
+    const { getClaudeDesktopConfigPath } = require('./claude-desktop-auto-config');
+    return getClaudeDesktopConfigPath();
+  });
+
+  ipcMain.handle('claude-desktop:open-config-folder', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening Claude Desktop config folder...');
+    const { getClaudeDesktopConfigPath } = await import('./claude-desktop-auto-config');
+    const configPath = getClaudeDesktopConfigPath();
+    await shell.showItemInFolder(configPath);
+  });
+
+  ipcMain.handle('claude-desktop:get-config-instructions', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop configuration instructions...');
+    const { getConfigurationInstructions } = await import('./claude-desktop-auto-config');
+    return await getConfigurationInstructions();
+  });
+
   // Docker Images IPC handlers
   ipcMain.handle('docker-images:load-all', async (_event) => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Loading all Docker images...');
