@@ -712,11 +712,11 @@ async function handleConfigureTypingMind(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typingmind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind' } = {
       'postgres': 'postgres',
       'mcp-servers': 'mcp-writing-system',
       'mcp-connector': 'mcp-connector',
-      'typing-mind': 'typingmind',
+      'typing-mind': 'typing-mind',
     };
 
     const actualServiceName = serviceMap[serviceName];
