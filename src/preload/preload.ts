@@ -1077,6 +1077,60 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Claude Desktop API
+   */
+  claudeDesktop: {
+    /**
+     * Auto-configure Claude Desktop with MCP server settings
+     */
+    autoConfigure: (): Promise<any> => {
+      return ipcRenderer.invoke('claude-desktop:auto-configure');
+    },
+
+    /**
+     * Check if Claude Desktop is configured
+     */
+    isConfigured: (): Promise<boolean> => {
+      return ipcRenderer.invoke('claude-desktop:is-configured');
+    },
+
+    /**
+     * Get current Claude Desktop configuration
+     */
+    getConfig: (): Promise<any> => {
+      return ipcRenderer.invoke('claude-desktop:get-config');
+    },
+
+    /**
+     * Reset Claude Desktop configuration
+     */
+    resetConfig: (): Promise<any> => {
+      return ipcRenderer.invoke('claude-desktop:reset-config');
+    },
+
+    /**
+     * Get the path where Claude Desktop config is stored
+     */
+    getConfigPath: (): Promise<string> => {
+      return ipcRenderer.invoke('claude-desktop:get-config-path');
+    },
+
+    /**
+     * Open Claude Desktop config folder in file explorer
+     */
+    openConfigFolder: (): Promise<void> => {
+      return ipcRenderer.invoke('claude-desktop:open-config-folder');
+    },
+
+    /**
+     * Get configuration instructions for manual setup
+     */
+    getConfigInstructions: (): Promise<string> => {
+      return ipcRenderer.invoke('claude-desktop:get-config-instructions');
+    },
+  },
+
+  /**
    * Docker Images API
    */
   dockerImages: {

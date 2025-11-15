@@ -5,7 +5,7 @@
  */
 
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
-import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
+import { loadClientOptions, setupClientSelectionListeners, setupClaudeDesktopListeners } from './client-selection-handlers.js';
 import { initializeDashboard } from './dashboard-handlers.js';
 
 // Type definitions for the API exposed by preload script
@@ -284,6 +284,15 @@ interface ElectronAPI {
     isConfigured: () => Promise<boolean>;
     resetConfig: () => Promise<any>;
     getMCPServersJSON: () => Promise<string>;
+  };
+  claudeDesktop: {
+    autoConfigure: () => Promise<any>;
+    isConfigured: () => Promise<boolean>;
+    getConfig: () => Promise<any>;
+    resetConfig: () => Promise<any>;
+    getConfigPath: () => Promise<string>;
+    openConfigFolder: () => Promise<void>;
+    getConfigInstructions: () => Promise<string>;
   };
 }
 
@@ -715,6 +724,9 @@ function init(): void {
   // Setup client selection listeners and load options
   setupClientSelectionListeners();
   loadClientOptions();
+
+  // Setup Claude Desktop listeners
+  setupClaudeDesktopListeners();
 
   // Initialize dashboard (main control interface)
   initializeDashboard().catch(err => {

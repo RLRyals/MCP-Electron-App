@@ -343,3 +343,167 @@ export function setupClientSelectionListeners(): void {
 
   console.log('Client selection listeners set up');
 }
+
+// ===========================
+// Claude Desktop Handlers
+// ===========================
+
+/**
+ * Update Claude Desktop status
+ */
+async function updateClaudeDesktopStatus(): Promise<void> {
+  try {
+    const isConfigured = await window.electronAPI.claudeDesktop.isConfigured();
+    const statusText = document.getElementById('claude-desktop-status-text');
+    const resetBtn = document.getElementById('claude-desktop-reset-btn');
+    const previewSection = document.getElementById('claude-desktop-config-preview');
+
+    if (statusText) {
+      if (isConfigured) {
+        statusText.textContent = '✓ Configured';
+        statusText.style.color = '#4caf50';
+        if (resetBtn) resetBtn.style.display = 'inline-block';
+
+        // Show config preview
+        try {
+          const config = await window.electronAPI.claudeDesktop.getConfig();
+          const configContent = document.getElementById('claude-desktop-config-content');
+          if (config && configContent) {
+            configContent.textContent = JSON.stringify(config, null, 2);
+            if (previewSection) previewSection.style.display = 'block';
+          }
+        } catch (error) {
+          console.error('Error loading config preview:', error);
+        }
+      } else {
+        statusText.textContent = 'Not Configured';
+        statusText.style.color = '#ff9800';
+        if (resetBtn) resetBtn.style.display = 'none';
+        if (previewSection) previewSection.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Error updating Claude Desktop status:', error);
+  }
+}
+
+/**
+ * Auto-configure Claude Desktop
+ */
+async function autoConfigureClaudeDesktop(): Promise<void> {
+  const button = document.getElementById('claude-desktop-auto-config-btn') as HTMLButtonElement;
+  if (!button) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Configuring...';
+
+    showNotification('Configuring Claude Desktop...', 'info');
+
+    const result = await window.electronAPI.claudeDesktop.autoConfigure();
+
+    if (result.success) {
+      showNotification('Claude Desktop configured successfully!', 'success');
+      await updateClaudeDesktopStatus();
+    } else {
+      showNotification(`Configuration failed: ${result.error || 'Unknown error'}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error auto-configuring Claude Desktop:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    showNotification(`Error: ${errorMsg}`, 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Auto-Configure Claude Desktop';
+    }
+  }
+}
+
+/**
+ * Open Claude Desktop config folder
+ */
+async function openClaudeDesktopConfigFolder(): Promise<void> {
+  try {
+    await window.electronAPI.claudeDesktop.openConfigFolder();
+    showNotification('Opening config folder...', 'info');
+  } catch (error) {
+    console.error('Error opening config folder:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    showNotification(`Error: ${errorMsg}`, 'error');
+  }
+}
+
+/**
+ * Reset Claude Desktop configuration
+ */
+async function resetClaudeDesktopConfig(): Promise<void> {
+  if (!confirm('Are you sure you want to reset Claude Desktop configuration? This will remove all MCP server settings.')) {
+    return;
+  }
+
+  try {
+    showNotification('Resetting configuration...', 'info');
+
+    const result = await window.electronAPI.claudeDesktop.resetConfig();
+
+    if (result.success) {
+      showNotification('Configuration reset successfully', 'success');
+      await updateClaudeDesktopStatus();
+    } else {
+      showNotification(`Reset failed: ${result.error || 'Unknown error'}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error resetting Claude Desktop config:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    showNotification(`Error: ${errorMsg}`, 'error');
+  }
+}
+
+/**
+ * Open Claude Desktop download link
+ */
+function openClaudeDesktopDownloadLink(event: Event): void {
+  event.preventDefault();
+  // Open external link (assuming we have shell API exposed)
+  const url = 'https://claude.ai/download';
+  console.log('Opening Claude Desktop download page:', url);
+  showNotification('Opening Claude Desktop download page...', 'info');
+  // If shell.openExternal is available through the API, use it
+  // Otherwise, the link will open in the default browser
+  window.open(url, '_blank');
+}
+
+/**
+ * Setup Claude Desktop event listeners
+ */
+export function setupClaudeDesktopListeners(): void {
+  // Auto-configure button
+  const autoConfigBtn = document.getElementById('claude-desktop-auto-config-btn');
+  if (autoConfigBtn) {
+    autoConfigBtn.addEventListener('click', autoConfigureClaudeDesktop);
+  }
+
+  // Open folder button
+  const openFolderBtn = document.getElementById('claude-desktop-open-folder-btn');
+  if (openFolderBtn) {
+    openFolderBtn.addEventListener('click', openClaudeDesktopConfigFolder);
+  }
+
+  // Reset button
+  const resetBtn = document.getElementById('claude-desktop-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', resetClaudeDesktopConfig);
+  }
+
+  // Download link
+  const downloadLink = document.getElementById('claude-desktop-download-link');
+  if (downloadLink) {
+    downloadLink.addEventListener('click', openClaudeDesktopDownloadLink);
+  }
+
+  // Initialize status
+  updateClaudeDesktopStatus();
+
+  console.log('Claude Desktop listeners set up');
+}
