@@ -1738,9 +1738,23 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="http-sse-port">
+                            HTTP/SSE Port
+                            <span class="tooltip" title="Port for HTTP/SSE server (default: 3001)">ⓘ</span>
+                        </label>
+                        <div class="input-with-indicator">
+                            <input type="number" id="http-sse-port" name="HTTP_SSE_PORT" min="1024" max="65535" required>
+                            <span class="port-indicator" id="http-sse-port-indicator">
+                                <span class="loading">⏳</span>
+                            </span>
+                        </div>
+                        <span class="validation-error" id="http-sse-port-error"></span>
+                    </div>
+
+                    <div class="form-group">
                         <label for="typing-mind-port">
                             Typing Mind Port
-                            <span class="tooltip" title="Port for Typing Mind service (default: 3000)">ⓘ</span>
+                            <span class="tooltip" title="Port for Typing Mind service (default: 8080)">ⓘ</span>
                         </label>
                         <div class="input-with-indicator">
                             <input type="number" id="typing-mind-port" name="TYPING_MIND_PORT" min="1024" max="65535" required>

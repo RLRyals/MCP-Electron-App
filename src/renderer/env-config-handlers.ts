@@ -10,6 +10,7 @@ interface EnvConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
+  HTTP_SSE_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
 }
@@ -33,6 +34,7 @@ export async function loadEnvConfig(): Promise<void> {
     (form.elements.namedItem('POSTGRES_PASSWORD') as HTMLInputElement).value = currentEnvConfig.POSTGRES_PASSWORD;
     (form.elements.namedItem('POSTGRES_PORT') as HTMLInputElement).value = String(currentEnvConfig.POSTGRES_PORT);
     (form.elements.namedItem('MCP_CONNECTOR_PORT') as HTMLInputElement).value = String(currentEnvConfig.MCP_CONNECTOR_PORT);
+    (form.elements.namedItem('HTTP_SSE_PORT') as HTMLInputElement).value = String(currentEnvConfig.HTTP_SSE_PORT);
     (form.elements.namedItem('TYPING_MIND_PORT') as HTMLInputElement).value = String(currentEnvConfig.TYPING_MIND_PORT);
     (form.elements.namedItem('MCP_AUTH_TOKEN') as HTMLInputElement).value = currentEnvConfig.MCP_AUTH_TOKEN;
 
@@ -93,16 +95,18 @@ export async function checkPortAvailability(port: number, indicatorId: string): 
 export async function checkAllPorts(): Promise<void> {
   const postgresPortInput = document.getElementById('postgres-port') as HTMLInputElement;
   const mcpPortInput = document.getElementById('mcp-connector-port') as HTMLInputElement;
+  const httpSsePortInput = document.getElementById('http-sse-port') as HTMLInputElement;
   const typingMindPortInput = document.getElementById('typing-mind-port') as HTMLInputElement;
 
   // Validate that we have valid input elements with values
-  if (!postgresPortInput || !mcpPortInput || !typingMindPortInput) {
+  if (!postgresPortInput || !mcpPortInput || !httpSsePortInput || !typingMindPortInput) {
     console.error('One or more port input elements not found');
     return;
   }
 
   const postgresPort = parseInt(postgresPortInput.value, 10);
   const mcpPort = parseInt(mcpPortInput.value, 10);
+  const httpSsePort = parseInt(httpSsePortInput.value, 10);
   const typingMindPort = parseInt(typingMindPortInput.value, 10);
 
   // Only check ports that have valid values
@@ -112,6 +116,9 @@ export async function checkAllPorts(): Promise<void> {
   }
   if (!isNaN(mcpPort)) {
     checks.push(checkPortAvailability(mcpPort, 'mcp-connector-port-indicator'));
+  }
+  if (!isNaN(httpSsePort)) {
+    checks.push(checkPortAvailability(httpSsePort, 'http-sse-port-indicator'));
   }
   if (!isNaN(typingMindPort)) {
     checks.push(checkPortAvailability(typingMindPort, 'typing-mind-port-indicator'));
@@ -180,6 +187,7 @@ export async function resetToDefaults(): Promise<void> {
     (form.elements.namedItem('POSTGRES_PASSWORD') as HTMLInputElement).value = defaultConfig.POSTGRES_PASSWORD;
     (form.elements.namedItem('POSTGRES_PORT') as HTMLInputElement).value = String(defaultConfig.POSTGRES_PORT);
     (form.elements.namedItem('MCP_CONNECTOR_PORT') as HTMLInputElement).value = String(defaultConfig.MCP_CONNECTOR_PORT);
+    (form.elements.namedItem('HTTP_SSE_PORT') as HTMLInputElement).value = String(defaultConfig.HTTP_SSE_PORT);
     (form.elements.namedItem('TYPING_MIND_PORT') as HTMLInputElement).value = String(defaultConfig.TYPING_MIND_PORT);
     (form.elements.namedItem('MCP_AUTH_TOKEN') as HTMLInputElement).value = defaultConfig.MCP_AUTH_TOKEN;
 
@@ -212,6 +220,7 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       POSTGRES_PASSWORD: (form.elements.namedItem('POSTGRES_PASSWORD') as HTMLInputElement).value,
       POSTGRES_PORT: parseInt((form.elements.namedItem('POSTGRES_PORT') as HTMLInputElement).value, 10),
       MCP_CONNECTOR_PORT: parseInt((form.elements.namedItem('MCP_CONNECTOR_PORT') as HTMLInputElement).value, 10),
+      HTTP_SSE_PORT: parseInt((form.elements.namedItem('HTTP_SSE_PORT') as HTMLInputElement).value, 10),
       TYPING_MIND_PORT: parseInt((form.elements.namedItem('TYPING_MIND_PORT') as HTMLInputElement).value, 10),
       MCP_AUTH_TOKEN: (form.elements.namedItem('MCP_AUTH_TOKEN') as HTMLInputElement).value,
     };
@@ -295,7 +304,7 @@ export function setupEnvConfigListeners(): void {
   }
 
   // Port inputs - check availability on change
-  const portInputs = ['postgres-port', 'mcp-connector-port', 'typing-mind-port'];
+  const portInputs = ['postgres-port', 'mcp-connector-port', 'http-sse-port', 'typing-mind-port'];
   portInputs.forEach(inputId => {
     const input = document.getElementById(inputId) as HTMLInputElement;
     if (input) {
