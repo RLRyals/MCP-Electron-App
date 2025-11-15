@@ -114,22 +114,29 @@ function setupDashboardListeners(): void {
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
 
-    if (target.classList.contains('view-logs-btn')) {
-      const serviceName = target.getAttribute('data-service');
+    // Find the button element even if a child element was clicked
+    const viewLogsBtn = target.closest('.view-logs-btn') as HTMLElement;
+    if (viewLogsBtn) {
+      const serviceName = viewLogsBtn.getAttribute('data-service');
       if (serviceName) {
         handleViewLogs(serviceName);
       }
+      return;
     }
 
-    if (target.classList.contains('copy-token-btn')) {
+    const copyTokenBtn = target.closest('.copy-token-btn') as HTMLElement;
+    if (copyTokenBtn) {
       handleCopyToken();
+      return;
     }
 
-    if (target.classList.contains('open-browser-btn')) {
-      const url = target.getAttribute('data-url');
+    const openBrowserBtn = target.closest('.open-browser-btn') as HTMLElement;
+    if (openBrowserBtn) {
+      const url = openBrowserBtn.getAttribute('data-url');
       if (url) {
         handleOpenBrowser(url);
       }
+      return;
     }
   });
 }
@@ -406,12 +413,14 @@ function updateMCPConnectorCard(status: MCPSystemStatus, config: EnvConfig, urls
       if (statusIcon && statusText && portText) {
         portText.textContent = `Port: ${config.MCP_CONNECTOR_PORT}`;
 
-        if (container?.running && container.health === 'healthy') {
+        // MCP Connector may not have health checks configured
+        // Show as healthy if running and health is 'healthy', 'none', or 'unknown'
+        if (container?.running && (container.health === 'healthy' || container.health === 'none' || container.health === 'unknown')) {
           statusIcon.innerHTML = '<span class="status-dot status-green"></span>';
           statusText.textContent = 'Healthy';
-        } else if (container?.running) {
+        } else if (container?.running && (container.health === 'starting' || container.health === 'unhealthy')) {
           statusIcon.innerHTML = '<span class="status-dot status-yellow"></span>';
-          statusText.textContent = 'Starting...';
+          statusText.textContent = container.health === 'starting' ? 'Starting...' : 'Unhealthy';
         } else {
           statusIcon.innerHTML = '<span class="status-dot status-red"></span>';
           statusText.textContent = 'Offline';
@@ -443,12 +452,14 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
       if (statusIcon && statusText && portText) {
         portText.textContent = `Port: ${config.TYPING_MIND_PORT}`;
 
-        if (container?.running && container.health === 'healthy') {
+        // Typing Mind may not have health checks configured
+        // Show as healthy if running and health is 'healthy', 'none', or 'unknown'
+        if (container?.running && (container.health === 'healthy' || container.health === 'none' || container.health === 'unknown')) {
           statusIcon.innerHTML = '<span class="status-dot status-green"></span>';
           statusText.textContent = 'Healthy';
-        } else if (container?.running) {
+        } else if (container?.running && (container.health === 'starting' || container.health === 'unhealthy')) {
           statusIcon.innerHTML = '<span class="status-dot status-yellow"></span>';
-          statusText.textContent = 'Starting...';
+          statusText.textContent = container.health === 'starting' ? 'Starting...' : 'Unhealthy';
         } else {
           statusIcon.innerHTML = '<span class="status-dot status-red"></span>';
           statusText.textContent = 'Offline';

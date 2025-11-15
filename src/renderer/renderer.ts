@@ -560,7 +560,7 @@ async function exportDiagnosticReport(): Promise<void> {
 /**
  * Show a notification message
  */
-function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+export function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
   notification.textContent = message;
@@ -583,10 +583,15 @@ function showNotification(message: string, type: 'success' | 'error' | 'info' = 
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => {
-      document.body.removeChild(notification);
+      if (notification.parentNode) {
+        document.body.removeChild(notification);
+      }
     }, 300);
   }, 3000);
 }
+
+// Make showNotification globally available for other modules
+(window as any).showNotification = showNotification;
 
 /**
  * Show error dialog with details
