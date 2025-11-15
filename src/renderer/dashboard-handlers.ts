@@ -436,7 +436,7 @@ function updateMCPConnectorCard(status: MCPSystemStatus, config: EnvConfig, urls
  * Update Typing Mind service card
  */
 function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: ServiceUrls): void {
-  const container = status.containers.find(c => c.name.includes('typing-mind'));
+  const container = status.containers.find(c => c.name.includes('typingmind'));
   const card = document.getElementById('typing-mind-card');
 
   // Show/hide card based on whether Typing Mind is configured
@@ -712,11 +712,11 @@ async function handleConfigureTypingMind(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typingmind' } = {
       'postgres': 'postgres',
       'mcp-servers': 'mcp-writing-system',
       'mcp-connector': 'mcp-connector',
-      'typing-mind': 'typing-mind',
+      'typing-mind': 'typingmind',
     };
 
     const actualServiceName = serviceMap[serviceName];
