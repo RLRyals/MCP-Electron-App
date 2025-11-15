@@ -55,5 +55,5 @@ EXPOSE 3001 3002 3003 3004 3005 3006 3007 3008 3009
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the HTTP/SSE server
-CMD ["node", "src/http-sse-server.js"]
+# Start all MCP servers (will be updated in Task 2.2)
+CMD ["node", "server.js"]
