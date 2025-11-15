@@ -1437,77 +1437,8 @@
     </header>
 
     <main>
-        <div class="welcome-card">
-            <h2>Welcome!</h2>
-            <p>
-                This is a modern Electron application with TypeScript support, designed to integrate
-                the Model Context Protocol (MCP) for enhanced AI capabilities.
-            </p>
+        <!-- Main Dashboard - Moved to top for easy access -->
 
-            <div class="info-grid">
-                <div class="info-item">
-                    <strong>Version</strong>
-                    <span id="app-version">Loading...</span>
-                </div>
-                <div class="info-item">
-                    <strong>Platform</strong>
-                    <span id="platform">Loading...</span>
-                </div>
-                <div class="info-item">
-                    <strong>Architecture</strong>
-                    <span id="architecture">Loading...</span>
-                </div>
-                <div class="info-item">
-                    <strong>Node Version</strong>
-                    <span id="node-version">Loading...</span>
-                </div>
-            </div>
-
-            <button class="test-button" id="test-ipc">Test IPC Communication</button>
-            <div class="test-result" id="test-result">
-                IPC communication successful!
-            </div>
-        </div>
-
-        <div class="prerequisites-card">
-            <h2>Prerequisites Check</h2>
-            <p style="margin-bottom: 20px; opacity: 0.9;">
-                Checking system prerequisites for MCP integration...
-            </p>
-
-            <div class="prereq-grid">
-                <div class="prereq-item">
-                    <h3>
-                        <span class="status-icon loading" id="docker-status-icon"></span>
-                        Docker
-                    </h3>
-                    <div class="prereq-detail" id="docker-detail">Checking...</div>
-                    <div class="prereq-error" id="docker-error" style="display: none;"></div>
-                </div>
-
-                <div class="prereq-item">
-                    <h3>
-                        <span class="status-icon loading" id="git-status-icon"></span>
-                        Git
-                    </h3>
-                    <div class="prereq-detail" id="git-detail">Checking...</div>
-                    <div class="prereq-error" id="git-error" style="display: none;"></div>
-                </div>
-
-                <div class="prereq-item" id="wsl-item" style="display: none;">
-                    <h3>
-                        <span class="status-icon loading" id="wsl-status-icon"></span>
-                        WSL
-                    </h3>
-                    <div class="prereq-detail" id="wsl-detail">Checking...</div>
-                    <div class="prereq-error" id="wsl-error" style="display: none;"></div>
-                </div>
-            </div>
-
-            <button class="test-button" id="check-prerequisites" title="Verify that Docker Desktop and Git are properly installed and running on your system">Check Prerequisites</button>
-        </div>
-
-        <!-- Main Dashboard -->
         <div class="dashboard-card" id="dashboard-card">
             <div class="dashboard-header">
                 <h2>MCP Writing System</h2>
@@ -1630,6 +1561,76 @@
             <div class="dashboard-footer">
                 <span id="dashboard-last-updated" class="last-updated">Last updated: --:--:--</span>
             </div>
+        </div>
+
+        <div class="welcome-card">
+            <h2>Welcome!</h2>
+            <p>
+                This is a modern Electron application with TypeScript support, designed to integrate
+                the Model Context Protocol (MCP) for enhanced AI capabilities.
+            </p>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Version</strong>
+                    <span id="app-version">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Platform</strong>
+                    <span id="platform">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Architecture</strong>
+                    <span id="architecture">Loading...</span>
+                </div>
+                <div class="info-item">
+                    <strong>Node Version</strong>
+                    <span id="node-version">Loading...</span>
+                </div>
+            </div>
+
+            <button class="test-button" id="test-ipc">Test IPC Communication</button>
+            <div class="test-result" id="test-result">
+                IPC communication successful!
+            </div>
+        </div>
+
+        <div class="prerequisites-card">
+            <h2>Prerequisites Check</h2>
+            <p style="margin-bottom: 20px; opacity: 0.9;">
+                Checking system prerequisites for MCP integration...
+            </p>
+
+            <div class="prereq-grid">
+                <div class="prereq-item">
+                    <h3>
+                        <span class="status-icon loading" id="docker-status-icon"></span>
+                        Docker
+                    </h3>
+                    <div class="prereq-detail" id="docker-detail">Checking...</div>
+                    <div class="prereq-error" id="docker-error" style="display: none;"></div>
+                </div>
+
+                <div class="prereq-item">
+                    <h3>
+                        <span class="status-icon loading" id="git-status-icon"></span>
+                        Git
+                    </h3>
+                    <div class="prereq-detail" id="git-detail">Checking...</div>
+                    <div class="prereq-error" id="git-error" style="display: none;"></div>
+                </div>
+
+                <div class="prereq-item" id="wsl-item" style="display: none;">
+                    <h3>
+                        <span class="status-icon loading" id="wsl-status-icon"></span>
+                        WSL
+                    </h3>
+                    <div class="prereq-detail" id="wsl-detail">Checking...</div>
+                    <div class="prereq-error" id="wsl-error" style="display: none;"></div>
+                </div>
+            </div>
+
+            <button class="test-button" id="check-prerequisites" title="Verify that Docker Desktop and Git are properly installed and running on your system">Check Prerequisites</button>
         </div>
 
         <div class="client-selection-card" id="client-selection-card">
