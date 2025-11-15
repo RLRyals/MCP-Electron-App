@@ -83,10 +83,15 @@ services:
     build:
       context: ${MCP_WRITING_SERVERS_DIR}
       dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
     container_name: mcp-writing-servers
     environment:
+      # Use pgbouncer for connection pooling (Task 1.2)
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
+      # Performance optimizations
+      NODE_OPTIONS: "--max-old-space-size=2048"
     ports:
       - "3001:3001"  # book-planning
       - "3002:3002"  # series-planning
@@ -102,12 +107,16 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_started
-    volumes:
-      - ${MCP_WRITING_SERVERS_DIR}:/app
-      - /app/node_modules
     networks:
       - writing-network
     restart: unless-stopped
+    # Healthcheck to ensure service is ready
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # TypingMind Web Server (Static Files)
   typingmind:
