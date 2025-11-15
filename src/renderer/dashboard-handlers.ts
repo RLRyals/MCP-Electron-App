@@ -274,18 +274,39 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
         hasShownOfflineNotification = true;
       }
     }
-  } else if (!status.healthy) {
-    // System degraded - yellow
-    statusElement.classList.add('status-yellow');
-    statusTextElement.textContent = 'System Degraded';
-    // Reset notification flag when system comes back online
-    hasShownOfflineNotification = false;
   } else {
-    // All systems operational - green
-    statusElement.classList.add('status-green');
-    statusTextElement.textContent = 'System Ready';
-    // Reset notification flag when system is healthy
-    hasShownOfflineNotification = false;
+    // Check core services health (postgres and mcp-servers only)
+    // Typing Mind and MCP Connector are optional and don't affect overall health
+    const coreContainers = status.containers.filter(c =>
+      c.name.includes('postgres') ||
+      c.name.includes('mcp-writing-system') ||
+      c.name.includes('mcp-connector')
+    );
+
+    const allCoreHealthy = coreContainers.length > 0 &&
+      coreContainers.every(c => c.running && c.health === 'healthy');
+    const someCoreStarting = coreContainers.some(c =>
+      c.running && c.health !== 'healthy' && c.health !== 'unhealthy'
+    );
+
+    if (allCoreHealthy) {
+      // All core systems operational - green
+      statusElement.classList.add('status-green');
+      statusTextElement.textContent = 'System Ready';
+      // Reset notification flag when system is healthy
+      hasShownOfflineNotification = false;
+    } else if (someCoreStarting) {
+      // Core system starting - yellow
+      statusElement.classList.add('status-yellow');
+      statusTextElement.textContent = 'System Starting';
+      hasShownOfflineNotification = false;
+    } else {
+      // Core system degraded - yellow
+      statusElement.classList.add('status-yellow');
+      statusTextElement.textContent = 'System Degraded';
+      // Reset notification flag when system comes back online
+      hasShownOfflineNotification = false;
+    }
   }
 }
 
@@ -417,6 +438,7 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
       const statusIcon = document.getElementById('typing-mind-status-icon');
       const statusText = document.getElementById('typing-mind-status-text');
       const portText = document.getElementById('typing-mind-port-display');
+      const openBrowserBtn = card.querySelector('.open-browser-btn') as HTMLButtonElement;
 
       if (statusIcon && statusText && portText) {
         portText.textContent = `Port: ${config.TYPING_MIND_PORT}`;
@@ -431,6 +453,11 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
           statusIcon.innerHTML = '<span class="status-dot status-red"></span>';
           statusText.textContent = 'Offline';
         }
+      }
+
+      // Update the Open Browser button data-url attribute
+      if (openBrowserBtn) {
+        openBrowserBtn.setAttribute('data-url', urls.typingMind);
       }
     } else {
       card.style.display = 'none';
