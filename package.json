@@ -31,10 +31,10 @@
     "@types/archiver": "^7.0.0",
     "@types/dockerode": "^3.3.45",
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "^20.19.24",
+    "@types/node": "^20.19.25",
     "electron": "^28.2.3",
     "electron-builder": "^24.13.3",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   },
   "build": {
     "appId": "com.mcp.electronapp",
