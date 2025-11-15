@@ -8,9 +8,10 @@ dist/
 out/
 build/
 
-# Compiled TypeScript (but keep build scripts)
+# Compiled TypeScript (but keep build scripts and templates)
 *.js
 !scripts/*.js
+!docker/mcp-writing-servers-templates/*.js
 *.js.map
 *.d.ts
 *.d.ts.map
