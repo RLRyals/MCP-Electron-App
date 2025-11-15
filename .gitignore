@@ -8,9 +8,10 @@ dist/
 out/
 build/
 
-# Compiled TypeScript (but keep build scripts)
+# Compiled TypeScript (but keep build scripts and bridge scripts)
 *.js
 !scripts/*.js
+!claude-desktop-bridge/*.js
 *.js.map
 *.d.ts
 *.d.ts.map
