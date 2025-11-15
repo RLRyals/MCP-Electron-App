@@ -23,6 +23,28 @@ services:
     networks:
       - writing-network
 
+  # PgBouncer for connection pooling
+  pgbouncer:
+    image: pgbouncer/pgbouncer:latest
+    container_name: writing-pgbouncer
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_DBNAME: ${POSTGRES_DB}
+      DATABASES_USER: ${POSTGRES_USER}
+      DATABASES_PASSWORD: ${POSTGRES_PASSWORD}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - writing-network
+    restart: unless-stopped
+
   # MCP Connector (Bridge between TypingMind and MCP Servers)
   mcp-connector:
     image: node:18-alpine
@@ -56,7 +78,7 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-writing-servers
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
     ports:
       - "3001:3001"  # book-planning
@@ -71,6 +93,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     volumes:
       - ${MCP_WRITING_SERVERS_DIR}:/app
       - /app/node_modules
