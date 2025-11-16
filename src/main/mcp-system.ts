@@ -15,6 +15,7 @@ import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
+import * as pgbouncerConfig from './pgbouncer-config';
 import { checkDockerRunning } from './prerequisites';
 
 const execAsync = promisify(exec);
@@ -583,6 +584,25 @@ export async function startMCPSystem(
     }
 
     await prepareMCPConfiguration();
+
+    // Generate PgBouncer configuration files
+    if (progressCallback) {
+      progressCallback({
+        message: 'Generating PgBouncer configuration...',
+        percent: 13,
+        step: 'pgbouncer-config',
+        status: 'checking',
+      });
+    }
+
+    const config = await envConfig.loadEnvConfig();
+    const pgbouncerResult = await pgbouncerConfig.generatePgBouncerConfig(config);
+    if (!pgbouncerResult.success) {
+      logWithCategory('warn', LogCategory.DOCKER, `Failed to generate PgBouncer config: ${pgbouncerResult.error}`);
+      // Continue anyway - system might work without it
+    } else {
+      logWithCategory('info', LogCategory.DOCKER, 'PgBouncer configuration generated successfully');
+    }
 
     // Determine which services to start
     const services = await determineServicesToStart();
