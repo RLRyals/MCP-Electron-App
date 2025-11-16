@@ -38,18 +38,30 @@ This document explains how to fix the database connection errors you encountered
 Edit `/home/user/MCP-Electron-App/.env` and update these values:
 
 ```bash
-# Update this to where you cloned MCP-Writing-Servers
-MCP_WRITING_SERVERS_DIR=/path/to/your/MCP-Writing-Servers
+# MCP_WRITING_SERVERS_DIR - The Electron app automatically clones this repo to:
+# - Linux: ~/.config/mcp-electron-app/repositories/mcp-writing-servers
+# - macOS: ~/Library/Application Support/mcp-electron-app/repositories/mcp-writing-servers
+# - Windows: %APPDATA%\mcp-electron-app\repositories\mcp-writing-servers
+#
+# The default .env is already configured for Linux.
+# Only change this if you're using a different location or OS.
 
-# Set a secure password
+# REQUIRED: Set a secure password
 POSTGRES_PASSWORD=your_secure_password_here
 
-# Update TypingMind path if you have it
+# Optional: Update TypingMind path if you have it
 TYPING_MIND_DIR=/path/to/typingmind
 
-# Set a secure auth token
+# REQUIRED: Set a secure auth token
 MCP_AUTH_TOKEN=your-secure-token-here
 ```
+
+**Important Notes:**
+- The MCP-Writing-Servers repository is **automatically cloned** by the Electron app on first run
+- The `.env` file already points to the correct location for Linux: `~/.config/mcp-electron-app/repositories/mcp-writing-servers`
+- If the repo hasn't been cloned yet, you can either:
+  1. Run the Electron app first (it will clone it automatically), OR
+  2. Manually create the directory structure and clone it yourself
 
 ### Step 2: Run Setup Script
 
@@ -109,16 +121,40 @@ curl http://localhost:3001/health
 
 ### Issue: "MCP_WRITING_SERVERS_DIR not found"
 
-If you don't have the MCP-Writing-Servers repository yet:
+The Electron app automatically clones MCP-Writing-Servers on first run. If you want to use Docker services before running the Electron app:
 
+**Option 1: Run the Electron app first (Recommended)**
 ```bash
-# Clone it first
-git clone https://github.com/RLRyals/MCP-Writing-Servers.git /home/user/MCP-Writing-Servers
+# The app will automatically clone the repo to the correct location
+# Then start Docker services
+./setup-pgbouncer.sh
+docker-compose up -d
+```
 
-# Then update .env
-echo "MCP_WRITING_SERVERS_DIR=/home/user/MCP-Writing-Servers" >> .env
+**Option 2: Manually clone the repository**
+```bash
+# Create the directory structure
+mkdir -p ~/.config/mcp-electron-app/repositories
 
-# Run setup again
+# Clone the repo
+git clone https://github.com/RLRyals/MCP-Writing-Servers.git \
+  ~/.config/mcp-electron-app/repositories/mcp-writing-servers
+
+# The .env file is already configured with this path
+# Run setup
+./setup-pgbouncer.sh
+docker-compose up -d
+```
+
+**Option 3: Use a custom location**
+```bash
+# Clone it to any location you prefer
+git clone https://github.com/RLRyals/MCP-Writing-Servers.git /your/custom/path
+
+# Update .env with your custom path
+sed -i 's|MCP_WRITING_SERVERS_DIR=.*|MCP_WRITING_SERVERS_DIR=/your/custom/path|' .env
+
+# Run setup
 ./setup-pgbouncer.sh
 docker-compose up -d
 ```
