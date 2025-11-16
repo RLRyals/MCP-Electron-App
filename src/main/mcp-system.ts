@@ -673,9 +673,9 @@ export async function startMCPSystem(
     }
 
     try {
-      // Start postgres, mcp-connector, and mcp-writing-servers
+      // Start postgres, pgbouncer, mcp-connector, and mcp-writing-servers
       // Docker Compose will handle dependencies automatically
-      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'mcp-connector', 'mcp-writing-servers']);
+      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'pgbouncer', 'mcp-connector', 'mcp-writing-servers']);
       logWithCategory('info', LogCategory.DOCKER, 'Core services started');
     } catch (error: any) {
       logWithCategory('error', LogCategory.DOCKER, 'Failed to start core services', error);
@@ -722,7 +722,7 @@ export async function startMCPSystem(
 
             // Retry startup
             logWithCategory('info', LogCategory.DOCKER, `Retrying container startup (attempt ${attempt}/3)...`);
-            await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'mcp-connector', 'mcp-writing-servers']);
+            await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'pgbouncer', 'mcp-connector', 'mcp-writing-servers']);
             logWithCategory('info', LogCategory.DOCKER, `Core services started successfully after retry ${attempt}`);
             retrySuccess = true;
             break;
