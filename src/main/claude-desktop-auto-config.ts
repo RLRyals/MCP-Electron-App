@@ -49,17 +49,18 @@ export interface AutoConfigResult {
 /**
  * MCP server definitions
  * These are the 9 MCP servers that will be configured
+ * Each server runs in native stdio mode via docker exec
  */
 const MCP_SERVERS = [
-  { name: 'book-planning-server', displayName: 'Book Planning', port: 3001 },
-  { name: 'series-planning-server', displayName: 'Series Planning', port: 3002 },
-  { name: 'chapter-planning-server', displayName: 'Chapter Planning', port: 3003 },
-  { name: 'character-planning-server', displayName: 'Character Planning', port: 3004 },
-  { name: 'scene-server', displayName: 'Scene', port: 3005 },
-  { name: 'core-continuity-server', displayName: 'Core Continuity', port: 3006 },
-  { name: 'review-server', displayName: 'Review', port: 3007 },
-  { name: 'reporting-server', displayName: 'Reporting', port: 3008 },
-  { name: 'author-server', displayName: 'Author', port: 3009 },
+  { name: 'book-planning-server', displayName: 'Book Planning', entryPoint: '/app/src/config-mcps/book-planning-server/index.js' },
+  { name: 'series-planning-server', displayName: 'Series Planning', entryPoint: '/app/src/config-mcps/series-planning-server/index.js' },
+  { name: 'chapter-planning-server', displayName: 'Chapter Planning', entryPoint: '/app/src/config-mcps/chapter-planning-server/index.js' },
+  { name: 'character-planning-server', displayName: 'Character Planning', entryPoint: '/app/src/config-mcps/character-planning-server/index.js' },
+  { name: 'scene-server', displayName: 'Scene', entryPoint: '/app/src/config-mcps/scene-server/index.js' },
+  { name: 'core-continuity-server', displayName: 'Core Continuity', entryPoint: '/app/src/config-mcps/core-continuity-server/index.js' },
+  { name: 'review-server', displayName: 'Review', entryPoint: '/app/src/config-mcps/review-server/index.js' },
+  { name: 'reporting-server', displayName: 'Reporting', entryPoint: '/app/src/config-mcps/reporting-server/index.js' },
+  { name: 'author-server', displayName: 'Author', entryPoint: '/app/src/config-mcps/author-server/index.js' },
 ];
 
 /**
@@ -96,94 +97,48 @@ export function getClaudeDesktopConfigPath(): string {
 }
 
 /**
- * Get the path to Node.js executable
- * Uses the same Node.js that is running Electron
+ * Get the Docker executable command
+ * Returns 'docker' on all platforms, assumes it's in PATH
  */
-function getNodePath(): string {
-  // For Electron, process.execPath points to the Electron binary
-  // We need to find the Node.js binary instead
-
-  // Check if we're in development or production
-  if (process.env.NODE_ENV === 'development' || app.isPackaged === false) {
-    // In development, use the system Node.js
-    return process.platform === 'win32' ? 'node.exe' : 'node';
-  }
-
-  // In production, Node.js should be available in the system PATH
-  // or we can use the Electron's Node.js
-  return process.platform === 'win32' ? 'node.exe' : 'node';
+function getDockerCommand(): string {
+  return 'docker';
 }
 
 /**
  * Build Claude Desktop configuration for all MCP servers
- * Uses stdio protocol via TCP bridge (port 8888)
+ * Uses native stdio protocol via docker exec -i
+ * Each server runs independently with MCP_STDIO_MODE=true
  */
 export function buildClaudeDesktopConfig(): ClaudeDesktopConfig {
-  logWithCategory('info', LogCategory.SYSTEM, 'Building Claude Desktop configuration for stdio protocol...');
+  logWithCategory('info', LogCategory.SYSTEM, 'Building Claude Desktop configuration for native stdio protocol...');
 
-  const nodePath = getNodePath();
+  const dockerCommand = getDockerCommand();
   const config: ClaudeDesktopConfig = {
     mcpServers: {}
   };
 
-  // For Claude Desktop, we use the stdio adapter approach
-  // Each server gets configured to connect via stdio over TCP using socat or similar
-  // The bridge service (Task 4.2) runs on port 8888 and forwards to the appropriate MCP server
-
-  // Option 1: Using npx to run a stdio bridge for each server
-  // This assumes the stdio adapter is available as an npm package or locally
-
-  // Option 2: Using TCP-to-stdio bridge (simpler for users)
-  // We'll use this approach as it requires less setup from users
-
+  // Configure each of the 9 MCP servers for native stdio mode
+  // Each server appears separately in Claude Desktop, allowing users to enable/disable individually
+  // This provides token efficiency - users only load the servers they need for their current task
   for (const server of MCP_SERVERS) {
     config.mcpServers[server.displayName] = {
-      command: nodePath,
+      command: dockerCommand,
       args: [
+        'exec',
+        '-i',
         '-e',
-        // Inline Node.js script that connects to the TCP bridge and forwards stdio
-        `
-const net = require('net');
-const readline = require('readline');
-
-const client = net.createConnection({ port: 8888, host: 'localhost' }, () => {
-  console.error('Connected to MCP bridge for ${server.displayName}');
-});
-
-// Forward stdin to TCP socket
-process.stdin.on('data', (data) => {
-  client.write(data);
-});
-
-// Forward TCP socket to stdout
-client.on('data', (data) => {
-  process.stdout.write(data);
-});
-
-client.on('error', (err) => {
-  console.error('Bridge connection error:', err.message);
-  process.exit(1);
-});
-
-client.on('end', () => {
-  console.error('Bridge connection closed');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  client.end();
-  process.exit(0);
-});
-        `.trim()
+        'MCP_STDIO_MODE=true',
+        'mcp-writing-servers',
+        'node',
+        server.entryPoint
       ],
       env: {
-        MCP_SERVER: server.name.replace('-server', ''),
-        MCP_SERVER_PORT: server.port.toString()
+        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:6432/writing_db?sslmode=disable'
       }
     };
   }
 
-  logWithCategory('info', LogCategory.SYSTEM, `Configured ${Object.keys(config.mcpServers).length} MCP servers for Claude Desktop`);
+  logWithCategory('info', LogCategory.SYSTEM, `Configured ${Object.keys(config.mcpServers).length} MCP servers for Claude Desktop with native stdio`);
 
   return config;
 }
@@ -470,35 +425,45 @@ Setup Instructions:
 
 1. Ensure Docker Services Are Running
    - The MCP servers must be running in Docker
-   - The Claude Desktop bridge service must be running on port 8888
    - Start services: docker-compose up -d
+   - Verify container is running: docker ps | grep mcp-writing-servers
 
 2. Auto-Configure (Recommended)
    - Click the "Auto-Configure Claude Desktop" button in the app
    - This will create/update the config file automatically
-   - All ${ourServerCount} MCP servers will be configured
+   - All ${ourServerCount} MCP servers will be configured with native stdio
 
 3. Manual Configuration (If Needed)
    - Edit: ${configPath}
    - Follow Claude Desktop's MCP documentation
-   - Each server uses stdio protocol over TCP bridge
+   - Each server uses native stdio protocol via docker exec
 
 4. Restart Claude Desktop
    - Close Claude Desktop completely
    - Reopen Claude Desktop
    - MCP servers should be available in the tools menu
 
+5. Enable/Disable Servers for Token Efficiency
+   - Each server appears separately in Claude Desktop settings
+   - Enable only the servers you need for your current task
+   - Examples:
+     * Writing a chapter: Enable "Scene", "Character Planning", "Core Continuity"
+     * Planning a book: Enable "Book Planning", "Series Planning"
+     * Reviewing: Enable "Review", "Chapter Planning"
+   - This reduces tokens in context during long conversations
+
 Available MCP Servers:
-${MCP_SERVERS.map((s, i) => `${i + 1}. ${s.displayName} (port ${s.port})`).join('\n')}
+${MCP_SERVERS.map((s, i) => `${i + 1}. ${s.displayName}`).join('\n')}
 
 Requirements:
-- Docker must be running with all MCP services
-- Port 8888 must be accessible (Claude Desktop bridge)
-- Node.js must be available in system PATH
+- Docker must be running with mcp-writing-servers container
+- Docker must be accessible from command line
+- Database must be accessible from container
 
 Troubleshooting:
-- If servers don't appear, check Docker logs: docker-compose logs
-- Verify bridge is running: docker-compose ps claude-bridge
+- If servers don't appear, check Docker logs: docker-compose logs mcp-writing-servers
+- Verify container is running: docker ps
+- Test docker exec: docker exec -i mcp-writing-servers node --version
 - Check Claude Desktop logs for connection errors
 - Ensure config file has correct JSON format
 
