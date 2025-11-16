@@ -198,6 +198,35 @@ interface PortConflictResult {
   conflicts: number[];
 }
 
+interface BackupResult {
+  success: boolean;
+  message: string;
+  path?: string;
+  size?: number;
+  error?: string;
+}
+
+interface RestoreResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+interface BackupMetadata {
+  filename: string;
+  path: string;
+  createdAt: string;
+  size: number;
+  database: string;
+  compressed: boolean;
+}
+
+interface ListBackupsResult {
+  success: boolean;
+  backups: BackupMetadata[];
+  error?: string;
+}
+
 interface ElectronAPI {
   ping: () => Promise<string>;
   getAppVersion: () => Promise<string>;
@@ -275,6 +304,16 @@ interface ElectronAPI {
     getWorkingDirectory: () => Promise<string>;
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
     removeProgressListener: () => void;
+  };
+  databaseBackup: {
+    create: (customPath?: string, compressed?: boolean) => Promise<BackupResult>;
+    restore: (backupPath: string, dropExisting?: boolean) => Promise<RestoreResult>;
+    list: () => Promise<ListBackupsResult>;
+    delete: (backupPath: string) => Promise<BackupResult>;
+    selectSaveLocation: () => Promise<string | null>;
+    selectRestoreFile: () => Promise<string | null>;
+    getDirectory: () => Promise<string>;
+    openDirectory: () => Promise<void>;
   };
   typingMind: {
     autoConfigure: () => Promise<any>;
