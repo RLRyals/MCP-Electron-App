@@ -1467,6 +1467,7 @@
                     <button id="dashboard-restart-system" class="action-button" title="Stop and restart all MCP services (useful for troubleshooting)">Restart System</button>
                     <button id="dashboard-open-typing-mind" class="action-button secondary" title="Open Typing Mind web interface in your default browser">Open Typing Mind</button>
                     <button id="dashboard-configure-typing-mind" class="action-button secondary" title="Automatically configure Typing Mind with MCP Connector settings">Configure Typing Mind</button>
+                    <button id="dashboard-configure-claude-desktop" class="action-button secondary" title="Configure Claude Desktop with native stdio MCP servers">Configure Claude Desktop</button>
                     <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh the status of all services and update the dashboard">🔄</button>
                 </div>
             </div>
@@ -1660,51 +1661,6 @@
             <div class="client-selection-status" id="client-selection-status"></div>
         </div>
 
-        <!-- Claude Desktop Configuration -->
-        <div class="client-selection-card" id="claude-desktop-config-card">
-            <h2>Claude Desktop Configuration</h2>
-            <p>
-                Configure Claude Desktop to use your MCP servers with ultra-low latency stdio protocol (1-5ms response time).
-            </p>
-
-            <div class="config-status" id="claude-desktop-status" style="display: block; margin: 20px 0;">
-                <strong>Status:</strong> <span id="claude-desktop-status-text">Checking...</span>
-            </div>
-
-            <div class="client-selection-actions" style="margin-top: 20px;">
-                <button id="claude-desktop-auto-config-btn" class="primary" title="Automatically configure Claude Desktop with all 9 MCP servers">
-                    Auto-Configure Claude Desktop
-                </button>
-
-                <button id="claude-desktop-open-folder-btn" title="Open the folder containing Claude Desktop configuration file">
-                    Open Config Folder
-                </button>
-
-                <button id="claude-desktop-reset-btn" style="display: none;" title="Remove MCP server configuration from Claude Desktop">
-                    Reset Configuration
-                </button>
-            </div>
-
-            <div class="config-status" id="claude-desktop-info-box" style="display: block; margin-top: 20px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);">
-                <h3 style="font-size: 1.1rem; margin-bottom: 10px;">What this does:</h3>
-                <ul style="margin-left: 20px; line-height: 1.6;">
-                    <li>Creates Claude Desktop config file at the correct platform-specific location</li>
-                    <li>Configures all 9 MCP servers for stdio access</li>
-                    <li>Uses ultra-low latency connection (1-5ms response time)</li>
-                    <li>Enables seamless integration with Claude Desktop app</li>
-                </ul>
-
-                <p style="margin-top: 15px;">
-                    <strong>Note:</strong> Claude Desktop must be installed separately.
-                    <a href="#" id="claude-desktop-download-link" style="color: #4caf50; text-decoration: underline;" title="Download Claude Desktop from official website">Download Claude Desktop</a>
-                </p>
-            </div>
-
-            <div class="config-status" id="claude-desktop-config-preview" style="display: none; margin-top: 20px; background: rgba(0, 0, 0, 0.3);">
-                <h3 style="font-size: 1.1rem; margin-bottom: 10px;">Configuration Preview:</h3>
-                <pre style="background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.85rem;"><code id="claude-desktop-config-content"></code></pre>
-            </div>
-        </div>
 
         <div class="env-config-card">
             <h2>Environment Configuration</h2>
