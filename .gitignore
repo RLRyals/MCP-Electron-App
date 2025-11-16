@@ -44,6 +44,9 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# PgBouncer userlist (contains password hashes)
+userlist.txt
+
 # Temporary files
 *.tmp
 *.temp
