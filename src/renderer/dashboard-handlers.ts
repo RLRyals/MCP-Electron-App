@@ -106,6 +106,11 @@ function setupDashboardListeners(): void {
     configureTypingMindBtn.addEventListener('click', handleConfigureTypingMind);
   }
 
+  const configureClaudeDesktopBtn = document.getElementById('dashboard-configure-claude-desktop');
+  if (configureClaudeDesktopBtn) {
+    configureClaudeDesktopBtn.addEventListener('click', handleConfigureClaudeDesktop);
+  }
+
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => updateSystemStatus());
   }
@@ -707,6 +712,24 @@ async function handleConfigureTypingMind(): Promise<void> {
 }
 
 /**
+ * Handle Configure Claude Desktop action
+ * Shows popup dialog for Claude Desktop configuration
+ */
+async function handleConfigureClaudeDesktop(): Promise<void> {
+  try {
+    // Get current configuration status
+    const isConfigured = await window.electronAPI.claudeDesktop.isConfigured();
+    const config = isConfigured ? await window.electronAPI.claudeDesktop.getConfig() : null;
+
+    // Show the configuration dialog
+    showClaudeDesktopDialog(isConfigured, config);
+  } catch (error) {
+    console.error('Error opening Claude Desktop configuration:', error);
+    showNotification('Failed to open configuration dialog', 'error');
+  }
+}
+
+/**
  * Handle View Logs action
  */
 async function handleViewLogs(serviceName: string): Promise<void> {
@@ -928,6 +951,168 @@ function showConfigurationDialog(config: any, mcpServersJSON: string): void {
       }
     });
   });
+}
+
+/**
+ * Show Claude Desktop configuration dialog
+ */
+function showClaudeDesktopDialog(isConfigured: boolean, config: any): void {
+  const dialog = document.createElement('div');
+  dialog.className = 'logs-dialog'; // Reuse logs dialog styles
+
+  const serverCount = config ? Object.keys(config.mcpServers || {}).length : 0;
+
+  dialog.innerHTML = `
+    <div class="logs-dialog-backdrop"></div>
+    <div class="logs-dialog-content" style="max-width: 700px;">
+      <div class="logs-dialog-header">
+        <h3>${isConfigured ? '✓ ' : ''}Claude Desktop Configuration</h3>
+        <button class="logs-dialog-close">×</button>
+      </div>
+      <div class="logs-dialog-body">
+        <div style="margin-bottom: 20px;">
+          <div style="padding: 15px; background: ${isConfigured ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 152, 0, 0.2)'}; border: 1px solid ${isConfigured ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 152, 0, 0.5)'}; border-radius: 10px; margin-bottom: 20px;">
+            <strong>Status:</strong> ${isConfigured ? `✓ Configured (${serverCount} servers)` : 'Not Configured'}
+          </div>
+
+          ${isConfigured ? `
+            <div style="margin-bottom: 20px;">
+              <h4>Configuration Preview:</h4>
+              <div style="max-height: 200px; overflow-y: auto; background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px;">
+                <pre style="margin: 0; font-family: monospace; font-size: 0.85em; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(JSON.stringify(config, null, 2))}</pre>
+              </div>
+            </div>
+          ` : ''}
+
+          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <button id="claude-desktop-auto-config-btn" class="logs-dialog-copy" style="flex: 1; min-width: 150px;">
+              ${isConfigured ? 'Reconfigure' : 'Auto-Configure'}
+            </button>
+            <button id="claude-desktop-open-folder-btn" class="logs-dialog-copy" style="flex: 1; min-width: 150px;">
+              Open Config Folder
+            </button>
+            ${isConfigured ? `
+              <button id="claude-desktop-reset-btn" class="logs-dialog-copy" style="flex: 1; min-width: 150px; background: rgba(244, 67, 54, 0.3); border-color: rgba(244, 67, 54, 0.5);">
+                Reset Configuration
+              </button>
+            ` : ''}
+          </div>
+
+          <div style="padding: 15px; background: rgba(0, 150, 255, 0.2); border-left: 3px solid rgba(0, 150, 255, 0.5); border-radius: 4px;">
+            <h4 style="margin-top: 0;">What this does:</h4>
+            <ul style="line-height: 1.8; margin-bottom: 10px;">
+              <li>Creates Claude Desktop config file at the correct platform-specific location</li>
+              <li>Configures all 9 MCP servers for stdio access</li>
+              <li>Uses ultra-low latency connection (1-5ms response time)</li>
+              <li>Enables seamless integration with Claude Desktop app</li>
+            </ul>
+            <p style="margin-bottom: 0;">
+              <strong>Note:</strong> Claude Desktop must be installed separately.
+              <a href="#" id="claude-desktop-download-link" style="color: #4caf50; text-decoration: underline;">Download Claude Desktop</a>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="logs-dialog-footer">
+        <button class="logs-dialog-close-btn">Close</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Add event listeners for close buttons
+  const closeButtons = dialog.querySelectorAll('.logs-dialog-close, .logs-dialog-close-btn');
+  closeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  });
+
+  // Auto-configure button
+  const autoConfigBtn = dialog.querySelector('#claude-desktop-auto-config-btn');
+  if (autoConfigBtn) {
+    autoConfigBtn.addEventListener('click', async () => {
+      try {
+        (autoConfigBtn as HTMLButtonElement).disabled = true;
+        (autoConfigBtn as HTMLButtonElement).textContent = 'Configuring...';
+
+        showNotification('Configuring Claude Desktop...', 'info');
+
+        const result = await window.electronAPI.claudeDesktop.autoConfigure();
+
+        if (result.success) {
+          showNotification('Claude Desktop configured successfully!', 'success');
+          // Close and reopen dialog to show updated status
+          document.body.removeChild(dialog);
+          const newConfig = await window.electronAPI.claudeDesktop.getConfig();
+          showClaudeDesktopDialog(true, newConfig);
+        } else {
+          showNotification('Configuration failed: ' + (result.error || 'Unknown error'), 'error');
+          (autoConfigBtn as HTMLButtonElement).disabled = false;
+          (autoConfigBtn as HTMLButtonElement).textContent = isConfigured ? 'Reconfigure' : 'Auto-Configure';
+        }
+      } catch (error) {
+        console.error('Error auto-configuring Claude Desktop:', error);
+        showNotification('Failed to configure Claude Desktop', 'error');
+        (autoConfigBtn as HTMLButtonElement).disabled = false;
+        (autoConfigBtn as HTMLButtonElement).textContent = isConfigured ? 'Reconfigure' : 'Auto-Configure';
+      }
+    });
+  }
+
+  // Open folder button
+  const openFolderBtn = dialog.querySelector('#claude-desktop-open-folder-btn');
+  if (openFolderBtn) {
+    openFolderBtn.addEventListener('click', async () => {
+      try {
+        await window.electronAPI.claudeDesktop.openConfigFolder();
+        showNotification('Opening config folder...', 'info');
+      } catch (error) {
+        console.error('Error opening config folder:', error);
+        showNotification('Failed to open config folder', 'error');
+      }
+    });
+  }
+
+  // Reset button
+  const resetBtn = dialog.querySelector('#claude-desktop-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to reset Claude Desktop configuration? This will remove all MCP server settings.')) {
+        return;
+      }
+
+      try {
+        showNotification('Resetting configuration...', 'info');
+
+        const result = await window.electronAPI.claudeDesktop.resetConfig();
+
+        if (result.success) {
+          showNotification('Configuration reset successfully', 'success');
+          // Close and reopen dialog to show updated status
+          document.body.removeChild(dialog);
+          showClaudeDesktopDialog(false, null);
+        } else {
+          showNotification('Reset failed: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error resetting Claude Desktop config:', error);
+        showNotification('Failed to reset configuration', 'error');
+      }
+    });
+  }
+
+  // Download link
+  const downloadLink = dialog.querySelector('#claude-desktop-download-link');
+  if (downloadLink) {
+    downloadLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = 'https://claude.ai/download';
+      window.open(url, '_blank');
+      showNotification('Opening Claude Desktop download page...', 'info');
+    });
+  }
 }
 
 /**
