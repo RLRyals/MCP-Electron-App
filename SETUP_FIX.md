@@ -33,9 +33,16 @@ This document explains how to fix the database connection errors you encountered
 
 ## Setup Instructions
 
-### Step 1: Update .env File
+### Step 1: Create and Configure .env File
 
-Edit `/home/user/MCP-Electron-App/.env` and update these values:
+First, create your `.env` file from the example:
+
+```bash
+cd /home/user/MCP-Electron-App
+cp .env.example .env
+```
+
+Then edit `.env` and update these values:
 
 ```bash
 # MCP_WRITING_SERVERS_DIR - The Electron app automatically clones this repo to:
