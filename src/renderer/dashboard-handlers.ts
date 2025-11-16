@@ -85,6 +85,10 @@ function setupDashboardListeners(): void {
   const openTypingMindBtn = document.getElementById('dashboard-open-typing-mind');
   const configureTypingMindBtn = document.getElementById('dashboard-configure-typing-mind');
   const refreshBtn = document.getElementById('dashboard-refresh-status');
+  const backupDbBtn = document.getElementById('dashboard-backup-database');
+  const restoreDbBtn = document.getElementById('dashboard-restore-database');
+  const manageBackupsBtn = document.getElementById('dashboard-manage-backups');
+  const openBackupFolderBtn = document.getElementById('dashboard-open-backup-folder');
 
   if (startBtn) {
     startBtn.addEventListener('click', handleStartSystem);
@@ -113,6 +117,22 @@ function setupDashboardListeners(): void {
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => updateSystemStatus());
+  }
+
+  if (backupDbBtn) {
+    backupDbBtn.addEventListener('click', handleBackupDatabase);
+  }
+
+  if (restoreDbBtn) {
+    restoreDbBtn.addEventListener('click', handleRestoreDatabase);
+  }
+
+  if (manageBackupsBtn) {
+    manageBackupsBtn.addEventListener('click', handleManageBackups);
+  }
+
+  if (openBackupFolderBtn) {
+    openBackupFolderBtn.addEventListener('click', handleOpenBackupFolder);
   }
 
   // Service card actions
@@ -1177,6 +1197,250 @@ function showNotification(message: string, type: 'success' | 'error' | 'info' = 
       }
     }, 300);
   }, 3000);
+}
+
+/**
+ * Handle Backup Database action
+ */
+async function handleBackupDatabase(): Promise<void> {
+  try {
+    // Ask user if they want to choose a custom location
+    const useCustomLocation = confirm('Would you like to choose where to save the backup?\n\nClick OK to choose a location, or Cancel to use the default backup folder.');
+
+    let customPath: string | null = null;
+    if (useCustomLocation) {
+      customPath = await window.electronAPI.databaseBackup.selectSaveLocation();
+      if (!customPath) {
+        // User cancelled the file dialog
+        return;
+      }
+    }
+
+    showNotification('Creating database backup...', 'info');
+
+    const result = await window.electronAPI.databaseBackup.create(customPath || undefined, true);
+
+    if (result.success) {
+      const sizeInMB = result.size ? (result.size / (1024 * 1024)).toFixed(2) : '?';
+      showNotification(`Backup created successfully! (${sizeInMB} MB)`, 'success');
+    } else {
+      showNotification(`Failed to create backup: ${result.error || result.message}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    showNotification('Failed to create database backup', 'error');
+  }
+}
+
+/**
+ * Handle Restore Database action
+ */
+async function handleRestoreDatabase(): Promise<void> {
+  try {
+    // Warn user about restore operation
+    if (!confirm('WARNING: Restoring a database backup will replace all current data.\n\nMake sure you have a recent backup of your current data before proceeding.\n\nDo you want to continue?')) {
+      return;
+    }
+
+    // Ask user to select a backup file
+    const backupPath = await window.electronAPI.databaseBackup.selectRestoreFile();
+    if (!backupPath) {
+      // User cancelled the file dialog
+      return;
+    }
+
+    // Ask if they want to drop the existing database
+    const dropExisting = confirm('Do you want to completely replace the existing database?\n\nClick OK to drop and recreate the database (recommended for clean restore).\nClick Cancel to merge the backup with existing data.');
+
+    showNotification('Restoring database... This may take a few minutes.', 'info');
+
+    const result = await window.electronAPI.databaseBackup.restore(backupPath, dropExisting);
+
+    if (result.success) {
+      showNotification('Database restored successfully!', 'success');
+      // Refresh system status after restore
+      await updateSystemStatus();
+    } else {
+      showNotification(`Failed to restore database: ${result.error || result.message}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error restoring database:', error);
+    showNotification('Failed to restore database', 'error');
+  }
+}
+
+/**
+ * Handle Manage Backups action
+ */
+async function handleManageBackups(): Promise<void> {
+  try {
+    showNotification('Loading backups...', 'info');
+
+    const result = await window.electronAPI.databaseBackup.list();
+
+    if (!result.success) {
+      showNotification(`Failed to load backups: ${result.error}`, 'error');
+      return;
+    }
+
+    showBackupsDialog(result.backups);
+  } catch (error) {
+    console.error('Error loading backups:', error);
+    showNotification('Failed to load backups', 'error');
+  }
+}
+
+/**
+ * Handle Open Backup Folder action
+ */
+async function handleOpenBackupFolder(): Promise<void> {
+  try {
+    await window.electronAPI.databaseBackup.openDirectory();
+    showNotification('Opening backup folder...', 'info');
+  } catch (error) {
+    console.error('Error opening backup folder:', error);
+    showNotification('Failed to open backup folder', 'error');
+  }
+}
+
+/**
+ * Show backups management dialog
+ */
+function showBackupsDialog(backups: any[]): void {
+  const dialog = document.createElement('div');
+  dialog.className = 'logs-dialog'; // Reuse logs dialog styles
+
+  const backupDirectory = backups.length > 0 ? backups[0].path.substring(0, backups[0].path.lastIndexOf('/')) : 'N/A';
+
+  let backupsHTML = '';
+  if (backups.length === 0) {
+    backupsHTML = '<p style="text-align: center; padding: 20px; opacity: 0.7;">No backups found</p>';
+  } else {
+    backupsHTML = backups.map(backup => {
+      const createdDate = new Date(backup.createdAt);
+      const sizeInMB = (backup.size / (1024 * 1024)).toFixed(2);
+      const isCompressed = backup.compressed ? '(Compressed)' : '(Plain SQL)';
+
+      return `
+        <div class="backup-item" style="padding: 15px; margin-bottom: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(backup.filename)}</div>
+              <div style="font-size: 0.9em; opacity: 0.8;">
+                ${createdDate.toLocaleString()} • ${sizeInMB} MB ${isCompressed}
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="backup-restore-btn" data-path="${escapeHtml(backup.path)}" style="padding: 8px 16px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Restore
+              </button>
+              <button class="backup-delete-btn" data-path="${escapeHtml(backup.path)}" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  dialog.innerHTML = `
+    <div class="logs-dialog-backdrop"></div>
+    <div class="logs-dialog-content" style="max-width: 800px; max-height: 80vh;">
+      <div class="logs-dialog-header">
+        <h3>Manage Database Backups</h3>
+        <button class="logs-dialog-close">×</button>
+      </div>
+      <div class="logs-dialog-body" style="max-height: 500px; overflow-y: auto;">
+        <div style="margin-bottom: 20px; padding: 15px; background: rgba(0, 150, 255, 0.2); border-left: 3px solid rgba(0, 150, 255, 0.5); border-radius: 4px;">
+          <strong>Backup Directory:</strong> ${escapeHtml(backupDirectory || 'N/A')}
+        </div>
+        ${backupsHTML}
+      </div>
+      <div class="logs-dialog-footer">
+        <button id="backups-create-new" class="logs-dialog-copy">Create New Backup</button>
+        <button class="logs-dialog-close-btn">Close</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Add event listeners for close buttons
+  const closeButtons = dialog.querySelectorAll('.logs-dialog-close, .logs-dialog-close-btn');
+  closeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  });
+
+  // Add event listener for create new backup button
+  const createNewBtn = dialog.querySelector('#backups-create-new');
+  if (createNewBtn) {
+    createNewBtn.addEventListener('click', async () => {
+      document.body.removeChild(dialog);
+      await handleBackupDatabase();
+    });
+  }
+
+  // Add event listeners for restore buttons
+  const restoreButtons = dialog.querySelectorAll('.backup-restore-btn');
+  restoreButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const backupPath = btn.getAttribute('data-path');
+      if (!backupPath) return;
+
+      // Confirm restore
+      if (!confirm('Are you sure you want to restore this backup?\n\nThis will replace all current database data.')) {
+        return;
+      }
+
+      document.body.removeChild(dialog);
+      showNotification('Restoring database...', 'info');
+
+      try {
+        const result = await window.electronAPI.databaseBackup.restore(backupPath, false);
+        if (result.success) {
+          showNotification('Database restored successfully!', 'success');
+          await updateSystemStatus();
+        } else {
+          showNotification(`Failed to restore: ${result.error || result.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('Error restoring backup:', error);
+        showNotification('Failed to restore backup', 'error');
+      }
+    });
+  });
+
+  // Add event listeners for delete buttons
+  const deleteButtons = dialog.querySelectorAll('.backup-delete-btn');
+  deleteButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const backupPath = btn.getAttribute('data-path');
+      if (!backupPath) return;
+
+      // Confirm deletion
+      if (!confirm('Are you sure you want to delete this backup?\n\nThis action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.databaseBackup.delete(backupPath);
+        if (result.success) {
+          showNotification('Backup deleted successfully', 'success');
+          // Refresh the dialog
+          document.body.removeChild(dialog);
+          await handleManageBackups();
+        } else {
+          showNotification(`Failed to delete backup: ${result.error || result.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting backup:', error);
+        showNotification('Failed to delete backup', 'error');
+      }
+    });
+  });
 }
 
 /**

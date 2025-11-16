@@ -18,6 +18,7 @@ import * as clientSelection from './client-selection';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
+import * as databaseBackup from './database-backup';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import * as migrations from './migrations';
@@ -893,6 +894,46 @@ function setupIPC(): void {
 
   ipcMain.handle('mcp-system:working-directory', async () => {
     return mcpSystem.getMCPWorkingDirectoryPath();
+  });
+
+  // Database Backup/Restore IPC handlers
+  ipcMain.handle('database-backup:create', async (_, customPath?: string, compressed?: boolean) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Creating database backup...');
+    return await databaseBackup.createBackup(customPath, compressed);
+  });
+
+  ipcMain.handle('database-backup:restore', async (_, backupPath: string, dropExisting?: boolean) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Restoring database from ${backupPath}...`);
+    return await databaseBackup.restoreBackup(backupPath, dropExisting);
+  });
+
+  ipcMain.handle('database-backup:list', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing available backups...');
+    return await databaseBackup.listBackups();
+  });
+
+  ipcMain.handle('database-backup:delete', async (_, backupPath: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting backup ${backupPath}...`);
+    return await databaseBackup.deleteBackup(backupPath);
+  });
+
+  ipcMain.handle('database-backup:select-save-location', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Showing save dialog for backup...');
+    return await databaseBackup.selectBackupSaveLocation();
+  });
+
+  ipcMain.handle('database-backup:select-restore-file', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Showing open dialog for restore...');
+    return await databaseBackup.selectBackupFileForRestore();
+  });
+
+  ipcMain.handle('database-backup:get-directory', async () => {
+    return databaseBackup.getBackupDirectoryPath();
+  });
+
+  ipcMain.handle('database-backup:open-directory', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening backup directory...');
+    return await databaseBackup.openBackupDirectory();
   });
 
   // Updater IPC handlers

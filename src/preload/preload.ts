@@ -392,6 +392,47 @@ interface PortConflictResult {
 }
 
 /**
+ * Database backup result
+ */
+interface BackupResult {
+  success: boolean;
+  message: string;
+  path?: string;
+  size?: number;
+  error?: string;
+}
+
+/**
+ * Database restore result
+ */
+interface RestoreResult {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+/**
+ * Backup metadata
+ */
+interface BackupMetadata {
+  filename: string;
+  path: string;
+  createdAt: string;
+  size: number;
+  database: string;
+  compressed: boolean;
+}
+
+/**
+ * List backups result
+ */
+interface ListBackupsResult {
+  success: boolean;
+  backups: BackupMetadata[];
+  error?: string;
+}
+
+/**
  * Update info for a component
  */
 interface UpdateInfo {
@@ -1273,6 +1314,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     removeProgressListener: (): void => {
       ipcRenderer.removeAllListeners('mcp-system:progress');
+    },
+  },
+
+  /**
+   * Database Backup/Restore API
+   */
+  databaseBackup: {
+    /**
+     * Create a database backup
+     */
+    create: (customPath?: string, compressed?: boolean): Promise<BackupResult> => {
+      return ipcRenderer.invoke('database-backup:create', customPath, compressed);
+    },
+
+    /**
+     * Restore database from a backup file
+     */
+    restore: (backupPath: string, dropExisting?: boolean): Promise<RestoreResult> => {
+      return ipcRenderer.invoke('database-backup:restore', backupPath, dropExisting);
+    },
+
+    /**
+     * List all available backups
+     */
+    list: (): Promise<ListBackupsResult> => {
+      return ipcRenderer.invoke('database-backup:list');
+    },
+
+    /**
+     * Delete a backup file
+     */
+    delete: (backupPath: string): Promise<BackupResult> => {
+      return ipcRenderer.invoke('database-backup:delete', backupPath);
+    },
+
+    /**
+     * Show file picker to select backup save location
+     */
+    selectSaveLocation: (): Promise<string | null> => {
+      return ipcRenderer.invoke('database-backup:select-save-location');
+    },
+
+    /**
+     * Show file picker to select backup file for restore
+     */
+    selectRestoreFile: (): Promise<string | null> => {
+      return ipcRenderer.invoke('database-backup:select-restore-file');
+    },
+
+    /**
+     * Get backup directory path
+     */
+    getDirectory: (): Promise<string> => {
+      return ipcRenderer.invoke('database-backup:get-directory');
+    },
+
+    /**
+     * Open backup directory in file explorer
+     */
+    openDirectory: (): Promise<void> => {
+      return ipcRenderer.invoke('database-backup:open-directory');
     },
   },
 
