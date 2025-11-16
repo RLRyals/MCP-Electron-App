@@ -595,7 +595,6 @@ export async function startMCPSystem(
       });
     }
 
-    const config = await envConfig.loadEnvConfig();
     const pgbouncerResult = await pgbouncerConfig.generatePgBouncerConfig(config);
     if (!pgbouncerResult.success) {
       logWithCategory('warn', LogCategory.DOCKER, `Failed to generate PgBouncer config: ${pgbouncerResult.error}`);
