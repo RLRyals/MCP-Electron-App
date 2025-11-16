@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
-    <title>MCP Electron App</title>
+    <title>FictionLab</title>
     <style>
         * {
             margin: 0;
@@ -1432,8 +1432,8 @@
 </head>
 <body>
     <header>
-        <h1>MCP Electron App</h1>
-        <p class="subtitle">Model Context Protocol Integration</p>
+        <h1>FictionLab</h1>
+        <p class="subtitle">Your AI-Powered Writing Laboratory</p>
     </header>
 
     <main>
@@ -1441,7 +1441,7 @@
 
         <div class="dashboard-card" id="dashboard-card">
             <div class="dashboard-header">
-                <h2>MCP Writing System</h2>
+                <h2>Writing System</h2>
                 <div class="dashboard-status">
                     <div id="dashboard-status-indicator" class="status-indicator status-red">
                         <span class="status-dot"></span>
@@ -1462,12 +1462,12 @@
             <div class="dashboard-section">
                 <h3>Quick Actions</h3>
                 <div class="dashboard-actions">
-                    <button id="dashboard-start-system" class="action-button primary" title="Start all MCP services including PostgreSQL database and MCP Servers">Start System</button>
-                    <button id="dashboard-stop-system" class="action-button" title="Gracefully shut down all running MCP services">Stop System</button>
-                    <button id="dashboard-restart-system" class="action-button" title="Stop and restart all MCP services (useful for troubleshooting)">Restart System</button>
+                    <button id="dashboard-start-system" class="action-button primary" title="Start all services including PostgreSQL database and context servers">Start System</button>
+                    <button id="dashboard-stop-system" class="action-button" title="Gracefully shut down all running services">Stop System</button>
+                    <button id="dashboard-restart-system" class="action-button" title="Stop and restart all services (useful for troubleshooting)">Restart System</button>
                     <button id="dashboard-open-typing-mind" class="action-button secondary" title="Open Typing Mind web interface in your default browser">Open Typing Mind</button>
-                    <button id="dashboard-configure-typing-mind" class="action-button secondary" title="Automatically configure Typing Mind with MCP Connector settings">Configure Typing Mind</button>
-                    <button id="dashboard-configure-claude-desktop" class="action-button secondary" title="Configure Claude Desktop with native stdio MCP servers">Configure Claude Desktop</button>
+                    <button id="dashboard-configure-typing-mind" class="action-button secondary" title="Automatically configure Typing Mind with connector settings">Configure Typing Mind</button>
+                    <button id="dashboard-configure-claude-desktop" class="action-button secondary" title="Configure Claude Desktop with native stdio servers">Configure Claude Desktop</button>
                     <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh the status of all services and update the dashboard">🔄</button>
                 </div>
             </div>
@@ -1501,7 +1501,7 @@
                                 <span id="mcp-servers-status-icon" class="service-status-icon">
                                     <span class="status-dot status-red"></span>
                                 </span>
-                                <h4>MCP Servers</h4>
+                                <h4>Context Servers</h4>
                             </div>
                             <span id="mcp-servers-status-text" class="service-status">Offline</span>
                         </div>
@@ -1509,7 +1509,7 @@
                             <div class="service-info">
                                 <span class="service-detail">Version: latest</span>
                             </div>
-                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers" title="View recent MCP Servers logs for troubleshooting">View Logs</button>
+                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers" title="View recent context server logs for troubleshooting">View Logs</button>
                         </div>
                     </div>
 
@@ -1520,7 +1520,7 @@
                                 <span id="mcp-connector-status-icon" class="service-status-icon">
                                     <span class="status-dot status-red"></span>
                                 </span>
-                                <h4>MCP Connector</h4>
+                                <h4>Context Connector</h4>
                             </div>
                             <span id="mcp-connector-status-text" class="service-status">Offline</span>
                         </div>
@@ -1529,8 +1529,8 @@
                                 <span id="mcp-connector-port-display" class="service-detail">Port: 50880</span>
                             </div>
                             <div class="service-actions">
-                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector" title="View recent MCP Connector logs for troubleshooting">View Logs</button>
-                                <button class="service-action-btn copy-token-btn" title="Copy the MCP authentication token to clipboard for configuring Claude Desktop">Copy Token</button>
+                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector" title="View recent connector logs for troubleshooting">View Logs</button>
+                                <button class="service-action-btn copy-token-btn" title="Copy the authentication token to clipboard for configuring Claude Desktop">Copy Token</button>
                             </div>
                         </div>
                     </div>
@@ -1567,8 +1567,7 @@
         <div class="welcome-card">
             <h2>Welcome!</h2>
             <p>
-                This is a modern Electron application with TypeScript support, designed to integrate
-                the Model Context Protocol (MCP) for enhanced AI capabilities.
+                Your AI-powered writing workspace with advanced context management. FictionLab simplifies setup and management of your writing tools.
             </p>
 
             <div class="info-grid">
@@ -1599,7 +1598,7 @@
         <div class="prerequisites-card">
             <h2>Prerequisites Check</h2>
             <p style="margin-bottom: 20px; opacity: 0.9;">
-                Checking system prerequisites for MCP integration...
+                Checking system prerequisites...
             </p>
 
             <div class="prereq-grid">
@@ -1637,7 +1636,7 @@
         <div class="client-selection-card" id="client-selection-card">
             <h2>Client Selection</h2>
             <p>
-                Choose which MCP clients you'd like to install and configure. You can select one or both clients based on your needs.
+                Choose which AI clients you'd like to install and configure. You can select one or both clients based on your needs.
             </p>
 
             <div class="client-selection-loading" id="client-selection-loading">
@@ -1665,7 +1664,7 @@
         <div class="env-config-card">
             <h2>Environment Configuration</h2>
             <p style="margin-bottom: 20px; opacity: 0.9;">
-                Configure environment variables for the MCP system. Settings will be saved to <code id="env-file-path">Loading...</code>
+                Configure environment variables for FictionLab. Settings will be saved to <code id="env-file-path">Loading...</code>
             </p>
 
             <form id="env-config-form">
@@ -1727,8 +1726,8 @@
 
                     <div class="form-group">
                         <label for="mcp-connector-port">
-                            MCP Connector Port
-                            <span class="tooltip" title="Port for MCP connector service (default: 50880)">ⓘ</span>
+                            Connector Port
+                            <span class="tooltip" title="Port for connector service (default: 50880)">ⓘ</span>
                         </label>
                         <div class="input-with-indicator">
                             <input type="number" id="mcp-connector-port" name="MCP_CONNECTOR_PORT" min="1024" max="65535" required>
@@ -1769,8 +1768,8 @@
 
                     <div class="form-group">
                         <label for="mcp-auth-token">
-                            MCP Auth Token
-                            <span class="tooltip" title="Authentication token for MCP (auto-generated)">ⓘ</span>
+                            Auth Token
+                            <span class="tooltip" title="Authentication token (auto-generated)">ⓘ</span>
                         </label>
                         <div class="input-with-buttons">
                             <input type="password" id="mcp-auth-token" name="MCP_AUTH_TOKEN" required>
@@ -1840,7 +1839,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2025 MCP Electron App | Built with Electron & TypeScript</p>
+        <p>&copy; 2025 FictionLab | Built with Electron & TypeScript</p>
     </footer>
 
     <script type="module" src="renderer.js"></script>

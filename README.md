@@ -1,10 +1,10 @@
-# MCP Electron App - One-Click Installer for MCP Writing System
+# FictionLab - Your AI-Powered Writing Laboratory
 
-A user-friendly desktop application that sets up and manages the MCP (Model Context Protocol) Writing System with AI capabilities. No terminal commands required - just download, install, and start writing with AI!
+A professional desktop application that sets up and manages an AI-powered writing workspace with advanced context management capabilities. No terminal commands required - just download, install, and start writing with AI!
 
 ## What Is This?
 
-The MCP Electron App is an installer and management tool that sets up everything you need to use the MCP Writing System with AI clients like Typing Mind or Claude Desktop. It handles all the technical setup automatically through an easy-to-use graphical interface.
+FictionLab is an installer and management tool that sets up everything you need to use an AI-powered writing system with clients like Typing Mind or Claude Desktop. It handles all the technical setup automatically through an easy-to-use graphical interface.
 
 **Perfect for:** Writers, researchers, students, professionals, or anyone who wants to use AI-powered writing tools without dealing with technical configuration.
 
@@ -20,37 +20,37 @@ The MCP Electron App is an installer and management tool that sets up everything
 
 Download the latest installer for your operating system from the [GitHub Releases](../../releases) page:
 
-- **Windows:** `MCP-Electron-App-Setup.exe` (Windows 10/11, 64-bit)
-- **macOS:** `MCP-Electron-App.dmg` (macOS 10.15+, Intel and Apple Silicon)
-- **Linux:** `MCP-Electron-App.AppImage` or `mcp-electron-app.deb` (Ubuntu 20.04+, Debian, other distros)
+- **Windows:** `FictionLab-Setup.exe` (Windows 10/11, 64-bit)
+- **macOS:** `FictionLab.dmg` (macOS 10.15+, Intel and Apple Silicon)
+- **Linux:** `FictionLab.AppImage` or `fictionlab.deb` (Ubuntu 20.04+, Debian, other distros)
 
 #### Installation Steps
 
 **Windows:**
-1. Download `MCP-Electron-App-Setup.exe`
+1. Download `FictionLab-Setup.exe`
 2. Double-click the installer
 3. Follow the installation wizard (choose installation folder if desired)
 4. Click "Install" and wait for completion
 5. Launch the app from your Start Menu or Desktop shortcut
 
 **macOS:**
-1. Download `MCP-Electron-App.dmg`
+1. Download `FictionLab.dmg`
 2. Open the downloaded DMG file
-3. Drag the MCP Electron App icon to your Applications folder
+3. Drag the FictionLab icon to your Applications folder
 4. Open from Applications (you may need to allow the app in Security & Privacy settings)
 
 **Linux:**
-1. Download `MCP-Electron-App.AppImage` or `mcp-electron-app.deb`
-2. For AppImage: Make it executable (`chmod +x MCP-Electron-App.AppImage`) and run it
-3. For .deb: Install with `sudo dpkg -i mcp-electron-app.deb`
+1. Download `FictionLab.AppImage` or `fictionlab.deb`
+2. For AppImage: Make it executable (`chmod +x FictionLab.AppImage`) and run it
+3. For .deb: Install with `sudo dpkg -i fictionlab.deb`
 4. Launch from your applications menu
 
 ### What the App Does For You
 
-The MCP Electron App automatically sets up and manages:
+FictionLab automatically sets up and manages:
 
-1. **PostgreSQL Database** - Stores your writing data and MCP context
-2. **MCP Servers** - Powers the AI integration and context management
+1. **PostgreSQL Database** - Stores your writing data and context
+2. **Context Servers** - Powers the AI integration and context management
 3. **Docker Containers** - Runs the database and servers (managed automatically)
 4. **AI Client Integration** - Connects with your choice of AI interface
 
@@ -64,7 +64,7 @@ All of this happens through the app's graphical interface - no configuration fil
 - No manual setup required
 - Runs in Docker (managed by the app)
 
-#### MCP Servers
+#### Context Servers
 - Pre-configured and ready to use
 - Automatic startup and health monitoring
 - Easy start/stop controls from the app
@@ -126,7 +126,7 @@ All of this happens through the app's graphical interface - no configuration fil
    - Downloading and setting up your chosen client(s)
 
 5. **Start Using!** - Once setup is complete:
-   - Click "Start Services" to launch the MCP system
+   - Click "Start Services" to launch FictionLab
    - Open your AI client (Typing Mind or Claude Desktop)
    - Begin writing with AI assistance
 
@@ -142,7 +142,7 @@ A: No! Those are only for developers who want to build the app from source. Regu
 A: The app will detect this and show you a step-by-step guide to install Docker Desktop. Just follow the on-screen instructions.
 
 **Q: How much does this cost?**
-A: The MCP Electron App is free and open-source. However, you may need:
+A: FictionLab is free and open-source. However, you may need:
 - Docker Desktop (free for personal use; a Docker Hub account is optional)
 - API credits for AI services (Claude, ChatGPT, etc.) depending on your chosen client
 
@@ -157,9 +157,9 @@ A: Yes! Just uninstall like any other application. Your data is stored separatel
 The first-time setup wizard guides you through every step, from checking prerequisites to choosing your AI client.
 
 ### System Dashboard
-Monitor the health of your MCP system at a glance:
+Monitor the health of your writing system at a glance:
 - PostgreSQL database status
-- MCP servers status
+- Context servers status
 - Docker container health
 - Quick start/stop controls
 
@@ -195,9 +195,9 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 **If you encounter issues:**
 
 1. **Check the App Logs**
-   - Windows: `%USERPROFILE%\AppData\Roaming\mcp-electron-app\logs`
-   - macOS: `~/Library/Logs/mcp-electron-app`
-   - Linux: `~/.config/mcp-electron-app/logs`
+   - Windows: `%USERPROFILE%\AppData\Roaming\fictionlab\logs`
+   - macOS: `~/Library/Logs/fictionlab`
+   - Linux: `~/.config/fictionlab/logs`
 
 2. **Review Prerequisites**
    - Ensure Docker Desktop is installed and running
@@ -215,7 +215,7 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 **The app says "Docker not running" - what do I do?**
 - Open Docker Desktop manually from your applications
 - Wait for it to fully start (the Docker icon should be steady, not spinning)
-- Click "Check Again" in the MCP Electron App
+- Click "Check Again" in FictionLab
 
 **Typing Mind won't download - why?**
 - Ensure Git is installed (the app can guide you through this)
@@ -227,14 +227,14 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 - Your data and configuration can be backed up and restored
 
 **Does this work offline after setup?**
-- The MCP system can run offline
+- FictionLab can run offline
 - However, AI clients need internet to communicate with AI services (Claude, ChatGPT, etc.)
 
 ---
 
 ## For Developers
 
-**The following section is ONLY for developers who want to build, modify, or contribute to the MCP Electron App itself. Regular users do NOT need to read this section.**
+**The following section is ONLY for developers who want to build, modify, or contribute to FictionLab itself. Regular users do NOT need to read this section.**
 
 ---
 
@@ -316,14 +316,14 @@ npm run package:all
 #### Build Outputs
 
 Built applications are placed in the `out/` directory:
-- **Windows:** `out/MCP Electron App Setup.exe`
-- **macOS:** `out/MCP Electron App.dmg`
-- **Linux:** `out/MCP Electron App.AppImage`, `out/mcp-electron-app.deb`
+- **Windows:** `out/FictionLab Setup.exe`
+- **macOS:** `out/FictionLab.dmg`
+- **Linux:** `out/FictionLab.AppImage`, `out/fictionlab.deb`
 
 ### Project Structure
 
 ```
-MCP-Electron-App/
+FictionLab/
 ├── config/                # Configuration files
 │   └── setup-config.json  # Build automation setup configuration
 ├── src/

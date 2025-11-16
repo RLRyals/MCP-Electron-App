@@ -1,5 +1,5 @@
 /**
- * Logging module for the MCP Electron App
+ * Logging module for FictionLab
  * Uses electron-log with custom configuration for log rotation and formatting
  */
 

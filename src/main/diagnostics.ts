@@ -126,7 +126,7 @@ export async function createDiagnosticReport(): Promise<string> {
     }
 
     // Create a README file
-    const readmeContent = `# MCP Electron App - Diagnostic Report
+    const readmeContent = `# FictionLab - Diagnostic Report
 
 Generated: ${new Date().toISOString()}
 

@@ -1,9 +1,9 @@
 {
-  "name": "mcp-electron-app",
+  "name": "fictionlab",
   "version": "0.1.0",
-  "description": "Model Context Protocol (MCP) integration for Electron applications",
+  "description": "AI-powered writing workspace for authors - your creative laboratory",
   "main": "dist/main/index.js",
-  "author": "MCP Team",
+  "author": "FictionLab",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -37,8 +37,8 @@
     "typescript": "^5.9.3"
   },
   "build": {
-    "appId": "com.mcp.electronapp",
-    "productName": "MCP Electron App",
+    "appId": "net.fictionlab.studio",
+    "productName": "FictionLab",
     "directories": {
       "output": "out",
       "buildResources": "resources"
@@ -92,7 +92,7 @@
         }
       ],
       "icon": "resources/icon.icns",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.productivity"
     },
     "dmg": {
       "contents": [
@@ -114,8 +114,8 @@
         "deb"
       ],
       "icon": "resources/icon.png",
-      "category": "Development",
-      "maintainer": "MCP Team <mcp@example.com>"
+      "category": "Office",
+      "maintainer": "FictionLab <support@fictionlab.net>"
     }
   }
 }
