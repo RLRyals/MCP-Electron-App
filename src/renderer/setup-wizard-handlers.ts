@@ -490,6 +490,11 @@ function createEnvironmentConfigForm(config: any): string {
                 </div>
 
                 <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">HTTP/SSE Port</label>
+                    <input type="number" id="http-sse-port" value="${config.HTTP_SSE_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
+                </div>
+
+                <div>
                     <label style="display: block; margin-bottom: 8px; font-weight: 500;">Typing Mind Port</label>
                     <input type="number" id="typing-mind-port" value="${config.TYPING_MIND_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
                 </div>
@@ -527,7 +532,7 @@ function setupEnvironmentFormListeners() {
 /**
  * Save environment configuration
  */
-async function saveEnvironmentConfig() {
+async function saveEnvironmentConfig(): Promise<boolean> {
     const statusEl = document.getElementById('env-config-status');
 
     try {
@@ -538,6 +543,7 @@ async function saveEnvironmentConfig() {
             POSTGRES_PASSWORD: '', // Will be auto-generated
             POSTGRES_PORT: parseInt((document.getElementById('postgres-port') as HTMLInputElement).value),
             MCP_CONNECTOR_PORT: parseInt((document.getElementById('mcp-connector-port') as HTMLInputElement).value),
+            HTTP_SSE_PORT: parseInt((document.getElementById('http-sse-port') as HTMLInputElement).value),
             MCP_AUTH_TOKEN: '', // Will be auto-generated
             TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value)
         };
@@ -603,6 +609,7 @@ async function saveEnvironmentConfig() {
                     </div>
                 `;
             }
+            return true;
         } else {
             throw new Error(result.error || 'Failed to save configuration');
         }
@@ -620,6 +627,7 @@ async function saveEnvironmentConfig() {
                 </div>
             `;
         }
+        return false;
     }
 }
 
@@ -1615,6 +1623,35 @@ function escapeHtml(text: string): string {
  * Navigation functions
  */
 async function nextStep() {
+    // For ENVIRONMENT step, automatically save configuration before proceeding
+    if (currentStep === WizardStep.ENVIRONMENT) {
+        const saved = await saveEnvironmentConfig();
+        if (!saved) {
+            // Save failed, don't proceed
+            return;
+        }
+
+        // Now complete the step and move to next
+        const result = await (window as any).electronAPI.setupWizard.completeStep(currentStep);
+        if (result.success && result.nextStep) {
+            // Update wizard state
+            wizardState = await (window as any).electronAPI.setupWizard.getState();
+
+            // Show next step
+            showStep(result.nextStep);
+
+            // Initialize next step
+            await initializeCurrentStep();
+
+            // Update progress
+            await updateProgress();
+
+            // Update sidebar
+            initializeSidebarSteps();
+        }
+        return;
+    }
+
     // For CLIENT_SELECTION step, automatically save selection before proceeding
     if (currentStep === WizardStep.CLIENT_SELECTION) {
         const saved = await saveClientSelection();
