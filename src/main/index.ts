@@ -206,14 +206,14 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
-          label: 'About MCP Electron App',
+          label: 'About FictionLab',
           click: () => {
-            const aboutMessage = `MCP Electron App v${app.getVersion()}\n\nA user-friendly desktop application for managing the MCP Writing System.\n\nCopyright © 2025 MCP Team\nLicense: MIT`;
+            const aboutMessage = `FictionLab v${app.getVersion()}\n\nYour AI-powered writing laboratory - a professional workspace for authors.\n\nCopyright © 2025 FictionLab\nLicense: MIT`;
             const { dialog } = require('electron');
             dialog.showMessageBox(mainWindow!, {
               type: 'info',
-              title: 'About MCP Electron App',
-              message: 'MCP Electron App',
+              title: 'About FictionLab',
+              message: 'FictionLab',
               detail: aboutMessage,
               buttons: ['OK'],
             });
