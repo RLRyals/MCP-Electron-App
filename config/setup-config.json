@@ -26,7 +26,7 @@
       "id": "typing-mind",
       "name": "Typing Mind UI",
       "url": "https://github.com/TypingMind/typingmind.git",
-      "clonePath": "typingmind",
+      "clonePath": "typing-mind",
       "branch": "main",
       "optional": true,
       "description": "Typing Mind web-based UI component"
@@ -94,7 +94,7 @@
       "id": "typing-mind-component",
       "name": "Typing Mind Integration",
       "description": "Optional Typing Mind UI component",
-      "enabled": false,
+      "enabled": true,
       "repositoryIds": [
         "typing-mind"
       ]
