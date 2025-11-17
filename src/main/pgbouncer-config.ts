@@ -7,8 +7,12 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { app } from 'electron';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import logger, { logWithCategory, LogCategory } from './logger';
 import { EnvConfig } from './env-config';
+
+const execAsync = promisify(exec);
 
 /**
  * Get the project root directory (where docker-compose.yml is located)
@@ -22,15 +26,30 @@ function getProjectRootDirectory(): string {
 }
 
 /**
- * Generate MD5 hash for PgBouncer authentication
- * Format: "md5" + md5(password + username)
+ * Fetch SCRAM-SHA-256 hash from PostgreSQL for PgBouncer authentication
+ * When using scram-sha-256 auth_type, PgBouncer needs the actual SCRAM hash from PostgreSQL
  */
-function generateMD5Hash(password: string, username: string): string {
-  const hash = crypto
-    .createHash('md5')
-    .update(password + username)
-    .digest('hex');
-  return `md5${hash}`;
+async function fetchScramHashFromPostgres(config: EnvConfig): Promise<string> {
+  try {
+    // Query PostgreSQL for the SCRAM hash
+    // Using sh -c for cross-platform compatibility and proper quote handling
+    const query = `SELECT rolpassword FROM pg_authid WHERE rolname = '${config.POSTGRES_USER}';`;
+    const command = `docker exec writing-postgres sh -c "psql -U ${config.POSTGRES_USER} -d ${config.POSTGRES_DB} -t -A -c \\"${query}\\""`;
+
+    const { stdout } = await execAsync(command);
+    const scramHash = stdout.trim();
+
+    if (!scramHash || !scramHash.startsWith('SCRAM-SHA-256')) {
+      throw new Error('Failed to retrieve valid SCRAM hash from PostgreSQL');
+    }
+
+    logWithCategory('info', LogCategory.DOCKER, 'Retrieved SCRAM hash from PostgreSQL');
+    return scramHash;
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.DOCKER, 'Could not fetch SCRAM hash from PostgreSQL, using plaintext password', error);
+    // Fallback to plaintext password if we can't get the hash
+    return config.POSTGRES_PASSWORD;
+  }
 }
 
 /**
@@ -57,7 +76,7 @@ export async function generatePgBouncerConfig(config: EnvConfig): Promise<{
 [pgbouncer]
 listen_addr = *
 listen_port = 6432
-auth_type = md5
+auth_type = scram-sha-256
 auth_file = /etc/pgbouncer/userlist.txt
 admin_users = ${config.POSTGRES_USER}
 pool_mode = transaction
@@ -77,9 +96,10 @@ client_tls_sslmode = disable
 `;
 
     // Generate userlist.txt content
-    // Format: "username" "md5hash"
-    const md5Hash = generateMD5Hash(config.POSTGRES_PASSWORD, config.POSTGRES_USER);
-    const userlistContent = `"${config.POSTGRES_USER}" "${md5Hash}"\n`;
+    // Format for scram-sha-256: "username" "SCRAM-SHA-256$..."
+    // PgBouncer needs the actual SCRAM hash from PostgreSQL for proper authentication
+    const passwordHash = await fetchScramHashFromPostgres(config);
+    const userlistContent = `"${config.POSTGRES_USER}" "${passwordHash}"\n`;
 
     // Write both files
     await fs.writeFile(iniPath, iniContent, 'utf-8');
