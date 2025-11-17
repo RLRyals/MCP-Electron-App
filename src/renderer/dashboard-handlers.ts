@@ -311,7 +311,7 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
     // Typing Mind and MCP Connector are optional and don't affect overall health
     const coreContainers = status.containers.filter(c =>
       c.name.includes('postgres') ||
-      c.name.includes('mcp-writing-system') ||
+      c.name.includes('mcp-writing-servers') ||
       c.name.includes('mcp-connector')
     );
 
@@ -397,10 +397,10 @@ function updatePostgreSQLCard(status: MCPSystemStatus, config: EnvConfig): void 
 
 /**
  * Update MCP Servers service card
- * Note: Looks for 'mcp-writing-system' (from core.yml) or 'mcp-connector' (from main compose file)
+ * Note: Looks for 'mcp-writing-servers' or 'mcp-connector'
  */
 function updateMCPServersCard(status: MCPSystemStatus): void {
-  const container = status.containers.find(c => c.name.includes('mcp-writing-system') || c.name.includes('mcp-connector'));
+  const container = status.containers.find(c => c.name.includes('mcp-writing-servers') || c.name.includes('mcp-connector'));
 
   const statusIcon = document.getElementById('mcp-servers-status-icon');
   const statusText = document.getElementById('mcp-servers-status-text');
@@ -755,9 +755,9 @@ async function handleConfigureClaudeDesktop(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind' } = {
       'postgres': 'postgres',
-      'mcp-servers': 'mcp-writing-system',
+      'mcp-servers': 'mcp-writing-servers',
       'mcp-connector': 'mcp-connector',
       'typing-mind': 'typing-mind',
     };

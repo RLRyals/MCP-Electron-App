@@ -299,7 +299,7 @@ interface ElectronAPI {
     restart: () => Promise<MCPSystemOperationResult>;
     getStatus: () => Promise<MCPSystemStatus>;
     getUrls: () => Promise<ServiceUrls>;
-    getLogs: (serviceName: 'postgres' | 'mcp-writing-system' | 'mcp-connector' | 'typing-mind', tail?: number) => Promise<ServiceLogsResult>;
+    getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => Promise<ServiceLogsResult>;
     checkPorts: () => Promise<PortConflictResult>;
     getWorkingDirectory: () => Promise<string>;
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
