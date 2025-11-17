@@ -32,6 +32,16 @@ function copyAssets() {
       }
     }
 
+    // Copy icon.png from resources to dist/renderer
+    const iconSrc = path.join(__dirname, '..', 'resources', 'icon.png');
+    const iconDest = path.join(distRenderer, 'icon.png');
+    if (fs.existsSync(iconSrc)) {
+      fs.copyFileSync(iconSrc, iconDest);
+      console.log(`  ✓ Copied icon.png`);
+    } else {
+      console.warn(`  ⚠ Warning: icon.png not found at ${iconSrc}`);
+    }
+
     // Also copy preload assets if they exist
     const srcPreload = path.join(__dirname, '..', 'src', 'preload');
     const distPreload = path.join(__dirname, '..', 'dist', 'preload');

@@ -38,6 +38,15 @@
             margin-bottom: 40px;
             padding-bottom: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .wizard-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
         }
 
         .wizard-steps {
@@ -574,7 +583,10 @@
 <body>
     <!-- Sidebar Navigation -->
     <div class="wizard-sidebar">
-        <div class="wizard-logo">FictionLab</div>
+        <div class="wizard-logo">
+            <img src="icon.png" alt="FictionLab Icon">
+            <span>FictionLab</span>
+        </div>
 
         <div class="wizard-steps" id="wizard-steps">
             <!-- Steps will be dynamically populated -->
@@ -601,7 +613,7 @@
             <div class="wizard-step-content" id="step-1" data-step="1">
                 <div class="welcome-content">
                     <div class="welcome-icon">
-                        <img src="../../resources/icon.png" alt="FictionLab" style="width: 120px; height: 120px; object-fit: contain;">
+                        <img src="icon.png" alt="FictionLab" style="width: 120px; height: 120px; object-fit: contain;">
                     </div>
                     <h1 class="welcome-title">Welcome to FictionLab</h1>
                     <p class="welcome-description">
