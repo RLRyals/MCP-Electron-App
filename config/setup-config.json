@@ -19,8 +19,8 @@
       "url": "https://github.com/TypingMind/typingmind-mcp.git",
       "clonePath": "typingmind-mcp",
       "branch": "main",
-      "optional": false,
-      "description": "MCP connector for Typing Mind integration"
+      "optional": true,
+      "description": "MCP connector for Typing Mind integration (deprecated - using npm package instead)"
     },
     {
       "id": "typing-mind",
@@ -35,12 +35,10 @@
   "buildOrder": {
     "order": [
       "mcp-writing-servers",
-      "typingmind-mcp",
       "typing-mind"
     ],
     "dependencies": {
       "mcp-writing-servers": [],
-      "typingmind-mcp": ["mcp-writing-servers"],
       "typing-mind": []
     },
     "allowParallel": false
@@ -86,11 +84,10 @@
     {
       "id": "core-system",
       "name": "Core System",
-      "description": "Core MCP system including Writing Servers and MCP Connector",
+      "description": "Core MCP system including Writing Servers",
       "enabled": true,
       "repositoryIds": [
-        "mcp-writing-servers",
-        "typingmind-mcp"
+        "mcp-writing-servers"
       ]
     },
     {
