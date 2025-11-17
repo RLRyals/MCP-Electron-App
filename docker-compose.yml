@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  mcp-network:
+    driver: bridge
+
 services:
   # PostgreSQL Database
   postgres:
@@ -16,8 +20,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    # Use host network for zero-latency localhost access
-    network_mode: host
+    networks:
+      - mcp-network
+    ports:
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ${MCP_WRITING_SERVERS_DIR}/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -32,7 +38,10 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: writing-pgbouncer
-    network_mode: host
+    networks:
+      - mcp-network
+    ports:
+      - "6432:6432"
     volumes:
       - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
@@ -42,7 +51,6 @@ services:
     restart: unless-stopped
 
   # MCP Connector (Bridge between TypingMind and MCP Servers)
-  # Uses host networking to access MCP servers on localhost:3001-3009
   mcp-connector:
     image: node:18-alpine
     container_name: mcp-connector
@@ -55,7 +63,10 @@ services:
       PORT: 50880
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN}
       NODE_ENV: production
-    network_mode: host
+    networks:
+      - mcp-network
+    ports:
+      - "${MCP_CONNECTOR_PORT}:50880"
     volumes:
       - ${MCP_WRITING_SERVERS_DIR}/mcp-config:/config:ro
       - mcp_workspace:/workspace
@@ -70,17 +81,18 @@ services:
       start_period: 40s
 
   # MCP Writing Servers - OPTIMIZED FOR CLAUDE DESKTOP
-  # Runs in host network mode for fastest stdio performance
   # Supports both HTTP/SSE (for TypingMind) and native stdio (for Claude Desktop)
   mcp-writing-servers:
     build:
       context: ${MCP_WRITING_SERVERS_DIR}
       dockerfile: Dockerfile
     container_name: mcp-writing-servers
-    # Host network = fastest possible performance (<1ms latency)
-    network_mode: host
+    networks:
+      - mcp-network
+    ports:
+      - "${HTTP_SSE_PORT}:3001"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:6432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=2048"
     depends_on:
@@ -92,11 +104,13 @@ services:
     restart: unless-stopped
 
   # TypingMind Web Server (Static Files)
-  # Uses host networking for direct access to MCP connector on localhost:50880
   typingmind:
     image: nginx:alpine
     container_name: typingmind
-    network_mode: host
+    networks:
+      - mcp-network
+    ports:
+      - "${TYPING_MIND_PORT}:8080"
     volumes:
       - ${TYPING_MIND_DIR}:/usr/share/nginx/html:ro
       - ${NGINX_CONF_PATH}:/etc/nginx/conf.d/default.conf:ro
@@ -104,7 +118,7 @@ services:
       - mcp-connector
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

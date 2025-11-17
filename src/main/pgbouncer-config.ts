@@ -50,8 +50,9 @@ export async function generatePgBouncerConfig(config: EnvConfig): Promise<{
     const userlistPath = path.join(projectRoot, 'userlist.txt');
 
     // Generate pgbouncer.ini content
+    // Use container hostname for cross-platform compatibility
     const iniContent = `[databases]
-* = host=localhost port=5432 dbname=${config.POSTGRES_DB}
+* = host=postgres port=5432 dbname=${config.POSTGRES_DB}
 
 [pgbouncer]
 listen_addr = *
