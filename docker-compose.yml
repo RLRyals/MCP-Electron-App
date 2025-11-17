@@ -92,7 +92,7 @@ services:
     ports:
       - "${HTTP_SSE_PORT}:3001"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=2048"
     depends_on:

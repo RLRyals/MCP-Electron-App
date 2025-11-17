@@ -109,8 +109,14 @@ function getDockerCommand(): string {
  * Uses native stdio protocol via docker exec -i
  * Each server runs independently with MCP_STDIO_MODE=true
  */
-export function buildClaudeDesktopConfig(): ClaudeDesktopConfig {
+export async function buildClaudeDesktopConfig(): Promise<ClaudeDesktopConfig> {
   logWithCategory('info', LogCategory.SYSTEM, 'Building Claude Desktop configuration for native stdio protocol...');
+
+  // Load environment config to get database credentials
+  const env = await envConfig.loadEnvConfig();
+
+  // Build DATABASE_URL with sslmode=disable for cross-platform compatibility
+  const databaseUrl = `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:6432/${env.POSTGRES_DB}?sslmode=disable`;
 
   const dockerCommand = getDockerCommand();
   const config: ClaudeDesktopConfig = {
@@ -133,7 +139,7 @@ export function buildClaudeDesktopConfig(): ClaudeDesktopConfig {
         server.entryPoint
       ],
       env: {
-        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:6432/writing_db?sslmode=disable'
+        DATABASE_URL: databaseUrl
       }
     };
   }
@@ -151,7 +157,7 @@ export async function autoConfigureClaudeDesktop(): Promise<AutoConfigResult> {
 
   try {
     // Build the configuration
-    const config = buildClaudeDesktopConfig();
+    const config = await buildClaudeDesktopConfig();
 
     // Get the config file path
     const configPath = getClaudeDesktopConfigPath();
