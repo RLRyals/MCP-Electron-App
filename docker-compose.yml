@@ -30,7 +30,7 @@ services:
 
   # PgBouncer for connection pooling
   pgbouncer:
-    image: pgbouncer/pgbouncer:latest
+    image: edoburu/pgbouncer:latest
     container_name: writing-pgbouncer
     network_mode: host
     volumes:
