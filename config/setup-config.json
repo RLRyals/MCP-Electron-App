@@ -16,7 +16,7 @@
     {
       "id": "typingmind-mcp",
       "name": "Typing Mind MCP Connector",
-      "url": "https://github.com/typingMind/typingmind-mcp.git",
+      "url": "https://github.com/TypingMind/typingmind-mcp.git",
       "clonePath": "typingmind-mcp",
       "branch": "main",
       "optional": false,
@@ -25,7 +25,7 @@
     {
       "id": "typing-mind",
       "name": "Typing Mind UI",
-      "url": "https://github.com/typingMind/typingmind.git",
+      "url": "https://github.com/TypingMind/typingmind.git",
       "clonePath": "typingmind",
       "branch": "main",
       "optional": true,
