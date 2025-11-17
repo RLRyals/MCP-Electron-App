@@ -1053,6 +1053,17 @@ async function initializeDownloadStep() {
             'verifying': 'custom_script',
         };
 
+        // Map phases to their base progress percentage (cumulative)
+        const phaseBaseProgress: Record<string, number> = {
+            'cloning': 0,      // 0-25%
+            'building': 25,    // 25-50%
+            'docker': 50,      // 50-75%
+            'verifying': 75,   // 75-100%
+        };
+
+        // Each phase contributes 25% to overall progress
+        const phaseWeight = 25;
+
         let currentOperationId: string | null = null;
         const startTime = new Date();
 
@@ -1100,9 +1111,15 @@ async function initializeDownloadStep() {
                 });
             }
 
+            // Calculate cumulative overall progress
+            // Each phase contributes 25% to overall progress
+            const baseProgress = phaseBaseProgress[phase] || 0;
+            const phaseProgress = (percent || 0) * (phaseWeight / 100); // Scale phase percent to phase weight
+            const overallPercent = Math.min(100, Math.round(baseProgress + phaseProgress));
+
             // Update overall progress
             progressTrackerUI?.updateOverallProgress({
-                overallPercent: Math.round(percent || 0),
+                overallPercent,
                 currentOperation: {
                     operationId: currentOperationId,
                     operationType,
@@ -1111,7 +1128,7 @@ async function initializeDownloadStep() {
                 },
                 operations: [],
                 totalOperations: 4, // 4 phases: clone, build, docker, verify
-                completedOperations: Math.floor((percent || 0) / 25),
+                completedOperations: Math.floor(overallPercent / 25),
                 failedOperations: 0,
                 phase: ProgressPhase.IN_PROGRESS,
                 startTime
