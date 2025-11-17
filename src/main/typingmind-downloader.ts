@@ -54,7 +54,7 @@ export interface TypingMindMetadata {
 }
 
 // GitHub repository configuration
-const REPO_URL = 'https://github.com/typingMind/typingmind.git';
+const REPO_URL = 'https://github.com/TypingMind/typingmind.git';
 const SPARSE_CHECKOUT_PATH = 'src';
 const TEMP_CLONE_DIR = 'temp-typing-mind-clone';
 
