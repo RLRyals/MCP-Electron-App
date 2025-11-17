@@ -1034,12 +1034,16 @@ function setupIPC(): void {
     // Close the wizard window and open the dashboard
     if (mainWindow) {
       logWithCategory('info', LogCategory.SYSTEM, 'Closing wizard and opening dashboard...');
-      mainWindow.close();
-      mainWindow = null;
 
-      // Small delay to ensure window closes cleanly
+      // Create the dashboard window BEFORE closing the wizard to prevent app.quit()
+      const wizardWindow = mainWindow;
+      mainWindow = null; // Clear reference so createWindow() can create new one
+
+      createWindow(); // Create dashboard immediately
+
+      // Close wizard after dashboard is created
       setTimeout(() => {
-        createWindow();
+        wizardWindow.close();
       }, 100);
     }
 
