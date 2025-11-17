@@ -76,7 +76,7 @@ export function getTypingMindDirectory(): string {
  */
 function getTempCloneDirectory(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system', TEMP_CLONE_DIR);
+  return path.join(userDataPath, TEMP_CLONE_DIR);
 }
 
 /**
@@ -84,7 +84,7 @@ function getTempCloneDirectory(): string {
  */
 export function getMetadataPath(): string {
   const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, 'mcp-writing-system', '.metadata.json');
+  return path.join(userDataPath, '.metadata.json');
 }
 
 /**
