@@ -407,6 +407,7 @@ async function waitForHealthy(
 
   const startTime = Date.now();
   let lastProgress = 0;
+  let checksPerformed = 0;
 
   while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT) {
     // Get health status from all compose files together
@@ -422,6 +423,7 @@ async function waitForHealthy(
     // Check if all containers are healthy
     const unhealthy = allContainers.filter(c => c.running && c.health !== 'healthy');
     const notRunning = allContainers.filter(c => !c.running);
+    checksPerformed++;
 
     // Calculate progress
     const healthyCount = allContainers.filter(c => c.health === 'healthy').length;
@@ -471,7 +473,13 @@ async function waitForHealthy(
     }
 
     if (unhealthy.length === 0) {
-      logWithCategory('info', LogCategory.DOCKER, 'All containers are healthy!');
+      // Fast path: if already healthy on first check, services were already running
+      const wasAlreadyRunning = checksPerformed === 1;
+      const message = wasAlreadyRunning
+        ? 'All services were already healthy - startup skipped'
+        : 'All services are healthy';
+
+      logWithCategory('info', LogCategory.DOCKER, message);
 
       if (progressCallback) {
         progressCallback({
@@ -482,7 +490,7 @@ async function waitForHealthy(
         });
       }
 
-      return { success: true, message: 'All services are healthy' };
+      return { success: true, message };
     }
 
     // Log current status
