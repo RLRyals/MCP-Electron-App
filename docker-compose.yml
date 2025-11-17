@@ -51,6 +51,7 @@ services:
       sh -c "npm install -g @typingmind/mcp@latest &&
              npx @typingmind/mcp@latest $${MCP_AUTH_TOKEN} --port $${PORT}"
     environment:
+      HOST: 0.0.0.0
       PORT: 50880
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN}
       NODE_ENV: production
@@ -62,9 +63,9 @@ services:
       - mcp-writing-servers
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "ps aux | grep '[n]ode.*mcp' || exit 1"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:50880/ping"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 40s
 
