@@ -32,6 +32,17 @@
             font-size: 2.5rem;
             margin-bottom: 10px;
             text-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 10px rgba(0, 212, 170, 0.3));
         }
 
         .subtitle {
@@ -1433,7 +1444,7 @@
 </head>
 <body>
     <header>
-        <h1>FictionLab</h1>
+        <h1><img src="../resources/icon.png" alt="FictionLab Logo" class="header-icon">FictionLab</h1>
         <p class="subtitle">Your AI-Powered Writing Laboratory</p>
     </header>
 
