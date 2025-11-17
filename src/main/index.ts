@@ -1699,13 +1699,13 @@ function setupIPC(): void {
         logWithCategory('info', LogCategory.GENERAL, 'Resolved config path', { resolvedConfigPath });
         await currentPipelineOrchestrator.loadConfig(resolvedConfigPath);
 
-        // Ensure workingDirectory is set to project root if not provided
-        // This ensures repositories are cloned to ./repositories/ relative to project root
-        // where Docker Compose can find them for volume mounts
+        // Ensure workingDirectory is set to userData if not provided
+        // This ensures repositories are cloned to {userData}/repositories/
+        // where Docker Compose expects them for volume mounts (via environment variables)
         const options = request.options || {};
         if (!options.workingDirectory) {
-          options.workingDirectory = mcpSystem.getProjectRootDirectory();
-          logWithCategory('info', LogCategory.GENERAL, 'Using project root as working directory', { workingDirectory: options.workingDirectory });
+          options.workingDirectory = mcpSystem.getMCPWorkingDirectory();
+          logWithCategory('info', LogCategory.GENERAL, 'Using userData as working directory', { workingDirectory: options.workingDirectory });
         }
 
         // Create progress throttler
