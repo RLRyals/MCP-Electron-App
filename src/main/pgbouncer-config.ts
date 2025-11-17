@@ -73,6 +73,7 @@ log_connections = 0
 log_disconnections = 0
 log_pooler_errors = 1
 ignore_startup_parameters = extra_float_digits
+client_tls_sslmode = disable
 `;
 
     // Generate userlist.txt content
