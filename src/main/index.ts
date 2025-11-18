@@ -238,6 +238,7 @@ function createWizardWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    icon: path.join(__dirname, '../resources/icon.png'),
     title: 'MCP Writing System - Setup Wizard',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
@@ -280,7 +281,8 @@ function createMigrationWizardWindow(): void {
     width: 1000,
     height: 800,
     minWidth: 800,
-    minHeight: 600,
+    minHeight: 600,        
+    icon: path.join(__dirname, '../resources/icon.png'),
     title: 'MCP Writing System - Migration Wizard',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
@@ -324,7 +326,8 @@ function createWindow(): void {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: 'MCP Electron App',
+    title: 'FictionLab',
+    icon: path.join(__dirname, '../resources/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
