@@ -1,6 +1,6 @@
 # Tests
 
-This directory contains unit tests for the MCP Electron App.
+This directory contains unit tests for the FictionLab App.
 
 ## Setup
 
