@@ -8,26 +8,26 @@ The TypingMind auto-configuration system is fully compatible with **Windows, Mac
 
 ### Windows
 ```
-User Data: C:\Users\<username>\AppData\Roaming\mcp-electron-app
-MCP Servers: C:\Users\<username>\AppData\Roaming\mcp-electron-app\repositories\mcp-writing-servers\src\config-mcps
-Config File: C:\Users\<username>\AppData\Roaming\mcp-electron-app\typingmind-mcp-config.json
-.env File: C:\Users\<username>\AppData\Roaming\mcp-electron-app\.env
+User Data: C:\Users\<username>\AppData\Roaming\fictionlab
+MCP Servers: C:\Users\<username>\AppData\Roaming\fictionlab\repositories\mcp-writing-servers\src\config-mcps
+Config File: C:\Users\<username>\AppData\Roaming\fictionlab\typingmind-mcp-config.json
+.env File: C:\Users\<username>\AppData\Roaming\fictionlab\.env
 ```
 
 ### macOS
 ```
-User Data: /Users/<username>/Library/Application Support/mcp-electron-app
-MCP Servers: /Users/<username>/Library/Application Support/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps
-Config File: /Users/<username>/Library/Application Support/mcp-electron-app/typingmind-mcp-config.json
-.env File: /Users/<username>/Library/Application Support/mcp-electron-app/.env
+User Data: /Users/<username>/Library/Application Support/fictionlab
+MCP Servers: /Users/<username>/Library/Application Support/fictionlab/repositories/mcp-writing-servers/src/config-mcps
+Config File: /Users/<username>/Library/Application Support/fictionlab/typingmind-mcp-config.json
+.env File: /Users/<username>/Library/Application Support/fictionlab/.env
 ```
 
 ### Linux
 ```
-User Data: /home/<username>/.config/mcp-electron-app
-MCP Servers: /home/<username>/.config/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps
-Config File: /home/<username>/.config/mcp-electron-app/typingmind-mcp-config.json
-.env File: /home/<username>/.config/mcp-electron-app/.env
+User Data: /home/<username>/.config/fictionlab
+MCP Servers: /home/<username>/.config/fictionlab/repositories/mcp-writing-servers/src/config-mcps
+Config File: /home/<username>/.config/fictionlab/typingmind-mcp-config.json
+.env File: /home/<username>/.config/fictionlab/.env
 ```
 
 ## How Cross-Platform Compatibility is Achieved
@@ -78,7 +78,7 @@ The implementation uses only cross-platform APIs:
     "book-planning-server": {
       "command": "node",
       "args": [
-        "C:\\Users\\User\\AppData\\Roaming\\mcp-electron-app\\repositories\\mcp-writing-servers\\src\\config-mcps\\book-planning-server\\index.js"
+        "C:\\Users\\User\\AppData\\Roaming\\fictionlab\\repositories\\mcp-writing-servers\\src\\config-mcps\\book-planning-server\\index.js"
       ],
       "env": {
         "NODE_ENV": "development",
@@ -96,7 +96,7 @@ The implementation uses only cross-platform APIs:
     "book-planning-server": {
       "command": "node",
       "args": [
-        "/Users/username/Library/Application Support/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
+        "/Users/username/Library/Application Support/fictionlab/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
       ],
       "env": {
         "NODE_ENV": "development",
@@ -114,7 +114,7 @@ The implementation uses only cross-platform APIs:
     "book-planning-server": {
       "command": "node",
       "args": [
-        "/home/username/.config/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
+        "/home/username/.config/fictionlab/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
       ],
       "env": {
         "NODE_ENV": "development",
@@ -135,13 +135,13 @@ The implementation uses only cross-platform APIs:
 2. **Check .env file location**
    ```bash
    # Windows
-   dir %APPDATA%\mcp-electron-app\.env
+   dir %APPDATA%\fictionlab\.env
 
    # Mac
-   ls ~/Library/Application\ Support/mcp-electron-app/.env
+   ls ~/Library/Application\ Support/fictionlab/.env
 
    # Linux
-   ls ~/.config/mcp-electron-app/.env
+   ls ~/.config/fictionlab/.env
    ```
 
 3. **Click "Configure Typing Mind"**

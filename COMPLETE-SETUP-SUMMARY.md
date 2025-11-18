@@ -16,7 +16,7 @@ When a user clicks **"Configure Typing Mind"**, here's what happens:
 - Reads `TYPING_MIND_PORT` (default: 3000)
 
 ### Step 2: Discover MCP Servers
-Automatically scans: `C:\Users\User\AppData\Roaming\mcp-electron-app\repositories\mcp-writing-servers\src\config-mcps`
+Automatically scans: `C:\Users\User\AppData\Roaming\fictionlab\repositories\mcp-writing-servers\src\config-mcps`
 
 Finds all available servers:
 - ✓ book-planning-server
@@ -38,7 +38,7 @@ Creates JSON configuration with correct paths for the current platform:
     "book-planning-server": {
       "command": "node",
       "args": [
-        "C:\\Users\\User\\AppData\\Roaming\\mcp-electron-app\\repositories\\mcp-writing-servers\\src\\config-mcps\\book-planning-server\\index.js"
+        "C:\\Users\\User\\AppData\\Roaming\\fictionlab\\repositories\\mcp-writing-servers\\src\\config-mcps\\book-planning-server\\index.js"
       ],
       "env": {
         "NODE_ENV": "development",
@@ -57,7 +57,7 @@ Creates JSON configuration with correct paths for the current platform:
     "book-planning-server": {
       "command": "node",
       "args": [
-        "/Users/username/Library/Application Support/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
+        "/Users/username/Library/Application Support/fictionlab/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"
       ],
       "env": {
         "NODE_ENV": "development",
@@ -256,7 +256,7 @@ To test the complete flow:
 ## Configuration Files
 
 ### TypingMind Config
-Saved at: `C:\Users\User\AppData\Roaming\mcp-electron-app\typingmind-mcp-config.json`
+Saved at: `C:\Users\User\AppData\Roaming\fictionlab\typingmind-mcp-config.json`
 
 ```json
 {
@@ -273,7 +273,7 @@ Saved at: `C:\Users\User\AppData\Roaming\mcp-electron-app\typingmind-mcp-config.
   "mcpServers": {
     "book-planning-server": {
       "command": "node",
-      "args": ["C:/Users/User/AppData/Roaming/mcp-electron-app/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"],
+      "args": ["C:/Users/User/AppData/Roaming/fictionlab/repositories/mcp-writing-servers/src/config-mcps/book-planning-server/index.js"],
       "env": { "NODE_ENV": "development", "MCP_STDIO_MODE": "false" }
     },
     ... (7 more servers)

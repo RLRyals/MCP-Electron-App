@@ -50,7 +50,7 @@ Examples:
 }
 
 // Get user data path
-const userDataPath = app?.getPath('userData') || path.join(process.env.APPDATA || process.env.HOME, '.mcp-electron-app');
+const userDataPath = app?.getPath('userData') || path.join(process.env.APPDATA || process.env.HOME, 'fictionlab');
 
 // Load .env file
 function loadEnvConfig() {
