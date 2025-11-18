@@ -1,6 +1,6 @@
-# MCP Electron App - Architecture Documentation
+# FictionLab App - Architecture Documentation
 
-This document provides a technical overview of the MCP Electron App architecture, module design, and system interactions.
+This document provides a technical overview of the FictionLab App architecture, module design, and system interactions.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This document provides a technical overview of the MCP Electron App architecture
 
 ## System Overview
 
-The MCP Electron App is a desktop application that manages the MCP (Model Context Protocol) Writing System. It provides a graphical interface for setting up, configuring, and managing:
+The FictionLab App is a desktop application that manages the MCP (Model Context Protocol) Writing System. It provides a graphical interface for setting up, configuring, and managing:
 
 - PostgreSQL database (via Docker)
 - MCP Servers (via Docker)
@@ -50,7 +50,7 @@ The MCP Electron App is a desktop application that manages the MCP (Model Contex
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        MCP Electron App                          │
+│                        FictionLab App                          │
 │                                                                   │
 │  ┌───────────────────┐         ┌─────────────────────────────┐  │
 │  │  Renderer Process │◄───IPC──┤     Main Process             │  │
@@ -399,7 +399,7 @@ interface ClientOption {
 - `updater:set-preferences`
 
 **Update Sources:**
-- **MCP Electron App:** GitHub Releases API
+- **FictionLab App:** GitHub Releases API
 - **MCP Servers:** Docker Hub API
 - **Typing Mind:** Git repository
 

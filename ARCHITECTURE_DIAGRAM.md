@@ -1,4 +1,4 @@
-# MCP Electron App - Architecture Diagrams
+# FictionLab App - Architecture Diagrams
 
 ## Current Architecture (Before Implementation)
 
@@ -489,7 +489,7 @@ Total Latency: ~5-15ms (10x faster than HTTP!)
 
 ## Summary
 
-This implementation transforms your MCP Electron App from a development prototype into a production-ready application with:
+This implementation transforms your FictionLab App from a development prototype into a production-ready application with:
 
 ✅ **Performance**: 10-100x faster startup, 20-30% faster queries
 ✅ **Scalability**: Connection pooling handles concurrent requests

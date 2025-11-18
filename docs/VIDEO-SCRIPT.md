@@ -1,4 +1,4 @@
-# MCP Electron App - Video Tutorial Script
+# FictionLab App - Video Tutorial Script
 
 **Duration:** Approximately 8-10 minutes
 
@@ -11,7 +11,7 @@
 ## Script Overview
 
 1. **Introduction** (30 seconds)
-2. **What is MCP Electron App** (45 seconds)
+2. **What is FictionLab App** (45 seconds)
 3. **Prerequisites Check** (30 seconds)
 4. **Installation** (1 minute)
 5. **First-Time Setup Wizard** (4 minutes)
@@ -28,7 +28,7 @@
 **[Screen: Desktop with browser open to GitHub Releases page]**
 
 **Narration:**
-> "Welcome! In this tutorial, I'll show you how to install and set up the MCP Electron App - a user-friendly application that helps you run AI-powered writing tools on your computer. No programming experience required!"
+> "Welcome! In this tutorial, I'll show you how to install and set up the FictionLab App - a user-friendly application that helps you run AI-powered writing tools on your computer. No programming experience required!"
 
 **Actions:**
 - Show cursor moving around screen
@@ -36,12 +36,12 @@
 
 ---
 
-### 2. What is MCP Electron App (45 seconds)
+### 2. What is FictionLab App (45 seconds)
 
 **[Screen: Animated diagram or slides showing components]**
 
 **Narration:**
-> "The MCP Electron App manages everything you need for AI-enhanced writing. It sets up a database, runs AI integration servers, and connects to AI clients like Typing Mind or Claude Desktop - all through a simple graphical interface. No terminal commands, no configuration files to edit. Just download, install, and start writing!"
+> "The FictionLab App manages everything you need for AI-enhanced writing. It sets up a database, runs AI integration servers, and connects to AI clients like Typing Mind or Claude Desktop - all through a simple graphical interface. No terminal commands, no configuration files to edit. Just download, install, and start writing!"
 
 **Visuals:**
 - Show diagram: App → Docker → Database + Servers → AI Clients
@@ -68,7 +68,7 @@
 **[Screen: GitHub Releases page]**
 
 **Narration:**
-> "Let's start by downloading the installer. Go to the MCP Electron App GitHub Releases page and download the installer for your operating system."
+> "Let's start by downloading the installer. Go to the FictionLab App GitHub Releases page and download the installer for your operating system."
 
 **Actions:**
 - Scroll to latest release
@@ -100,7 +100,7 @@
 
 #### Step 1: Welcome Screen (15 seconds)
 
-**[Screen: MCP Electron App - Welcome screen]**
+**[Screen: FictionLab App - Welcome screen]**
 
 **Narration:**
 > "The first time you open the app, you'll see the setup wizard. This will guide you through seven easy steps. Let's click 'Get Started.'"
@@ -281,10 +281,10 @@
 
 ### 8. Wrap-up and Next Steps (30 seconds)
 
-**[Screen: Back to MCP Electron App dashboard]**
+**[Screen: Back to FictionLab App dashboard]**
 
 **Narration:**
-> "And that's it! You've successfully installed the MCP Electron App, completed setup, and accessed your AI client. When you're done writing, simply click 'Stop System' to shut everything down gracefully."
+> "And that's it! You've successfully installed the FictionLab App, completed setup, and accessed your AI client. When you're done writing, simply click 'Stop System' to shut everything down gracefully."
 
 **Actions:**
 - Show "Stop System" button
@@ -296,7 +296,7 @@
 **[Screen: Show Help menu one more time, then fade to end screen]**
 
 **End Screen Text:**
-- "MCP Electron App"
+- "FictionLab App"
 - "Download: github.com/RLRyals/MCP-Electron-App"
 - "Documentation: Link to docs"
 - "Need help? Check the FAQ or report issues on GitHub"
@@ -368,7 +368,7 @@
 
 Add YouTube chapters for easy navigation:
 - 0:00 - Introduction
-- 0:30 - What is MCP Electron App
+- 0:30 - What is FictionLab App
 - 1:15 - Prerequisites
 - 1:45 - Installation
 - 2:45 - Setup Wizard
@@ -395,7 +395,7 @@ Add YouTube chapters for easy navigation:
 ### Short Version (2-3 minutes)
 
 Focus on:
-1. What is MCP Electron App (30s)
+1. What is FictionLab App (30s)
 2. Download and install (30s)
 3. Quick setup wizard walkthrough (60s)
 4. Open AI client (30s)
@@ -431,9 +431,9 @@ Cover:
 **Video Description Template:**
 
 ```
-MCP Electron App - Complete Installation and Setup Tutorial
+FictionLab App - Complete Installation and Setup Tutorial
 
-Learn how to install and set up the MCP Electron App in just 10 minutes! This user-friendly application manages the MCP Writing System with AI capabilities.
+Learn how to install and set up the FictionLab App in just 10 minutes! This user-friendly application manages the MCP Writing System with AI capabilities.
 
 🔗 Download: https://github.com/RLRyals/MCP-Electron-App/releases
 📖 Documentation: https://github.com/RLRyals/MCP-Electron-App/blob/main/docs/USER-GUIDE.md
@@ -442,7 +442,7 @@ Learn how to install and set up the MCP Electron App in just 10 minutes! This us
 
 Timestamps:
 0:00 - Introduction
-0:30 - What is MCP Electron App
+0:30 - What is FictionLab App
 1:15 - Prerequisites
 1:45 - Installation
 2:45 - Setup Wizard

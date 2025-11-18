@@ -104,12 +104,12 @@ Make sure you have the latest version with HTTP/SSE support.
 
 Sometimes the repository might be corrupted or outdated:
 
-1. Close the MCP Electron App
+1. Close the FictionLab App
 2. Delete the repository:
    ```bash
    rm -rf ~/.config/MCP\ Electron\ App/repositories/mcp-writing-servers
    ```
-3. Restart the MCP Electron App (it will re-clone automatically)
+3. Restart the FictionLab App (it will re-clone automatically)
 
 ### 3. Check Docker Container Status
 
@@ -126,7 +126,7 @@ docker logs mcp-writing-system 2>&1 | grep "HTTP/SSE\|Starting\|port"
 
 ### 4. Verify Environment Configuration
 
-1. Open the MCP Electron App
+1. Open the FictionLab App
 2. Go to **Settings → Environment Configuration**
 3. Verify all fields are filled:
    - `MCP_AUTH_TOKEN` is set
@@ -160,9 +160,9 @@ When the system is properly configured, you should see:
 
 ## File Locations Reference
 
-- **MCP Electron App Config**: `~/.config/MCP Electron App/config/mcp-config.json`
-- **MCP-Writing-Servers Repo**: `~/.config/MCP Electron App/repositories/mcp-writing-servers/`
-- **Docker Compose Files**: `~/.config/MCP Electron App/repositories/mcp-writing-servers/docker/`
+- **FictionLab App Config**: `~/.config/FictionLab App/config/mcp-config.json`
+- **MCP-Writing-Servers Repo**: `~/.config/FictionLab App/repositories/mcp-writing-servers/`
+- **Docker Compose Files**: `~/.config/FictionLab App/repositories/mcp-writing-servers/docker/`
 - **Reference Entrypoint**: `MCP-Electron-App/docker/connector-entrypoint.sh` (in source code)
 
 ## Code References
@@ -179,7 +179,7 @@ Key files to check:
 If these solutions don't work:
 
 1. **Check application logs**:
-   - In the MCP Electron App, go to **Diagnostics → View Logs**
+   - In the FictionLab App, go to **Diagnostics → View Logs**
 
 2. **Check Docker logs**:
    ```bash

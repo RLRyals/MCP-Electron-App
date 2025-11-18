@@ -981,4 +981,4 @@ This specification provides a comprehensive blueprint for implementing database 
 
 **Document Version**: 1.0
 **Last Updated**: 2025-11-16
-**Author**: Claude (MCP Electron App AI Assistant)
+**Author**: Claude (FictionLab App AI Assistant)

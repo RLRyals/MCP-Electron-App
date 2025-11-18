@@ -1,6 +1,6 @@
-# MCP Electron App - Release Process
+# FictionLab App - Release Process
 
-This document describes the process for creating and publishing releases of the MCP Electron App.
+This document describes the process for creating and publishing releases of the FictionLab App.
 
 ## Table of Contents
 
@@ -356,7 +356,7 @@ npm run package:all
    - Go to GitHub Releases page
    - Click "Draft a new release"
    - Choose tag (create new if needed)
-   - Enter release title: `MCP Electron App v1.2.0`
+   - Enter release title: `FictionLab App v1.2.0`
    - Write release notes
    - Upload all installers
    - Upload checksums files

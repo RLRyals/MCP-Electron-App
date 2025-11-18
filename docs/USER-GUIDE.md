@@ -1,6 +1,6 @@
-# MCP Electron App - User Guide
+# FictionLab App - User Guide
 
-Welcome to the MCP Electron App! This guide will walk you through everything you need to know to install, set up, and use the MCP Writing System.
+Welcome to the FictionLab App! This guide will walk you through everything you need to know to install, set up, and use the MCP Writing System.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ Welcome to the MCP Electron App! This guide will walk you through everything you
 
 ## Introduction
 
-The MCP Electron App is a **user-friendly desktop application** that sets up and manages the MCP (Model Context Protocol) Writing System. It provides everything you need to use AI-powered writing tools without any technical configuration or terminal commands.
+The FictionLab App is a **user-friendly desktop application** that sets up and manages the MCP (Model Context Protocol) Writing System. It provides everything you need to use AI-powered writing tools without any technical configuration or terminal commands.
 
 **Perfect for:** Writers, researchers, students, professionals, or anyone who wants AI assistance without dealing with technical setup.
 
@@ -31,7 +31,7 @@ The MCP Electron App is a **user-friendly desktop application** that sets up and
 
 ## What This App Does
 
-The MCP Electron App automatically sets up and manages:
+The FictionLab App automatically sets up and manages:
 
 1. **PostgreSQL Database** - Stores your writing data and context
 2. **MCP Servers** - Powers AI integration and context management
@@ -90,8 +90,8 @@ Visit the [GitHub Releases page](https://github.com/RLRyals/MCP-Electron-App/rel
 **On macOS:**
 
 1. Open the downloaded `MCP-Electron-App.dmg` file
-2. Drag the MCP Electron App icon to your Applications folder
-3. Open Applications and find MCP Electron App
+2. Drag the FictionLab App icon to your Applications folder
+3. Open Applications and find FictionLab App
 4. Right-click and select "Open" (first time only, to bypass security)
 5. Click "Open" in the security dialog
 
@@ -327,7 +327,7 @@ You can use both Typing Mind and Claude Desktop simultaneously! They both connec
 The app can check for and install updates for:
 - MCP Servers
 - Typing Mind
-- The MCP Electron App itself
+- The FictionLab App itself
 
 ### Checking for Updates
 
@@ -420,13 +420,13 @@ For more detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 **Windows:**
 1. Settings → Apps → Apps & features
-2. Find "MCP Electron App"
+2. Find "FictionLab App"
 3. Click "Uninstall"
 4. Follow the prompts
 
 **macOS:**
 1. Open Applications folder
-2. Drag "MCP Electron App" to Trash
+2. Drag "FictionLab App" to Trash
 3. Empty Trash
 
 **Linux:**
@@ -473,7 +473,7 @@ No! This app is designed for non-technical users. Everything is done through but
 
 ### Is this free?
 
-Yes, the MCP Electron App is free and open-source. However, you may need:
+Yes, the FictionLab App is free and open-source. However, you may need:
 - API credits for AI services (Claude, ChatGPT, etc.) depending on your client
 - Docker Desktop (free for personal use; a Docker Hub account is optional)
 
@@ -564,4 +564,4 @@ See the "Uninstalling" section above for all file locations.
 
 **Happy Writing!** 🎉
 
-The MCP Electron App team
+The FictionLab App team

@@ -1,4 +1,4 @@
-# MCP Electron App - Quick Start Guide
+# FictionLab App - Quick Start Guide
 
 **For experienced users who want to get up and running fast.**
 
@@ -30,7 +30,7 @@ Run the installer and complete the installation wizard.
 
 ### 2. Launch and Run Setup Wizard
 
-Open the MCP Electron App. The first-time setup wizard will guide you through 7 steps:
+Open the FictionLab App. The first-time setup wizard will guide you through 7 steps:
 
 1. **Welcome** → Click "Get Started"
 2. **Prerequisites Check** → Verify Docker and Git (install if prompted)
@@ -194,7 +194,7 @@ Menu → Help → Check for Updates
 ```
 
 **Available updates:**
-- MCP Electron App (installer)
+- FictionLab App (installer)
 - MCP Servers (Docker images)
 - Typing Mind (Git pull)
 
@@ -324,7 +324,7 @@ cat backup.sql | docker exec -i mcp-postgres psql -U mcp_user -d mcp_writing
 
 ### Quick Uninstall (keep data)
 
-**Windows:** Settings → Apps → Uninstall "MCP Electron App"
+**Windows:** Settings → Apps → Uninstall "FictionLab App"
 **macOS:** Drag app to Trash
 **Linux:** `sudo apt remove mcp-electron-app` or delete AppImage
 

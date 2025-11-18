@@ -1,6 +1,6 @@
 # Quick Start: Performance & Claude Desktop Implementation
 
-This guide helps you get started with implementing performance improvements and Claude Desktop support for the MCP Electron App.
+This guide helps you get started with implementing performance improvements and Claude Desktop support for the FictionLab App.
 
 ## 📚 Documentation Overview
 

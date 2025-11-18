@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Create a report to help us improve the MCP Electron App
+about: Create a report to help us improve the FictionLab App
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -35,7 +35,7 @@ If applicable, add screenshots to help explain your problem.
 **Please complete the following information:**
 
 - **Operating System:** [e.g., Windows 11, macOS 14.1, Ubuntu 22.04]
-- **MCP Electron App Version:** [e.g., 1.0.0 - find in Help → About]
+- **FictionLab App Version:** [e.g., 1.0.0 - find in Help → About]
 - **Docker Desktop Version:** [e.g., 24.0.5 - find with `docker --version`]
 - **Git Version:** [e.g., 2.40.0 - find with `git --version`]
 
@@ -43,7 +43,7 @@ If applicable, add screenshots to help explain your problem.
 
 **Please attach a diagnostic report:**
 
-1. In the MCP Electron App, go to menu: **Diagnostics → Export Diagnostic Report**
+1. In the FictionLab App, go to menu: **Diagnostics → Export Diagnostic Report**
 2. Save the ZIP file
 3. Attach it to this issue (drag and drop the file here)
 

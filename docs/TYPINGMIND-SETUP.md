@@ -4,13 +4,13 @@ This guide explains how to automatically configure TypingMind to work with the M
 
 ## Overview
 
-The MCP Electron App includes automatic configuration tools to set up TypingMind with your MCP Connector. This eliminates manual configuration and ensures all settings are correct.
+The FictionLab App includes automatic configuration tools to set up TypingMind with your MCP Connector. This eliminates manual configuration and ensures all settings are correct.
 
 ## Automatic Setup (Recommended)
 
 ### Method 1: Using the Electron App UI
 
-1. **Start the MCP Electron App**
+1. **Start the FictionLab App**
 2. **Navigate to Dashboard**
 3. **Click "Auto-Configure TypingMind"** button
 4. The app will automatically:

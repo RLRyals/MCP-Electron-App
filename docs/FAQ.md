@@ -1,6 +1,6 @@
-# MCP Electron App - Frequently Asked Questions (FAQ)
+# FictionLab App - Frequently Asked Questions (FAQ)
 
-Quick answers to common questions about the MCP Electron App.
+Quick answers to common questions about the FictionLab App.
 
 ## Table of Contents
 
@@ -18,9 +18,9 @@ Quick answers to common questions about the MCP Electron App.
 
 ## General Questions
 
-### What is the MCP Electron App?
+### What is the FictionLab App?
 
-The MCP Electron App is a desktop application that sets up and manages the MCP (Model Context Protocol) Writing System. It provides an easy-to-use graphical interface for running AI-powered writing tools without any technical configuration.
+The FictionLab App is a desktop application that sets up and manages the MCP (Model Context Protocol) Writing System. It provides an easy-to-use graphical interface for running AI-powered writing tools without any technical configuration.
 
 ### Who is this app for?
 
@@ -35,7 +35,7 @@ Anyone who wants to use AI writing tools without dealing with technical setup! P
 
 ### Is this free?
 
-Yes! The MCP Electron App is **free and open-source**. However, you may need:
+Yes! The FictionLab App is **free and open-source**. However, you may need:
 - **Docker Desktop:** Free for personal use (requires Docker Hub account)
 - **AI Service API Keys:** If using services like OpenAI or Claude (usage-based pricing)
 
@@ -122,7 +122,7 @@ Docker is a platform that runs applications in isolated "containers." Think of i
 
 ### Do I need Docker experience?
 
-**No!** You don't need to know anything about Docker. The MCP Electron App:
+**No!** You don't need to know anything about Docker. The FictionLab App:
 - Checks if Docker is installed
 - Guides you through Docker installation if needed
 - Manages all Docker commands automatically
@@ -135,7 +135,7 @@ You'll never need to type Docker commands yourself!
 **Total recommended:** 10GB free space
 
 Breakdown:
-- MCP Electron App: ~200MB
+- FictionLab App: ~200MB
 - Docker Desktop: ~500MB
 - Docker images (PostgreSQL, MCP): ~1-2GB
 - Typing Mind (optional): ~100MB
@@ -224,7 +224,7 @@ Try it and see! The app is free, so there's no risk.
 
 **For Claude Desktop:** You need an Anthropic account and Claude subscription.
 
-**MCP Electron App:** No API keys needed! The app generates all required tokens automatically.
+**FictionLab App:** No API keys needed! The app generates all required tokens automatically.
 
 ### Where do I get API keys?
 
@@ -239,7 +239,7 @@ Both require creating an account and adding payment information. API usage is ty
 
 ### How do I start the system?
 
-1. Open the MCP Electron App
+1. Open the FictionLab App
 2. Make sure Docker Desktop is running
 3. Click "Start System" on the dashboard
 4. Wait 30-60 seconds for services to start
@@ -349,7 +349,7 @@ All ports can be changed in Environment Configuration if there are conflicts.
 - Docker image pulls (Postgres from Docker Hub)
 - Repository cloning for MCP servers (via Git)
 
-**The MCP Electron App never sends your data anywhere!**
+**The FictionLab App never sends your data anywhere!**
 
 ### Can I backup my data?
 
@@ -398,7 +398,7 @@ This removes:
 3. Click "Update" for components you want to update
 
 **What can be updated:**
-- MCP Electron App itself
+- FictionLab App itself
 - MCP Servers (Docker images)
 - Typing Mind
 

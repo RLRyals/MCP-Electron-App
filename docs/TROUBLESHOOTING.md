@@ -1,6 +1,6 @@
-# MCP Electron App - Troubleshooting Guide
+# FictionLab App - Troubleshooting Guide
 
-This guide helps you diagnose and fix common issues with the MCP Electron App.
+This guide helps you diagnose and fix common issues with the FictionLab App.
 
 ## Quick Links to Specific Issues
 
@@ -50,7 +50,7 @@ Many issues can be fixed with a restart:
 
 ### 4. Restart the App
 
-Sometimes restarting the MCP Electron App itself helps:
+Sometimes restarting the FictionLab App itself helps:
 1. Close the app completely
 2. Reopen it
 3. Check if the issue persists
@@ -58,12 +58,12 @@ Sometimes restarting the MCP Electron App itself helps:
 ### 5. Restart Docker Desktop
 
 If services won't start:
-1. Close the MCP Electron App
+1. Close the FictionLab App
 2. Quit Docker Desktop
 3. Wait 30 seconds
 4. Start Docker Desktop
 5. Wait for Docker to be fully running
-6. Start the MCP Electron App
+6. Start the FictionLab App
 
 ---
 
@@ -828,7 +828,7 @@ Run comprehensive tests:
 4. **Actual behavior:** What actually happened?
 5. **Environment:**
    - Operating system and version
-   - MCP Electron App version
+   - FictionLab App version
    - Docker Desktop version
 6. **Logs:** Export and attach diagnostic report
 7. **Screenshots:** If relevant

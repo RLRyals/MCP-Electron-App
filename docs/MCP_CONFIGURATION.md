@@ -90,7 +90,7 @@ The MCP-Writing-Servers repository will be updated to:
 | `connector-entrypoint.sh` | `MCP-Electron-App/docker/connector-entrypoint.sh` | Reference implementation for MCP-Writing-Servers PR |
 
 Where:
-- `{userData}` = Electron app user data directory (e.g., `~/.config/MCP Electron App`)
+- `{userData}` = Electron app user data directory (e.g., `~/.config/FictionLab App`)
 
 **Volume Mounting**:
 - The config file is passed to Docker via the `MCP_CONFIG_FILE_PATH` environment variable

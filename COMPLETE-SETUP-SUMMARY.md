@@ -45,7 +45,7 @@ Creates JSON configuration with correct paths for the current platform:
         "MCP_STDIO_MODE": "false"
       }
     },
-    ... (all 8 servers)
+    ... (all MCP servers)
   }
 }
 ```
@@ -64,7 +64,7 @@ Creates JSON configuration with correct paths for the current platform:
         "MCP_STDIO_MODE": "false"
       }
     },
-    ... (all 8 servers)
+    ... (all MCP servers)
   }
 }
 ```
@@ -138,7 +138,7 @@ Displays a popup with:
 
 4. **User notification**:
    - Shows success dialog
-   - Displays all 8 servers configured
+   - Displays all MCP servers configured
    - Lists server names
    - Provides copy/paste instructions
 
@@ -169,7 +169,7 @@ Next Steps:
 5. Click "Connect" and start using MCP tools!
 
 Note: All MCP servers have been automatically started and are ready to use.
-You should see tools from all 8 servers in Typing Mind once connected.
+You should see tools from all MCP servers in Typing Mind once connected.
 ```
 
 ## Key Features
@@ -234,7 +234,7 @@ All operations are logged with the `SYSTEM` category:
 [SYSTEM] Building MCP servers configuration...
 [SYSTEM] Added server config: book-planning-server -> C:/Users/.../index.js
 ...
-[SYSTEM] Calling http://localhost:50880/start with 8 servers
+[SYSTEM] Calling http://localhost:50880/start with MCP servers
 [SYSTEM] MCP servers started successfully
 ```
 
@@ -245,7 +245,7 @@ To test the complete flow:
 1. Ensure the system is running (click "Start System")
 2. Wait for all services to be healthy
 3. Click "Configure Typing Mind" button
-4. Check the success dialog shows 8 servers
+4. Check the success dialog shows MCP servers
 5. Click "Open Typing Mind"
 6. In TypingMind Settings → MCP Integration:
    - Paste Server URL: `http://localhost:50880`

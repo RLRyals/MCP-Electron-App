@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea or enhancement for the MCP Electron App
+about: Suggest an idea or enhancement for the FictionLab App
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
@@ -34,7 +34,7 @@ Describe how you (or others) would use this feature:
 
 ## Benefits
 
-How would this feature benefit MCP Electron App users?
+How would this feature benefit FictionLab App users?
 
 - Benefit 1: ...
 - Benefit 2: ...

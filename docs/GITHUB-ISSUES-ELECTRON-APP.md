@@ -1,4 +1,4 @@
-# GitHub Issues for MCP Electron App
+# GitHub Issues for FictionLab App
 
 Copy these issues to your new Electron app repository.
 

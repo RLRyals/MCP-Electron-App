@@ -1,6 +1,6 @@
 # Release Process
 
-This document outlines the process for creating and publishing releases of the MCP Electron App.
+This document outlines the process for creating and publishing releases of the FictionLab App.
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ This document outlines the process for creating and publishing releases of the M
 
 ## Overview
 
-The MCP Electron App uses GitHub Actions for automated multi-platform builds. When a version tag is pushed, the CI/CD pipeline automatically:
+The FictionLab App uses GitHub Actions for automated multi-platform builds. When a version tag is pushed, the CI/CD pipeline automatically:
 
 1. Builds the application for Windows, macOS, and Linux
 2. Generates SHA256 checksums for all artifacts

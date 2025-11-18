@@ -1,6 +1,6 @@
-# Contributing to MCP Electron App
+# Contributing to FictionLab App
 
-Thank you for your interest in contributing to the MCP Electron App! This guide will help you get started.
+Thank you for your interest in contributing to the FictionLab App! This guide will help you get started.
 
 ## Table of Contents
 
@@ -824,7 +824,7 @@ logger.debug('Docker output:', output);
 
 ## License
 
-By contributing to MCP Electron App, you agree that your contributions will be licensed under the MIT License.
+By contributing to FictionLab App, you agree that your contributions will be licensed under the MIT License.
 
 ---
 

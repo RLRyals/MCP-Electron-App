@@ -129,7 +129,7 @@ The implementation uses only cross-platform APIs:
 
 ### On Each Platform:
 
-1. **Start the MCP Electron App**
+1. **Start the FictionLab App**
    - Should launch correctly on all platforms
 
 2. **Check .env file location**
@@ -145,7 +145,7 @@ The implementation uses only cross-platform APIs:
    ```
 
 3. **Click "Configure Typing Mind"**
-   - Should discover 8 servers on all platforms
+   - Should discover MCP servers on all platforms
    - Should generate correct paths for each OS
    - Should successfully call /start endpoint
 

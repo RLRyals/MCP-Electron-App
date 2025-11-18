@@ -10,7 +10,7 @@
 
 ---
 
-This document describes the Docker image pre-loading system planned for the MCP Electron App. This feature will allow bundling pre-built Docker images with the application to provide a faster, more reliable installation experience.
+This document describes the Docker image pre-loading system planned for the FictionLab App. This feature will allow bundling pre-built Docker images with the application to provide a faster, more reliable installation experience.
 
 ## Overview
 

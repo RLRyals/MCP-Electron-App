@@ -10,7 +10,7 @@
 
 ---
 
-This document provides practical examples of using the Docker image pre-loading system planned for the MCP Electron App.
+This document provides practical examples of using the Docker image pre-loading system planned for the FictionLab App.
 
 ## Basic Usage
 

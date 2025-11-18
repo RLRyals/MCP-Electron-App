@@ -1,4 +1,4 @@
-# MCP Electron App - Performance & Claude Desktop Implementation Tasks
+# FictionLab App - Performance & Claude Desktop Implementation Tasks
 
 This document contains detailed task breakdowns for implementing performance improvements and Claude Desktop support. Each task is designed to be small, testable, and suitable for Claude Code Web.
 

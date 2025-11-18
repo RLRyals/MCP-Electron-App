@@ -6,7 +6,7 @@ This guide explains how to automatically set up TypingMind with your MCP Connect
 
 ### Quick Setup (3 Simple Steps!)
 
-1. **Start Your MCP Electron App**
+1. **Start Your FictionLab App**
    - Open the application
    - The dashboard will appear
    - Click "Start System" if not already running
@@ -15,7 +15,7 @@ This guide explains how to automatically set up TypingMind with your MCP Connect
 2. **Click "Configure Typing Mind" Button**
    - On the dashboard, find the "Configure Typing Mind" button
    - Click it once
-   - Wait for the success message showing **8 servers configured**
+   - Wait for the success message showing **MCP servers configured**
 
 3. **Open Typing Mind and Connect**
    - Click the "Open Typing Mind" button
