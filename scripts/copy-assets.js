@@ -42,6 +42,25 @@ function copyAssets() {
       console.warn(`  ⚠ Warning: icon.png not found at ${iconSrc}`);
     }
 
+    // Copy all icon files from resources to dist/resources
+    console.log('Copying resources directory...');
+    const srcResources = path.join(__dirname, '..', 'resources');
+    const distResources = path.join(__dirname, '..', 'dist', 'resources');
+
+    if (fs.existsSync(srcResources)) {
+      ensureDirSync(distResources);
+      const resourceFiles = ['icon.png', 'icon.ico', 'icon.icns'];
+
+      for (const file of resourceFiles) {
+        const srcPath = path.join(srcResources, file);
+        if (fs.existsSync(srcPath)) {
+          const destPath = path.join(distResources, file);
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`  ✓ Copied resources/${file}`);
+        }
+      }
+    }
+
     // Also copy preload assets if they exist
     const srcPreload = path.join(__dirname, '..', 'src', 'preload');
     const distPreload = path.join(__dirname, '..', 'dist', 'preload');

@@ -233,12 +233,16 @@ function createMenu(): void {
 function createWizardWindow(): void {
   logger.info('Creating setup wizard window...');
 
+  const iconPath = process.platform === 'win32'
+    ? path.join(__dirname, '../resources/icon.ico')
+    : path.join(__dirname, '../resources/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 768,
-    icon: path.join(__dirname, '../resources/icon.png'),
+    icon: iconPath,
     title: 'MCP Writing System - Setup Wizard',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
@@ -277,12 +281,16 @@ function createWizardWindow(): void {
 function createMigrationWizardWindow(): void {
   logger.info('Creating migration wizard window...');
 
+  const iconPath = process.platform === 'win32'
+    ? path.join(__dirname, '../resources/icon.ico')
+    : path.join(__dirname, '../resources/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
     minWidth: 800,
-    minHeight: 600,        
-    icon: path.join(__dirname, '../resources/icon.png'),
+    minHeight: 600,
+    icon: iconPath,
     title: 'MCP Writing System - Migration Wizard',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
@@ -321,13 +329,17 @@ function createMigrationWizardWindow(): void {
 function createWindow(): void {
   logger.info('Creating main window...');
 
+  const iconPath = process.platform === 'win32'
+    ? path.join(__dirname, '../resources/icon.ico')
+    : path.join(__dirname, '../resources/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
     title: 'FictionLab',
-    icon: path.join(__dirname, '../resources/icon.png'),
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
