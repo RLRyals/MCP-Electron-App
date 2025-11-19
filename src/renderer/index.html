@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
     <title>FictionLab</title>
+    <link rel="stylesheet" href="styles/tabs.css">
     <style>
         * {
             margin: 0;
@@ -1421,6 +1422,46 @@
             border-color: rgba(255, 255, 255, 0.5);
         }
 
+        /* Service Status Badges */
+        .service-status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid;
+        }
+
+        .service-status-badge.status-healthy {
+            background: rgba(0, 212, 170, 0.2);
+            border-color: rgba(0, 212, 170, 0.5);
+            color: #00D4AA;
+        }
+
+        .service-status-badge.status-starting {
+            background: rgba(255, 184, 77, 0.2);
+            border-color: rgba(255, 184, 77, 0.5);
+            color: #FFB84D;
+        }
+
+        .service-status-badge.status-offline {
+            background: rgba(244, 67, 54, 0.2);
+            border-color: rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
+        /* Resource Usage Display */
+        .resource-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .resource-value {
+            font-weight: 600;
+            color: #00D4AA;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .dashboard-actions {
@@ -1448,145 +1489,28 @@
         <p class="subtitle">Your AI-Powered Writing Laboratory</p>
     </header>
 
-    <main>
-        <!-- Main Dashboard - Moved to top for easy access -->
+    <!-- Tab Navigation -->
+    <div class="tab-navigation-wrapper">
+        <nav id="tab-navigation" role="tablist" aria-label="Main navigation">
+            <!-- Tab buttons will be inserted here by TabNavigation.ts -->
+        </nav>
+    </div>
 
-        <div class="dashboard-card" id="dashboard-card">
-            <div class="dashboard-header">
-                <h2>Writing System</h2>
-                <div class="dashboard-status">
-                    <div id="dashboard-status-indicator" class="status-indicator status-red">
-                        <span class="status-dot"></span>
-                    </div>
-                    <span id="dashboard-status-text">System Offline</span>
+    <main class="tab-content-container">
+        <!-- Dashboard Tab Panel -->
+        <div id="tab-panel-dashboard" class="tab-panel active" role="tabpanel" aria-labelledby="tab-dashboard" data-tab-name="Dashboard">
+            <div class="tab-panel-content">
+                <!-- Dashboard content will be populated by DashboardTab component -->
+                <div class="dashboard-card" id="dashboard-card">
+                    <!-- Content populated by DashboardTab.ts -->
                 </div>
-            </div>
-
-            <div class="dashboard-progress" id="dashboard-progress">
-                <div class="dashboard-progress-bar-container">
-                    <div class="dashboard-progress-bar" id="dashboard-progress-bar"></div>
-                </div>
-                <div class="dashboard-progress-text" id="dashboard-progress-text">
-                    Initializing...
-                </div>
-            </div>
-
-            <div class="dashboard-section">
-                <h3>Quick Actions</h3>
-                <div class="dashboard-actions">
-                    <button id="dashboard-start-system" class="action-button primary" title="Start all services including PostgreSQL database and context servers">Start System</button>
-                    <button id="dashboard-stop-system" class="action-button" title="Gracefully shut down all running services">Stop System</button>
-                    <button id="dashboard-restart-system" class="action-button" title="Stop and restart all services (useful for troubleshooting)">Restart System</button>
-                    <button id="dashboard-open-typing-mind" class="action-button secondary" title="Open Typing Mind web interface in your default browser">Open Typing Mind</button>
-                    <button id="dashboard-configure-typing-mind" class="action-button secondary" title="Automatically configure Typing Mind with connector settings">Configure Typing Mind</button>
-                    <button id="dashboard-configure-claude-desktop" class="action-button secondary" title="Configure Claude Desktop with native stdio servers">Configure Claude Desktop</button>
-                    <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh the status of all services and update the dashboard">🔄</button>
-                </div>
-            </div>
-
-            <div class="dashboard-section">
-                <h3>Database Management</h3>
-                <div class="dashboard-actions">
-                    <button id="dashboard-backup-database" class="action-button secondary" title="Create a backup of your PostgreSQL database">Backup Database</button>
-                    <button id="dashboard-restore-database" class="action-button secondary" title="Restore database from a backup file">Restore Database</button>
-                    <button id="dashboard-manage-backups" class="action-button secondary" title="View and manage existing database backups">Manage Backups</button>
-                    <button id="dashboard-open-backup-folder" class="action-button secondary" title="Open the folder containing database backups">Open Backup Folder</button>
-                </div>
-            </div>
-
-            <div class="dashboard-section">
-                <h3>Services</h3>
-                <div class="service-cards">
-                    <!-- PostgreSQL Card -->
-                    <div class="service-card" id="postgres-card">
-                        <div class="service-card-header">
-                            <div class="service-name">
-                                <span id="postgres-status-icon" class="service-status-icon">
-                                    <span class="status-dot status-red"></span>
-                                </span>
-                                <h4>PostgreSQL</h4>
-                            </div>
-                            <span id="postgres-status-text" class="service-status">Offline</span>
-                        </div>
-                        <div class="service-card-body">
-                            <div class="service-info">
-                                <span id="postgres-port-display" class="service-detail">Port: 5432</span>
-                            </div>
-                            <button class="service-action-btn view-logs-btn" data-service="postgres" title="View recent PostgreSQL database logs for troubleshooting">View Logs</button>
-                        </div>
-                    </div>
-
-                    <!-- MCP Servers Card -->
-                    <div class="service-card" id="mcp-servers-card">
-                        <div class="service-card-header">
-                            <div class="service-name">
-                                <span id="mcp-servers-status-icon" class="service-status-icon">
-                                    <span class="status-dot status-red"></span>
-                                </span>
-                                <h4>Context Servers</h4>
-                            </div>
-                            <span id="mcp-servers-status-text" class="service-status">Offline</span>
-                        </div>
-                        <div class="service-card-body">
-                            <div class="service-info">
-                                <span class="service-detail">Version: latest</span>
-                            </div>
-                            <button class="service-action-btn view-logs-btn" data-service="mcp-servers" title="View recent context server logs for troubleshooting">View Logs</button>
-                        </div>
-                    </div>
-
-                    <!-- MCP Connector Card -->
-                    <div class="service-card" id="mcp-connector-card" style="display: none;">
-                        <div class="service-card-header">
-                            <div class="service-name">
-                                <span id="mcp-connector-status-icon" class="service-status-icon">
-                                    <span class="status-dot status-red"></span>
-                                </span>
-                                <h4>Context Connector</h4>
-                            </div>
-                            <span id="mcp-connector-status-text" class="service-status">Offline</span>
-                        </div>
-                        <div class="service-card-body">
-                            <div class="service-info">
-                                <span id="mcp-connector-port-display" class="service-detail">Port: 50880</span>
-                            </div>
-                            <div class="service-actions">
-                                <button class="service-action-btn view-logs-btn" data-service="mcp-connector" title="View recent connector logs for troubleshooting">View Logs</button>
-                                <button class="service-action-btn copy-token-btn" title="Copy the authentication token to clipboard for configuring Claude Desktop">Copy Token</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Typing Mind Card -->
-                    <div class="service-card" id="typing-mind-card" style="display: none;">
-                        <div class="service-card-header">
-                            <div class="service-name">
-                                <span id="typing-mind-status-icon" class="service-status-icon">
-                                    <span class="status-dot status-red"></span>
-                                </span>
-                                <h4>Typing Mind</h4>
-                            </div>
-                            <span id="typing-mind-status-text" class="service-status">Offline</span>
-                        </div>
-                        <div class="service-card-body">
-                            <div class="service-info">
-                                <span id="typing-mind-port-display" class="service-detail">Port: 3000</span>
-                            </div>
-                            <div class="service-actions">
-                                <button class="service-action-btn view-logs-btn" data-service="typing-mind" title="View recent Typing Mind logs for troubleshooting">View Logs</button>
-                                <button class="service-action-btn open-browser-btn" data-url="" title="Open Typing Mind interface in your default web browser">Open Browser</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-footer">
-                <span id="dashboard-last-updated" class="last-updated">Last updated: --:--:--</span>
             </div>
         </div>
 
-        <div class="welcome-card">
+        <!-- Setup Tab Panel -->
+        <div id="tab-panel-setup" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-setup" data-tab-name="Setup" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="welcome-card">
             <h2>Welcome!</h2>
             <p>
                 Your AI-powered writing workspace with advanced context management. FictionLab simplifies setup and management of your writing tools.
@@ -1614,6 +1538,43 @@
             <button class="test-button" id="test-ipc">Test IPC Communication</button>
             <div class="test-result" id="test-result">
                 IPC communication successful!
+            </div>
+        </div>
+
+        <div class="env-config-card" style="max-width: 900px;">
+            <h2>Update Tools</h2>
+            <p style="margin-bottom: 20px; opacity: 0.9;">
+                Keep your FictionLab installation up to date with the latest features and improvements.
+            </p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>
+                        MCP-Writing-Servers
+                        <span class="tooltip" title="Update the MCP Writing Servers repository via git pull">ⓘ</span>
+                    </label>
+                    <button type="button" class="test-button" id="update-mcp-servers" title="Pull latest changes from MCP-Writing-Servers repository">Update MCP-Writing-Servers</button>
+                    <div id="mcp-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        Typing Mind
+                        <span class="tooltip" title="Check for and install Typing Mind updates">ⓘ</span>
+                    </label>
+                    <button type="button" class="test-button" id="update-typing-mind" title="Check for Typing Mind updates">Check for Updates</button>
+                    <div id="typing-mind-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        FictionLab
+                        <span class="tooltip" title="Check for FictionLab application updates">ⓘ</span>
+                    </label>
+                    <div id="fictionlab-current-version" style="margin-bottom: 8px; font-size: 0.9rem; opacity: 0.9;">Current Version: Loading...</div>
+                    <button type="button" class="test-button" id="check-fictionlab-updates" title="Check for FictionLab application updates">Check for Updates</button>
+                    <div id="fictionlab-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
+                </div>
             </div>
         </div>
 
@@ -1814,49 +1775,187 @@
 
             <div class="config-status" id="config-status"></div>
         </div>
-
-        <div class="docker-card">
-            <h2>Docker Control</h2>
-            <p style="margin-bottom: 20px; opacity: 0.9;">
-                Manage Docker Desktop - start, stop, restart, and monitor health status.
-            </p>
-
-            <div class="docker-status" id="docker-status">
-                Status: Checking...
             </div>
-
-            <div class="docker-buttons">
-                <button id="start-docker" title="Start Docker Desktop application">Start Docker</button>
-                <button id="stop-docker" title="Stop Docker Desktop application (this will stop all running containers)">Stop Docker</button>
-                <button id="restart-docker" title="Restart Docker Desktop to resolve issues">Restart Docker</button>
-                <button id="check-docker-health" title="Perform a comprehensive health check on Docker Desktop">Check Health</button>
-            </div>
-
-            <div class="docker-progress" id="docker-progress">
-                <div class="docker-progress-bar-container">
-                    <div class="docker-progress-bar" id="docker-progress-bar"></div>
-                </div>
-                <div class="docker-progress-text" id="docker-progress-text">
-                    Starting Docker...
-                </div>
-            </div>
-
-            <div class="docker-health-info" id="docker-health-info"></div>
         </div>
 
-        <div class="diagnostics-card">
-            <h2>Diagnostics & Logging</h2>
-            <p style="margin-bottom: 20px; opacity: 0.9;">
-                Tools for debugging and troubleshooting the application.
-            </p>
+        <!-- Database Tab Panel -->
+        <div id="tab-panel-database" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-database" data-tab-name="Database" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="dashboard-card">
+                    <div class="dashboard-header">
+                        <h2>Database Management</h2>
+                        <div class="dashboard-status">
+                            <div id="database-status-indicator" class="status-indicator">
+                                <span class="status-dot"></span>
+                            </div>
+                            <span id="database-status-text">Checking...</span>
+                        </div>
+                    </div>
 
-            <div class="diagnostics-buttons">
-                <button id="view-logs" title="Open the application log file to view detailed activity and error messages">View Logs</button>
-                <button id="test-system" title="Run a comprehensive system test to verify all components are working correctly">Test System</button>
-                <button id="export-report" title="Export a complete diagnostic report including logs, configuration, and system information for troubleshooting">Export Diagnostic Report</button>
+                    <div class="dashboard-section">
+                        <h3>Backup & Restore</h3>
+                        <div class="dashboard-actions">
+                            <button id="db-backup-database" class="action-button primary" title="Create a backup of your PostgreSQL database">Create Backup</button>
+                            <button id="db-restore-database" class="action-button secondary" title="Restore database from a backup file">Restore from Backup</button>
+                            <button id="db-manage-backups" class="action-button secondary" title="View and manage existing database backups">Manage Backups</button>
+                            <button id="db-open-backup-folder" class="action-button secondary" title="Open the folder containing database backups">Open Backup Folder</button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <h3>Database Tools</h3>
+                        <p style="opacity: 0.9; margin-bottom: 15px;">
+                            Advanced database administration tools including CRUD operations, schema management, and audit logs.
+                        </p>
+                        <div class="dashboard-actions">
+                            <button class="action-button secondary" title="Query and manage database records">CRUD Operations</button>
+                            <button class="action-button secondary" title="View and manage database schema">Schema Explorer</button>
+                            <button class="action-button secondary" title="View database audit logs">Audit Logs</button>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
 
-            <div id="system-test-results"></div>
+        <!-- Services Tab Panel -->
+        <div id="tab-panel-services" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-services" data-tab-name="Services" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="dashboard-card">
+                    <div class="dashboard-header">
+                        <h2>Service Management</h2>
+                        <div class="dashboard-actions" style="gap: 10px;">
+                            <button id="services-refresh-all" class="action-button icon-only" title="Refresh all service statuses">🔄</button>
+                        </div>
+                    </div>
+
+                    <div class="service-cards" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+                        <!-- PostgreSQL Service Card -->
+                        <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
+                            <div class="service-card-header">
+                                <div class="service-name">
+                                    <h4>PostgreSQL Database</h4>
+                                </div>
+                                <span id="postgres-status-badge" class="service-status-badge status-offline">Offline</span>
+                            </div>
+                            <div class="service-card-body">
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <div class="service-detail" id="postgres-port-info">Port: 5432</div>
+                                    <div class="service-detail" id="postgres-version-info">Version: PostgreSQL 17</div>
+                                </div>
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
+                                    <div id="postgres-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
+                                        <div class="resource-item">Not running</div>
+                                    </div>
+                                </div>
+                                <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <button id="postgres-start" class="service-action-btn" title="Start PostgreSQL service">Start</button>
+                                    <button id="postgres-stop" class="service-action-btn" title="Stop PostgreSQL service">Stop</button>
+                                    <button id="postgres-restart" class="service-action-btn" title="Restart PostgreSQL service">Restart</button>
+                                    <button id="postgres-view-logs" class="service-action-btn" title="View PostgreSQL logs">View Logs</button>
+                                    <button id="postgres-view-connection" class="service-action-btn" title="View connection details">Connection Info</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MCP Servers Card -->
+                        <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
+                            <div class="service-card-header">
+                                <div class="service-name">
+                                    <h4>MCP Servers</h4>
+                                </div>
+                                <span id="mcp-servers-status-badge" class="service-status-badge status-offline">Offline</span>
+                            </div>
+                            <div class="service-card-body">
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <div class="service-detail" id="mcp-servers-port-info">Connector Port: 50880</div>
+                                    <div class="service-detail" id="mcp-servers-version-info">Version: Latest</div>
+                                </div>
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
+                                    <div id="mcp-servers-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
+                                        <div class="resource-item">Not running</div>
+                                    </div>
+                                </div>
+                                <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <button id="mcp-servers-start" class="service-action-btn" title="Start MCP Servers">Start</button>
+                                    <button id="mcp-servers-stop" class="service-action-btn" title="Stop MCP Servers">Stop</button>
+                                    <button id="mcp-servers-restart" class="service-action-btn" title="Restart MCP Servers">Restart</button>
+                                    <button id="mcp-servers-view-logs" class="service-action-btn" title="View MCP Servers logs">View Logs</button>
+                                    <button id="mcp-servers-health-check" class="service-action-btn" title="Check health status">Health Check</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Typing Mind Service Card -->
+                        <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
+                            <div class="service-card-header">
+                                <div class="service-name">
+                                    <h4>Typing Mind</h4>
+                                </div>
+                                <span id="typing-mind-status-badge" class="service-status-badge status-offline">Offline</span>
+                            </div>
+                            <div class="service-card-body">
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <div class="service-detail" id="typing-mind-url-info">Port: 8080</div>
+                                    <div class="service-detail" id="typing-mind-version-info">Version: Latest</div>
+                                </div>
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
+                                    <div id="typing-mind-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
+                                        <div class="resource-item">Not running</div>
+                                    </div>
+                                </div>
+                                <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <button id="typing-mind-start" class="service-action-btn" title="Start Typing Mind">Start</button>
+                                    <button id="typing-mind-stop" class="service-action-btn" title="Stop Typing Mind">Stop</button>
+                                    <button id="typing-mind-restart" class="service-action-btn" title="Restart Typing Mind">Restart</button>
+                                    <button id="typing-mind-view-logs" class="service-action-btn" title="View Typing Mind logs">View Logs</button>
+                                    <button id="typing-mind-open-browser" class="service-action-btn" title="Open in browser">Open Browser</button>
+                                    <button id="typing-mind-configure" class="service-action-btn" title="Configure Typing Mind">Configure</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Docker Desktop Service Card -->
+                        <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
+                            <div class="service-card-header">
+                                <div class="service-name">
+                                    <h4>Docker Desktop</h4>
+                                </div>
+                                <span id="docker-status-badge" class="service-status-badge status-offline">Offline</span>
+                            </div>
+                            <div class="service-card-body">
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <div class="service-detail" id="docker-version-info">Docker Desktop</div>
+                                    <div class="service-detail" id="docker-health-info">Status: Checking...</div>
+                                </div>
+                                <div class="service-info" style="margin-bottom: 15px;">
+                                    <p style="font-size: 0.85rem; opacity: 0.9;">
+                                        Container runtime for all FictionLab services
+                                    </p>
+                                </div>
+                                <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <button id="docker-service-start" class="service-action-btn" title="Start Docker Desktop">Start</button>
+                                    <button id="docker-service-stop" class="service-action-btn" title="Stop Docker Desktop">Stop</button>
+                                    <button id="docker-service-restart" class="service-action-btn" title="Restart Docker Desktop">Restart</button>
+                                    <button id="docker-service-health-check" class="service-action-btn" title="Check Docker health">Health Check</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-footer" style="margin-top: 30px;">
+                        <span id="services-last-updated" class="last-updated">Last updated: --:--:--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Logs Tab Panel -->
+        <div id="tab-panel-logs" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-logs" data-tab-name="Logs" aria-hidden="true">
+            <!-- LogsTab component will be rendered here -->
         </div>
     </main>
 

@@ -19,6 +19,7 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
 import * as databaseBackup from './database-backup';
+import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import * as migrations from './migrations';
@@ -56,6 +57,7 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: BrowserWindow | null = null;
+let typingMindWindow: BrowserWindow | null = null;
 
 /**
  * Create the application menu
@@ -369,6 +371,100 @@ function createWindow(): void {
   });
 
   logger.info('Main window created');
+}
+
+/**
+ * Create the Typing Mind window
+ */
+function createTypingMindWindow(url: string): void {
+  logger.info('Creating Typing Mind window...');
+
+  // If window already exists, focus it and navigate to URL
+  if (typingMindWindow && !typingMindWindow.isDestroyed()) {
+    typingMindWindow.focus();
+    typingMindWindow.loadURL(url);
+    return;
+  }
+
+  const iconPath = process.platform === 'win32'
+    ? path.join(__dirname, '../resources/icon.ico')
+    : path.join(__dirname, '../resources/icon.png');
+
+  typingMindWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 768,
+    icon: iconPath,
+    title: 'Typing Mind - FictionLab',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true, // Enable spell checking
+    },
+    show: false, // Don't show until ready
+  });
+
+  // Load the Typing Mind URL
+  typingMindWindow.loadURL(url);
+
+  // Show window when ready to avoid visual flash
+  typingMindWindow.once('ready-to-show', () => {
+    logger.info('Typing Mind window ready to show');
+    typingMindWindow?.show();
+  });
+
+  // Set up context menu with spell check support
+  typingMindWindow.webContents.on('context-menu', (_event, params) => {
+    const menu = Menu.buildFromTemplate([
+      // Add spelling suggestions if there's a misspelled word
+      ...(params.misspelledWord && params.dictionarySuggestions.length > 0
+        ? [
+            ...params.dictionarySuggestions.slice(0, 5).map(suggestion => ({
+              label: suggestion,
+              click: () => typingMindWindow?.webContents.replaceMisspelling(suggestion),
+            })),
+            { type: 'separator' as const },
+          ]
+        : []
+      ),
+      // Standard editing menu items
+      ...(params.isEditable
+        ? [
+            { role: 'undo' as const },
+            { role: 'redo' as const },
+            { type: 'separator' as const },
+            { role: 'cut' as const },
+            { role: 'copy' as const },
+            { role: 'paste' as const },
+            { role: 'pasteAndMatchStyle' as const },
+            { role: 'selectAll' as const },
+          ]
+        : params.selectionText
+        ? [
+            { role: 'copy' as const },
+          ]
+        : []
+      ),
+    ]);
+
+    if (menu.items.length > 0) {
+      menu.popup();
+    }
+  });
+
+  // Open DevTools in development mode
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    typingMindWindow.webContents.openDevTools();
+  }
+
+  typingMindWindow.on('closed', () => {
+    typingMindWindow = null;
+  });
+
+  logger.info('Typing Mind window created');
 }
 
 /**
@@ -755,6 +851,20 @@ function setupIPC(): void {
     return JSON.stringify(serversConfig, null, 2);
   });
 
+  ipcMain.handle('typingmind:open-window', async (_, url: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening Typing Mind window at ${url}...`);
+    try {
+      createTypingMindWindow(url);
+      return { success: true };
+    } catch (error) {
+      logWithCategory('error', LogCategory.ERROR, 'Failed to open Typing Mind window', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   // Claude Desktop Auto-Configuration IPC handlers
   ipcMain.handle('claude-desktop:auto-configure', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring Claude Desktop...');
@@ -949,6 +1059,86 @@ function setupIPC(): void {
   ipcMain.handle('database-backup:open-directory', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening backup directory...');
     return await databaseBackup.openBackupDirectory();
+  });
+
+  // Database Administration IPC handlers (MCP database tools)
+  ipcMain.handle('database-admin:check-connection', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking database admin server connection...');
+    return await databaseAdmin.checkConnection();
+  });
+
+  ipcMain.handle('database-admin:get-server-info', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting database server info...');
+    return await databaseAdmin.getServerInfo();
+  });
+
+  // CRUD Operations
+  ipcMain.handle('database-admin:query-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Querying records from table ${params.table}...`);
+    return await databaseAdmin.queryRecords(params);
+  });
+
+  ipcMain.handle('database-admin:insert-record', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Inserting record into table ${params.table}...`);
+    return await databaseAdmin.insertRecord(params);
+  });
+
+  ipcMain.handle('database-admin:update-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating records in table ${params.table}...`);
+    return await databaseAdmin.updateRecords(params);
+  });
+
+  ipcMain.handle('database-admin:delete-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting records from table ${params.table}...`);
+    return await databaseAdmin.deleteRecords(params);
+  });
+
+  // Batch Operations
+  ipcMain.handle('database-admin:batch-insert', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch inserting ${params.records?.length || 0} records into table ${params.table}...`);
+    return await databaseAdmin.batchInsert(params);
+  });
+
+  ipcMain.handle('database-admin:batch-update', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch updating records in table ${params.table}...`);
+    return await databaseAdmin.batchUpdate(params);
+  });
+
+  ipcMain.handle('database-admin:batch-delete', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch deleting records from table ${params.table}...`);
+    return await databaseAdmin.batchDelete(params);
+  });
+
+  // Schema Management
+  ipcMain.handle('database-admin:get-schema', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting schema for table ${params.table}...`);
+    return await databaseAdmin.getSchema(params);
+  });
+
+  ipcMain.handle('database-admin:list-tables', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing database tables...');
+    return await databaseAdmin.listTables();
+  });
+
+  ipcMain.handle('database-admin:get-relationships', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting table relationships...');
+    return await databaseAdmin.getRelationships(params);
+  });
+
+  ipcMain.handle('database-admin:list-columns', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Listing columns for table ${params.table}...`);
+    return await databaseAdmin.listColumns(params);
+  });
+
+  // Audit Functions
+  ipcMain.handle('database-admin:query-audit-logs', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Querying audit logs...');
+    return await databaseAdmin.queryAuditLogs(params);
+  });
+
+  ipcMain.handle('database-admin:get-audit-summary', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting audit summary...');
+    return await databaseAdmin.getAuditSummary(params);
   });
 
   // Updater IPC handlers
@@ -1853,6 +2043,12 @@ app.whenReady().then(async () => {
   // Initialize logging system after app is ready
   initializeLogger();
   logger.info('App is ready');
+
+  // Set Windows App User Model ID for proper taskbar behavior
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('net.fictionlab.studio');
+  }
+
   setupIPC();
   createMenu();
 

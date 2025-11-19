@@ -7,6 +7,11 @@
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
 import { initializeDashboard } from './dashboard-handlers.js';
+import { createDefaultTabNavigation } from './components/TabNavigation.js';
+import { initializeSetupTab } from './components/SetupTab.js';
+import { createDashboardTab } from './components/DashboardTab.js';
+import { createDefaultLogsTab } from './components/LogsTab.js';
+import { initializeServicesTab } from './components/ServicesTab.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -54,6 +59,7 @@ interface EnvConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
+  HTTP_SSE_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
 }
@@ -315,6 +321,23 @@ interface ElectronAPI {
     getDirectory: () => Promise<string>;
     openDirectory: () => Promise<void>;
   };
+  databaseAdmin: {
+    checkConnection: () => Promise<any>;
+    getServerInfo: () => Promise<any>;
+    queryRecords: (params: any) => Promise<any>;
+    insertRecord: (params: any) => Promise<any>;
+    updateRecords: (params: any) => Promise<any>;
+    deleteRecords: (params: any) => Promise<any>;
+    batchInsert: (params: any) => Promise<any>;
+    batchUpdate: (params: any) => Promise<any>;
+    batchDelete: (params: any) => Promise<any>;
+    getSchema: (params: any) => Promise<any>;
+    listTables: () => Promise<any>;
+    getRelationships: (params: any) => Promise<any>;
+    listColumns: (params: any) => Promise<any>;
+    queryAuditLogs: (params: any) => Promise<any>;
+    getAuditSummary: (params: any) => Promise<any>;
+  };
   typingMind: {
     autoConfigure: () => Promise<any>;
     setCustomConfig: (serverUrl: string, authToken: string) => Promise<any>;
@@ -323,6 +346,7 @@ interface ElectronAPI {
     isConfigured: () => Promise<boolean>;
     resetConfig: () => Promise<any>;
     getMCPServersJSON: () => Promise<string>;
+    openWindow: (url: string) => Promise<{ success: boolean; error?: string }>;
   };
   claudeDesktop: {
     autoConfigure: () => Promise<any>;
@@ -332,6 +356,10 @@ interface ElectronAPI {
     getConfigPath: () => Promise<string>;
     openConfigFolder: () => Promise<void>;
     getConfigInstructions: () => Promise<string>;
+  };
+  updates: {
+    checkForUpdates: () => Promise<any>;
+    downloadAndInstall: () => Promise<any>;
   };
 }
 
@@ -717,6 +745,41 @@ window.addEventListener('unhandledrejection', (event) => {
 function init(): void {
   console.log('Renderer process initialized');
 
+  // Initialize tab navigation system
+  const tabNavigation = createDefaultTabNavigation();
+  tabNavigation.initialize();
+
+  // Initialize dashboard tab component
+  const dashboardTab = createDashboardTab();
+  dashboardTab.initialize();
+
+  // Initialize logs tab component
+  const logsTab = createDefaultLogsTab();
+
+  // Declare servicesTab variable to initialize it when needed
+  let servicesTab: any = null;
+
+  // Listen for tab changes to initialize LogsTab and ServicesTab when first shown
+  window.addEventListener('tab-changed', async (e: Event) => {
+    const customEvent = e as CustomEvent;
+    if (customEvent.detail.tabId === 'logs' && !logsTab['isInitialized']) {
+      try {
+        await logsTab.initialize();
+      } catch (err) {
+        console.error('Error initializing Logs Tab:', err);
+      }
+    }
+    if (customEvent.detail.tabId === 'services' && !servicesTab) {
+      try {
+        servicesTab = await initializeServicesTab();
+        console.log('Services Tab initialized successfully');
+      } catch (err) {
+        console.error('Error initializing Services Tab:', err);
+        showNotification('Failed to initialize Services Tab', 'error');
+      }
+    }
+  });
+
   // Load app information
   loadAppInfo();
 
@@ -764,6 +827,12 @@ function init(): void {
   setupClientSelectionListeners();
   loadClientOptions();
 
+  // Initialize Setup Tab
+  initializeSetupTab().catch(err => {
+    console.error('Error initializing Setup Tab:', err);
+    // Don't show notification - this is not critical
+  });
+
   // Initialize dashboard (main control interface)
   initializeDashboard().catch(err => {
     console.error('Critical error initializing dashboard:', err);
@@ -789,6 +858,51 @@ function init(): void {
   const healthButton = document.getElementById('check-docker-health');
   if (healthButton) {
     healthButton.addEventListener('click', checkDockerHealth);
+  }
+
+  // Set up Database tab event listeners
+  const dbBackupButton = document.getElementById('db-backup-database');
+  if (dbBackupButton) {
+    dbBackupButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardBackupButton = document.getElementById('dashboard-backup-database');
+      if (dashboardBackupButton) {
+        dashboardBackupButton.click();
+      }
+    });
+  }
+
+  const dbRestoreButton = document.getElementById('db-restore-database');
+  if (dbRestoreButton) {
+    dbRestoreButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardRestoreButton = document.getElementById('dashboard-restore-database');
+      if (dashboardRestoreButton) {
+        dashboardRestoreButton.click();
+      }
+    });
+  }
+
+  const dbManageBackupsButton = document.getElementById('db-manage-backups');
+  if (dbManageBackupsButton) {
+    dbManageBackupsButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardManageButton = document.getElementById('dashboard-manage-backups');
+      if (dashboardManageButton) {
+        dashboardManageButton.click();
+      }
+    });
+  }
+
+  const dbOpenBackupFolderButton = document.getElementById('db-open-backup-folder');
+  if (dbOpenBackupFolderButton) {
+    dbOpenBackupFolderButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardOpenFolderButton = document.getElementById('dashboard-open-backup-folder');
+      if (dashboardOpenFolderButton) {
+        dashboardOpenFolderButton.click();
+      }
+    });
   }
 
   // Automatically check prerequisites on load
