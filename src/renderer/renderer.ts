@@ -11,6 +11,7 @@ import { createDefaultTabNavigation } from './components/TabNavigation.js';
 import { initializeSetupTab } from './components/SetupTab.js';
 import { createDashboardTab } from './components/DashboardTab.js';
 import { createDefaultLogsTab } from './components/LogsTab.js';
+import { initializeServicesTab } from './components/ServicesTab.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -732,7 +733,10 @@ function init(): void {
   // Initialize logs tab component
   const logsTab = createDefaultLogsTab();
 
-  // Listen for tab changes to initialize LogsTab when the Logs tab is first shown
+  // Declare servicesTab variable to initialize it when needed
+  let servicesTab: any = null;
+
+  // Listen for tab changes to initialize LogsTab and ServicesTab when first shown
   window.addEventListener('tab-changed', async (e: Event) => {
     const customEvent = e as CustomEvent;
     if (customEvent.detail.tabId === 'logs' && !logsTab['isInitialized']) {
@@ -740,6 +744,15 @@ function init(): void {
         await logsTab.initialize();
       } catch (err) {
         console.error('Error initializing Logs Tab:', err);
+      }
+    }
+    if (customEvent.detail.tabId === 'services' && !servicesTab) {
+      try {
+        servicesTab = await initializeServicesTab();
+        console.log('Services Tab initialized successfully');
+      } catch (err) {
+        console.error('Error initializing Services Tab:', err);
+        showNotification('Failed to initialize Services Tab', 'error');
       }
     }
   });
