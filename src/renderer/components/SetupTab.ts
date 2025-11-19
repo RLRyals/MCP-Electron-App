@@ -233,35 +233,26 @@ async function handleUpdateMCPServers(): Promise<void> {
 
     showNotification('Checking for MCP-Writing-Servers updates...', 'info');
 
-    // Get the working directory
-    const workingDir = await window.electronAPI.mcpSystem.getWorkingDirectory();
+    // Check for updates using the updater API
+    const updateCheck = await window.electronAPI.updater.checkMCPServers();
 
-    // Check if git API is available
-    if (!(window.electronAPI as any).git?.pull) {
-      showNotification('Git update functionality not yet implemented', 'info');
+    if (!updateCheck.available) {
+      showNotification('MCP-Writing-Servers is already up to date', 'info');
       if (statusDiv) {
-        statusDiv.textContent = 'Manual update required: Navigate to MCP-Writing-Servers directory and run "git pull"';
-        statusDiv.style.color = '#FFB84D';
+        statusDiv.textContent = `Already up to date (${updateCheck.currentVersion || 'latest'})`;
+        statusDiv.style.color = '#00D4AA';
       }
       return;
     }
 
-    // Perform git pull
-    const result = await (window.electronAPI as any).git.pull(workingDir + '/MCP-Writing-Servers');
+    // Perform the update
+    const result = await window.electronAPI.updater.updateMCPServers();
 
     if (result.success) {
-      if (result.changes) {
-        showNotification('MCP-Writing-Servers updated successfully!', 'success');
-        if (statusDiv) {
-          statusDiv.textContent = `Updated: ${result.changes}`;
-          statusDiv.style.color = '#00D4AA';
-        }
-      } else {
-        showNotification('MCP-Writing-Servers is already up to date', 'info');
-        if (statusDiv) {
-          statusDiv.textContent = 'Already up to date';
-          statusDiv.style.color = '#00D4AA';
-        }
+      showNotification('MCP-Writing-Servers updated successfully!', 'success');
+      if (statusDiv) {
+        statusDiv.textContent = `Updated: ${result.message}`;
+        statusDiv.style.color = '#00D4AA';
       }
     } else {
       showNotification(`Update failed: ${result.error || result.message}`, 'error');
@@ -275,7 +266,7 @@ async function handleUpdateMCPServers(): Promise<void> {
     console.error('Error updating MCP-Writing-Servers:', error);
     showNotification('Failed to update MCP-Writing-Servers', 'error');
     if (statusDiv) {
-      statusDiv.textContent = 'Update failed';
+      statusDiv.textContent = `Update failed: ${error instanceof Error ? error.message : String(error)}`;
       statusDiv.style.color = '#f44336';
     }
   } finally {
@@ -303,53 +294,45 @@ async function handleUpdateTypingMind(): Promise<void> {
       statusDiv.style.color = '#FFB84D';
     }
 
-    // Check if update API is available
-    if (!(window.electronAPI as any).typingMind?.checkForUpdates) {
-      showNotification('Typing Mind update checking not yet implemented', 'info');
+    showNotification('Checking for Typing Mind updates...', 'info');
+
+    // Check for updates using the updater API
+    const updateCheck = await window.electronAPI.updater.checkTypingMind();
+
+    if (!updateCheck.available) {
+      showNotification('Typing Mind is already up to date', 'info');
       if (statusDiv) {
-        statusDiv.textContent = 'Update checking not available - check Docker Hub for latest Typing Mind image';
-        statusDiv.style.color = '#FFB84D';
+        statusDiv.textContent = `Already up to date (${updateCheck.currentVersion || 'latest'})`;
+        statusDiv.style.color = '#00D4AA';
       }
       return;
     }
 
-    showNotification('Checking for Typing Mind updates...', 'info');
+    // Show update available message
+    if (statusDiv) {
+      statusDiv.textContent = `Update available: ${updateCheck.latestVersion || 'newer version'}`;
+      statusDiv.style.color = '#FFB84D';
+    }
 
-    // Check if Typing Mind container needs update
-    const result = await (window.electronAPI as any).typingMind.checkForUpdates();
+    // Ask user if they want to update
+    if (confirm(`A new version of Typing Mind is available${updateCheck.latestVersion ? `: ${updateCheck.latestVersion}` : ''}\n\nWould you like to update now?`)) {
+      button.textContent = 'Updating...';
+      showNotification('Updating Typing Mind...', 'info');
 
-    if (result.hasUpdate) {
-      if (statusDiv) {
-        statusDiv.textContent = `Update available: ${result.latestVersion}`;
-        statusDiv.style.color = '#FFB84D';
-      }
+      const result = await window.electronAPI.updater.updateTypingMind();
 
-      // Ask user if they want to update
-      if (confirm(`A new version of Typing Mind is available: ${result.latestVersion}\n\nWould you like to update now?`)) {
-        button.textContent = 'Updating...';
-        showNotification('Updating Typing Mind...', 'info');
-
-        const updateResult = await (window.electronAPI as any).typingMind.update();
-
-        if (updateResult.success) {
-          showNotification('Typing Mind updated successfully!', 'success');
-          if (statusDiv) {
-            statusDiv.textContent = `Updated to ${result.latestVersion}`;
-            statusDiv.style.color = '#00D4AA';
-          }
-        } else {
-          showNotification(`Update failed: ${updateResult.error}`, 'error');
-          if (statusDiv) {
-            statusDiv.textContent = `Update failed: ${updateResult.error}`;
-            statusDiv.style.color = '#f44336';
-          }
+      if (result.success) {
+        showNotification('Typing Mind updated successfully!', 'success');
+        if (statusDiv) {
+          statusDiv.textContent = `Updated: ${result.message}`;
+          statusDiv.style.color = '#00D4AA';
         }
-      }
-    } else {
-      showNotification('Typing Mind is up to date', 'info');
-      if (statusDiv) {
-        statusDiv.textContent = `Up to date (${result.currentVersion})`;
-        statusDiv.style.color = '#00D4AA';
+      } else {
+        showNotification(`Update failed: ${result.error || result.message}`, 'error');
+        if (statusDiv) {
+          statusDiv.textContent = `Update failed: ${result.error || result.message}`;
+          statusDiv.style.color = '#f44336';
+        }
       }
     }
 
@@ -357,7 +340,7 @@ async function handleUpdateTypingMind(): Promise<void> {
     console.error('Error checking Typing Mind updates:', error);
     showNotification('Failed to check for updates', 'error');
     if (statusDiv) {
-      statusDiv.textContent = 'Failed to check for updates';
+      statusDiv.textContent = `Failed to check for updates: ${error instanceof Error ? error.message : String(error)}`;
       statusDiv.style.color = '#f44336';
     }
   } finally {
