@@ -1,0 +1,182 @@
+{
+  "name": "FictionLab",
+  "description": "AI-powered writing workspace manager built with Electron. Desktop app that sets up and manages PostgreSQL database, MCP context servers, and AI client integration (Typing Mind/Claude Desktop) for writers.",
+
+  "projectType": "electron-app",
+  "languages": ["TypeScript", "JavaScript", "HTML", "CSS"],
+  "frameworks": ["Electron", "Node.js"],
+
+  "architecture": {
+    "overview": "Multi-process Electron application with main process (Node.js), renderer process (Chromium), and IPC communication. Manages Docker containers for PostgreSQL and MCP servers.",
+    "mainComponents": [
+      "Main Process (src/main/) - Electron backend, IPC handlers, Docker management",
+      "Renderer Process (src/renderer/) - UI with tab-based navigation",
+      "Preload Scripts (src/preload/) - Secure IPC bridge",
+      "Services (src/services/) - Business logic for Docker, database, MCP servers"
+    ]
+  },
+
+  "keyDirectories": {
+    "src/main": "Electron main process - window management, IPC handlers, app lifecycle",
+    "src/renderer": "UI code - HTML, CSS, TypeScript for the interface",
+    "src/renderer/components": "UI components - DashboardTab, DatabaseTab, ServicesTab, LogsTab, TabNavigation",
+    "src/renderer/components/DatabaseAdmin": "Database admin UI - CRUD, Batch, Schema, Backup managers",
+    "src/renderer/styles": "CSS stylesheets - tabs.css, schema.css, etc.",
+    "src/preload": "Preload scripts - expose safe IPC APIs to renderer",
+    "src/services": "Business logic - Docker operations, database management, MCP server control",
+    "dist": "Compiled JavaScript output (DO NOT EDIT - generated from TypeScript)",
+    "resources": "Static assets - icons, images",
+    "config": "Configuration templates - MCP config, setup config"
+  },
+
+  "uiStructure": {
+    "navigationStyle": "Tab-based navigation system",
+    "tabs": [
+      {
+        "id": "dashboard",
+        "name": "Dashboard",
+        "description": "System overview, quick actions, service status cards",
+        "file": "src/renderer/components/DashboardTab.ts"
+      },
+      {
+        "id": "setup",
+        "name": "Setup",
+        "description": "Prerequisites check, client selection, environment configuration, update tools",
+        "file": "src/renderer/components/SetupTab.ts"
+      },
+      {
+        "id": "database",
+        "name": "Database",
+        "description": "Database admin tools, CRUD operations, schema explorer, backup management",
+        "file": "src/renderer/components/DatabaseTab.ts"
+      },
+      {
+        "id": "services",
+        "name": "Services",
+        "description": "Individual service management cards (PostgreSQL, MCP Servers, Typing Mind, Docker)",
+        "file": "src/renderer/components/ServicesTab.ts"
+      },
+      {
+        "id": "logs",
+        "name": "Logs",
+        "description": "Application and service logs viewer",
+        "file": "src/renderer/components/LogsTab.ts"
+      }
+    ]
+  },
+
+  "buildProcess": {
+    "steps": [
+      "1. Compile TypeScript (main): tsc -p tsconfig.main.json",
+      "2. Compile TypeScript (renderer): tsc -p tsconfig.renderer.json",
+      "3. Copy assets: node scripts/copy-assets.js"
+    ],
+    "command": "npm run build",
+    "output": "dist/",
+    "requirements": [
+      "Node.js 18+",
+      "TypeScript installed",
+      "@types/node package (critical!)"
+    ]
+  },
+
+  "knownIssues": [
+    {
+      "issue": "TypeScript build fails with 'Cannot find type definition file for node'",
+      "cause": "@types/node package missing from node_modules",
+      "solution": "Session start hook will auto-install it, or manually: curl -sL https://registry.npmjs.org/@types/node/-/node-20.19.25.tgz | tar xz -C node_modules/@types && mv node_modules/@types/package node_modules/@types/node"
+    },
+    {
+      "issue": "UI shows single long page instead of tabs",
+      "cause": "Build not completed - TypeScript components not compiled to JavaScript",
+      "solution": "Run 'npm run build' to compile all components"
+    },
+    {
+      "issue": "Tab styling broken/missing",
+      "cause": "CSS files in src/renderer/styles/ not copied to dist/",
+      "solution": "Ensure scripts/copy-assets.js includes styles directory copying (already fixed)"
+    },
+    {
+      "issue": "npm install fails with 403 errors for electron",
+      "cause": "Network restrictions in sandboxed environments",
+      "solution": "Build can proceed with existing node_modules if @types/node is present"
+    }
+  ],
+
+  "developmentWorkflow": {
+    "beforeCoding": [
+      "1. Run session start hook (automatic in Claude Code)",
+      "2. Verify build completed successfully",
+      "3. Check dist/ directory has compiled JavaScript"
+    ],
+    "afterChanges": [
+      "1. Run 'npm run build' if TypeScript was modified",
+      "2. Restart app with 'npm start' to see changes",
+      "3. Check console for errors"
+    ],
+    "debugging": [
+      "Use Chrome DevTools (Ctrl+Shift+I) in the Electron app",
+      "Main process logs: Check electron-log output",
+      "Build errors: Check TypeScript compiler output"
+    ]
+  },
+
+  "commonCommands": {
+    "npm run build": "Compile TypeScript and copy assets",
+    "npm run dev": "Build and start in development mode",
+    "npm start": "Start the Electron application",
+    "npm run clean": "Remove dist/ and out/ directories",
+    "npm run package": "Build production installer",
+    "git status": "Check current branch and uncommitted changes"
+  },
+
+  "ipcChannels": {
+    "description": "Communication between main and renderer processes",
+    "categories": [
+      "prerequisites:* - System checks (Docker, Git, WSL)",
+      "envConfig:* - Environment configuration management",
+      "docker:* - Docker Desktop control",
+      "mcpSystem:* - MCP server management",
+      "databaseBackup:* - Database backup/restore",
+      "databaseAdmin:* - Database CRUD operations",
+      "typingMind:* - Typing Mind configuration",
+      "claudeDesktop:* - Claude Desktop configuration"
+    ],
+    "location": "Defined in src/preload/index.ts, handled in src/main/ipc/"
+  },
+
+  "databaseFeatures": {
+    "description": "Database administration tools integrated via MCP-Writing-Servers",
+    "components": {
+      "CRUD": "Query builder, data grid, table selector - full create/read/update/delete",
+      "Batch": "Batch insert, update, delete - CSV upload support",
+      "Schema": "Schema explorer, table details, relationship diagrams",
+      "Backup": "Backup manager, backup wizard, restore functionality"
+    },
+    "mcpIntegration": "Uses 25+ database admin tools from MCP-Writing-Servers via IPC"
+  },
+
+  "testingNotes": {
+    "manualTesting": "Build and run the app to test UI changes",
+    "requiresDocker": "Full functionality requires Docker Desktop running",
+    "requiresDatabase": "Database features require PostgreSQL container running",
+    "uiTesting": "Use Chrome DevTools in Electron for inspecting elements"
+  },
+
+  "gitWorkflow": {
+    "branches": "Feature branches prefixed with 'claude/' for AI agent work",
+    "commitMessage": "Use conventional commits: feat:, fix:, docs:, etc.",
+    "beforeCommit": "Always run build to ensure code compiles",
+    "beforePush": "Test that the app runs successfully"
+  },
+
+  "tips": [
+    "The app uses tab-based navigation - all major features are organized into tabs",
+    "Database admin tools are accessed via the Database tab",
+    "Always rebuild after TypeScript changes: npm run build",
+    "Check dist/ to verify compiled output exists",
+    "Session start hook handles most setup automatically",
+    "If UI looks broken, check that CSS files were copied to dist/renderer/styles/",
+    "Use git status frequently to track which branch you're on"
+  ]
+}
