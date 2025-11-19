@@ -8,10 +8,11 @@
  * - CRUD operation interface
  * - Batch operations support
  * - Audit log viewer
- * - Placeholder for admin UI components
+ * - Database backup and restore management
  */
 
 import { databaseService } from '../services/databaseService';
+import { BackupManager } from './DatabaseAdmin/Backup/BackupManager';
 
 export interface DatabaseEvent {
   timestamp: Date;
@@ -27,9 +28,12 @@ export class DatabaseTab {
   private readonly CHECK_INTERVAL = 30000; // 30 seconds
   private isConnected: boolean = false;
   private availableTables: string[] = [];
+  private backupManager: BackupManager | null = null;
+  private currentView: 'overview' | 'backup' = 'overview';
 
   constructor() {
     this.recentEvents = [];
+    this.backupManager = new BackupManager();
   }
 
   /**
@@ -60,6 +64,19 @@ export class DatabaseTab {
   private render(): void {
     if (!this.container) return;
 
+    if (this.currentView === 'backup') {
+      this.renderBackupView();
+    } else {
+      this.renderOverviewView();
+    }
+  }
+
+  /**
+   * Render overview view
+   */
+  private renderOverviewView(): void {
+    if (!this.container) return;
+
     this.container.innerHTML = `
       ${this.renderHeader()}
       ${this.renderConnectionStatus()}
@@ -70,6 +87,41 @@ export class DatabaseTab {
 
     // Attach event listeners
     this.attachEventListeners();
+  }
+
+  /**
+   * Render backup view
+   */
+  private async renderBackupView(): Promise<void> {
+    if (!this.container) return;
+
+    this.container.innerHTML = `
+      ${this.renderHeader()}
+      <div class="database-backup-view">
+        <div class="backup-view-header">
+          <button class="btn-back" id="back-to-overview-btn">
+            <span class="btn-icon">←</span>
+            Back to Overview
+          </button>
+        </div>
+        <div id="backup-manager-container"></div>
+      </div>
+    `;
+
+    // Attach back button listener
+    const backBtn = document.getElementById('back-to-overview-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.currentView = 'overview';
+        this.render();
+      });
+    }
+
+    // Initialize backup manager
+    const backupContainer = document.getElementById('backup-manager-container');
+    if (backupContainer && this.backupManager) {
+      await this.backupManager.initialize(backupContainer);
+    }
   }
 
   /**
@@ -133,6 +185,9 @@ export class DatabaseTab {
           </button>
           <button id="db-test-query" class="action-button secondary" title="Test a simple query">
             Test Query
+          </button>
+          <button id="db-manage-backups" class="action-button primary" title="Manage database backups">
+            💾 Manage Backups
           </button>
         </div>
       </div>
@@ -221,6 +276,11 @@ export class DatabaseTab {
     if (testQueryBtn) {
       testQueryBtn.addEventListener('click', () => this.handleTestQuery());
     }
+
+    const manageBackupsBtn = document.getElementById('db-manage-backups');
+    if (manageBackupsBtn) {
+      manageBackupsBtn.addEventListener('click', () => this.handleManageBackups());
+    }
   }
 
   // ===================
@@ -301,6 +361,15 @@ export class DatabaseTab {
     } catch (error: any) {
       this.addEvent('error', `Test query error: ${error.message}`);
     }
+  }
+
+  /**
+   * Handle manage backups button click
+   */
+  private async handleManageBackups(): Promise<void> {
+    this.addEvent('info', 'Opening backup management...');
+    this.currentView = 'backup';
+    await this.render();
   }
 
   // ===================
@@ -572,6 +641,10 @@ export class DatabaseTab {
   public destroy(): void {
     this.stopConnectionChecks();
     this.recentEvents = [];
+    if (this.backupManager) {
+      this.backupManager.destroy();
+      this.backupManager = null;
+    }
     console.log('DatabaseTab destroyed');
   }
 }

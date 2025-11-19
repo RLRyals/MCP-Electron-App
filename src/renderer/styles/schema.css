@@ -1,0 +1,649 @@
+/**
+ * Schema Explorer Styles
+ * Styles for database schema exploration components
+ */
+
+/* ===========================
+   Schema Explorer Container
+   =========================== */
+
+.schema-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 20px;
+}
+
+.schema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schema-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.schema-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.view-mode-toggle {
+  display: flex;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.view-toggle-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.view-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.view-toggle-btn.active {
+  background: rgba(0, 212, 170, 0.3);
+  color: #00D4AA;
+}
+
+/* ===========================
+   Schema Content Layout
+   =========================== */
+
+.schema-content {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.schema-sidebar {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.schema-main-panel {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.schema-panel {
+  display: none;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: auto;
+}
+
+.schema-panel.active {
+  display: block;
+}
+
+/* ===========================
+   Table Search
+   =========================== */
+
+.table-search {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(0, 212, 170, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===========================
+   Table List
+   =========================== */
+
+.table-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.table-list-item {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.table-list-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateX(4px);
+}
+
+.table-list-item.selected {
+  background: rgba(0, 212, 170, 0.1);
+  border-color: rgba(0, 212, 170, 0.5);
+}
+
+.table-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-icon {
+  font-size: 1.2rem;
+}
+
+.table-name {
+  font-weight: 500;
+  color: #fff;
+}
+
+.table-item-meta {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.record-count {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.loading-message,
+.empty-message {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+/* ===========================
+   Table Details Component
+   =========================== */
+
+.table-details {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 15px;
+}
+
+.table-details-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.table-details-empty .empty-icon {
+  font-size: 4rem;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+.table-details-empty h4 {
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.table-details-empty p {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.table-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-details-header h4 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #00D4AA;
+}
+
+.table-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-item strong {
+  color: #fff;
+}
+
+/* ===========================
+   Tabs
+   =========================== */
+
+.table-details-tabs {
+  display: flex;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.tab-button {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tab-button.active {
+  background: rgba(0, 212, 170, 0.3);
+  color: #00D4AA;
+}
+
+.table-details-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.tab-content {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===========================
+   Details Table
+   =========================== */
+
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.details-table thead {
+  background: rgba(0, 212, 170, 0.2);
+}
+
+.details-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #00D4AA;
+  border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+}
+
+.details-table td {
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.details-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.details-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.details-table code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #00FFD1;
+}
+
+/* ===========================
+   Badges
+   =========================== */
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-primary {
+  background: rgba(33, 150, 243, 0.3);
+  color: #2196F3;
+  border: 1px solid rgba(33, 150, 243, 0.5);
+}
+
+.badge-info {
+  background: rgba(0, 212, 170, 0.3);
+  color: #00D4AA;
+  border: 1px solid rgba(0, 212, 170, 0.5);
+}
+
+.badge-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ===========================
+   Keys Section
+   =========================== */
+
+.keys-section {
+  margin-bottom: 25px;
+}
+
+.keys-section h5 {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.key-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.key-list li {
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border-left: 3px solid #00D4AA;
+}
+
+.key-list code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #00FFD1;
+}
+
+/* ===========================
+   Sample Data
+   =========================== */
+
+.sample-data-info {
+  padding: 10px 15px;
+  background: rgba(0, 212, 170, 0.1);
+  border-radius: 6px;
+  margin-bottom: 15px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  border-left: 3px solid #00D4AA;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.sample-data-table {
+  min-width: 600px;
+}
+
+.null-value {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* ===========================
+   ERD Component
+   =========================== */
+
+.erd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.erd-empty .empty-icon {
+  font-size: 4rem;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+.erd-empty h4 {
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.erd-empty p {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.erd-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.erd-svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.erd-svg:active {
+  cursor: grabbing;
+}
+
+/* ===========================
+   ERD Controls
+   =========================== */
+
+.erd-controls {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.erd-control-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 212, 170, 0.3);
+  border: 2px solid rgba(0, 212, 170, 0.5);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.erd-control-btn:hover {
+  background: rgba(0, 212, 170, 0.5);
+  border-color: rgba(0, 212, 170, 0.7);
+  transform: scale(1.1);
+}
+
+.erd-control-btn:active {
+  transform: scale(0.95);
+}
+
+/* ===========================
+   ERD Table Nodes
+   =========================== */
+
+.table-node {
+  transition: all 0.3s ease;
+}
+
+.table-node.highlighted .table-rect {
+  stroke: #00D4AA;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 10px rgba(0, 212, 170, 0.5));
+}
+
+.table-node:hover .table-rect {
+  filter: drop-shadow(0 0 8px rgba(33, 150, 243, 0.4));
+}
+
+.table-rect {
+  transition: all 0.3s ease;
+}
+
+.relationship-line {
+  transition: all 0.3s ease;
+}
+
+.relationship-line:hover {
+  stroke: #2196F3;
+  stroke-width: 3;
+}
+
+/* ===========================
+   Responsive Design
+   =========================== */
+
+@media (max-width: 1024px) {
+  .schema-content {
+    flex-direction: column;
+  }
+
+  .schema-sidebar {
+    width: 100%;
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .schema-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .schema-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+  }
+
+  .view-toggle-btn {
+    flex: 1;
+  }
+
+  .table-details-tabs {
+    overflow-x: auto;
+  }
+}
+
+/* ===========================
+   Scrollbar Styles
+   =========================== */
+
+.table-list::-webkit-scrollbar,
+.table-details-content::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-list::-webkit-scrollbar-track,
+.table-details-content::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.table-list::-webkit-scrollbar-thumb,
+.table-details-content::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 170, 0.3);
+  border-radius: 4px;
+}
+
+.table-list::-webkit-scrollbar-thumb:hover,
+.table-details-content::-webkit-scrollbar-thumb:hover,
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 170, 0.5);
+}
