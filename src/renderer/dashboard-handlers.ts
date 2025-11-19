@@ -799,16 +799,21 @@ async function handleCopyToken(): Promise<void> {
 
 /**
  * Handle Open Browser action
+ * Opens Typing Mind in a dedicated Electron window with context menu support
  */
 async function handleOpenBrowser(url: string): Promise<void> {
   try {
-    // Use shell.openExternal via a new IPC call, or just window.open
-    // For now, we'll use window.open which should work in Electron
-    window.open(url, '_blank');
-    showNotification(`Opening ${url}`, 'info');
+    // Open Typing Mind in a dedicated Electron window with context menu support
+    const result = await window.electronAPI.typingMind.openWindow(url);
+
+    if (result.success) {
+      showNotification('Opening Typing Mind...', 'info');
+    } else {
+      showNotification(`Failed to open Typing Mind: ${result.error}`, 'error');
+    }
   } catch (error) {
-    console.error('Error opening browser:', error);
-    showNotification('Failed to open browser', 'error');
+    console.error('Error opening Typing Mind window:', error);
+    showNotification('Failed to open Typing Mind', 'error');
   }
 }
 

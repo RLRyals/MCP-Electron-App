@@ -1103,6 +1103,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Open Typing Mind in a dedicated Electron window
+     */
+    openWindow: (url: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('typingmind:open-window', url);
+    },
+
+    /**
      * Listen for Typing Mind download progress updates
      */
     onProgress: (callback: (progress: TypingMindProgress) => void): void => {
