@@ -642,6 +642,39 @@ export class ServicesTab {
   }
 
   /**
+   * Redact sensitive information from logs
+   */
+  private redactSensitiveInfo(logs: string): string {
+    let redacted = logs;
+
+    // Redact PostgreSQL connection strings
+    redacted = redacted.replace(
+      /postgresql:\/\/([^:]+):([^@]+)@/gi,
+      'postgresql://$1:********@'
+    );
+
+    // Redact password in connection URIs
+    redacted = redacted.replace(
+      /:\/\/([^:]+):([^@]+)@/gi,
+      '://$1:********@'
+    );
+
+    // Redact environment variables for passwords
+    redacted = redacted.replace(
+      /(POSTGRES_PASSWORD|PASSWORD|PASS|pwd)=([^\s&]+)/gi,
+      '$1=********'
+    );
+
+    // Redact authentication tokens
+    redacted = redacted.replace(
+      /(MCP_AUTH_TOKEN|AUTH_TOKEN|TOKEN|token)=([^\s&]+)/gi,
+      '$1=********'
+    );
+
+    return redacted;
+  }
+
+  /**
    * Handle viewing service logs
    */
   private async handleViewLogs(serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', displayName: string): Promise<void> {
@@ -649,7 +682,8 @@ export class ServicesTab {
       const result = await window.electronAPI.mcpSystem.getLogs(serviceName, 100);
 
       if (result.success) {
-        this.showLogsDialog(displayName, result.logs);
+        const redactedLogs = this.redactSensitiveInfo(result.logs);
+        this.showLogsDialog(displayName, redactedLogs);
       } else {
         this.showNotification(`Failed to get logs: ${result.error}`, 'error');
       }
@@ -669,12 +703,12 @@ export class ServicesTab {
       const details = `
 Database: ${config.POSTGRES_DB}
 User: ${config.POSTGRES_USER}
-Password: ${config.POSTGRES_PASSWORD}
+Password: ********
 Port: ${config.POSTGRES_PORT}
 Host: localhost
 
 Connection String:
-postgresql://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@localhost:${config.POSTGRES_PORT}/${config.POSTGRES_DB}
+postgresql://${config.POSTGRES_USER}:********@localhost:${config.POSTGRES_PORT}/${config.POSTGRES_DB}
       `.trim();
 
       this.showLogsDialog('PostgreSQL Connection Details', details);

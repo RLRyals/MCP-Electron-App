@@ -12,6 +12,7 @@ import { initializeSetupTab } from './components/SetupTab.js';
 import { createDashboardTab } from './components/DashboardTab.js';
 import { createDefaultLogsTab } from './components/LogsTab.js';
 import { initializeServicesTab } from './components/ServicesTab.js';
+import { createDatabaseTab } from './components/DatabaseTab.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -357,9 +358,20 @@ interface ElectronAPI {
     openConfigFolder: () => Promise<void>;
     getConfigInstructions: () => Promise<string>;
   };
-  updates: {
-    checkForUpdates: () => Promise<any>;
-    downloadAndInstall: () => Promise<any>;
+  updater: {
+    checkAll: () => Promise<any>;
+    checkMCPServers: () => Promise<any>;
+    checkTypingMind: () => Promise<any>;
+    updateAll: () => Promise<any>;
+    updateMCPServers: () => Promise<any>;
+    updateTypingMind: () => Promise<any>;
+    getPreferences: () => Promise<any>;
+    setPreferences: (prefs: any) => Promise<void>;
+    onProgress: (callback: (progress: any) => void) => void;
+    removeProgressListener: () => void;
+    onCheckComplete: (callback: (result: any) => void) => void;
+    onAutoCheckComplete: (callback: (result: any) => void) => void;
+    removeCheckListeners: () => void;
   };
 }
 
@@ -756,10 +768,11 @@ function init(): void {
   // Initialize logs tab component
   const logsTab = createDefaultLogsTab();
 
-  // Declare servicesTab variable to initialize it when needed
+  // Declare servicesTab and databaseTab variables to initialize them when needed
   let servicesTab: any = null;
+  let databaseTab: any = null;
 
-  // Listen for tab changes to initialize LogsTab and ServicesTab when first shown
+  // Listen for tab changes to initialize LogsTab, ServicesTab, and DatabaseTab when first shown
   window.addEventListener('tab-changed', async (e: Event) => {
     const customEvent = e as CustomEvent;
     if (customEvent.detail.tabId === 'logs' && !logsTab['isInitialized']) {
@@ -776,6 +789,16 @@ function init(): void {
       } catch (err) {
         console.error('Error initializing Services Tab:', err);
         showNotification('Failed to initialize Services Tab', 'error');
+      }
+    }
+    if (customEvent.detail.tabId === 'database' && !databaseTab) {
+      try {
+        databaseTab = createDatabaseTab();
+        await databaseTab.initialize();
+        console.log('Database Tab initialized successfully');
+      } catch (err) {
+        console.error('Error initializing Database Tab:', err);
+        showNotification('Failed to initialize Database Tab', 'error');
       }
     }
   });
