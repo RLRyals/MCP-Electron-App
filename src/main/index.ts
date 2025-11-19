@@ -19,6 +19,7 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
 import * as databaseBackup from './database-backup';
+import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
 import * as migrations from './migrations';
@@ -1058,6 +1059,86 @@ function setupIPC(): void {
   ipcMain.handle('database-backup:open-directory', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening backup directory...');
     return await databaseBackup.openBackupDirectory();
+  });
+
+  // Database Administration IPC handlers (MCP database tools)
+  ipcMain.handle('database-admin:check-connection', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking database admin server connection...');
+    return await databaseAdmin.checkConnection();
+  });
+
+  ipcMain.handle('database-admin:get-server-info', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting database server info...');
+    return await databaseAdmin.getServerInfo();
+  });
+
+  // CRUD Operations
+  ipcMain.handle('database-admin:query-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Querying records from table ${params.table}...`);
+    return await databaseAdmin.queryRecords(params);
+  });
+
+  ipcMain.handle('database-admin:insert-record', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Inserting record into table ${params.table}...`);
+    return await databaseAdmin.insertRecord(params);
+  });
+
+  ipcMain.handle('database-admin:update-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating records in table ${params.table}...`);
+    return await databaseAdmin.updateRecords(params);
+  });
+
+  ipcMain.handle('database-admin:delete-records', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting records from table ${params.table}...`);
+    return await databaseAdmin.deleteRecords(params);
+  });
+
+  // Batch Operations
+  ipcMain.handle('database-admin:batch-insert', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch inserting ${params.records?.length || 0} records into table ${params.table}...`);
+    return await databaseAdmin.batchInsert(params);
+  });
+
+  ipcMain.handle('database-admin:batch-update', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch updating records in table ${params.table}...`);
+    return await databaseAdmin.batchUpdate(params);
+  });
+
+  ipcMain.handle('database-admin:batch-delete', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch deleting records from table ${params.table}...`);
+    return await databaseAdmin.batchDelete(params);
+  });
+
+  // Schema Management
+  ipcMain.handle('database-admin:get-schema', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting schema for table ${params.table}...`);
+    return await databaseAdmin.getSchema(params);
+  });
+
+  ipcMain.handle('database-admin:list-tables', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing database tables...');
+    return await databaseAdmin.listTables();
+  });
+
+  ipcMain.handle('database-admin:get-relationships', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting table relationships...');
+    return await databaseAdmin.getRelationships(params);
+  });
+
+  ipcMain.handle('database-admin:list-columns', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Listing columns for table ${params.table}...`);
+    return await databaseAdmin.listColumns(params);
+  });
+
+  // Audit Functions
+  ipcMain.handle('database-admin:query-audit-logs', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Querying audit logs...');
+    return await databaseAdmin.queryAuditLogs(params);
+  });
+
+  ipcMain.handle('database-admin:get-audit-summary', async (_, params: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting audit summary...');
+    return await databaseAdmin.getAuditSummary(params);
   });
 
   // Updater IPC handlers

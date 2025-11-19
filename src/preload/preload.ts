@@ -1325,6 +1325,116 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Database Administration API (MCP Tools)
+   */
+  databaseAdmin: {
+    /**
+     * Check connection to database admin server
+     */
+    checkConnection: (): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:check-connection');
+    },
+
+    /**
+     * Get database server info
+     */
+    getServerInfo: (): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:get-server-info');
+    },
+
+    /**
+     * Query records from a table
+     */
+    queryRecords: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:query-records', params);
+    },
+
+    /**
+     * Insert a record into a table
+     */
+    insertRecord: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:insert-record', params);
+    },
+
+    /**
+     * Update records in a table
+     */
+    updateRecords: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:update-records', params);
+    },
+
+    /**
+     * Delete records from a table
+     */
+    deleteRecords: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:delete-records', params);
+    },
+
+    /**
+     * Batch insert multiple records
+     */
+    batchInsert: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:batch-insert', params);
+    },
+
+    /**
+     * Batch update multiple records
+     */
+    batchUpdate: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:batch-update', params);
+    },
+
+    /**
+     * Batch delete multiple sets of records
+     */
+    batchDelete: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:batch-delete', params);
+    },
+
+    /**
+     * Get schema information for a table
+     */
+    getSchema: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:get-schema', params);
+    },
+
+    /**
+     * List all available tables
+     */
+    listTables: (): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:list-tables');
+    },
+
+    /**
+     * Get table relationships
+     */
+    getRelationships: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:get-relationships', params);
+    },
+
+    /**
+     * List columns for a table
+     */
+    listColumns: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:list-columns', params);
+    },
+
+    /**
+     * Query audit logs
+     */
+    queryAuditLogs: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:query-audit-logs', params);
+    },
+
+    /**
+     * Get audit summary
+     */
+    getAuditSummary: (params: any): Promise<any> => {
+      return ipcRenderer.invoke('database-admin:get-audit-summary', params);
+    },
+  },
+
+  /**
    * Database Backup/Restore API
    */
   databaseBackup: {

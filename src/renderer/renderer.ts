@@ -320,6 +320,23 @@ interface ElectronAPI {
     getDirectory: () => Promise<string>;
     openDirectory: () => Promise<void>;
   };
+  databaseAdmin: {
+    checkConnection: () => Promise<any>;
+    getServerInfo: () => Promise<any>;
+    queryRecords: (params: any) => Promise<any>;
+    insertRecord: (params: any) => Promise<any>;
+    updateRecords: (params: any) => Promise<any>;
+    deleteRecords: (params: any) => Promise<any>;
+    batchInsert: (params: any) => Promise<any>;
+    batchUpdate: (params: any) => Promise<any>;
+    batchDelete: (params: any) => Promise<any>;
+    getSchema: (params: any) => Promise<any>;
+    listTables: () => Promise<any>;
+    getRelationships: (params: any) => Promise<any>;
+    listColumns: (params: any) => Promise<any>;
+    queryAuditLogs: (params: any) => Promise<any>;
+    getAuditSummary: (params: any) => Promise<any>;
+  };
   typingMind: {
     autoConfigure: () => Promise<any>;
     setCustomConfig: (serverUrl: string, authToken: string) => Promise<any>;
