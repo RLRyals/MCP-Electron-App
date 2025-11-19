@@ -880,14 +880,14 @@ function showConfigurationDialog(config: any, mcpServersJSON: string): void {
       </div>
       <div class="logs-dialog-body">
         <div style="margin-bottom: 20px;">
-          <h4>Configuration Values (Click to Copy):</h4>
+          <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #e0e0e0;">Configuration Values (Click to Copy):</div>
 
           <!-- Server URL -->
           <div style="margin-bottom: 15px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Server URL:</label>
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #e0e0e0;">Server URL:</label>
             <div style="display: flex; gap: 10px;">
               <input type="text" readonly value="${escapeHtml(config.serverUrl)}"
-                     style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; background: #f5f5f5;">
+                     style="flex: 1; padding: 8px; border: 1px solid #444; border-radius: 4px; font-family: monospace; background: #2a2a2a; color: #e0e0e0;">
               <button class="copy-btn" data-copy="${escapeHtml(config.serverUrl)}"
                       style="padding: 8px 16px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 Copy
@@ -897,10 +897,10 @@ function showConfigurationDialog(config: any, mcpServersJSON: string): void {
 
           <!-- Auth Token -->
           <div style="margin-bottom: 15px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Auth Token:</label>
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #e0e0e0;">Auth Token:</label>
             <div style="display: flex; gap: 10px;">
               <input type="text" readonly value="${escapeHtml(config.authToken)}"
-                     style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; background: #f5f5f5;">
+                     style="flex: 1; padding: 8px; border: 1px solid #444; border-radius: 4px; font-family: monospace; background: #2a2a2a; color: #e0e0e0;">
               <button class="copy-btn" data-copy="${escapeHtml(config.authToken)}"
                       style="padding: 8px 16px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 Copy
@@ -910,27 +910,27 @@ function showConfigurationDialog(config: any, mcpServersJSON: string): void {
 
           <!-- MCP Servers JSON -->
           <div style="margin-bottom: 15px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #e0e0e0;">
               MCP Servers JSON (${serverCount} servers):
             </label>
             <div style="display: flex; gap: 10px;">
               <textarea readonly
-                        style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; background: #f5f5f5; resize: vertical; min-height: 120px; font-size: 0.85em;"
+                        style="flex: 1; padding: 8px; border: 1px solid #444; border-radius: 4px; font-family: monospace; background: #2a2a2a; color: #e0e0e0; resize: vertical; min-height: 120px; font-size: 0.85em;"
               >${escapeHtml(mcpServersJSON)}</textarea>
               <button class="copy-btn" data-copy-json='${escapeHtml(mcpServersJSON)}'
                       style="padding: 8px 16px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer; align-self: flex-start;">
                 Copy
               </button>
             </div>
-            <div style="font-size: 0.85em; color: #666; margin-top: 5px;">
+            <div style="font-size: 0.85em; color: #b0b0b0; margin-top: 5px;">
               Servers: ${serverNames.join(', ')}
             </div>
           </div>
         </div>
 
-        <div style="margin-top: 20px; padding: 15px; background: #f0f9ff; border-left: 3px solid #0284c7; border-radius: 4px;">
-          <h4 style="margin-top: 0;">Next Steps:</h4>
-          <ol style="line-height: 1.8; margin-bottom: 0;">
+        <div style="margin-top: 20px; padding: 15px; background: rgba(2, 132, 199, 0.15); border-left: 3px solid #0284c7; border-radius: 4px;">
+          <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 10px; color: #e0e0e0;">Next Steps:</div>
+          <ol style="line-height: 1.8; margin-bottom: 0; color: #d0d0d0;">
             <li>Click "Open Typing Mind" to launch the web interface</li>
             <li>In TypingMind, go to Settings → MCP Integration</li>
             <li>Paste the <strong>Server URL</strong> and <strong>Auth Token</strong> from above</li>
