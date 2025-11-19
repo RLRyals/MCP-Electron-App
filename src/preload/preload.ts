@@ -72,6 +72,8 @@ interface EnvConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
+  HTTP_SSE_PORT: number;
+  DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
 }

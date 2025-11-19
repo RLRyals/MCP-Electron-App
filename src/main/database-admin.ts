@@ -56,7 +56,7 @@ interface MCPToolResponse {
 async function getMCPServerUrl(): Promise<string> {
   try {
     const config = await envConfig.loadEnvConfig();
-    const port = 3010; // Database admin server port
+    const port = config.DB_ADMIN_PORT; // Database admin server port
     return `http://localhost:${port}`;
   } catch (error) {
     // Default to port 3010 if config fails
@@ -70,8 +70,9 @@ async function getMCPServerUrl(): Promise<string> {
 async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperationResult> {
   logWithCategory('info', LogCategory.SYSTEM, `Calling MCP tool: ${toolName}`);
 
+  const baseUrl = await getMCPServerUrl();
+
   try {
-    const baseUrl = await getMCPServerUrl();
     const requestId = Date.now();
 
     const request: MCPToolRequest = {
@@ -137,8 +138,11 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
     const axiosError = error as AxiosError;
 
     if (axiosError.code === 'ECONNREFUSED') {
+      // Extract port from baseUrl for error message
+      const portMatch = baseUrl.match(/:(\d+)$/);
+      const port = portMatch ? portMatch[1] : '3010';
       logWithCategory('error', LogCategory.SYSTEM, 'Cannot connect to MCP database server', {
-        message: 'Server not running on port 3010',
+        message: `Server not running on port ${port}`,
       });
       return {
         success: false,
