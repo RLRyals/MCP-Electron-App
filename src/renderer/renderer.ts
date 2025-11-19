@@ -358,9 +358,20 @@ interface ElectronAPI {
     openConfigFolder: () => Promise<void>;
     getConfigInstructions: () => Promise<string>;
   };
-  updates: {
-    checkForUpdates: () => Promise<any>;
-    downloadAndInstall: () => Promise<any>;
+  updater: {
+    checkAll: () => Promise<any>;
+    checkMCPServers: () => Promise<any>;
+    checkTypingMind: () => Promise<any>;
+    updateAll: () => Promise<any>;
+    updateMCPServers: () => Promise<any>;
+    updateTypingMind: () => Promise<any>;
+    getPreferences: () => Promise<any>;
+    setPreferences: (prefs: any) => Promise<void>;
+    onProgress: (callback: (progress: any) => void) => void;
+    removeProgressListener: () => void;
+    onCheckComplete: (callback: (result: any) => void) => void;
+    onAutoCheckComplete: (callback: (result: any) => void) => void;
+    removeCheckListeners: () => void;
   };
 }
 
