@@ -441,15 +441,11 @@ function showUpdateDialog(updateInfo: UpdateCheckResult): void {
   const closeButton = document.getElementById('close-update-dialog');
 
   if (downloadButton) {
-    downloadButton.addEventListener('click', async () => {
-      try {
-        await window.electronAPI.updates.downloadAndInstall();
-        showNotification('Downloading update...', 'info');
-        document.body.removeChild(dialog);
-      } catch (error) {
-        console.error('Error downloading update:', error);
-        showNotification('Failed to download update', 'error');
-      }
+    downloadButton.addEventListener('click', () => {
+      // Note: Electron app self-updates are not yet implemented
+      // Users should download updates manually from the releases page
+      showNotification('Please download the latest version from the releases page', 'info');
+      document.body.removeChild(dialog);
     });
   }
 
