@@ -8,6 +8,9 @@ import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
 import { initializeDashboard } from './dashboard-handlers.js';
 import { createDefaultTabNavigation } from './components/TabNavigation.js';
+import { initializeSetupTab } from './components/SetupTab.js';
+import { createDashboardTab } from './components/DashboardTab.js';
+import { createDefaultLogsTab } from './components/LogsTab.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -722,6 +725,25 @@ function init(): void {
   const tabNavigation = createDefaultTabNavigation();
   tabNavigation.initialize();
 
+  // Initialize dashboard tab component
+  const dashboardTab = createDashboardTab();
+  dashboardTab.initialize();
+
+  // Initialize logs tab component
+  const logsTab = createDefaultLogsTab();
+
+  // Listen for tab changes to initialize LogsTab when the Logs tab is first shown
+  window.addEventListener('tab-changed', async (e: Event) => {
+    const customEvent = e as CustomEvent;
+    if (customEvent.detail.tabId === 'logs' && !logsTab['isInitialized']) {
+      try {
+        await logsTab.initialize();
+      } catch (err) {
+        console.error('Error initializing Logs Tab:', err);
+      }
+    }
+  });
+
   // Load app information
   loadAppInfo();
 
@@ -768,6 +790,12 @@ function init(): void {
   // Setup client selection listeners and load options
   setupClientSelectionListeners();
   loadClientOptions();
+
+  // Initialize Setup Tab
+  initializeSetupTab().catch(err => {
+    console.error('Error initializing Setup Tab:', err);
+    // Don't show notification - this is not critical
+  });
 
   // Initialize dashboard (main control interface)
   initializeDashboard().catch(err => {

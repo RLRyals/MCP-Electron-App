@@ -371,3 +371,129 @@
   font-size: 0.9em;
   margin: 0 2px;
 }
+
+/* Activity List Styles */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(2px);
+}
+
+.activity-item.activity-success {
+  border-left-color: #4caf50;
+}
+
+.activity-item.activity-error {
+  border-left-color: #f44336;
+}
+
+.activity-item.activity-warning {
+  border-left-color: #ff9800;
+}
+
+.activity-item.activity-info {
+  border-left-color: #2196f3;
+}
+
+.activity-icon {
+  font-size: 1.2rem;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activity-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-message {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.activity-time {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+}
+
+.activity-empty {
+  text-align: center;
+  padding: 30px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Prominent Button Style */
+.action-button.prominent {
+  background: linear-gradient(135deg, #00D4AA 0%, #00A884 100%);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(0, 212, 170, 0.4);
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button.prominent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.action-button.prominent:hover::before {
+  left: 100%;
+}
+
+.action-button.prominent:hover {
+  background: linear-gradient(135deg, #00E6BD 0%, #00C097 100%);
+  box-shadow: 0 6px 20px rgba(0, 212, 170, 0.6);
+  transform: translateY(-2px);
+}
+
+.action-button.prominent:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(0, 212, 170, 0.4);
+}
+
+/* Animation for activity items */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.activity-item {
+  animation: slideInLeft 0.3s ease-out;
+}
