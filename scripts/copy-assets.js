@@ -32,6 +32,22 @@ function copyAssets() {
       }
     }
 
+    // Copy styles directory
+    const srcStyles = path.join(srcRenderer, 'styles');
+    const distStyles = path.join(distRenderer, 'styles');
+    if (fs.existsSync(srcStyles)) {
+      ensureDirSync(distStyles);
+      const styleFiles = fs.readdirSync(srcStyles);
+      for (const file of styleFiles) {
+        if (file.endsWith('.css')) {
+          const srcPath = path.join(srcStyles, file);
+          const destPath = path.join(distStyles, file);
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`  ✓ Copied styles/${file}`);
+        }
+      }
+    }
+
     // Copy icon.png from resources to dist/renderer
     const iconSrc = path.join(__dirname, '..', 'resources', 'icon.png');
     const iconDest = path.join(distRenderer, 'icon.png');
