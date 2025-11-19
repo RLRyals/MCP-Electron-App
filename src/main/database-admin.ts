@@ -70,8 +70,9 @@ async function getMCPServerUrl(): Promise<string> {
 async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperationResult> {
   logWithCategory('info', LogCategory.SYSTEM, `Calling MCP tool: ${toolName}`);
 
+  const baseUrl = await getMCPServerUrl();
+
   try {
-    const baseUrl = await getMCPServerUrl();
     const requestId = Date.now();
 
     const request: MCPToolRequest = {
