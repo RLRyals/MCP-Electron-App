@@ -11,8 +11,8 @@
  * - Database backup and restore management
  */
 
-import { databaseService } from '../services/databaseService';
-import { BackupManager } from './DatabaseAdmin/Backup/BackupManager';
+import { databaseService } from '../services/databaseService.js';
+import { BackupManager } from './DatabaseAdmin/Backup/BackupManager.js';
 
 export interface DatabaseEvent {
   timestamp: Date;

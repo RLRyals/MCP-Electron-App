@@ -10,8 +10,8 @@
  * - Integrity validation
  */
 
-import { BackupList, BackupMetadata } from './BackupList';
-import { BackupWizard, BackupOptions } from './BackupWizard';
+import { BackupList, BackupMetadata } from './BackupList.js';
+import { BackupWizard, BackupOptions } from './BackupWizard.js';
 
 export interface RestoreOptions {
   backupPath: string;
