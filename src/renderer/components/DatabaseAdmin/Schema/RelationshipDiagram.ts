@@ -339,7 +339,10 @@ export class RelationshipDiagram {
       </div>
     `;
 
-    this.svgElement = document.getElementById('erd-svg') as SVGSVGElement;
+    const svgEl = document.getElementById('erd-svg');
+    if (svgEl instanceof SVGSVGElement) {
+      this.svgElement = svgEl;
+    }
     this.attachEventListeners();
     this.resetView();
   }

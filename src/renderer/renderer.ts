@@ -59,6 +59,7 @@ interface EnvConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
+  HTTP_SSE_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
 }
@@ -345,6 +346,7 @@ interface ElectronAPI {
     isConfigured: () => Promise<boolean>;
     resetConfig: () => Promise<any>;
     getMCPServersJSON: () => Promise<string>;
+    openWindow: (url: string) => Promise<{ success: boolean; error?: string }>;
   };
   claudeDesktop: {
     autoConfigure: () => Promise<any>;
@@ -354,6 +356,10 @@ interface ElectronAPI {
     getConfigPath: () => Promise<string>;
     openConfigFolder: () => Promise<void>;
     getConfigInstructions: () => Promise<string>;
+  };
+  updates: {
+    checkForUpdates: () => Promise<any>;
+    downloadAndInstall: () => Promise<any>;
   };
 }
 
