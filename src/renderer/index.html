@@ -1422,6 +1422,46 @@
             border-color: rgba(255, 255, 255, 0.5);
         }
 
+        /* Service Status Badges */
+        .service-status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid;
+        }
+
+        .service-status-badge.status-healthy {
+            background: rgba(0, 212, 170, 0.2);
+            border-color: rgba(0, 212, 170, 0.5);
+            color: #00D4AA;
+        }
+
+        .service-status-badge.status-starting {
+            background: rgba(255, 184, 77, 0.2);
+            border-color: rgba(255, 184, 77, 0.5);
+            color: #FFB84D;
+        }
+
+        .service-status-badge.status-offline {
+            background: rgba(244, 67, 54, 0.2);
+            border-color: rgba(244, 67, 54, 0.5);
+            color: #f44336;
+        }
+
+        /* Resource Usage Display */
+        .resource-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .resource-value {
+            font-weight: 600;
+            color: #00D4AA;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .dashboard-actions {
