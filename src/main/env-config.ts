@@ -21,6 +21,7 @@ export interface EnvConfig {
   POSTGRES_PORT: number;
   MCP_CONNECTOR_PORT: number;
   HTTP_SSE_PORT: number;
+  DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
   TYPING_MIND_PORT: number;
   GITHUB_TOKEN?: string;
@@ -36,6 +37,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   POSTGRES_PORT: 5432,
   MCP_CONNECTOR_PORT: 50880,
   HTTP_SSE_PORT: 3001,
+  DB_ADMIN_PORT: 3010,
   MCP_AUTH_TOKEN: '',
   TYPING_MIND_PORT: 8080,
   GITHUB_TOKEN: '',
@@ -257,6 +259,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'HTTP_SSE_PORT':
           config.HTTP_SSE_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'DB_ADMIN_PORT':
+          config.DB_ADMIN_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'MCP_AUTH_TOKEN':
           config.MCP_AUTH_TOKEN = unquotedValue;
           break;
@@ -362,6 +367,7 @@ export function formatEnvFile(config: EnvConfig): string {
     `POSTGRES_PORT=${config.POSTGRES_PORT}`,
     `MCP_CONNECTOR_PORT=${config.MCP_CONNECTOR_PORT}`,
     `HTTP_SSE_PORT=${config.HTTP_SSE_PORT}`,
+    `DB_ADMIN_PORT=${config.DB_ADMIN_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
     `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
   ];
@@ -445,6 +451,11 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const httpSsePortValidation = validatePort(config.HTTP_SSE_PORT);
   if (!httpSsePortValidation.valid) {
     errors.push(`HTTP/SSE port: ${httpSsePortValidation.error}`);
+  }
+
+  const dbAdminPortValidation = validatePort(config.DB_ADMIN_PORT);
+  if (!dbAdminPortValidation.valid) {
+    errors.push(`DB Admin port: ${dbAdminPortValidation.error}`);
   }
 
   const typingMindPortValidation = validatePort(config.TYPING_MIND_PORT);

@@ -333,6 +333,7 @@ async function execDockerCompose(
         POSTGRES_PORT: String(config.POSTGRES_PORT),
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
         HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
+        DB_ADMIN_PORT: String(config.DB_ADMIN_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
         TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
