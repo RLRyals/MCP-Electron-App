@@ -1962,6 +1962,12 @@ app.whenReady().then(async () => {
   // Initialize logging system after app is ready
   initializeLogger();
   logger.info('App is ready');
+
+  // Set Windows App User Model ID for proper taskbar behavior
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('net.fictionlab.studio');
+  }
+
   setupIPC();
   createMenu();
 

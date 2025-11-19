@@ -7,6 +7,7 @@
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
 import { initializeDashboard } from './dashboard-handlers.js';
+import { createDefaultTabNavigation } from './components/TabNavigation.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -717,6 +718,10 @@ window.addEventListener('unhandledrejection', (event) => {
 function init(): void {
   console.log('Renderer process initialized');
 
+  // Initialize tab navigation system
+  const tabNavigation = createDefaultTabNavigation();
+  tabNavigation.initialize();
+
   // Load app information
   loadAppInfo();
 
@@ -789,6 +794,51 @@ function init(): void {
   const healthButton = document.getElementById('check-docker-health');
   if (healthButton) {
     healthButton.addEventListener('click', checkDockerHealth);
+  }
+
+  // Set up Database tab event listeners
+  const dbBackupButton = document.getElementById('db-backup-database');
+  if (dbBackupButton) {
+    dbBackupButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardBackupButton = document.getElementById('dashboard-backup-database');
+      if (dashboardBackupButton) {
+        dashboardBackupButton.click();
+      }
+    });
+  }
+
+  const dbRestoreButton = document.getElementById('db-restore-database');
+  if (dbRestoreButton) {
+    dbRestoreButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardRestoreButton = document.getElementById('dashboard-restore-database');
+      if (dashboardRestoreButton) {
+        dashboardRestoreButton.click();
+      }
+    });
+  }
+
+  const dbManageBackupsButton = document.getElementById('db-manage-backups');
+  if (dbManageBackupsButton) {
+    dbManageBackupsButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardManageButton = document.getElementById('dashboard-manage-backups');
+      if (dashboardManageButton) {
+        dashboardManageButton.click();
+      }
+    });
+  }
+
+  const dbOpenBackupFolderButton = document.getElementById('db-open-backup-folder');
+  if (dbOpenBackupFolderButton) {
+    dbOpenBackupFolderButton.addEventListener('click', () => {
+      // Delegate to dashboard handler
+      const dashboardOpenFolderButton = document.getElementById('dashboard-open-backup-folder');
+      if (dashboardOpenFolderButton) {
+        dashboardOpenFolderButton.click();
+      }
+    });
   }
 
   // Automatically check prerequisites on load

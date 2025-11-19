@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
     <title>FictionLab</title>
+    <link rel="stylesheet" href="styles/tabs.css">
     <style>
         * {
             margin: 0;
@@ -1448,10 +1449,18 @@
         <p class="subtitle">Your AI-Powered Writing Laboratory</p>
     </header>
 
-    <main>
-        <!-- Main Dashboard - Moved to top for easy access -->
+    <!-- Tab Navigation -->
+    <div class="tab-navigation-wrapper">
+        <nav id="tab-navigation" role="tablist" aria-label="Main navigation">
+            <!-- Tab buttons will be inserted here by TabNavigation.ts -->
+        </nav>
+    </div>
 
-        <div class="dashboard-card" id="dashboard-card">
+    <main class="tab-content-container">
+        <!-- Dashboard Tab Panel -->
+        <div id="tab-panel-dashboard" class="tab-panel active" role="tabpanel" aria-labelledby="tab-dashboard" data-tab-name="Dashboard">
+            <div class="tab-panel-content">
+                <div class="dashboard-card" id="dashboard-card">
             <div class="dashboard-header">
                 <h2>Writing System</h2>
                 <div class="dashboard-status">
@@ -1585,8 +1594,13 @@
                 <span id="dashboard-last-updated" class="last-updated">Last updated: --:--:--</span>
             </div>
         </div>
+            </div>
+        </div>
 
-        <div class="welcome-card">
+        <!-- Setup Tab Panel -->
+        <div id="tab-panel-setup" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-setup" data-tab-name="Setup" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="welcome-card">
             <h2>Welcome!</h2>
             <p>
                 Your AI-powered writing workspace with advanced context management. FictionLab simplifies setup and management of your writing tools.
@@ -1814,8 +1828,52 @@
 
             <div class="config-status" id="config-status"></div>
         </div>
+            </div>
+        </div>
 
-        <div class="docker-card">
+        <!-- Database Tab Panel -->
+        <div id="tab-panel-database" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-database" data-tab-name="Database" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="dashboard-card">
+                    <div class="dashboard-header">
+                        <h2>Database Management</h2>
+                        <div class="dashboard-status">
+                            <div id="database-status-indicator" class="status-indicator">
+                                <span class="status-dot"></span>
+                            </div>
+                            <span id="database-status-text">Checking...</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <h3>Backup & Restore</h3>
+                        <div class="dashboard-actions">
+                            <button id="db-backup-database" class="action-button primary" title="Create a backup of your PostgreSQL database">Create Backup</button>
+                            <button id="db-restore-database" class="action-button secondary" title="Restore database from a backup file">Restore from Backup</button>
+                            <button id="db-manage-backups" class="action-button secondary" title="View and manage existing database backups">Manage Backups</button>
+                            <button id="db-open-backup-folder" class="action-button secondary" title="Open the folder containing database backups">Open Backup Folder</button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-section">
+                        <h3>Database Tools</h3>
+                        <p style="opacity: 0.9; margin-bottom: 15px;">
+                            Advanced database administration tools including CRUD operations, schema management, and audit logs.
+                        </p>
+                        <div class="dashboard-actions">
+                            <button class="action-button secondary" title="Query and manage database records">CRUD Operations</button>
+                            <button class="action-button secondary" title="View and manage database schema">Schema Explorer</button>
+                            <button class="action-button secondary" title="View database audit logs">Audit Logs</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services Tab Panel -->
+        <div id="tab-panel-services" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-services" data-tab-name="Services" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="docker-card">
             <h2>Docker Control</h2>
             <p style="margin-bottom: 20px; opacity: 0.9;">
                 Manage Docker Desktop - start, stop, restart, and monitor health status.
@@ -1843,8 +1901,13 @@
 
             <div class="docker-health-info" id="docker-health-info"></div>
         </div>
+            </div>
+        </div>
 
-        <div class="diagnostics-card">
+        <!-- Logs Tab Panel -->
+        <div id="tab-panel-logs" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-logs" data-tab-name="Logs" aria-hidden="true">
+            <div class="tab-panel-content">
+                <div class="diagnostics-card">
             <h2>Diagnostics & Logging</h2>
             <p style="margin-bottom: 20px; opacity: 0.9;">
                 Tools for debugging and troubleshooting the application.
@@ -1857,6 +1920,8 @@
             </div>
 
             <div id="system-test-results"></div>
+        </div>
+            </div>
         </div>
     </main>
 
