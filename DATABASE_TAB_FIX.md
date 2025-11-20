@@ -1,10 +1,17 @@
-# Database Tab Fix - Port 3010 Not Accessible
+# Database Tab Fix - PgBouncer Connection Pool Exhausted
 
 ## Issue
 The database tab shows error: `Request failed with status code 404` when calling `db_list_tables`.
 
-## Root Cause
-The MCP database admin server on port 3010 is not running or accessible.
+## Root Cause (UPDATED)
+**PgBouncer connection pool exhaustion!** The database admin server cannot connect to the database because PgBouncer has reached its `max_client_conn` limit of 200.
+
+Error from logs:
+```
+[DATABASE-ADMIN-SERVER] Database health check failed: no more connections allowed (max_client_conn)
+```
+
+This occurs when too many MCP servers are running simultaneously and each maintains database connections through PgBouncer.
 
 ## Diagnostic Steps
 
@@ -29,7 +36,94 @@ docker logs mcp-writing-servers
 
 Look for any errors related to the database admin server starting on port 3010.
 
-## Solutions
+## The Fix (Applied in PR)
+
+The following changes have been made to fix this issue:
+
+### 1. Increased PgBouncer Connection Limits
+**File:** `src/main/pgbouncer-config.ts`
+
+- `max_client_conn`: 200 → **500** (total client connections)
+- `default_pool_size`: 25 → **50** (connections per database pool)
+- `reserve_pool_size`: 10 → **20** (emergency reserve)
+
+### 2. Increased PostgreSQL Max Connections
+**File:** `docker-compose.yml`
+
+- PostgreSQL `max_connections`: 200 → **300**
+
+These changes allow more MCP servers to run simultaneously without exhausting the connection pool.
+
+## How to Apply the Fix
+
+### Step 1: Stop the MCP System
+```bash
+# From the app: Dashboard → Stop System
+# Or via command line:
+docker-compose down
+```
+
+### Step 2: Update Your Code
+```bash
+git checkout claude/fix-database-tab-019dvCgsyYFiMfeZ9LZmmGeu
+git pull
+```
+
+### Step 3: Regenerate PgBouncer Configuration
+The app needs to regenerate `pgbouncer.ini` with the new settings:
+
+1. Open the MCP Electron App
+2. Go to **Dashboard**
+3. The app will automatically regenerate pgbouncer.ini when you start the system
+
+Or manually regenerate by:
+- Stop the system (if running)
+- Restart the app
+- The config files are regenerated on system start
+
+### Step 4: Restart the System
+```bash
+# From the app: Dashboard → Start System
+# Or via command line:
+docker-compose up -d
+```
+
+### Step 5: Verify the Fix
+1. Wait for all containers to be healthy
+2. Open the **Database** tab
+3. Click **"Refresh Connection"**
+4. Status should show "Connected to MCP Database Server"
+5. Click **"List Tables"** - should work without errors
+
+## Verification Commands
+
+### Check PgBouncer Status
+```bash
+docker exec writing-pgbouncer psql -p 6432 -U writer -d pgbouncer -c "SHOW POOLS;"
+```
+
+### Check Active Connections
+```bash
+docker exec writing-pgbouncer psql -p 6432 -U writer -d pgbouncer -c "SHOW CLIENTS;"
+```
+
+### Check Database Admin Server Logs
+```bash
+docker logs mcp-writing-servers 2>&1 | grep -A 5 "database-admin-server"
+```
+
+You should see:
+```
+[database-admin-server] HTTP server running on port 3000
+[DATABASE-ADMIN-SERVER] Initialized with 25 tools
+```
+
+WITHOUT the error:
+```
+[DATABASE-ADMIN-SERVER] Database health check failed: no more connections allowed
+```
+
+## Previous Solutions (For Reference)
 
 ### Solution 1: Start the MCP System
 If the containers aren't running:
