@@ -338,11 +338,22 @@ export class DatabaseTab {
         const logs = result.data?.data || result.data || [];
         this.addEvent('success', `Retrieved ${logs.length} audit log entries`);
         console.log('Audit Logs:', logs);
+
+        // Display logs in a modal or table
+        if (logs.length > 0) {
+          this.displayAuditLogs(logs);
+        } else {
+          this.addEvent('info', 'No audit logs found');
+        }
       } else {
-        this.addEvent('warning', result.error || 'No audit logs available');
+        const errorMsg = result.error || 'No audit logs available';
+        this.addEvent('error', errorMsg);
+        console.error('Audit logs error:', result);
       }
     } catch (error: any) {
-      this.addEvent('error', `Error querying audit logs: ${error.message}`);
+      const errorMsg = error.response?.data?.error?.message || error.message || String(error);
+      this.addEvent('error', `Error querying audit logs: ${errorMsg}`);
+      console.error('Audit logs exception:', error);
     }
   }
 
@@ -546,6 +557,44 @@ export class DatabaseTab {
                 <td>${col.nullable ? 'Yes' : 'No'}</td>
                 <td>${col.default || '-'}</td>
                 <td>${col.isPrimaryKey ? 'PK' : ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    detailsPanel.innerHTML = html;
+  }
+
+  /**
+   * Display audit logs
+   */
+  private displayAuditLogs(logs: any[]): void {
+    const detailsPanel = document.getElementById('database-table-details');
+    if (!detailsPanel) return;
+
+    const html = `
+      <div class="audit-logs-display">
+        <h4>Audit Logs (${logs.length} entries)</h4>
+        <table class="schema-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Table</th>
+              <th>Operation</th>
+              <th>User</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map((log: any) => `
+              <tr>
+                <td>${this.escapeHtml(log.timestamp || log.created_at || '-')}</td>
+                <td><strong>${this.escapeHtml(log.table_name || log.table || '-')}</strong></td>
+                <td>${this.escapeHtml(log.operation || log.action || '-')}</td>
+                <td>${this.escapeHtml(log.user || log.changed_by || '-')}</td>
+                <td><small>${this.escapeHtml(JSON.stringify(log.details || log.changes || {}).substring(0, 100))}</small></td>
               </tr>
             `).join('')}
           </tbody>
