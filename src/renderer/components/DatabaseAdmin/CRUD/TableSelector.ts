@@ -45,9 +45,12 @@ export class TableSelector {
       const result = await databaseService.listTables();
 
       if (result.success && result.data) {
-        const tableNames = result.data.tables || result.data;
-        this.tables = Array.isArray(tableNames)
-          ? tableNames.map(name => ({ name }))
+        const tablesData = result.data.tables || result.data;
+        // Extract table names from table objects
+        this.tables = Array.isArray(tablesData)
+          ? tablesData.map((t: any) => ({
+              name: typeof t === 'string' ? t : t.name
+            }))
           : [];
 
         this.filteredTables = [...this.tables];
