@@ -3,7 +3,7 @@
  * Provides table selection interface with search and record count display
  */
 
-import { databaseService } from '../../../services/databaseService';
+import { databaseService } from '../../../services/databaseService.js';
 
 export interface TableInfo {
   name: string;

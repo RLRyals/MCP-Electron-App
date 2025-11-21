@@ -3,7 +3,7 @@
  * Displays query results with sorting, inline editing, pagination, and export capabilities
  */
 
-import { databaseService, QueryParams } from '../../../services/databaseService';
+import { databaseService, QueryParams } from '../../../services/databaseService.js';
 
 export interface DataGridColumn {
   name: string;
