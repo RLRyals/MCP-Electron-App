@@ -305,8 +305,11 @@ export class DatabaseTab {
       const result = await databaseService.listTables();
 
       if (result.success && result.data) {
-        const tables = result.data.tables || result.data;
-        this.availableTables = Array.isArray(tables) ? tables : [];
+        const tablesData = result.data.tables || result.data;
+        // Extract table names from table objects
+        this.availableTables = Array.isArray(tablesData)
+          ? tablesData.map((t: any) => typeof t === 'string' ? t : t.name)
+          : [];
 
         this.updateTableList(this.availableTables);
         this.addEvent('success', `Found ${this.availableTables.length} tables`);
