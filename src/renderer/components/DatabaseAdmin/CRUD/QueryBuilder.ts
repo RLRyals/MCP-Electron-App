@@ -3,7 +3,7 @@
  * Visual interface for building database queries with WHERE clauses, ORDER BY, and pagination
  */
 
-import { databaseService, QueryParams } from '../../../services/databaseService';
+import { databaseService, QueryParams } from '../../../services/databaseService.js';
 
 export interface WhereClause {
   id: string;

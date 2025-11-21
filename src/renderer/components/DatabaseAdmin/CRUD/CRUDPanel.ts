@@ -3,10 +3,10 @@
  * Main container for CRUD operations, coordinates TableSelector, QueryBuilder, and DataGrid
  */
 
-import { TableSelector } from './TableSelector';
-import { QueryBuilder } from './QueryBuilder';
-import { DataGrid } from './DataGrid';
-import { QueryParams } from '../../../services/databaseService';
+import { TableSelector } from './TableSelector.js';
+import { QueryBuilder } from './QueryBuilder.js';
+import { DataGrid } from './DataGrid.js';
+import { QueryParams } from '../../../services/databaseService.js';
 
 export interface CRUDPanelEvents {
   onStatusChange?: (message: string, type: 'info' | 'success' | 'error') => void;
