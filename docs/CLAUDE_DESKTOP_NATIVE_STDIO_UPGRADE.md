@@ -47,8 +47,8 @@ config.mcpServers[server.displayName] = {
 ```typescript
 config.mcpServers[server.displayName] = {
   command: 'docker',
-  args: ['exec', '-i', '-e', 'MCP_STDIO_MODE=true', 'mcp-writing-servers', 'node', server.entryPoint],
-  env: { DATABASE_URL: '...' }
+  args: ['exec', '-i', '-e', 'MCP_STDIO_MODE=true', 'mcp-writing-servers', 'node', server.entryPoint]
+  // No env section - container environment variables are inherited via docker exec
 };
 ```
 
@@ -109,10 +109,7 @@ Claude Desktop config at:
         "mcp-writing-servers",
         "node",
         "/app/src/config-mcps/book-planning-server/index.js"
-      ],
-      "env": {
-        "DATABASE_URL": "postgresql://postgres:password@localhost:6432/writing_db?sslmode=disable"
-      }
+      ]
     },
     "Series Planning": { /* ... */ },
     "Chapter Planning": { /* ... */ },
@@ -125,6 +122,8 @@ Claude Desktop config at:
   }
 }
 ```
+
+**Note:** Database credentials are NOT included in the configuration for security reasons. The `DATABASE_URL` and other environment variables are already set in the Docker container (via `docker-compose.yml`) and are automatically inherited when running commands via `docker exec`.
 
 ## User Benefits
 

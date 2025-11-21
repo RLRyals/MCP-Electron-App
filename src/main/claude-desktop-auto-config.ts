@@ -112,12 +112,6 @@ function getDockerCommand(): string {
 export async function buildClaudeDesktopConfig(): Promise<ClaudeDesktopConfig> {
   logWithCategory('info', LogCategory.SYSTEM, 'Building Claude Desktop configuration for native stdio protocol...');
 
-  // Load environment config to get database credentials
-  const env = await envConfig.loadEnvConfig();
-
-  // Build DATABASE_URL with sslmode=disable for cross-platform compatibility
-  const databaseUrl = `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:6432/${env.POSTGRES_DB}?sslmode=disable`;
-
   const dockerCommand = getDockerCommand();
   const config: ClaudeDesktopConfig = {
     mcpServers: {}
@@ -126,6 +120,10 @@ export async function buildClaudeDesktopConfig(): Promise<ClaudeDesktopConfig> {
   // Configure each of the 9 MCP servers for native stdio mode
   // Each server appears separately in Claude Desktop, allowing users to enable/disable individually
   // This provides token efficiency - users only load the servers they need for their current task
+  //
+  // NOTE: DATABASE_URL is NOT passed here for security reasons
+  // The environment variables are already set in the Docker container via docker-compose.yml
+  // and will be inherited when running via 'docker exec'
   for (const server of MCP_SERVERS) {
     config.mcpServers[server.displayName] = {
       command: dockerCommand,
@@ -137,10 +135,8 @@ export async function buildClaudeDesktopConfig(): Promise<ClaudeDesktopConfig> {
         'mcp-writing-servers',
         'node',
         server.entryPoint
-      ],
-      env: {
-        DATABASE_URL: databaseUrl
-      }
+      ]
+      // No env section - container environment variables are inherited
     };
   }
 
