@@ -13,6 +13,7 @@
 
 import { databaseService } from '../services/databaseService.js';
 import { BackupManager } from './DatabaseAdmin/Backup/BackupManager.js';
+import { CRUDPanel } from './DatabaseAdmin/CRUD/CRUDPanel.js';
 
 export interface DatabaseEvent {
   timestamp: Date;
@@ -29,7 +30,9 @@ export class DatabaseTab {
   private isConnected: boolean = false;
   private availableTables: string[] = [];
   private backupManager: BackupManager | null = null;
+  private crudPanel: CRUDPanel | null = null;
   private currentView: 'overview' | 'backup' = 'overview';
+  private currentActiveTab: 'schema' | 'data' = 'schema';
 
   constructor() {
     this.recentEvents = [];
@@ -528,43 +531,135 @@ export class DatabaseTab {
   }
 
   /**
-   * Display table schema
+   * Display table schema with tabbed interface
    */
-  private displayTableSchema(tableName: string, schema: any): void {
+  private async displayTableSchema(tableName: string, schema: any): Promise<void> {
     const detailsPanel = document.getElementById('database-table-details');
     if (!detailsPanel) return;
 
     const columns = schema.columns || [];
 
     const html = `
-      <div class="table-schema">
+      <div class="table-details-container">
         <h4>${this.escapeHtml(tableName)}</h4>
-        <table class="schema-table">
-          <thead>
-            <tr>
-              <th>Column</th>
-              <th>Type</th>
-              <th>Nullable</th>
-              <th>Default</th>
-              <th>Key</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${columns.map((col: any) => `
-              <tr>
-                <td><strong>${this.escapeHtml(col.name || '')}</strong></td>
-                <td>${this.escapeHtml(col.type || '')}</td>
-                <td>${col.nullable ? 'Yes' : 'No'}</td>
-                <td>${col.default || '-'}</td>
-                <td>${col.isPrimaryKey ? 'PK' : ''}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+
+        <!-- Tab Navigation -->
+        <div class="table-details-tabs">
+          <button class="tab-button active" data-tab="schema">Schema</button>
+          <button class="tab-button" data-tab="data">Data & CRUD</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="table-details-content">
+          <!-- Schema Tab -->
+          <div class="tab-content active" id="schema-tab">
+            <table class="schema-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Type</th>
+                  <th>Nullable</th>
+                  <th>Default</th>
+                  <th>Key</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${columns.map((col: any) => `
+                  <tr>
+                    <td><strong>${this.escapeHtml(col.name || '')}</strong></td>
+                    <td>${this.escapeHtml(col.type || '')}</td>
+                    <td>${col.nullable ? 'Yes' : 'No'}</td>
+                    <td>${col.default || '-'}</td>
+                    <td>${col.isPrimaryKey ? 'PK' : ''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Data Tab -->
+          <div class="tab-content" id="data-tab">
+            <div id="crud-panel-container"></div>
+          </div>
+        </div>
       </div>
     `;
 
     detailsPanel.innerHTML = html;
+
+    // Attach tab switching event listeners
+    this.attachTabListeners(tableName);
+
+    // If data tab is active, initialize CRUD panel
+    if (this.currentActiveTab === 'data') {
+      await this.initializeCRUDPanel(tableName);
+    }
+  }
+
+  /**
+   * Attach tab switching listeners
+   */
+  private attachTabListeners(tableName: string): void {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+      button.addEventListener('click', async (e) => {
+        const target = e.target as HTMLElement;
+        const tab = target.getAttribute('data-tab') as 'schema' | 'data';
+
+        // Update active tab
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        target.classList.add('active');
+
+        // Update content visibility
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(content => content.classList.remove('active'));
+
+        const activeContent = document.getElementById(`${tab}-tab`);
+        if (activeContent) {
+          activeContent.classList.add('active');
+        }
+
+        // Store current tab
+        this.currentActiveTab = tab;
+
+        // Initialize CRUD panel if data tab is selected
+        if (tab === 'data') {
+          await this.initializeCRUDPanel(tableName);
+        }
+      });
+    });
+  }
+
+  /**
+   * Initialize CRUD panel for a table
+   */
+  private async initializeCRUDPanel(tableName: string): Promise<void> {
+    const container = document.getElementById('crud-panel-container');
+    if (!container) return;
+
+    try {
+      // Destroy existing panel if any
+      if (this.crudPanel) {
+        this.crudPanel.destroy();
+      }
+
+      // Create new CRUD panel
+      this.crudPanel = new CRUDPanel(container, {
+        onStatusChange: (message, type) => {
+          this.addEvent(type, message);
+        }
+      });
+
+      await this.crudPanel.initialize();
+
+      // Auto-select the current table
+      await this.crudPanel.selectTable(tableName);
+
+      this.addEvent('success', `CRUD panel loaded for ${tableName}`);
+    } catch (error: any) {
+      this.addEvent('error', `Failed to initialize CRUD panel: ${error.message}`);
+      console.error('CRUD panel initialization error:', error);
+    }
   }
 
   /**
@@ -696,6 +791,10 @@ export class DatabaseTab {
     if (this.backupManager) {
       this.backupManager.destroy();
       this.backupManager = null;
+    }
+    if (this.crudPanel) {
+      this.crudPanel.destroy();
+      this.crudPanel = null;
     }
     console.log('DatabaseTab destroyed');
   }
