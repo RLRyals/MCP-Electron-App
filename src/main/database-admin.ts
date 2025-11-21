@@ -85,12 +85,12 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       id: requestId,
     };
 
-    logWithCategory('info', LogCategory.SYSTEM, `MCP Request to ${baseUrl}`, {
+    logWithCategory('info', LogCategory.SYSTEM, `MCP Request to ${baseUrl}/api/tool-call`, {
       tool: toolName,
       args: JSON.stringify(args).substring(0, 200),
     });
 
-    const response = await axios.post<MCPToolResponse>(baseUrl, request, {
+    const response = await axios.post<MCPToolResponse>(`${baseUrl}/api/tool-call`, request, {
       timeout: 30000, // 30 second timeout
       headers: {
         'Content-Type': 'application/json',
