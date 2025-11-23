@@ -260,13 +260,14 @@ export class DataGrid {
    * Render pagination controls
    */
   private renderPagination(): string {
-    const totalPages = Math.ceil(this.totalRecords / this.pageSize);
+    const totalRecords = this.totalRecords || 0;
+    const totalPages = Math.ceil(totalRecords / this.pageSize);
     const hasMultiplePages = totalPages > 1;
 
     return `
       <div class="data-grid-pagination">
         <div class="pagination-info">
-          Showing ${this.data.length} of ${this.totalRecords.toLocaleString()} records
+          Showing ${this.data.length} of ${totalRecords.toLocaleString()} records
         </div>
         ${hasMultiplePages ? `
           <div class="pagination-controls">
@@ -810,6 +811,8 @@ export class DataGrid {
   public clear(): void {
     this.data = [];
     this.columns = [];
+    this.totalRecords = 0;
+    this.currentPage = 1;
     this.selectedRows.clear();
     this.render();
   }
