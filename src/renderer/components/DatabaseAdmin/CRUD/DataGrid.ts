@@ -52,16 +52,47 @@ export class DataGrid {
       const result = await databaseService.queryRecords(queryParams);
 
       console.log('[DataGrid] Query result:', result);
+      console.log('[DataGrid] result.data type:', typeof result.data);
+      console.log('[DataGrid] result.data is array:', Array.isArray(result.data));
+      console.log('[DataGrid] result.data keys:', result.data ? Object.keys(result.data) : 'null');
 
       if (result.success && result.data) {
         // Handle different response formats
         // MCP server returns: { records: [...], total_count: N }
         // Or sometimes: { data: [...], totalCount: N }
-        const responseData = result.data.records || result.data.data || result.data;
-        this.data = Array.isArray(responseData) ? responseData : [];
+
+        // Try different paths to find the records
+        let responseData;
+        if (result.data.records) {
+          console.log('[DataGrid] Found result.data.records, type:', typeof result.data.records, 'isArray:', Array.isArray(result.data.records));
+          responseData = result.data.records;
+        } else if (result.data.data) {
+          console.log('[DataGrid] Found result.data.data, type:', typeof result.data.data, 'isArray:', Array.isArray(result.data.data));
+          responseData = result.data.data;
+        } else if (Array.isArray(result.data)) {
+          console.log('[DataGrid] result.data itself is an array');
+          responseData = result.data;
+        } else {
+          console.log('[DataGrid] Could not find records array, using result.data');
+          responseData = result.data;
+        }
+
+        // Ensure we have an array
+        if (Array.isArray(responseData)) {
+          this.data = responseData;
+        } else if (responseData && typeof responseData === 'object') {
+          // If it's an object but not an array, wrap it in an array
+          console.warn('[DataGrid] responseData is an object, not an array. Wrapping in array:', responseData);
+          this.data = [responseData];
+        } else {
+          console.error('[DataGrid] responseData is not an array or object:', typeof responseData, responseData);
+          this.data = [];
+        }
+
         this.totalRecords = result.data.total_count || result.data.totalCount || result.data.count || this.data.length;
 
         console.log('[DataGrid] Loaded records:', this.data.length, 'Total:', this.totalRecords);
+        console.log('[DataGrid] First record:', this.data[0]);
 
         // Extract columns from data
         if (this.data.length > 0) {
