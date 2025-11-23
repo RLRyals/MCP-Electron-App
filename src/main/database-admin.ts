@@ -112,7 +112,17 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
     // Extract result from JSON-RPC response
     if (mcpResponse.result?.content?.[0]?.text) {
       try {
-        const resultData = JSON.parse(mcpResponse.result.content[0].text);
+        let textContent = mcpResponse.result.content[0].text;
+
+        // MCP server may return formatted text with headers like:
+        // "Query Results from 'table':\n\nRecords returned: 2\n\n{...JSON...}"
+        // Extract the JSON portion by finding the first { or [ character
+        const jsonStartIndex = textContent.search(/[\{\[]/);
+        if (jsonStartIndex > 0) {
+          textContent = textContent.substring(jsonStartIndex);
+        }
+
+        const resultData = JSON.parse(textContent);
         logWithCategory('info', LogCategory.SYSTEM, `MCP tool ${toolName} completed successfully`);
         return {
           success: true,
@@ -120,6 +130,9 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
         };
       } catch (parseError) {
         // If not JSON, return as plain text
+        logWithCategory('warn', LogCategory.SYSTEM, `Failed to parse MCP response as JSON for tool ${toolName}`, {
+          error: parseError,
+        });
         return {
           success: true,
           data: mcpResponse.result.content[0].text,
