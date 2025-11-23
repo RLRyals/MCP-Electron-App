@@ -113,25 +113,36 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
     if (mcpResponse.result?.content?.[0]?.text) {
       try {
         let textContent = mcpResponse.result.content[0].text;
+        logWithCategory('info', LogCategory.SYSTEM, `MCP raw response text (first 500 chars): ${textContent.substring(0, 500)}`);
 
         // MCP server may return formatted text with headers like:
         // "Query Results from 'table':\n\nRecords returned: 2\n\n{...JSON...}"
         // Extract the JSON portion by finding the first { or [ character
         const jsonStartIndex = textContent.search(/[\{\[]/);
         if (jsonStartIndex > 0) {
+          logWithCategory('info', LogCategory.SYSTEM, `Found JSON start at index ${jsonStartIndex}, extracting...`);
           textContent = textContent.substring(jsonStartIndex);
+        } else if (jsonStartIndex === -1) {
+          logWithCategory('warn', LogCategory.SYSTEM, 'No JSON object or array found in MCP response');
         }
 
+        logWithCategory('info', LogCategory.SYSTEM, `Attempting to parse JSON (first 500 chars): ${textContent.substring(0, 500)}`);
         const resultData = JSON.parse(textContent);
-        logWithCategory('info', LogCategory.SYSTEM, `MCP tool ${toolName} completed successfully`);
+        logWithCategory('info', LogCategory.SYSTEM, `MCP tool ${toolName} completed successfully, parsed data type: ${typeof resultData}, isArray: ${Array.isArray(resultData)}`);
+
+        if (resultData && typeof resultData === 'object') {
+          logWithCategory('info', LogCategory.SYSTEM, `Parsed data keys: ${Object.keys(resultData).join(', ')}`);
+        }
+
         return {
           success: true,
           data: resultData,
         };
-      } catch (parseError) {
+      } catch (parseError: any) {
         // If not JSON, return as plain text
         logWithCategory('warn', LogCategory.SYSTEM, `Failed to parse MCP response as JSON for tool ${toolName}`, {
-          error: parseError,
+          error: parseError.message,
+          responseText: mcpResponse.result.content[0].text.substring(0, 500),
         });
         return {
           success: true,
