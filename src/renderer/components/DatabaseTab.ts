@@ -82,10 +82,16 @@ export class DatabaseTab {
 
     this.container.innerHTML = `
       ${this.renderHeader()}
-      ${this.renderConnectionStatus()}
-      ${this.renderQuickActions()}
-      ${this.renderTableBrowser()}
-      ${this.renderActivityLog()}
+      <div class="database-layout">
+        <div class="database-sidebar">
+          ${this.renderConnectionStatus()}
+          ${this.renderQuickActions()}
+          ${this.renderActivityLog()}
+        </div>
+        <div class="database-main-content">
+          ${this.renderTableBrowser()}
+        </div>
+      </div>
     `;
 
     // Attach event listeners
@@ -133,12 +139,17 @@ export class DatabaseTab {
   private renderHeader(): string {
     return `
       <div class="database-header">
-        <h2>Database Administration</h2>
-        <div class="database-status">
-          <div id="database-connection-indicator" class="status-indicator status-red">
-            <span class="status-dot"></span>
+        <div class="database-header-left">
+          <h2>Database Administration</h2>
+          <span class="database-subtitle">Manage your PostgreSQL database and MCP server</span>
+        </div>
+        <div class="database-header-right">
+          <div class="database-status">
+            <div id="database-connection-indicator" class="status-indicator status-red">
+              <span class="status-dot"></span>
+            </div>
+            <span id="database-connection-text">Checking connection...</span>
           </div>
-          <span id="database-connection-text">Checking connection...</span>
         </div>
       </div>
     `;
@@ -149,20 +160,33 @@ export class DatabaseTab {
    */
   private renderConnectionStatus(): string {
     return `
-      <div class="database-section">
-        <h3>MCP Server Connection</h3>
-        <div class="connection-info">
-          <div class="info-row">
-            <span class="info-label">Server Address:</span>
-            <span class="info-value" id="server-address">localhost:3010</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Protocol:</span>
-            <span class="info-value">JSON-RPC 2.0 over HTTP</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Status:</span>
-            <span class="info-value" id="connection-status-text">Checking...</span>
+      <div class="database-card">
+        <div class="database-card-header">
+          <h3>Server Connection</h3>
+        </div>
+        <div class="database-card-body">
+          <div class="connection-info-compact">
+            <div class="info-item-compact">
+              <span class="info-icon">🌐</span>
+              <div class="info-content">
+                <span class="info-label">Server</span>
+                <span class="info-value" id="server-address">localhost:3010</span>
+              </div>
+            </div>
+            <div class="info-item-compact">
+              <span class="info-icon">🔌</span>
+              <div class="info-content">
+                <span class="info-label">Status</span>
+                <span class="info-value" id="connection-status-text">Checking...</span>
+              </div>
+            </div>
+            <div class="info-item-compact">
+              <span class="info-icon">📡</span>
+              <div class="info-content">
+                <span class="info-label">Protocol</span>
+                <span class="info-value">JSON-RPC 2.0</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -174,24 +198,33 @@ export class DatabaseTab {
    */
   private renderQuickActions(): string {
     return `
-      <div class="database-section">
-        <h3>Quick Actions</h3>
-        <div class="database-actions">
-          <button id="db-refresh-connection" class="action-button secondary" title="Refresh connection status">
-            Refresh Connection
-          </button>
-          <button id="db-list-tables" class="action-button secondary" title="List all database tables">
-            List Tables
-          </button>
-          <button id="db-view-audit-logs" class="action-button secondary" title="View audit logs">
-            View Audit Logs
-          </button>
-          <button id="db-test-query" class="action-button secondary" title="Test a simple query">
-            Test Query
-          </button>
-          <button id="db-manage-backups" class="action-button primary" title="Manage database backups">
-            💾 Manage Backups
-          </button>
+      <div class="database-card">
+        <div class="database-card-header">
+          <h3>Quick Actions</h3>
+        </div>
+        <div class="database-card-body">
+          <div class="quick-actions-grid">
+            <button id="db-refresh-connection" class="quick-action-btn" title="Refresh connection status">
+              <span class="action-icon">🔄</span>
+              <span class="action-label">Refresh</span>
+            </button>
+            <button id="db-list-tables" class="quick-action-btn" title="List all database tables">
+              <span class="action-icon">📋</span>
+              <span class="action-label">List Tables</span>
+            </button>
+            <button id="db-view-audit-logs" class="quick-action-btn" title="View audit logs">
+              <span class="action-icon">📜</span>
+              <span class="action-label">Audit Logs</span>
+            </button>
+            <button id="db-test-query" class="quick-action-btn" title="Test a simple query">
+              <span class="action-icon">🔍</span>
+              <span class="action-label">Test Query</span>
+            </button>
+            <button id="db-manage-backups" class="quick-action-btn quick-action-primary" title="Manage database backups">
+              <span class="action-icon">💾</span>
+              <span class="action-label">Backups</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -202,17 +235,28 @@ export class DatabaseTab {
    */
   private renderTableBrowser(): string {
     return `
-      <div class="database-section">
-        <h3>Table Browser</h3>
-        <div class="table-browser">
-          <div class="table-list" id="database-table-list">
-            <div class="loading-message">
-              Click "List Tables" to view available database tables
+      <div class="database-card database-card-full">
+        <div class="database-card-header">
+          <h3>Table Browser</h3>
+        </div>
+        <div class="database-card-body">
+          <div class="table-browser">
+            <div class="table-browser-sidebar">
+              <div class="table-list" id="database-table-list">
+                <div class="empty-state-compact">
+                  <span class="empty-icon">📋</span>
+                  <p>Click "List Tables" to view available tables</p>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="table-details" id="database-table-details">
-            <div class="empty-state">
-              Select a table to view its schema and data
+            <div class="table-browser-main">
+              <div class="table-details" id="database-table-details">
+                <div class="empty-state">
+                  <span class="empty-icon">📊</span>
+                  <h4>No Table Selected</h4>
+                  <p>Select a table from the list to view its schema and data</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -229,10 +273,14 @@ export class DatabaseTab {
       : '<div class="activity-empty">No recent activity</div>';
 
     return `
-      <div class="database-section">
-        <h3>Activity Log</h3>
-        <div class="activity-list" id="database-activity-list">
-          ${eventsHtml}
+      <div class="database-card">
+        <div class="database-card-header">
+          <h3>Activity Log</h3>
+        </div>
+        <div class="database-card-body">
+          <div class="activity-list-compact" id="database-activity-list">
+            ${eventsHtml}
+          </div>
         </div>
       </div>
     `;
@@ -494,7 +542,12 @@ export class DatabaseTab {
     if (!tableList) return;
 
     if (tables.length === 0) {
-      tableList.innerHTML = '<div class="loading-message">No tables found</div>';
+      tableList.innerHTML = `
+        <div class="empty-state-compact">
+          <span class="empty-icon">📋</span>
+          <p>No tables found</p>
+        </div>
+      `;
       return;
     }
 
@@ -511,6 +564,11 @@ export class DatabaseTab {
     const tableItems = tableList.querySelectorAll('.table-item');
     tableItems.forEach(item => {
       item.addEventListener('click', () => {
+        // Remove active class from all items
+        tableItems.forEach(i => i.classList.remove('active'));
+        // Add active class to clicked item
+        item.classList.add('active');
+
         const tableName = item.getAttribute('data-table');
         if (tableName) {
           this.handleTableClick(tableName);
