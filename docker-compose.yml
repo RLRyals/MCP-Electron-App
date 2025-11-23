@@ -96,6 +96,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=2048"
+      # Connection pool configuration to prevent exhaustion
+      DB_POOL_MAX: 5          # Max connections per server (10 servers × 5 = 50 total)
+      DB_POOL_MIN: 1          # Minimum connections per server
+      DB_POOL_IDLE_TIMEOUT: 10000  # Release idle connections after 10 seconds
     depends_on:
       postgres:
         condition: service_healthy
