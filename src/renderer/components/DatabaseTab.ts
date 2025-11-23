@@ -307,20 +307,33 @@ export class DatabaseTab {
 
       const result = await databaseService.listTables();
 
+      // Debug logging
+      console.log('[DatabaseTab] List tables result:', result);
+      console.log('[DatabaseTab] result.success:', result.success);
+      console.log('[DatabaseTab] result.data:', result.data);
+
       if (result.success && result.data) {
         const tablesData = result.data.tables || result.data;
+        console.log('[DatabaseTab] tablesData:', tablesData);
+        console.log('[DatabaseTab] tablesData is array:', Array.isArray(tablesData));
+
         // Extract table names from table objects
         this.availableTables = Array.isArray(tablesData)
           ? tablesData.map((t: any) => typeof t === 'string' ? t : t.name)
           : [];
 
+        console.log('[DatabaseTab] Extracted table names:', this.availableTables);
+
         this.updateTableList(this.availableTables);
         this.addEvent('success', `Found ${this.availableTables.length} tables`);
       } else {
-        this.addEvent('error', result.error || 'Failed to list tables');
+        const errorMsg = result.error || 'Failed to list tables';
+        console.error('[DatabaseTab] List tables failed:', errorMsg);
+        this.addEvent('error', errorMsg);
         this.updateTableList([]);
       }
     } catch (error: any) {
+      console.error('[DatabaseTab] List tables exception:', error);
       this.addEvent('error', `Error listing tables: ${error.message}`);
       this.updateTableList([]);
     }
