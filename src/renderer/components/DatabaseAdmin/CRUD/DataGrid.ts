@@ -57,7 +57,8 @@ export class DataGrid {
         // Handle different response formats
         // MCP server returns: { records: [...], total_count: N }
         // Or sometimes: { data: [...], totalCount: N }
-        this.data = result.data.records || result.data.data || result.data || [];
+        const responseData = result.data.records || result.data.data || result.data;
+        this.data = Array.isArray(responseData) ? responseData : [];
         this.totalRecords = result.data.total_count || result.data.totalCount || result.data.count || this.data.length;
 
         console.log('[DataGrid] Loaded records:', this.data.length, 'Total:', this.totalRecords);
