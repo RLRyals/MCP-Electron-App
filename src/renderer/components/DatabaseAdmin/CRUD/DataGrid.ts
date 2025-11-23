@@ -48,11 +48,16 @@ export class DataGrid {
     this.tableName = tableName;
 
     try {
+      console.log('[DataGrid] Loading data for table:', tableName, 'with params:', queryParams);
       const result = await databaseService.queryRecords(queryParams);
+
+      console.log('[DataGrid] Query result:', result);
 
       if (result.success && result.data) {
         this.data = result.data.data || result.data || [];
         this.totalRecords = result.data.totalCount || this.data.length;
+
+        console.log('[DataGrid] Loaded records:', this.data.length, 'Total:', this.totalRecords);
 
         // Extract columns from data
         if (this.data.length > 0) {
@@ -62,15 +67,19 @@ export class DataGrid {
             sortable: true,
             editable: true,
           }));
+          console.log('[DataGrid] Extracted columns:', this.columns.map(c => c.name));
         } else {
           this.columns = [];
+          console.log('[DataGrid] No data returned, no columns to extract');
         }
 
         this.render();
       } else {
+        console.error('[DataGrid] Load failed:', result.error);
         this.showError(result.error || 'Failed to load data');
       }
     } catch (error: any) {
+      console.error('[DataGrid] Exception loading data:', error);
       this.showError(`Error loading data: ${error.message}`);
     }
   }

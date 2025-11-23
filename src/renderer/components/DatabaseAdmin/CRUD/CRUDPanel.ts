@@ -157,19 +157,26 @@ export class CRUDPanel {
    */
   private async executeQuery(params: QueryParams): Promise<void> {
     if (!this.currentTable || !this.dataGrid) {
+      console.error('[CRUDPanel] Cannot execute query - missing table or grid', {
+        currentTable: this.currentTable,
+        hasDataGrid: !!this.dataGrid
+      });
       this.emitStatus('No table selected', 'error');
       return;
     }
 
     try {
+      console.log('[CRUDPanel] Executing query:', params);
       this.emitStatus('Executing query...', 'info');
       this.lastQuery = params;
 
       await this.dataGrid.loadData(this.currentTable, params);
 
       const resultCount = this.dataGrid.getData().length;
+      console.log('[CRUDPanel] Query complete, rows:', resultCount);
       this.emitStatus(`Query executed successfully. ${resultCount} rows returned.`, 'success');
     } catch (error: any) {
+      console.error('[CRUDPanel] Query failed:', error);
       this.emitStatus(`Query failed: ${error.message}`, 'error');
     }
   }
