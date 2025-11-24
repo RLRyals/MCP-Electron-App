@@ -40,31 +40,51 @@ export class CRUDPanel {
   private render(): void {
     this.container.innerHTML = `
       <div class="crud-panel">
-        <div class="crud-panel-header">
-          <h3>CRUD Operations</h3>
-          <div class="crud-panel-description">
-            Select a table, build queries visually, and manage your data
-          </div>
-        </div>
-
         <div class="crud-panel-body">
-          <!-- Table Selector Section -->
-          <div class="crud-section table-selector-section">
+          <!-- Table Selector Section (Hidden by default when table is pre-selected) -->
+          <div class="crud-section table-selector-section" id="table-selector-section" style="display: none;">
             <div id="table-selector-container"></div>
           </div>
 
-          <!-- Query Builder Section -->
-          <div class="crud-section query-builder-section">
-            <div id="query-builder-container"></div>
+          <!-- Query Builder Section (Collapsible) -->
+          <div class="crud-section query-builder-section" id="query-builder-section">
+            <div class="crud-section-header" id="query-builder-header">
+              <h4>Query Builder</h4>
+              <button class="collapse-btn" id="collapse-query-builder" title="Toggle query builder">
+                <span class="collapse-icon">▼</span>
+              </button>
+            </div>
+            <div id="query-builder-container" class="query-builder-content"></div>
           </div>
 
-          <!-- Data Grid Section -->
-          <div class="crud-section data-grid-section">
+          <!-- Data Grid Section (Main Focus) -->
+          <div class="crud-section data-grid-section" id="data-grid-section">
             <div id="data-grid-container"></div>
           </div>
         </div>
       </div>
     `;
+
+    // Add collapse button listener
+    this.attachCollapseListener();
+  }
+
+  /**
+   * Attach listener for query builder collapse button
+   */
+  private attachCollapseListener(): void {
+    const collapseBtn = this.container.querySelector('#collapse-query-builder');
+    const queryBuilderContent = this.container.querySelector('#query-builder-container');
+    const collapseIcon = this.container.querySelector('.collapse-icon');
+
+    if (collapseBtn && queryBuilderContent) {
+      collapseBtn.addEventListener('click', () => {
+        const isCollapsed = queryBuilderContent.classList.toggle('collapsed');
+        if (collapseIcon) {
+          collapseIcon.textContent = isCollapsed ? '▶' : '▼';
+        }
+      });
+    }
   }
 
   /**
