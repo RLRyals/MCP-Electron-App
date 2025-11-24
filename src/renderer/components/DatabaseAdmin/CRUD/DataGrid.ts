@@ -61,20 +61,39 @@ export class DataGrid {
         // MCP server returns: { records: [...], total_count: N }
         // Or sometimes: { data: [...], totalCount: N }
 
+        console.log('[DataGrid] Raw result.data structure:', JSON.stringify(result.data, null, 2).substring(0, 500));
+
         // Try different paths to find the records
         let responseData;
-        if (result.data.records) {
-          console.log('[DataGrid] Found result.data.records, type:', typeof result.data.records, 'isArray:', Array.isArray(result.data.records));
+        if (result.data.records && Array.isArray(result.data.records)) {
+          console.log('[DataGrid] Found result.data.records array, length:', result.data.records.length);
           responseData = result.data.records;
-        } else if (result.data.data) {
-          console.log('[DataGrid] Found result.data.data, type:', typeof result.data.data, 'isArray:', Array.isArray(result.data.data));
+        } else if (result.data.data && Array.isArray(result.data.data)) {
+          console.log('[DataGrid] Found result.data.data array, length:', result.data.data.length);
           responseData = result.data.data;
         } else if (Array.isArray(result.data)) {
-          console.log('[DataGrid] result.data itself is an array');
+          console.log('[DataGrid] result.data itself is an array, length:', result.data.length);
           responseData = result.data;
+        } else if (result.data.rows && Array.isArray(result.data.rows)) {
+          console.log('[DataGrid] Found result.data.rows array, length:', result.data.rows.length);
+          responseData = result.data.rows;
         } else {
-          console.log('[DataGrid] Could not find records array, using result.data');
-          responseData = result.data;
+          // Last resort: check if result.data has a single key that contains the array
+          const keys = Object.keys(result.data);
+          console.log('[DataGrid] Checking keys in result.data:', keys);
+
+          for (const key of keys) {
+            if (Array.isArray(result.data[key])) {
+              console.log(`[DataGrid] Found array at result.data.${key}, length:`, result.data[key].length);
+              responseData = result.data[key];
+              break;
+            }
+          }
+
+          if (!responseData) {
+            console.warn('[DataGrid] Could not find array, treating result.data as single record');
+            responseData = result.data;
+          }
         }
 
         // Ensure we have an array
@@ -92,17 +111,24 @@ export class DataGrid {
         this.totalRecords = result.data.total_count || result.data.totalCount || result.data.count || this.data.length;
 
         console.log('[DataGrid] Loaded records:', this.data.length, 'Total:', this.totalRecords);
-        console.log('[DataGrid] First record:', this.data[0]);
+        console.log('[DataGrid] First record sample:', this.data[0] ? JSON.stringify(this.data[0]).substring(0, 200) : 'none');
 
         // Extract columns from data
         if (this.data.length > 0) {
           const firstRow = this.data[0];
-          this.columns = Object.keys(firstRow).map(key => ({
-            name: key,
-            sortable: true,
-            editable: true,
-          }));
-          console.log('[DataGrid] Extracted columns:', this.columns.map(c => c.name));
+
+          // Ensure firstRow is an object
+          if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+            this.columns = Object.keys(firstRow).map(key => ({
+              name: key,
+              sortable: true,
+              editable: true,
+            }));
+            console.log('[DataGrid] Extracted columns:', this.columns.map(c => c.name));
+          } else {
+            console.error('[DataGrid] First row is not a valid object:', firstRow);
+            this.columns = [];
+          }
         } else {
           this.columns = [];
           console.log('[DataGrid] No data returned, no columns to extract');
