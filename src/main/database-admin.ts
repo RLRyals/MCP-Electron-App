@@ -119,6 +119,10 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
         // "Query Results from 'table':\n\nRecords returned: 2\n\n{...JSON...}"
         // Extract the JSON portion by finding the first { or [ character
         const jsonStartIndex = textContent.search(/[\{\[]/);
+        
+        // LOG RAW CONTENT FOR DEBUGGING
+        logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Raw MCP Response Content: ${textContent}`);
+
         if (jsonStartIndex > 0) {
           logWithCategory('info', LogCategory.SYSTEM, `Found JSON start at index ${jsonStartIndex}, extracting...`);
           textContent = textContent.substring(jsonStartIndex);
@@ -128,6 +132,19 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
 
         logWithCategory('info', LogCategory.SYSTEM, `Attempting to parse JSON (first 500 chars): ${textContent.substring(0, 500)}`);
         const resultData = JSON.parse(textContent);
+        
+        // LOG PARSED DATA STRUCTURE
+        logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Parsed Data Type: ${typeof resultData}`);
+        if (typeof resultData === 'object' && resultData !== null) {
+             logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Parsed Data Keys: ${Object.keys(resultData).join(', ')}`);
+             if (Array.isArray(resultData)) {
+                 logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Data is Array of length ${resultData.length}`);
+                 if (resultData.length > 0) {
+                     logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] First item sample: ${JSON.stringify(resultData[0]).substring(0, 100)}`);
+                 }
+             }
+        }
+
         logWithCategory('info', LogCategory.SYSTEM, `MCP tool ${toolName} completed successfully, parsed data type: ${typeof resultData}, isArray: ${Array.isArray(resultData)}`);
 
         if (resultData && typeof resultData === 'object') {

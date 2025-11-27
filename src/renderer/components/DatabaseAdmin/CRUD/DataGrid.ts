@@ -155,6 +155,26 @@ export class DataGrid {
         ${this.renderTable()}
         ${this.renderPagination()}
         ${this.renderRecordForm()}
+        
+        <!-- Raw Data Modal -->
+        <div id="raw-data-modal" class="modal" style="display: none;">
+          <div class="modal-content large-modal">
+            <div class="modal-header">
+              <h3>Raw Data Response</h3>
+              <button class="modal-close" id="close-raw-data">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="raw-data-info">
+                <p><strong>Total Records:</strong> <span id="raw-total-records">0</span></p>
+                <p><strong>Data Type:</strong> <span id="raw-data-type">-</span></p>
+              </div>
+              <pre id="raw-data-content" class="code-block"></pre>
+            </div>
+            <div class="modal-footer">
+              <button class="action-button primary" id="close-raw-data-btn">Close</button>
+            </div>
+          </div>
+        </div>
       </div>
     `;
 
@@ -183,6 +203,9 @@ export class DataGrid {
           ` : ''}
         </div>
         <div class="toolbar-right">
+          <button id="view-raw-data" class="toolbar-button secondary" title="View raw data response">
+            🔍 Raw View
+          </button>
           <button id="export-csv" class="toolbar-button" title="Export to CSV">
             📄 CSV
           </button>
@@ -315,10 +338,24 @@ export class DataGrid {
     }
 
     if (typeof value === 'object') {
-      return this.escapeHtml(JSON.stringify(value));
+      const json = JSON.stringify(value);
+      if (json === '{}') return '<span class="empty-object">{}</span>';
+      
+      // Check if it's likely a "bad" object display (e.g. [object Object] string)
+      if (String(value) === '[object Object]') {
+         return `<span class="object-value" title="${this.escapeHtml(json)}">{...}</span>`;
+      }
+      
+      return `<span class="object-value" title="${this.escapeHtml(json)}">${this.escapeHtml(json.substring(0, 50) + (json.length > 50 ? '...' : ''))}</span>`;
     }
 
     const strValue = String(value);
+    
+    // Detect [object Object] string
+    if (strValue === '[object Object]') {
+      return '<span class="error-value" title="Data is [object Object] string">Invalid Data</span>';
+    }
+
     if (strValue.length > 50) {
       return this.escapeHtml(strValue.substring(0, 50)) + '...';
     }
@@ -426,6 +463,23 @@ export class DataGrid {
     const exportJsonBtn = this.container.querySelector('#export-json');
     if (exportJsonBtn) {
       exportJsonBtn.addEventListener('click', () => this.exportToJson());
+    }
+
+    // Raw View button
+    const rawViewBtn = this.container.querySelector('#view-raw-data');
+    if (rawViewBtn) {
+      rawViewBtn.addEventListener('click', () => this.showRawData());
+    }
+    
+    // Raw Data Modal listeners
+    const closeRawBtn = this.container.querySelector('#close-raw-data');
+    if (closeRawBtn) {
+      closeRawBtn.addEventListener('click', () => this.closeRawData());
+    }
+    
+    const closeRawBtn2 = this.container.querySelector('#close-raw-data-btn');
+    if (closeRawBtn2) {
+      closeRawBtn2.addEventListener('click', () => this.closeRawData());
     }
 
     // Select all checkbox
@@ -785,6 +839,34 @@ export class DataGrid {
       }
     } catch (error: any) {
       alert(`Error deleting records: ${error.message}`);
+    }
+  }
+
+  // ===================
+  // Raw Data View
+  // ===================
+
+  private showRawData(): void {
+    const modal = this.container.querySelector('#raw-data-modal') as HTMLElement;
+    const content = this.container.querySelector('#raw-data-content') as HTMLElement;
+    const totalRecords = this.container.querySelector('#raw-total-records') as HTMLElement;
+    const dataType = this.container.querySelector('#raw-data-type') as HTMLElement;
+
+    if (!modal || !content) return;
+
+    totalRecords.textContent = String(this.totalRecords);
+    dataType.textContent = Array.isArray(this.data) ? 'Array' : typeof this.data;
+    
+    // Format JSON for display
+    content.textContent = JSON.stringify(this.data, null, 2);
+    
+    modal.style.display = 'flex';
+  }
+
+  private closeRawData(): void {
+    const modal = this.container.querySelector('#raw-data-modal') as HTMLElement;
+    if (modal) {
+      modal.style.display = 'none';
     }
   }
 

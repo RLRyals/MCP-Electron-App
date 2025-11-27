@@ -41,20 +41,25 @@ export class CRUDPanel {
     this.container.innerHTML = `
       <div class="crud-panel">
         <div class="crud-panel-body">
-          <!-- Table Selector Section (Hidden by default when table is pre-selected) -->
-          <div class="crud-section table-selector-section" id="table-selector-section" style="display: none;">
-            <div id="table-selector-container"></div>
-          </div>
-
-          <!-- Query Builder Section (Collapsible) -->
-          <div class="crud-section query-builder-section" id="query-builder-section">
-            <div class="crud-section-header" id="query-builder-header">
-              <h4>Query Builder</h4>
-              <button class="collapse-btn" id="collapse-query-builder" title="Toggle query builder">
-                <span class="collapse-icon">▼</span>
-              </button>
-            </div>
-            <div id="query-builder-container" class="query-builder-content"></div>
+          <!-- Top Section: Query Builder & Table Selector -->
+          <div class="crud-top-section">
+             <!-- Table Selector Section (Hidden by default when table is pre-selected) -->
+             <div class="crud-section table-selector-section" id="table-selector-section" style="display: none;">
+               <div id="table-selector-container"></div>
+             </div>
+ 
+             <!-- Query Builder Section (Collapsible) -->
+             <div class="crud-section query-builder-section" id="query-builder-section">
+               <div class="crud-section-header" id="query-builder-header">
+                 <h4>Query Builder</h4>
+                 <div class="header-actions">
+                    <button class="collapse-btn" id="collapse-query-builder" title="Toggle query builder">
+                      <span class="collapse-icon">▼</span>
+                    </button>
+                 </div>
+               </div>
+               <div id="query-builder-container" class="query-builder-content"></div>
+             </div>
           </div>
 
           <!-- Data Grid Section (Main Focus) -->
