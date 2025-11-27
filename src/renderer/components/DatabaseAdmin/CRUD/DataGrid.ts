@@ -59,11 +59,8 @@ export class DataGrid {
         console.log('[DataGrid] Raw result.data structure:', JSON.stringify(result.data, null, 2).substring(0, 500));
 
         // Extract records from MCP server response
-        // The MCP server response can be in various formats:
-        // 1. { records: [...], total_count: N }
-        // 2. { data: [...], totalCount: N }
-        // 3. Direct array: [...]
-        // 4. { rows: [...] }
+        // The MCP server response format is:
+        // { table: "table_name", count: N, total_count: N, records: [...] }
         let records: any[] = [];
         let totalCount = 0;
 
@@ -73,36 +70,42 @@ export class DataGrid {
           records = result.data;
           totalCount = result.data.length;
         } else if (typeof result.data === 'object' && result.data !== null) {
-          // Object response - try different property names
-          const possibleRecordKeys = ['records', 'data', 'rows', 'results'];
-          
-          for (const key of possibleRecordKeys) {
-            if (result.data[key] && Array.isArray(result.data[key])) {
-              console.log(`[DataGrid] Found records at result.data.${key}, length:`, result.data[key].length);
-              records = result.data[key];
-              break;
-            }
-          }
-
-          // If still no records found, check if result.data itself looks like a single record
-          if (records.length === 0 && Object.keys(result.data).length > 0) {
-            // Check if this looks like metadata vs actual data
-            const keys = Object.keys(result.data);
-            const hasMetadataKeys = keys.some(k => ['type', 'text', 'content'].includes(k.toLowerCase()));
+          // Object response - check for 'records' key first (MCP standard format)
+          if (result.data.records && Array.isArray(result.data.records)) {
+            console.log('[DataGrid] Found records in MCP format, length:', result.data.records.length);
+            records = result.data.records;
+            totalCount = result.data.total_count || result.data.count || records.length;
+          } else {
+            // Fallback: try other possible property names
+            const possibleRecordKeys = ['data', 'rows', 'results'];
             
-            if (hasMetadataKeys) {
-              console.warn('[DataGrid] Response appears to be metadata, not records:', result.data);
-              this.showError('Query returned metadata instead of records. Please check the MCP server response format.');
-              return;
-            } else {
-              // Treat as a single record
-              console.log('[DataGrid] Treating result.data as single record');
-              records = [result.data];
+            for (const key of possibleRecordKeys) {
+              if (result.data[key] && Array.isArray(result.data[key])) {
+                console.log(`[DataGrid] Found records at result.data.${key}, length:`, result.data[key].length);
+                records = result.data[key];
+                totalCount = result.data.total_count || result.data.totalCount || result.data.count || records.length;
+                break;
+              }
+            }
+
+            // If still no records found, check if result.data itself looks like a single record
+            if (records.length === 0 && Object.keys(result.data).length > 0) {
+              // Check if this looks like metadata vs actual data
+              const keys = Object.keys(result.data);
+              const hasMetadataKeys = keys.some(k => ['type', 'text', 'content'].includes(k.toLowerCase()));
+              
+              if (hasMetadataKeys) {
+                console.warn('[DataGrid] Response appears to be metadata, not records:', result.data);
+                this.showError('Query returned metadata instead of records. Please check the MCP server response format.');
+                return;
+              } else {
+                // Treat as a single record
+                console.log('[DataGrid] Treating result.data as single record');
+                records = [result.data];
+                totalCount = 1;
+              }
             }
           }
-
-          // Extract total count
-          totalCount = result.data.total_count || result.data.totalCount || result.data.count || records.length;
         } else {
           console.error('[DataGrid] Unexpected result.data type:', typeof result.data);
           this.showError('Unexpected response format from server');
