@@ -48,15 +48,24 @@ export class DataGrid {
     this.tableName = tableName;
 
     try {
+      console.log('[DataGrid] ========== LOAD DATA START ==========');
       console.log('[DataGrid] Loading data for table:', tableName, 'with params:', queryParams);
+      
       const result = await databaseService.queryRecords(queryParams);
 
-      console.log('[DataGrid] Query result:', result);
+      console.log('[DataGrid] ========== QUERY RESULT RECEIVED ==========');
+      console.log('[DataGrid] result.success:', result.success);
+      console.log('[DataGrid] result.error:', result.error);
       console.log('[DataGrid] result.data type:', typeof result.data);
       console.log('[DataGrid] result.data is array:', Array.isArray(result.data));
+      
+      if (result.data) {
+        console.log('[DataGrid] result.data keys:', Object.keys(result.data));
+        console.log('[DataGrid] Raw result.data structure:', JSON.stringify(result.data, null, 2).substring(0, 1000));
+      }
 
       if (result.success && result.data) {
-        console.log('[DataGrid] Raw result.data structure:', JSON.stringify(result.data, null, 2).substring(0, 500));
+        console.log('[DataGrid] ========== EXTRACTING RECORDS ==========');
 
         // Extract records from MCP server response
         // The MCP server response format is:
@@ -66,22 +75,25 @@ export class DataGrid {
 
         if (Array.isArray(result.data)) {
           // Direct array response
-          console.log('[DataGrid] Direct array response, length:', result.data.length);
+          console.log('[DataGrid] ✓ Direct array response, length:', result.data.length);
           records = result.data;
           totalCount = result.data.length;
         } else if (typeof result.data === 'object' && result.data !== null) {
           // Object response - check for 'records' key first (MCP standard format)
           if (result.data.records && Array.isArray(result.data.records)) {
-            console.log('[DataGrid] Found records in MCP format, length:', result.data.records.length);
+            console.log('[DataGrid] ✓ Found records in MCP format, length:', result.data.records.length);
+            console.log('[DataGrid] ✓ First record:', JSON.stringify(result.data.records[0]).substring(0, 200));
             records = result.data.records;
             totalCount = result.data.total_count || result.data.count || records.length;
+            console.log('[DataGrid] ✓ Total count:', totalCount);
           } else {
             // Fallback: try other possible property names
+            console.log('[DataGrid] ⚠ No "records" key found, trying fallback keys...');
             const possibleRecordKeys = ['data', 'rows', 'results'];
             
             for (const key of possibleRecordKeys) {
               if (result.data[key] && Array.isArray(result.data[key])) {
-                console.log(`[DataGrid] Found records at result.data.${key}, length:`, result.data[key].length);
+                console.log(`[DataGrid] ✓ Found records at result.data.${key}, length:`, result.data[key].length);
                 records = result.data[key];
                 totalCount = result.data.total_count || result.data.totalCount || result.data.count || records.length;
                 break;
@@ -90,31 +102,35 @@ export class DataGrid {
 
             // If still no records found, check if result.data itself looks like a single record
             if (records.length === 0 && Object.keys(result.data).length > 0) {
+              console.log('[DataGrid] ⚠ No array found in standard keys, checking if single record...');
               // Check if this looks like metadata vs actual data
               const keys = Object.keys(result.data);
               const hasMetadataKeys = keys.some(k => ['type', 'text', 'content'].includes(k.toLowerCase()));
               
               if (hasMetadataKeys) {
-                console.warn('[DataGrid] Response appears to be metadata, not records:', result.data);
+                console.error('[DataGrid] ✗ Response appears to be metadata, not records:', result.data);
                 this.showError('Query returned metadata instead of records. Please check the MCP server response format.');
                 return;
               } else {
                 // Treat as a single record
-                console.log('[DataGrid] Treating result.data as single record');
+                console.log('[DataGrid] ✓ Treating result.data as single record');
                 records = [result.data];
                 totalCount = 1;
               }
             }
           }
         } else {
-          console.error('[DataGrid] Unexpected result.data type:', typeof result.data);
+          console.error('[DataGrid] ✗ Unexpected result.data type:', typeof result.data);
           this.showError('Unexpected response format from server');
           return;
         }
 
+        console.log('[DataGrid] ========== VALIDATING RECORDS ==========');
+        console.log('[DataGrid] Records extracted:', records.length);
+
         // Validate we have actual records
         if (records.length === 0) {
-          console.log('[DataGrid] No records returned');
+          console.log('[DataGrid] ⚠ No records returned');
           this.data = [];
           this.columns = [];
           this.totalRecords = 0;
@@ -124,8 +140,12 @@ export class DataGrid {
 
         // Validate first record is an object (not metadata)
         const firstRecord = records[0];
+        console.log('[DataGrid] First record type:', typeof firstRecord);
+        console.log('[DataGrid] First record is array:', Array.isArray(firstRecord));
+        console.log('[DataGrid] First record keys:', firstRecord ? Object.keys(firstRecord) : 'null');
+        
         if (!firstRecord || typeof firstRecord !== 'object' || Array.isArray(firstRecord)) {
-          console.error('[DataGrid] First record is not a valid object:', firstRecord);
+          console.error('[DataGrid] ✗ First record is not a valid object:', firstRecord);
           this.showError('Invalid record format received from server');
           return;
         }
@@ -135,11 +155,12 @@ export class DataGrid {
         if (firstRecordKeys.length === 2 && 
             firstRecordKeys.includes('type') && 
             firstRecordKeys.includes('text')) {
-          console.error('[DataGrid] Records appear to be metadata (type/text), not actual data');
+          console.error('[DataGrid] ✗ Records appear to be metadata (type/text), not actual data');
           this.showError('Query returned metadata instead of table records. The MCP server may not be configured correctly.');
           return;
         }
 
+        console.log('[DataGrid] ========== SETTING DATA ==========');
         // Set the data
         this.data = records;
         this.totalRecords = totalCount;
@@ -151,18 +172,21 @@ export class DataGrid {
           editable: true,
         }));
 
-        console.log('[DataGrid] Successfully loaded:', this.data.length, 'records');
-        console.log('[DataGrid] Total records:', this.totalRecords);
-        console.log('[DataGrid] Columns:', this.columns.map(c => c.name).join(', '));
-        console.log('[DataGrid] First record sample:', JSON.stringify(this.data[0]).substring(0, 200));
+        console.log('[DataGrid] ✓ Successfully loaded:', this.data.length, 'records');
+        console.log('[DataGrid] ✓ Total records:', this.totalRecords);
+        console.log('[DataGrid] ✓ Columns:', this.columns.map(c => c.name).join(', '));
+        console.log('[DataGrid] ✓ First record sample:', JSON.stringify(this.data[0]).substring(0, 200));
+        console.log('[DataGrid] ========== RENDERING GRID ==========');
 
         this.render();
+        console.log('[DataGrid] ========== LOAD DATA COMPLETE ==========');
       } else {
-        console.error('[DataGrid] Load failed:', result.error);
+        console.error('[DataGrid] ✗ Load failed:', result.error);
         this.showError(result.error || 'Failed to load data');
       }
     } catch (error: any) {
-      console.error('[DataGrid] Exception loading data:', error);
+      console.error('[DataGrid] ✗ Exception loading data:', error);
+      console.error('[DataGrid] ✗ Stack trace:', error.stack);
       this.showError(`Error loading data: ${error.message}`);
     }
   }
