@@ -63,7 +63,7 @@ export class QueryBuilder {
     this.selectedColumns = []; // Select all by default
     this.whereClauses = [];
     this.orderBy = [];
-    this.limit = 100;
+    this.limit = 10;  // Changed from 100 to 10 for better UX
     this.offset = 0;
     this.render();
   }
@@ -102,9 +102,12 @@ export class QueryBuilder {
     this.container.innerHTML = `
       <div class="query-builder">
         <div class="query-builder-header">
-          <h4>Query Builder - ${this.escapeHtml(this.tableName)}</h4>
-          <button id="execute-query" class="action-button primary">
-            Execute Query
+          <div class="query-builder-title">
+            <h4>Query Builder - ${this.escapeHtml(this.tableName)}</h4>
+            <p class="query-builder-subtitle">Build and execute queries visually</p>
+          </div>
+          <button id="execute-query" class="action-button primary execute-query-btn">
+            ▶ Execute Query
           </button>
         </div>
 

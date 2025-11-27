@@ -785,3 +785,160 @@
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.3);
 }
+
+/* Query Builder Improvements */
+.query-builder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 20px;
+}
+
+.query-builder-title h4 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: #00D4AA;
+  font-weight: 600;
+}
+
+.query-builder-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.execute-query-btn {
+  padding: 10px 24px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  background: rgba(0, 212, 170, 0.3) !important;
+  border-color: rgba(0, 212, 170, 0.5) !important;
+  box-shadow: 0 2px 8px rgba(0, 212, 170, 0.2);
+  transition: all 0.3s ease;
+}
+
+.execute-query-btn:hover {
+  background: rgba(0, 212, 170, 0.5) !important;
+  border-color: rgba(0, 212, 170, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+  transform: translateY(-1px);
+}
+
+.execute-query-btn:active {
+  transform: translateY(0);
+}
+
+/* Enhanced Data Table Styling */
+.data-table tbody td {
+  padding: 12px 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.data-table tbody td:last-child {
+  border-right: none;
+}
+
+.data-table thead th {
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.data-table thead th:last-child {
+  border-right: none;
+}
+
+/* Sortable Column Styling */
+.sortable-column {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sortable-column:hover {
+  background: rgba(0, 212, 170, 0.15);
+  color: #00D4AA;
+}
+
+.sortable-column.sorted {
+  color: #00D4AA;
+  background: rgba(0, 212, 170, 0.1);
+}
+
+/* Cell Editor Styling */
+.cell-editor {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(0, 212, 170, 0.6);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.cell-editor:focus {
+  outline: none;
+  border-color: rgba(0, 212, 170, 0.9);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.2);
+}
+
+/* Editable Cell Indicator */
+.data-cell.editable {
+  cursor: pointer;
+  position: relative;
+}
+
+.data-cell.editable:hover {
+  background: rgba(0, 212, 170, 0.05);
+}
+
+/* Action Button Small */
+.action-button-small {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.action-button-small:hover {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+  transform: scale(1.1);
+}
+
+/* Null Value Styling */
+.null-value {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Data Grid Error State */
+.data-grid-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  border-radius: 8px;
+  min-height: 200px;
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.error-message {
+  color: #F44336;
+  font-size: 1rem;
+  max-width: 600px;
+}

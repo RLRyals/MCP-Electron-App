@@ -54,85 +54,104 @@ export class DataGrid {
       console.log('[DataGrid] Query result:', result);
       console.log('[DataGrid] result.data type:', typeof result.data);
       console.log('[DataGrid] result.data is array:', Array.isArray(result.data));
-      console.log('[DataGrid] result.data keys:', result.data ? Object.keys(result.data) : 'null');
 
       if (result.success && result.data) {
-        // Handle different response formats
-        // MCP server returns: { records: [...], total_count: N }
-        // Or sometimes: { data: [...], totalCount: N }
-
         console.log('[DataGrid] Raw result.data structure:', JSON.stringify(result.data, null, 2).substring(0, 500));
 
-        // Try different paths to find the records
-        let responseData;
-        if (result.data.records && Array.isArray(result.data.records)) {
-          console.log('[DataGrid] Found result.data.records array, length:', result.data.records.length);
-          responseData = result.data.records;
-        } else if (result.data.data && Array.isArray(result.data.data)) {
-          console.log('[DataGrid] Found result.data.data array, length:', result.data.data.length);
-          responseData = result.data.data;
-        } else if (Array.isArray(result.data)) {
-          console.log('[DataGrid] result.data itself is an array, length:', result.data.length);
-          responseData = result.data;
-        } else if (result.data.rows && Array.isArray(result.data.rows)) {
-          console.log('[DataGrid] Found result.data.rows array, length:', result.data.rows.length);
-          responseData = result.data.rows;
-        } else {
-          // Last resort: check if result.data has a single key that contains the array
-          const keys = Object.keys(result.data);
-          console.log('[DataGrid] Checking keys in result.data:', keys);
+        // Extract records from MCP server response
+        // The MCP server response can be in various formats:
+        // 1. { records: [...], total_count: N }
+        // 2. { data: [...], totalCount: N }
+        // 3. Direct array: [...]
+        // 4. { rows: [...] }
+        let records: any[] = [];
+        let totalCount = 0;
 
-          for (const key of keys) {
-            if (Array.isArray(result.data[key])) {
-              console.log(`[DataGrid] Found array at result.data.${key}, length:`, result.data[key].length);
-              responseData = result.data[key];
+        if (Array.isArray(result.data)) {
+          // Direct array response
+          console.log('[DataGrid] Direct array response, length:', result.data.length);
+          records = result.data;
+          totalCount = result.data.length;
+        } else if (typeof result.data === 'object' && result.data !== null) {
+          // Object response - try different property names
+          const possibleRecordKeys = ['records', 'data', 'rows', 'results'];
+          
+          for (const key of possibleRecordKeys) {
+            if (result.data[key] && Array.isArray(result.data[key])) {
+              console.log(`[DataGrid] Found records at result.data.${key}, length:`, result.data[key].length);
+              records = result.data[key];
               break;
             }
           }
 
-          if (!responseData) {
-            console.warn('[DataGrid] Could not find array, treating result.data as single record');
-            responseData = result.data;
+          // If still no records found, check if result.data itself looks like a single record
+          if (records.length === 0 && Object.keys(result.data).length > 0) {
+            // Check if this looks like metadata vs actual data
+            const keys = Object.keys(result.data);
+            const hasMetadataKeys = keys.some(k => ['type', 'text', 'content'].includes(k.toLowerCase()));
+            
+            if (hasMetadataKeys) {
+              console.warn('[DataGrid] Response appears to be metadata, not records:', result.data);
+              this.showError('Query returned metadata instead of records. Please check the MCP server response format.');
+              return;
+            } else {
+              // Treat as a single record
+              console.log('[DataGrid] Treating result.data as single record');
+              records = [result.data];
+            }
           }
+
+          // Extract total count
+          totalCount = result.data.total_count || result.data.totalCount || result.data.count || records.length;
+        } else {
+          console.error('[DataGrid] Unexpected result.data type:', typeof result.data);
+          this.showError('Unexpected response format from server');
+          return;
         }
 
-        // Ensure we have an array
-        if (Array.isArray(responseData)) {
-          this.data = responseData;
-        } else if (responseData && typeof responseData === 'object') {
-          // If it's an object but not an array, wrap it in an array
-          console.warn('[DataGrid] responseData is an object, not an array. Wrapping in array:', responseData);
-          this.data = [responseData];
-        } else {
-          console.error('[DataGrid] responseData is not an array or object:', typeof responseData, responseData);
+        // Validate we have actual records
+        if (records.length === 0) {
+          console.log('[DataGrid] No records returned');
           this.data = [];
-        }
-
-        this.totalRecords = result.data.total_count || result.data.totalCount || result.data.count || this.data.length;
-
-        console.log('[DataGrid] Loaded records:', this.data.length, 'Total:', this.totalRecords);
-        console.log('[DataGrid] First record sample:', this.data[0] ? JSON.stringify(this.data[0]).substring(0, 200) : 'none');
-
-        // Extract columns from data
-        if (this.data.length > 0) {
-          const firstRow = this.data[0];
-
-          // Ensure firstRow is an object
-          if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
-            this.columns = Object.keys(firstRow).map(key => ({
-              name: key,
-              sortable: true,
-              editable: true,
-            }));
-            console.log('[DataGrid] Extracted columns:', this.columns.map(c => c.name));
-          } else {
-            console.error('[DataGrid] First row is not a valid object:', firstRow);
-            this.columns = [];
-          }
-        } else {
           this.columns = [];
-          console.log('[DataGrid] No data returned, no columns to extract');
+          this.totalRecords = 0;
+          this.render();
+          return;
         }
+
+        // Validate first record is an object (not metadata)
+        const firstRecord = records[0];
+        if (!firstRecord || typeof firstRecord !== 'object' || Array.isArray(firstRecord)) {
+          console.error('[DataGrid] First record is not a valid object:', firstRecord);
+          this.showError('Invalid record format received from server');
+          return;
+        }
+
+        // Check if this looks like query metadata instead of actual data
+        const firstRecordKeys = Object.keys(firstRecord);
+        if (firstRecordKeys.length === 2 && 
+            firstRecordKeys.includes('type') && 
+            firstRecordKeys.includes('text')) {
+          console.error('[DataGrid] Records appear to be metadata (type/text), not actual data');
+          this.showError('Query returned metadata instead of table records. The MCP server may not be configured correctly.');
+          return;
+        }
+
+        // Set the data
+        this.data = records;
+        this.totalRecords = totalCount;
+
+        // Extract columns from first record
+        this.columns = Object.keys(firstRecord).map(key => ({
+          name: key,
+          sortable: true,
+          editable: true,
+        }));
+
+        console.log('[DataGrid] Successfully loaded:', this.data.length, 'records');
+        console.log('[DataGrid] Total records:', this.totalRecords);
+        console.log('[DataGrid] Columns:', this.columns.map(c => c.name).join(', '));
+        console.log('[DataGrid] First record sample:', JSON.stringify(this.data[0]).substring(0, 200));
 
         this.render();
       } else {

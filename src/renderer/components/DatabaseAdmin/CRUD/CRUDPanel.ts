@@ -163,7 +163,7 @@ export class CRUDPanel {
   private async executeDefaultQuery(tableName: string): Promise<void> {
     const defaultParams: QueryParams = {
       table: tableName,
-      limit: 100,
+      limit: 10,  // Changed from 100 to 10 for faster initial load
       offset: 0,
     };
 
