@@ -390,3 +390,10 @@ export class DatabaseTab {
     return div.innerHTML;
   }
 }
+
+/**
+ * Factory function to create the database tab instance
+ */
+export function createDatabaseTab(): DatabaseTab {
+  return new DatabaseTab();
+}

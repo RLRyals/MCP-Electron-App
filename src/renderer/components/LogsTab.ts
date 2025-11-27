@@ -1357,11 +1357,12 @@ export class LogsTab {
       if (resultsContainer) resultsContainer.style.display = 'block';
       if (resultsContent) resultsContent.innerHTML = '<div class="logs-loading"><div class="spinner"></div><p>Running system tests...</p></div>';
 
-      const result = await window.electronAPI.mcpSystem.runSystemTest();
+      const result = await window.electronAPI.logger.testSystem();
 
       if (resultsContent) {
-        if (result.success) {
-          resultsContent.innerHTML = result.results.map((check: any) => `
+        // SystemTestResult has { passed: boolean, checks: SystemCheck[], systemInfo: any }
+        if (result && result.checks) {
+          resultsContent.innerHTML = result.checks.map((check: any) => `
             <div class="test-check ${check.status === 'pass' ? 'pass' : check.status === 'fail' ? 'fail' : 'warning'}">
               <div class="test-check-icon">${check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️'}</div>
               <div class="test-check-content">
@@ -1371,7 +1372,7 @@ export class LogsTab {
             </div>
           `).join('');
         } else {
-          resultsContent.innerHTML = `<div class="error-message">Failed to run system test: ${result.error}</div>`;
+          resultsContent.innerHTML = `<div class="error-message">Failed to run system test or no results returned</div>`;
         }
       }
     } catch (error) {
@@ -1391,10 +1392,7 @@ export class LogsTab {
    */
   private async openLogsFolder(): Promise<void> {
     try {
-      const result = await window.electronAPI.logger.openLogsFolder();
-      if (!result.success) {
-        this.showNotification(`Failed to open logs folder: ${result.error}`, 'error');
-      }
+      await window.electronAPI.logger.openLogsDirectory();
     } catch (error) {
       console.error('Error opening logs folder:', error);
       this.showNotification('Failed to open logs folder', 'error');
