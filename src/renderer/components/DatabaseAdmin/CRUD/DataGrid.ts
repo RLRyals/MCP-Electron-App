@@ -33,7 +33,7 @@ export class DataGrid {
   private sortColumn: string | null = null;
   private sortDirection: 'ASC' | 'DESC' = 'ASC';
   private currentPage: number = 1;
-  private pageSize: number = 100;
+  private pageSize: number = 10;
   private totalRecords: number = 0;
 
   constructor(container: HTMLElement, events: DataGridEvents = {}) {

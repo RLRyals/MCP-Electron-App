@@ -11,6 +11,8 @@
  * - Diagnostic tools
  */
 
+import { databaseService } from '../services/databaseService.js';
+
 export interface LogEntry {
   timestamp: string;
   level: 'error' | 'warn' | 'info' | 'debug';
@@ -34,6 +36,11 @@ export class LogsTab {
   private searchQuery: string = '';
   private logs: LogEntry[] = [];
   private isInitialized: boolean = false;
+  
+  // Database Connection & Activity
+  private dbConnectionInterval: NodeJS.Timeout | null = null;
+  private isDbConnected: boolean = false;
+  private dbActivity: LogEntry[] = [];
 
   constructor(options: LogsTabOptions) {
     this.containerId = options.containerId;
@@ -61,6 +68,9 @@ export class LogsTab {
         this.startAutoRefresh();
       }
 
+      // Start database connection checks
+      this.startDbConnectionChecks();
+
       this.isInitialized = true;
       console.log('LogsTab initialized successfully');
     } catch (error) {
@@ -82,8 +92,15 @@ export class LogsTab {
     container.innerHTML = `
       <div class="logs-tab-container">
         <div class="logs-header">
-          <h2>Logs & Diagnostics</h2>
-          <p class="logs-subtitle">View and manage application and service logs</p>
+          <div class="header-content">
+            <div>
+              <h2>Logs & Diagnostics</h2>
+              <p class="logs-subtitle">View and manage application and service logs</p>
+            </div>
+            <div class="header-status">
+               ${this.renderDbConnectionStatus()}
+            </div>
+          </div>
         </div>
 
         <!-- Service Selector and Controls -->
@@ -197,6 +214,14 @@ export class LogsTab {
           <h3>System Test Results</h3>
           <div id="system-test-results-content"></div>
         </div>
+
+        <!-- Database Activity Log (Moved from Database Tab) -->
+        <div class="logs-section">
+          <h3>Database Activity</h3>
+          <div class="database-activity-container" id="database-activity-log">
+             <div class="activity-empty">No recent database activity</div>
+          </div>
+        </div>
       </div>
     `;
 
@@ -232,6 +257,71 @@ export class LogsTab {
       .logs-subtitle {
         opacity: 0.9;
         font-size: 1rem;
+      }
+      
+      .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      
+      .db-status-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        position: relative;
+      }
+      
+      .status-indicator.status-green {
+        background-color: #00D4AA;
+        box-shadow: 0 0 8px rgba(0, 212, 170, 0.6);
+      }
+      
+      .status-indicator.status-red {
+        background-color: #F44336;
+        box-shadow: 0 0 8px rgba(244, 67, 54, 0.6);
+      }
+      
+      .status-info {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .status-label {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .status-value {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      
+      .icon-button-small {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+      
+      .icon-button-small:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
       }
 
       .logs-controls {
@@ -589,11 +679,6 @@ export class LogsTab {
         padding: 20px;
       }
 
-      .system-test-results h3 {
-        font-size: 1.5rem;
-        margin-bottom: 15px;
-      }
-
       .test-check {
         padding: 12px;
         margin-bottom: 8px;
@@ -636,6 +721,57 @@ export class LogsTab {
         font-size: 0.9rem;
         opacity: 0.9;
       }
+      
+      .logs-section {
+        margin-top: 30px;
+      }
+      
+      .logs-section h3 {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+      }
+      
+      .database-activity-container {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        height: 200px;
+        overflow-y: auto;
+        padding: 10px;
+      }
+      
+      .activity-empty {
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+        padding: 20px;
+        font-style: italic;
+      }
+      
+      .db-activity-item {
+        padding: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 0.9rem;
+        display: flex;
+        gap: 10px;
+      }
+      
+      .db-activity-item:last-child {
+        border-bottom: none;
+      }
+      
+      .db-activity-item.error {
+        color: #ffcdd2;
+      }
+      
+      .db-activity-item.warning {
+        color: #fff3cd;
+      }
+      
+      .activity-time {
+        color: rgba(255, 255, 255, 0.5);
+        font-family: monospace;
+        white-space: nowrap;
+      }
 
       @media (max-width: 768px) {
         .logs-controls {
@@ -661,6 +797,106 @@ export class LogsTab {
     `;
 
     document.head.appendChild(style);
+  }
+
+  /**
+   * Render Database Connection Status
+   */
+  private renderDbConnectionStatus(): string {
+    return `
+      <div class="db-status-card">
+        <div class="status-indicator ${this.isDbConnected ? 'status-green' : 'status-red'}" id="db-connection-indicator">
+          <span class="status-dot"></span>
+        </div>
+        <div class="status-info">
+          <span class="status-label">Database Server</span>
+          <span class="status-value" id="db-connection-text">${this.isDbConnected ? 'Connected' : 'Disconnected'}</span>
+        </div>
+        <button id="refresh-db-connection" class="icon-button-small" title="Refresh Connection">
+          🔄
+        </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Start Database Connection Checks
+   */
+  private startDbConnectionChecks(): void {
+    this.checkDbConnection();
+    this.dbConnectionInterval = setInterval(() => this.checkDbConnection(), 30000);
+  }
+
+  /**
+   * Check Database Connection
+   */
+  private async checkDbConnection(): Promise<void> {
+    try {
+      const result = await databaseService.checkConnection();
+      this.isDbConnected = result.success;
+      this.updateDbConnectionUI();
+    } catch (error) {
+      this.isDbConnected = false;
+      this.updateDbConnectionUI();
+    }
+  }
+
+  /**
+   * Update Database Connection UI
+   */
+  private updateDbConnectionUI(): void {
+    const indicator = document.getElementById('db-connection-indicator');
+    const text = document.getElementById('db-connection-text');
+    
+    if (indicator) {
+      indicator.className = `status-indicator ${this.isDbConnected ? 'status-green' : 'status-red'}`;
+    }
+    
+    if (text) {
+      text.textContent = this.isDbConnected ? 'Connected' : 'Disconnected';
+    }
+  }
+
+  /**
+   * Add Database Activity
+   */
+  public addDbActivity(type: 'info' | 'success' | 'warning' | 'error', message: string): void {
+    let level: 'info' | 'warn' | 'error' | 'debug' = 'info';
+    
+    if (type === 'warning') level = 'warn';
+    else if (type === 'error') level = 'error';
+    
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      source: 'Database'
+    };
+    
+    this.dbActivity.unshift(entry);
+    if (this.dbActivity.length > 50) this.dbActivity.pop();
+    
+    this.renderDbActivity();
+  }
+
+  /**
+   * Render Database Activity
+   */
+  private renderDbActivity(): void {
+    const container = document.getElementById('database-activity-log');
+    if (!container) return;
+    
+    if (this.dbActivity.length === 0) {
+      container.innerHTML = '<div class="activity-empty">No recent database activity</div>';
+      return;
+    }
+    
+    container.innerHTML = this.dbActivity.map(entry => `
+      <div class="db-activity-item ${entry.level}">
+        <span class="activity-time">${new Date(entry.timestamp).toLocaleTimeString()}</span>
+        <span class="activity-message">${entry.message}</span>
+      </div>
+    `).join('');
   }
 
   /**
@@ -762,6 +998,15 @@ export class LogsTab {
     if (openFolder) {
       openFolder.addEventListener('click', () => this.openLogsFolder());
     }
+    
+    // Refresh DB Connection
+    const refreshDb = document.getElementById('refresh-db-connection');
+    if (refreshDb) {
+      refreshDb.addEventListener('click', () => {
+        this.checkDbConnection();
+        this.addDbActivity('info', 'Checking database connection...');
+      });
+    }
   }
 
   /**
@@ -829,13 +1074,13 @@ export class LogsTab {
       const result = await window.electronAPI.mcpSystem.getLogs(serviceName, 200);
 
       if (result.success) {
-        const logLines = result.logs.split('\n').filter(line => line.trim() !== '');
+        const logLines = result.logs.split('\\n').filter(line => line.trim() !== '');
         this.logs = logLines.map(line => this.parseServiceLogLine(line, service)).filter(log => log !== null) as LogEntry[];
       } else {
         this.logs = [];
       }
     } catch (error) {
-      console.error(`Error loading ${service} logs:`, error);
+      console.error(\`Error loading \${service} logs:\`, error);
       this.logs = [];
     }
   }
@@ -855,8 +1100,8 @@ export class LogsTab {
       };
     } catch {
       // Fall back to simple parsing
-      const timestampMatch = line.match(/(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/);
-      const levelMatch = line.match(/\[(ERROR|WARN|INFO|DEBUG)\]/i);
+      const timestampMatch = line.match(/(\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2})/);
+      const levelMatch = line.match(/\\[(ERROR|WARN|INFO|DEBUG)\\]/i);
 
       return {
         timestamp: timestampMatch ? timestampMatch[1] : new Date().toISOString(),
@@ -874,7 +1119,7 @@ export class LogsTab {
     if (!line || line.trim() === '') return null;
 
     // Extract timestamp if present
-    const timestampMatch = line.match(/(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/);
+    const timestampMatch = line.match(/(\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2})/);
 
     // Try to detect log level
     let level: 'error' | 'warn' | 'info' | 'debug' = 'info';
@@ -921,13 +1166,13 @@ export class LogsTab {
 
     // Render
     if (filteredLogs.length === 0) {
-      logsDisplay.innerHTML = `
+      logsDisplay.innerHTML = \`
         <div class="logs-empty">
           <div class="logs-empty-icon">📭</div>
           <p>No logs found</p>
-          ${this.searchQuery ? '<p style="font-size: 0.9rem; opacity: 0.8;">Try adjusting your search or filter</p>' : ''}
+          \${this.searchQuery ? '<p style="font-size: 0.9rem; opacity: 0.8;">Try adjusting your search or filter</p>' : ''}
         </div>
-      `;
+      \`;
       return;
     }
 
@@ -935,13 +1180,13 @@ export class LogsTab {
       const highlightedMessage = this.highlightSearchQuery(log.message);
       const timestamp = new Date(log.timestamp).toLocaleTimeString();
 
-      return `
-        <div class="log-entry level-${log.level}">
-          <span class="log-timestamp">${timestamp}</span>
-          <span class="log-level ${log.level}">${log.level}</span>
-          <span class="log-message">${highlightedMessage}</span>
+      return \`
+        <div class="log-entry level-\${log.level}">
+          <span class="log-timestamp">\${timestamp}</span>
+          <span class="log-level \${log.level}">\${log.level}</span>
+          <span class="log-message">\${highlightedMessage}</span>
         </div>
-      `;
+      \`;
     }).join('');
 
     // Scroll to bottom
@@ -958,7 +1203,7 @@ export class LogsTab {
 
     const escapedText = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(this.searchQuery);
-    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const regex = new RegExp(\`(\${escapedQuery})\`, 'gi');
 
     return escapedText.replace(regex, '<span class="log-highlight">$1</span>');
   }
@@ -981,7 +1226,7 @@ export class LogsTab {
 
     if (logCount) {
       const count = this.logs.length;
-      logCount.textContent = `${count} ${count === 1 ? 'entry' : 'entries'}`;
+      logCount.textContent = \`\${count} \${count === 1 ? 'entry' : 'entries'}\`;
     }
 
     if (logSource) {
@@ -1002,7 +1247,7 @@ export class LogsTab {
   private updateAutoRefreshStatus(): void {
     const status = document.getElementById('auto-refresh-status');
     if (status) {
-      status.textContent = `Auto-refresh: ${this.autoRefresh ? 'ON' : 'OFF'}`;
+      status.textContent = \`Auto-refresh: \${this.autoRefresh ? 'ON' : 'OFF'}\`;
     }
   }
 
@@ -1041,15 +1286,15 @@ export class LogsTab {
       // Format logs as text
       const logsText = this.logs.map(log => {
         const timestamp = new Date(log.timestamp).toISOString();
-        return `[${timestamp}] [${log.level.toUpperCase()}] ${log.message}`;
-      }).join('\n');
+        return \`[\${timestamp}] [\${log.level.toUpperCase()}] \${log.message}\`;
+      }).join('\\n');
 
       // Create blob and download
       const blob = new Blob([logsText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${this.currentService}-logs-${Date.now()}.txt`;
+      a.download = \`\${this.currentService}-logs-\${Date.now()}.txt\`;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -1079,9 +1324,9 @@ export class LogsTab {
       const result = await window.electronAPI.logger.exportDiagnosticReport();
 
       if (result.success) {
-        this.showNotification(`Diagnostic report exported to: ${result.path}`, 'success');
+        this.showNotification(\`Diagnostic report exported to: \${result.path}\`, 'success');
       } else {
-        this.showNotification(`Failed to export report: ${result.error}`, 'error');
+        this.showNotification(\`Failed to export report: \${result.error}\`, 'error');
       }
     } catch (error) {
       console.error('Error exporting diagnostic report:', error);
@@ -1101,48 +1346,34 @@ export class LogsTab {
   private async runSystemTest(): Promise<void> {
     try {
       const button = document.getElementById('run-system-test') as HTMLButtonElement;
-      const resultsContainer = document.getElementById('system-test-results-container');
-      const resultsContent = document.getElementById('system-test-results-content');
-
       if (button) {
         button.disabled = true;
-        button.innerHTML = '<span class="diagnostic-icon">⏳</span><span class="diagnostic-label">Testing...</span>';
+        button.textContent = 'Running...';
       }
 
-      if (resultsContainer) {
-        resultsContainer.style.display = 'block';
-      }
+      const resultsContainer = document.getElementById('system-test-results-container');
+      const resultsContent = document.getElementById('system-test-results-content');
+      
+      if (resultsContainer) resultsContainer.style.display = 'block';
+      if (resultsContent) resultsContent.innerHTML = '<div class="logs-loading"><div class="spinner"></div><p>Running system tests...</p></div>';
+
+      const result = await window.electronAPI.mcpSystem.runSystemTest();
 
       if (resultsContent) {
-        resultsContent.innerHTML = '<p style="text-align: center; padding: 20px;">Running system tests...</p>';
-      }
-
-      const results = await window.electronAPI.logger.testSystem();
-
-      if (resultsContent) {
-        const checksHtml = results.checks.map(check => {
-          const icon = check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '⚠';
-          return `
-            <div class="test-check ${check.status}">
-              <span class="test-check-icon">${icon}</span>
+        if (result.success) {
+          resultsContent.innerHTML = result.results.map((check: any) => \`
+            <div class="test-check \${check.status === 'pass' ? 'pass' : check.status === 'fail' ? 'fail' : 'warning'}">
+              <div class="test-check-icon">\${check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️'}</div>
               <div class="test-check-content">
-                <div class="test-check-name">${check.name}</div>
-                <div class="test-check-message">${check.message}</div>
+                <div class="test-check-name">\${check.name}</div>
+                <div class="test-check-message">\${check.message}</div>
               </div>
             </div>
-          `;
-        }).join('');
-
-        resultsContent.innerHTML = `
-          <div style="margin-bottom: 15px; padding: 15px; background: ${results.passed ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)'}; border-radius: 8px;">
-            <strong>Overall Result:</strong> ${results.passed ? '✓ All tests passed' : '✗ Some tests failed'}
-          </div>
-          ${checksHtml}
-        `;
+          \`).join('');
+        } else {
+          resultsContent.innerHTML = \`<div class="error-message">Failed to run system test: \${result.error}</div>\`;
+        }
       }
-
-      const message = results.passed ? 'System test passed!' : 'System test completed with warnings';
-      this.showNotification(message, results.passed ? 'success' : 'error');
     } catch (error) {
       console.error('Error running system test:', error);
       this.showNotification('Failed to run system test', 'error');
@@ -1160,11 +1391,28 @@ export class LogsTab {
    */
   private async openLogsFolder(): Promise<void> {
     try {
-      await window.electronAPI.logger.openLogsDirectory();
-      this.showNotification('Opening logs folder...', 'info');
+      const result = await window.electronAPI.logger.openLogsFolder();
+      if (!result.success) {
+        this.showNotification(\`Failed to open logs folder: \${result.error}\`, 'error');
+      }
     } catch (error) {
       console.error('Error opening logs folder:', error);
       this.showNotification('Failed to open logs folder', 'error');
+    }
+  }
+
+  /**
+   * Show notification helper
+   */
+  private showNotification(message: string, type: 'success' | 'error' | 'info'): void {
+    // Use a simple alert for now, or a custom toast if available
+    // For this implementation, we'll log to console and maybe show a temporary element
+    console.log(\`[\${type.toUpperCase()}] \${message}\`);
+    
+    // If we have a notification system, use it here
+    // For now, we'll just add to the application logs if it's an error
+    if (type === 'error') {
+      this.showError(message);
     }
   }
 
@@ -1174,54 +1422,26 @@ export class LogsTab {
   private showError(message: string): void {
     const logsDisplay = document.getElementById('logs-display');
     if (logsDisplay) {
-      logsDisplay.innerHTML = `
-        <div class="logs-empty">
-          <div class="logs-empty-icon">❌</div>
-          <p>${message}</p>
-        </div>
-      `;
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'log-entry level-error';
+      errorDiv.innerHTML = \`
+        <span class="log-timestamp">\${new Date().toLocaleTimeString()}</span>
+        <span class="log-level error">ERROR</span>
+        <span class="log-message">\${this.escapeHtml(message)}</span>
+      \`;
+      logsDisplay.appendChild(errorDiv);
+      logsDisplay.scrollTop = logsDisplay.scrollHeight;
     }
   }
 
   /**
-   * Show notification
-   */
-  private showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-    // Use the global showNotification function if available
-    if ((window as any).showNotification) {
-      (window as any).showNotification(message, type);
-    } else {
-      console.log(`[${type.toUpperCase()}] ${message}`);
-    }
-  }
-
-  /**
-   * Destroy the component
+   * Clean up resources
    */
   public destroy(): void {
     this.stopAutoRefresh();
-    this.logs = [];
-    this.isInitialized = false;
-
-    // Remove styles
-    const styles = document.getElementById('logs-tab-styles');
-    if (styles) {
-      styles.remove();
+    if (this.dbConnectionInterval) {
+      clearInterval(this.dbConnectionInterval);
+      this.dbConnectionInterval = null;
     }
-
-    console.log('LogsTab destroyed');
   }
-}
-
-/**
- * Create and initialize the default LogsTab
- */
-export function createDefaultLogsTab(): LogsTab {
-  const logsTab = new LogsTab({
-    containerId: 'tab-panel-logs',
-    autoRefresh: true,
-    refreshInterval: 5000 // 5 seconds
-  });
-
-  return logsTab;
 }
