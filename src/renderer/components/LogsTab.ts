@@ -1074,13 +1074,13 @@ export class LogsTab {
       const result = await window.electronAPI.mcpSystem.getLogs(serviceName, 200);
 
       if (result.success) {
-        const logLines = result.logs.split('\\n').filter(line => line.trim() !== '');
+        const logLines = result.logs.split('\n').filter(line => line.trim() !== '');
         this.logs = logLines.map(line => this.parseServiceLogLine(line, service)).filter(log => log !== null) as LogEntry[];
       } else {
         this.logs = [];
       }
     } catch (error) {
-      console.error(\`Error loading \${service} logs:\`, error);
+      console.error(`Error loading ${service} logs:`, error);
       this.logs = [];
     }
   }
@@ -1166,13 +1166,13 @@ export class LogsTab {
 
     // Render
     if (filteredLogs.length === 0) {
-      logsDisplay.innerHTML = \`
+      logsDisplay.innerHTML = `
         <div class="logs-empty">
           <div class="logs-empty-icon">📭</div>
           <p>No logs found</p>
-          \${this.searchQuery ? '<p style="font-size: 0.9rem; opacity: 0.8;">Try adjusting your search or filter</p>' : ''}
+          ${this.searchQuery ? '<p style="font-size: 0.9rem; opacity: 0.8;">Try adjusting your search or filter</p>' : ''}
         </div>
-      \`;
+      `;
       return;
     }
 
@@ -1180,13 +1180,13 @@ export class LogsTab {
       const highlightedMessage = this.highlightSearchQuery(log.message);
       const timestamp = new Date(log.timestamp).toLocaleTimeString();
 
-      return \`
-        <div class="log-entry level-\${log.level}">
-          <span class="log-timestamp">\${timestamp}</span>
-          <span class="log-level \${log.level}">\${log.level}</span>
-          <span class="log-message">\${highlightedMessage}</span>
+      return `
+        <div class="log-entry level-${log.level}">
+          <span class="log-timestamp">${timestamp}</span>
+          <span class="log-level ${log.level}">${log.level}</span>
+          <span class="log-message">${highlightedMessage}</span>
         </div>
-      \`;
+      `;
     }).join('');
 
     // Scroll to bottom
@@ -1203,7 +1203,7 @@ export class LogsTab {
 
     const escapedText = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(this.searchQuery);
-    const regex = new RegExp(\`(\${escapedQuery})\`, 'gi');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
 
     return escapedText.replace(regex, '<span class="log-highlight">$1</span>');
   }
@@ -1226,7 +1226,7 @@ export class LogsTab {
 
     if (logCount) {
       const count = this.logs.length;
-      logCount.textContent = \`\${count} \${count === 1 ? 'entry' : 'entries'}\`;
+      logCount.textContent = `${count} ${count === 1 ? 'entry' : 'entries'}`;
     }
 
     if (logSource) {
@@ -1247,7 +1247,7 @@ export class LogsTab {
   private updateAutoRefreshStatus(): void {
     const status = document.getElementById('auto-refresh-status');
     if (status) {
-      status.textContent = \`Auto-refresh: \${this.autoRefresh ? 'ON' : 'OFF'}\`;
+      status.textContent = `Auto-refresh: ${this.autoRefresh ? 'ON' : 'OFF'}`;
     }
   }
 
@@ -1286,7 +1286,7 @@ export class LogsTab {
       // Format logs as text
       const logsText = this.logs.map(log => {
         const timestamp = new Date(log.timestamp).toISOString();
-        return \`[\${timestamp}] [\${log.level.toUpperCase()}] \${log.message}\`;
+        return `[${timestamp}] [${log.level.toUpperCase()}] ${log.message}`;
       }).join('\\n');
 
       // Create blob and download
@@ -1294,7 +1294,7 @@ export class LogsTab {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = \`\${this.currentService}-logs-\${Date.now()}.txt\`;
+      a.download = `${this.currentService}-logs-${Date.now()}.txt`;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -1324,9 +1324,9 @@ export class LogsTab {
       const result = await window.electronAPI.logger.exportDiagnosticReport();
 
       if (result.success) {
-        this.showNotification(\`Diagnostic report exported to: \${result.path}\`, 'success');
+        this.showNotification(`Diagnostic report exported to: ${result.path}`, 'success');
       } else {
-        this.showNotification(\`Failed to export report: \${result.error}\`, 'error');
+        this.showNotification(`Failed to export report: ${result.error}`, 'error');
       }
     } catch (error) {
       console.error('Error exporting diagnostic report:', error);
@@ -1361,17 +1361,17 @@ export class LogsTab {
 
       if (resultsContent) {
         if (result.success) {
-          resultsContent.innerHTML = result.results.map((check: any) => \`
-            <div class="test-check \${check.status === 'pass' ? 'pass' : check.status === 'fail' ? 'fail' : 'warning'}">
-              <div class="test-check-icon">\${check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️'}</div>
+          resultsContent.innerHTML = result.results.map((check: any) => `
+            <div class="test-check ${check.status === 'pass' ? 'pass' : check.status === 'fail' ? 'fail' : 'warning'}">
+              <div class="test-check-icon">${check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️'}</div>
               <div class="test-check-content">
-                <div class="test-check-name">\${check.name}</div>
-                <div class="test-check-message">\${check.message}</div>
+                <div class="test-check-name">${check.name}</div>
+                <div class="test-check-message">${check.message}</div>
               </div>
             </div>
-          \`).join('');
+          `).join('');
         } else {
-          resultsContent.innerHTML = \`<div class="error-message">Failed to run system test: \${result.error}</div>\`;
+          resultsContent.innerHTML = `<div class="error-message">Failed to run system test: ${result.error}</div>`;
         }
       }
     } catch (error) {
@@ -1393,7 +1393,7 @@ export class LogsTab {
     try {
       const result = await window.electronAPI.logger.openLogsFolder();
       if (!result.success) {
-        this.showNotification(\`Failed to open logs folder: \${result.error}\`, 'error');
+        this.showNotification(`Failed to open logs folder: ${result.error}`, 'error');
       }
     } catch (error) {
       console.error('Error opening logs folder:', error);
@@ -1407,7 +1407,7 @@ export class LogsTab {
   private showNotification(message: string, type: 'success' | 'error' | 'info'): void {
     // Use a simple alert for now, or a custom toast if available
     // For this implementation, we'll log to console and maybe show a temporary element
-    console.log(\`[\${type.toUpperCase()}] \${message}\`);
+    console.log(`[${type.toUpperCase()}] ${message}`);
     
     // If we have a notification system, use it here
     // For now, we'll just add to the application logs if it's an error
@@ -1424,11 +1424,11 @@ export class LogsTab {
     if (logsDisplay) {
       const errorDiv = document.createElement('div');
       errorDiv.className = 'log-entry level-error';
-      errorDiv.innerHTML = \`
-        <span class="log-timestamp">\${new Date().toLocaleTimeString()}</span>
+      errorDiv.innerHTML = `
+        <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
         <span class="log-level error">ERROR</span>
-        <span class="log-message">\${this.escapeHtml(message)}</span>
-      \`;
+        <span class="log-message">${this.escapeHtml(message)}</span>
+      `;
       logsDisplay.appendChild(errorDiv);
       logsDisplay.scrollTop = logsDisplay.scrollHeight;
     }
@@ -1444,4 +1444,15 @@ export class LogsTab {
       this.dbConnectionInterval = null;
     }
   }
+}
+
+/**
+ * Factory function to create the default logs tab instance
+ */
+export function createDefaultLogsTab(): LogsTab {
+  return new LogsTab({
+    containerId: 'logs-tab-content',
+    autoRefresh: true,
+    refreshInterval: 5000
+  });
 }
