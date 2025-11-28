@@ -394,6 +394,24 @@ interface PortConflictResult {
 }
 
 /**
+ * Port conflict details
+ */
+interface PortConflict {
+  port: number;
+  name: string;
+  suggested: number;
+}
+
+/**
+ * Port conflict check result with suggestions
+ */
+interface PortConflictCheckResult {
+  hasConflicts: boolean;
+  conflicts: PortConflict[];
+  suggestedConfig?: EnvConfig;
+}
+
+/**
  * Database backup result
  */
 interface BackupResult {

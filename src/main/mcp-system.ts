@@ -213,35 +213,56 @@ async function ensureDockerComposeFiles(): Promise<void> {
 }
 
 /**
+ * Stop existing containers to release ports
+ */
+export async function stopExistingContainers(): Promise<void> {
+  const coreFile = getDockerComposeFilePath('core');
+  logWithCategory('info', LogCategory.DOCKER, 'Stopping and removing existing containers...');
+
+  try {
+    // First, try to stop containers gracefully
+    try {
+      await execDockerCompose(coreFile, 'stop', []);
+      logWithCategory('info', LogCategory.DOCKER, 'Containers stopped');
+      // Wait for containers to fully stop
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (stopError: any) {
+      logWithCategory('warn', LogCategory.DOCKER, 'Stop command encountered an issue (may be safe to ignore)', stopError);
+    }
+
+    // Then remove containers and orphans (without removing volumes to preserve data)
+    await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
+    logWithCategory('info', LogCategory.DOCKER, 'Cleanup completed');
+
+    // Wait longer for ports to be fully released
+    logWithCategory('info', LogCategory.DOCKER, 'Waiting for ports to be released...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.DOCKER, 'Cleanup encountered an issue (may be safe to ignore)', error);
+    // Continue anyway - containers might not exist yet
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
+
+/**
  * Check if ports are available before starting
  */
-export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[] }> {
+export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[]; details?: any }> {
   logWithCategory('info', LogCategory.DOCKER, 'Checking for port conflicts...');
 
   const config = await envConfig.loadEnvConfig();
-  const conflicts: number[] = [];
+  const result = await envConfig.checkAllPortsAndSuggestAlternatives(config);
 
-  // Check all ports
-  const portsToCheck = [
-    config.POSTGRES_PORT,
-    config.MCP_CONNECTOR_PORT,
-    config.TYPING_MIND_PORT,
-  ];
-
-  for (const port of portsToCheck) {
-    const available = await envConfig.checkPortAvailable(port);
-    if (!available) {
-      conflicts.push(port);
-      logWithCategory('warn', LogCategory.DOCKER, `Port ${port} is already in use`);
-    }
+  if (result.hasConflicts) {
+    const conflictPorts = result.conflicts.map(c => c.port);
+    logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${conflictPorts.join(', ')}`);
+    return { 
+      success: false, 
+      conflicts: conflictPorts,
+      details: result.conflicts
+    };
   }
 
-  if (conflicts.length > 0) {
-    logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${conflicts.join(', ')}`);
-    return { success: false, conflicts };
-  }
-
-  logWithCategory('info', LogCategory.DOCKER, 'No port conflicts detected');
   return { success: true, conflicts: [] };
 }
 
@@ -616,53 +637,52 @@ export async function startMCPSystem(
     const services = await determineServicesToStart();
     logWithCategory('info', LogCategory.DOCKER, `Services to start: ${JSON.stringify(services)}`);
 
-    // Check port conflicts (optional - warn but continue)
-    const portCheck = await checkPortConflicts();
+    // Check port conflicts
+    let portCheck = await checkPortConflicts();
+    
     if (!portCheck.success) {
       logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${portCheck.conflicts.join(', ')}`);
-      // We'll continue anyway - docker-compose will fail with a better error if there's a real conflict
-    }
-
-    // Clean up any existing containers to prevent port conflicts
-    if (progressCallback) {
-      progressCallback({
-        message: 'Cleaning up old containers...',
-        percent: 15,
-        step: 'cleanup',
-        status: 'checking',
-      });
-    }
-
-    const coreFile = getDockerComposeFilePath('core');
-    try {
-      logWithCategory('info', LogCategory.DOCKER, 'Stopping and removing any existing containers...');
-
-      // First, try to stop containers gracefully
-      try {
-        await execDockerCompose(coreFile, 'stop', []);
-        logWithCategory('info', LogCategory.DOCKER, 'Containers stopped');
-        // Wait for containers to fully stop
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (stopError: any) {
-        logWithCategory('warn', LogCategory.DOCKER, 'Stop command encountered an issue (may be safe to ignore)', stopError);
+      
+      // Try to resolve by stopping existing containers
+      if (progressCallback) {
+        progressCallback({
+          message: 'Port conflicts detected. Cleaning up old containers...',
+          percent: 15,
+          step: 'cleanup',
+          status: 'checking',
+        });
       }
 
-      // Then remove containers and orphans (without removing volumes to preserve data)
-      await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
-      logWithCategory('info', LogCategory.DOCKER, 'Cleanup completed');
-
-      // Wait longer for ports to be fully released (increased from 1s to 3s)
-      logWithCategory('info', LogCategory.DOCKER, 'Waiting for ports to be released...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    } catch (error: any) {
-      logWithCategory('warn', LogCategory.DOCKER, 'Cleanup encountered an issue (may be safe to ignore)', error);
-      // Continue anyway - containers might not exist yet
-      // But still wait a bit
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await stopExistingContainers();
+      
+      // Re-check ports
+      portCheck = await checkPortConflicts();
+      
+      if (!portCheck.success) {
+        const conflictMsg = `Port conflicts persisting after cleanup: ${portCheck.conflicts.join(', ')}. Please stop other applications using these ports or change the ports in the Setup Wizard.`;
+        logWithCategory('error', LogCategory.DOCKER, conflictMsg);
+        return {
+          success: false,
+          message: conflictMsg,
+          error: 'PORT_CONFLICT',
+        };
+      }
+    } else {
+      // No conflicts, but still good to ensure clean slate
+      if (progressCallback) {
+        progressCallback({
+          message: 'Cleaning up old containers...',
+          percent: 15,
+          step: 'cleanup',
+          status: 'checking',
+        });
+      }
+      await stopExistingContainers();
     }
 
     // Start services
     const composeFiles: string[] = [];
+    const coreFile = getDockerComposeFilePath('core');
 
     // 1. Build and start core services
     composeFiles.push(coreFile);

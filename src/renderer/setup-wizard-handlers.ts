@@ -443,6 +443,9 @@ async function initializeEnvironmentStep() {
         // Add event listeners
         setupEnvironmentFormListeners();
 
+        // Check for port conflicts
+        checkPortConflicts(config);
+
         // Check if already configured
         if (wizardState.data.environment?.saved) {
             showSuccessMessage('Configuration previously saved', 'env-config-container');
@@ -463,11 +466,109 @@ async function initializeEnvironmentStep() {
 }
 
 /**
+ * Check for port conflicts and update UI
+ */
+async function checkPortConflicts(config: any) {
+    const conflictContainer = document.getElementById('port-conflict-container');
+    if (!conflictContainer) return;
+
+    try {
+        conflictContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: #aaa;">Checking ports...</div>';
+        
+        const result = await (window as any).electronAPI.envConfig.checkAllPorts(config);
+        
+        if (result.hasConflicts) {
+            const conflictList = result.conflicts.map((c: any) => 
+                `<li><strong>${c.name}</strong>: Port ${c.port} is in use (Suggested: ${c.suggested})</li>`
+            ).join('');
+
+            conflictContainer.innerHTML = `
+                <div class="alert warning" style="margin-bottom: 20px;">
+                    <span style="font-size: 1.5rem;">⚠️</span>
+                    <div style="flex: 1;">
+                        <strong>Port Conflicts Detected</strong>
+                        <p style="margin: 5px 0;">The following ports are already in use:</p>
+                        <ul style="margin: 5px 0 10px 20px; padding: 0;">
+                            ${conflictList}
+                        </ul>
+                        <button id="use-suggested-ports-btn" class="wizard-btn secondary" style="padding: 8px 15px; font-size: 0.9rem;">
+                            Use Suggested Ports
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Add event listener for the button
+            document.getElementById('use-suggested-ports-btn')?.addEventListener('click', () => {
+                if (result.suggestedConfig) {
+                    applySuggestedConfig(result.suggestedConfig);
+                }
+            });
+        } else {
+            conflictContainer.innerHTML = ''; // No conflicts
+        }
+    } catch (error) {
+        console.error('Error checking port conflicts:', error);
+        conflictContainer.innerHTML = `
+            <div class="alert error" style="margin-bottom: 20px;">
+                <strong>Error checking ports:</strong> ${error instanceof Error ? error.message : String(error)}
+            </div>
+        `;
+    }
+}
+
+/**
+ * Apply suggested configuration to form
+ */
+function applySuggestedConfig(config: any) {
+    const fields = [
+        { id: 'postgres-port', key: 'POSTGRES_PORT' },
+        { id: 'mcp-port', key: 'MCP_CONNECTOR_PORT' },
+        { id: 'http-port', key: 'HTTP_SSE_PORT' },
+        { id: 'db-admin-port', key: 'DB_ADMIN_PORT' },
+        { id: 'typing-mind-port', key: 'TYPING_MIND_PORT' }
+    ];
+
+    fields.forEach(field => {
+        const input = document.getElementById(field.id) as HTMLInputElement;
+        if (input && config[field.key]) {
+            input.value = config[field.key];
+            // Highlight change
+            input.style.borderColor = '#4CAF50';
+            setTimeout(() => {
+                input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            }, 2000);
+        }
+    });
+
+    // Re-check conflicts with new values
+    checkPortConflicts(config);
+    
+    // Show success message
+    const conflictContainer = document.getElementById('port-conflict-container');
+    if (conflictContainer) {
+        conflictContainer.innerHTML = `
+            <div class="alert success" style="margin-bottom: 20px;">
+                <span style="font-size: 1.5rem;">✓</span>
+                <div>
+                    <strong>Ports Updated</strong><br>
+                    Applied suggested available ports.
+                </div>
+            </div>
+        `;
+        setTimeout(() => {
+            if (conflictContainer) conflictContainer.innerHTML = '';
+        }, 3000);
+    }
+}
+
+/**
  * Create environment configuration form HTML
  */
 function createEnvironmentConfigForm(config: any): string {
     return `
         <div style="background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 15px;">
+            <div id="port-conflict-container"></div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
                 <div>
                     <label style="display: block; margin-bottom: 8px; font-weight: 500;">Database Name</label>
