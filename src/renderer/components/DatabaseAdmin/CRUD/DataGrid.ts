@@ -67,6 +67,37 @@ export class DataGrid {
       if (result.success && result.data) {
         console.log('[DataGrid] ========== EXTRACTING RECORDS ==========');
 
+        // WORKAROUND: Check if the response has the MCP content wrapper
+        // Format: { content: [{ type: "text", text: "...JSON..." }] }
+        if (result.data && typeof result.data === 'object' && 'content' in result.data) {
+          console.log('[DataGrid] ⚠ Detected MCP content wrapper, extracting JSON from text field...');
+          try {
+            const content = (result.data as any).content;
+            if (Array.isArray(content) && content[0]?.text) {
+              const textContent = content[0].text;
+              console.log('[DataGrid] Raw text content (first 200 chars):', textContent.substring(0, 200));
+              
+              // Extract JSON from the text (it may have headers like "Query Results from 'table':")
+              const jsonStartIndex = textContent.search(/[\{\[]/);
+              if (jsonStartIndex >= 0) {
+                const jsonText = textContent.substring(jsonStartIndex);
+                console.log('[DataGrid] Extracted JSON (first 200 chars):', jsonText.substring(0, 200));
+                
+                const parsedData = JSON.parse(jsonText);
+                console.log('[DataGrid] ✓ Successfully parsed JSON from MCP wrapper');
+                console.log('[DataGrid] Parsed data keys:', Object.keys(parsedData));
+                
+                // Now use the parsed data instead of result.data
+                result.data = parsedData;
+              } else {
+                console.error('[DataGrid] ✗ No JSON found in text content');
+              }
+            }
+          } catch (error) {
+            console.error('[DataGrid] ✗ Failed to extract JSON from MCP wrapper:', error);
+          }
+        }
+
         // Extract records from MCP server response
         // The MCP server response format is:
         // { table: "table_name", count: N, total_count: N, records: [...] }
