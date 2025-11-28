@@ -33,6 +33,9 @@ interface MCPToolRequest {
 
 /**
  * MCP Tool call response (JSON-RPC 2.0)
+ * Can come in two formats:
+ * 1. JSON-RPC format: { jsonrpc, result: { content: [...] }, id }
+ * 2. Direct format: { content: [...] }
  */
 interface MCPToolResponse {
   jsonrpc: '2.0';
@@ -42,6 +45,10 @@ interface MCPToolResponse {
       text: string;
     }>;
   };
+  content?: Array<{
+    type: 'text';
+    text: string;
+  }>;
   error?: {
     code: number;
     message: string;
@@ -109,10 +116,25 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       };
     }
 
-    // Extract result from JSON-RPC response
-    if (mcpResponse.result?.content?.[0]?.text) {
+    // The response can come in two formats:
+    // 1. JSON-RPC format: { jsonrpc: "2.0", result: { content: [...] }, id: ... }
+    // 2. Direct format: { content: [...] }
+    let contentArray: Array<{ type: string; text: string }> | undefined;
+    
+    if (mcpResponse.result?.content) {
+      // JSON-RPC format
+      contentArray = mcpResponse.result.content;
+      logWithCategory('info', LogCategory.SYSTEM, 'Response in JSON-RPC format');
+    } else if (mcpResponse.content) {
+      // Direct format
+      contentArray = mcpResponse.content;
+      logWithCategory('info', LogCategory.SYSTEM, 'Response in direct format');
+    }
+
+    // Extract result from response
+    if (contentArray?.[0]?.text) {
       try {
-        let textContent = mcpResponse.result.content[0].text;
+        let textContent = contentArray[0].text;
         logWithCategory('info', LogCategory.SYSTEM, `MCP raw response text (first 500 chars): ${textContent.substring(0, 500)}`);
 
         // MCP server may return formatted text with headers like:
@@ -159,11 +181,11 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
         // If not JSON, return as plain text
         logWithCategory('warn', LogCategory.SYSTEM, `Failed to parse MCP response as JSON for tool ${toolName}`, {
           error: parseError.message,
-          responseText: mcpResponse.result.content[0].text.substring(0, 500),
+          responseText: contentArray[0].text.substring(0, 500),
         });
         return {
           success: true,
-          data: mcpResponse.result.content[0].text,
+          data: contentArray[0].text,
         };
       }
     }
@@ -174,6 +196,7 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       data: null,
       message: 'Tool executed successfully with no data returned',
     };
+
 
   } catch (error: any) {
     const axiosError = error as AxiosError;
