@@ -1449,7 +1449,7 @@ export class LogsTab {
  */
 export function createDefaultLogsTab(): LogsTab {
   return new LogsTab({
-    containerId: 'logs-tab-content',
+    containerId: 'tab-panel-logs',
     autoRefresh: true,
     refreshInterval: 5000
   });
