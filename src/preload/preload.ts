@@ -805,6 +805,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Check all ports for conflicts and suggest alternatives
+     */
+    checkAllPorts: (config: EnvConfig): Promise<PortConflictCheckResult> => {
+      return ipcRenderer.invoke('env:check-all-ports', config);
+    },
+
+    /**
+     * Find next available port
+     */
+    findNextAvailablePort: (startPort: number): Promise<number | null> => {
+      return ipcRenderer.invoke('env:find-next-available-port', startPort);
+    },
+
+    /**
      * Reset configuration to defaults
      */
     resetDefaults: (): Promise<EnvConfig> => {

@@ -215,6 +215,106 @@ export function checkPortAvailable(port: number): Promise<boolean> {
 }
 
 /**
+ * Find next available port starting from a given port
+ * @param startPort Port to start checking from
+ * @param maxAttempts Maximum number of ports to try (default: 100)
+ */
+export async function findNextAvailablePort(startPort: number, maxAttempts: number = 100): Promise<number | null> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const port = startPort + i;
+    if (port > 65535) break; // Port number out of range
+    
+    const available = await checkPortAvailable(port);
+    if (available) {
+      return port;
+    }
+  }
+  return null; // No available port found
+}
+
+/**
+ * Port conflict information
+ */
+export interface PortConflict {
+  port: number;
+  name: string;
+  suggested: number;
+}
+
+/**
+ * Result of port conflict check
+ */
+export interface PortConflictCheckResult {
+  hasConflicts: boolean;
+  conflicts: PortConflict[];
+  suggestedConfig?: EnvConfig;
+}
+
+/**
+ * Check all configured ports for conflicts and suggest alternatives
+ * @param config Configuration to check
+ */
+export async function checkAllPortsAndSuggestAlternatives(
+  config: EnvConfig
+): Promise<PortConflictCheckResult> {
+  logger.info('Checking all ports for conflicts...');
+  
+  const conflicts: PortConflict[] = [];
+  const portChecks = [
+    { port: config.POSTGRES_PORT, name: 'PostgreSQL', key: 'POSTGRES_PORT' as const },
+    { port: config.MCP_CONNECTOR_PORT, name: 'MCP Connector', key: 'MCP_CONNECTOR_PORT' as const },
+    { port: config.HTTP_SSE_PORT, name: 'HTTP/SSE', key: 'HTTP_SSE_PORT' as const },
+    { port: config.DB_ADMIN_PORT, name: 'DB Admin', key: 'DB_ADMIN_PORT' as const },
+    { port: config.TYPING_MIND_PORT, name: 'TypingMind', key: 'TYPING_MIND_PORT' as const },
+  ];
+
+  // Check each port
+  for (const check of portChecks) {
+    const available = await checkPortAvailable(check.port);
+    if (!available) {
+      logger.warn(`Port ${check.port} (${check.name}) is already in use`);
+      
+      // Find next available port
+      const suggested = await findNextAvailablePort(check.port + 1);
+      if (suggested) {
+        conflicts.push({
+          port: check.port,
+          name: check.name,
+          suggested,
+        });
+        logger.info(`Suggested alternative port for ${check.name}: ${suggested}`);
+      } else {
+        logger.error(`Could not find available alternative port for ${check.name}`);
+        conflicts.push({
+          port: check.port,
+          name: check.name,
+          suggested: check.port, // Keep original if no alternative found
+        });
+      }
+    }
+  }
+
+  // If conflicts exist, create suggested configuration
+  let suggestedConfig: EnvConfig | undefined;
+  if (conflicts.length > 0) {
+    suggestedConfig = { ...config };
+    for (const conflict of conflicts) {
+      const check = portChecks.find(c => c.port === conflict.port);
+      if (check) {
+        suggestedConfig[check.key] = conflict.suggested;
+      }
+    }
+    logger.info(`Created suggested configuration with ${conflicts.length} port changes`);
+  }
+
+  return {
+    hasConflicts: conflicts.length > 0,
+    conflicts,
+    suggestedConfig,
+  };
+}
+
+/**
  * Parse .env file content
  * @param content File content to parse
  */

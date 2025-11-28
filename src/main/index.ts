@@ -633,6 +633,16 @@ function setupIPC(): void {
     return envConfig.getEnvFilePath();
   });
 
+  ipcMain.handle('env:check-all-ports', async (_, config: envConfig.EnvConfig) => {
+    logger.info('Checking all ports for conflicts...');
+    return await envConfig.checkAllPortsAndSuggestAlternatives(config);
+  });
+
+  ipcMain.handle('env:find-next-available-port', async (_, startPort: number) => {
+    logger.info(`Finding next available port starting from ${startPort}...`);
+    return await envConfig.findNextAvailablePort(startPort);
+  });
+
   
   // Docker IPC handlers
   ipcMain.handle('docker:start', async (_event) => {

@@ -40,13 +40,20 @@ jobs:
       - name: Generate checksums
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path out/release
-          Get-ChildItem -Path out -Filter *.exe -Recurse | ForEach-Object {
-            $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
-            $filename = $_.Name
-            "$($hash.Hash.ToLower())  $filename" | Out-File -Append -FilePath out/checksums-windows.txt -Encoding utf8
-            Copy-Item $_.FullName -Destination out/release/
-          }
+          $releaseDir = Join-Path $PWD 'out\release'
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter *.exe -Recurse -File |
+            Where-Object { $_.FullName -notlike "$releaseDir\*" } |
+            ForEach-Object {
+              $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+              $filename = $_.Name
+              "$($hash.Hash.ToLower())  $filename" | Out-File -Append -FilePath (Join-Path $PWD 'out\checksums-windows.txt') -Encoding utf8
+
+              $dest = Join-Path $releaseDir $filename
+              Copy-Item -Path $_.FullName -Destination $dest -Force
+            }
+
           Get-Content out/checksums-windows.txt
 
       - name: Upload build artifacts
