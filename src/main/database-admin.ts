@@ -196,11 +196,23 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       }
     }
 
-    // No result content
+    // No result content - this shouldn't happen for successful queries
+    console.error('[DATABASE-ADMIN] No content array found in response!', {
+      hasResult: !!mcpResponse.result,
+      hasResultContent: !!mcpResponse.result?.content,
+      hasDirectContent: !!mcpResponse.content,
+      responseKeys: Object.keys(mcpResponse)
+    });
+    
+    logWithCategory('warn', LogCategory.SYSTEM, 'MCP response has no content array', {
+      responseStructure: JSON.stringify(mcpResponse).substring(0, 200)
+    });
+    
+    // Return the raw response as a last resort so we can see what's happening
     return {
       success: true,
-      data: null,
-      message: 'Tool executed successfully with no data returned',
+      data: mcpResponse,
+      message: 'Warning: Returning raw MCP response - no content array found',
     };
 
 
