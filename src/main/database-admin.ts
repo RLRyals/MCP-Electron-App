@@ -173,6 +173,10 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
           logWithCategory('info', LogCategory.SYSTEM, `Parsed data keys: ${Object.keys(resultData).join(', ')}`);
         }
 
+        // LOG WHAT WE'RE ABOUT TO RETURN
+        logWithCategory('info', LogCategory.SYSTEM, `[RETURNING] success: true, data type: ${typeof resultData}, data keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
+        console.error(`[DATABASE-ADMIN] *** NEW CODE IS RUNNING *** Returning parsed data with keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
+
         return {
           success: true,
           data: resultData,
