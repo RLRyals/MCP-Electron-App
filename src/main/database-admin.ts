@@ -75,6 +75,8 @@ async function getMCPServerUrl(): Promise<string> {
  * Call an MCP tool using JSON-RPC 2.0 protocol
  */
 async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperationResult> {
+  // VERSION MARKER - If you see this, the new code IS running!
+  console.error(`[DATABASE-ADMIN-V2] *** CALLING MCP TOOL: ${toolName} ***`);
   logWithCategory('info', LogCategory.SYSTEM, `Calling MCP tool: ${toolName}`);
 
   const baseUrl = await getMCPServerUrl();
