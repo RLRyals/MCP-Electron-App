@@ -97,25 +97,80 @@ export function getMCPWorkingDirectory(): string {
 
 /**
  * Get the project root directory (where docker-compose.yml is located)
+ * Cross-platform support for Windows, macOS, and Linux (including AppImage)
  */
 export function getProjectRootDirectory(): string {
-  // In production (packaged app), __dirname is in app.asar/dist/main
-  // In development, __dirname is in src/main
-  // We need to go up to the project root where docker-compose.yml is located
+  let projectRoot: string;
+  
   if (app.isPackaged) {
-    // In packaged app, go from app.asar/dist/main -> app.asar -> resources -> app
-    return path.join(path.dirname(app.getAppPath()));
+    // In packaged app, resources are in the resources directory
+    // Linux AppImage: /tmp/.mount_XXX/resources or extracted location
+    // macOS: AppName.app/Contents/Resources
+    // Windows: AppName/resources
+    
+    const appPath = app.getAppPath(); // Points to app.asar
+    
+    // On Linux AppImage, use process.resourcesPath if available
+    // This points to the actual resources directory, not the temp mount
+    if (process.platform === 'linux' && process.resourcesPath) {
+      projectRoot = process.resourcesPath;
+      logWithCategory('info', LogCategory.DOCKER, `Using Linux resourcesPath: ${projectRoot}`);
+    } else {
+      // Windows and macOS: go from app.asar to parent (resources directory)
+      projectRoot = path.dirname(appPath);
+    }
   } else {
     // In development, go from src/main -> project root
-    return path.join(__dirname, '..', '..');
+    projectRoot = path.join(__dirname, '..', '..');
   }
+  
+  // Normalize the path for consistency across platforms
+  projectRoot = path.normalize(projectRoot);
+  
+  logWithCategory('info', LogCategory.DOCKER, `Project root directory: ${projectRoot}`);
+  
+  // Validate that docker-compose.yml exists at this location
+  const composePath = path.join(projectRoot, 'docker-compose.yml');
+  if (!fs.existsSync(composePath)) {
+    logWithCategory('warn', LogCategory.DOCKER, 
+      `docker-compose.yml not found at ${composePath}. Checking alternative paths...`);
+    
+    // Try alternative: resources subdirectory (for some packaging configurations)
+    const altPath = path.join(projectRoot, 'resources', 'docker-compose.yml');
+    if (fs.existsSync(altPath)) {
+      projectRoot = path.join(projectRoot, 'resources');
+      logWithCategory('info', LogCategory.DOCKER, `Found docker-compose.yml in resources subdirectory: ${projectRoot}`);
+    } else {
+      logWithCategory('warn', LogCategory.DOCKER, 
+        `docker-compose.yml not found in either ${composePath} or ${altPath}`);
+    }
+  } else {
+    logWithCategory('info', LogCategory.DOCKER, `Verified docker-compose.yml exists at: ${composePath}`);
+  }
+  
+  return projectRoot;
 }
 
 /**
  * Get the cloned MCP-Writing-Servers repository path (still needed for data files)
+ * Ensures the directory exists before returning the path
  */
 export function getMCPRepositoryDirectory(): string {
-  return path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
+  const repoPath = path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
+  
+  // Ensure directory exists before returning
+  // This prevents Docker mount errors when the path doesn't exist
+  try {
+    if (!fs.existsSync(repoPath)) {
+      fs.mkdirSync(repoPath, { recursive: true });
+      logWithCategory('info', LogCategory.DOCKER, `Created MCP repository directory: ${repoPath}`);
+    }
+  } catch (error) {
+    logWithCategory('error', LogCategory.DOCKER, `Failed to create MCP repository directory: ${repoPath}`, error);
+    // Return the path anyway - let the caller handle the error
+  }
+  
+  return repoPath;
 }
 
 /**
@@ -210,6 +265,46 @@ async function ensureDockerComposeFiles(): Promise<void> {
     logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found, cloning...');
     await cloneMCPRepository();
   }
+}
+
+/**
+ * Validate all Docker volume mount paths exist as directories
+ * This prevents mount failures, especially on Linux where file vs directory matters
+ */
+async function validateMountPaths(): Promise<{ success: boolean; error?: string }> {
+  logWithCategory('info', LogCategory.DOCKER, 'Validating Docker mount paths...');
+  
+  const pathsToValidate = [
+    { name: 'MCP Repository', path: getMCPRepositoryDirectory() },
+    { name: 'TypingMind', path: typingMindDownloader.getTypingMindDirectory() },
+    { name: 'Project Root', path: getProjectRootDirectory() },
+  ];
+  
+  for (const { name, path: dirPath } of pathsToValidate) {
+    try {
+      // Check if path exists
+      if (!fs.existsSync(dirPath)) {
+        logWithCategory('warn', LogCategory.DOCKER, `${name} directory does not exist: ${dirPath}. Creating...`);
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      
+      // Check if it's a directory (not a file)
+      const stats = fs.statSync(dirPath);
+      if (!stats.isDirectory()) {
+        const error = `${name} path exists but is not a directory: ${dirPath}`;
+        logWithCategory('error', LogCategory.DOCKER, error);
+        return { success: false, error };
+      }
+      
+      logWithCategory('info', LogCategory.DOCKER, `✓ ${name} directory validated: ${dirPath}`);
+    } catch (error: any) {
+      const errorMsg = `Failed to validate ${name} directory: ${dirPath} - ${error.message}`;
+      logWithCategory('error', LogCategory.DOCKER, errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+  
+  return { success: true };
 }
 
 /**
@@ -602,6 +697,25 @@ export async function startMCPSystem(
     }
 
     await ensureDockerComposeFiles();
+
+    // Validate all mount paths exist as directories
+    if (progressCallback) {
+      progressCallback({
+        message: 'Validating mount paths...',
+        percent: 11,
+        step: 'validate-mounts',
+        status: 'checking',
+      });
+    }
+
+    const mountValidation = await validateMountPaths();
+    if (!mountValidation.success) {
+      return {
+        success: false,
+        message: `Mount path validation failed: ${mountValidation.error}`,
+        error: 'INVALID_MOUNT_PATH',
+      };
+    }
 
     // Prepare MCP configuration (generates mcp-config.json and copies custom entrypoint)
     if (progressCallback) {
