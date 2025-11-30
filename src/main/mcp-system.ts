@@ -356,7 +356,29 @@ export async function stopExistingContainers(): Promise<void> {
   logWithCategory('info', LogCategory.DOCKER, 'Stopping and removing existing containers...');
 
   try {
-    // First, try to stop containers gracefully
+    // First, force remove any orphaned containers by name (from failed installations or V1 docker-compose)
+    // This handles containers that might not be tracked by the current compose project
+    const containerNames = [
+      'fictionlab-postgres',
+      'fictionlab-pgbouncer', 
+      'fictionlab-mcp-connector',
+      'fictionlab-mcp-servers',
+      'fictionlab-typingmind'
+    ];
+    
+    for (const name of containerNames) {
+      try {
+        await execAsync(`docker rm -f ${name}`, { timeout: 10000 });
+        logWithCategory('info', LogCategory.DOCKER, `Removed orphaned container: ${name}`);
+      } catch (error: any) {
+        // Container doesn't exist or already removed - this is fine
+        if (!error.message.includes('No such container')) {
+          logWithCategory('debug', LogCategory.DOCKER, `Could not remove ${name}: ${error.message}`);
+        }
+      }
+    }
+
+    // Then try to stop containers gracefully using compose
     try {
       await execDockerCompose(coreFile, 'stop', []);
       logWithCategory('info', LogCategory.DOCKER, 'Containers stopped');
@@ -469,7 +491,8 @@ async function execDockerCompose(
   const composeFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
 
   // Build the command without inline environment variables
-  const fullCommand = `docker-compose ${composeFlags} ${command} ${args.join(' ')}`;
+  // Use Docker Compose V2 syntax (docker compose) instead of V1 (docker-compose)
+  const fullCommand = `docker compose ${composeFlags} ${command} ${args.join(' ')}`;
 
   logWithCategory('info', LogCategory.DOCKER, `Executing: ${fullCommand}`);
   logWithCategory('info', LogCategory.DOCKER, `Working directory: ${workingDir}`);
@@ -1279,25 +1302,25 @@ export async function getDetailedServiceStatus(): Promise<DetailedSystemStatus> 
     const serviceDefinitions = [
       {
         serviceName: 'PostgreSQL Database',
-        containerName: 'writing-postgres',
+        containerName: 'fictionlab-postgres',
         port: config.POSTGRES_PORT,
         url: serviceUrls.postgres,
       },
       {
         serviceName: 'MCP Connector',
-        containerName: 'mcp-connector',
+        containerName: 'fictionlab-mcp-connector',
         port: config.MCP_CONNECTOR_PORT,
         url: serviceUrls.mcpConnector,
       },
       {
         serviceName: 'MCP Writing Servers',
-        containerName: 'mcp-writing-servers',
+        containerName: 'fictionlab-mcp-servers',
         port: 3001, // Primary port
         url: undefined, // Internal service
       },
       {
         serviceName: 'TypingMind UI',
-        containerName: 'typingmind',
+        containerName: 'fictionlab-typingmind',
         port: config.TYPING_MIND_PORT,
         url: serviceUrls.typingMind,
       },
@@ -1392,10 +1415,10 @@ export async function viewServiceLogs(
   try {
     // Map service names to actual container names (from docker-compose.yml)
     const containerNameMap: { [key: string]: string } = {
-      'postgres': 'writing-postgres',
-      'mcp-writing-servers': 'mcp-writing-servers',
-      'mcp-connector': 'mcp-connector',
-      'typing-mind': 'typingmind',
+      'postgres': 'fictionlab-postgres',
+      'mcp-writing-servers': 'fictionlab-mcp-servers',
+      'mcp-connector': 'fictionlab-mcp-connector',
+      'typing-mind': 'fictionlab-typingmind',
     };
 
     const containerName = containerNameMap[serviceName] || serviceName;

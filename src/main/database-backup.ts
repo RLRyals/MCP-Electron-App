@@ -113,7 +113,7 @@ export async function createBackup(
 
     // Build pg_dump command
     // We'll execute this inside the postgres container for simplicity
-    const containerName = 'writing-postgres';
+    const containerName = 'fictionlab-postgres';
 
     // Determine the format and compression options
     let dumpCommand: string;
@@ -193,7 +193,7 @@ export async function restoreBackup(
     const user = config.POSTGRES_USER;
     const password = config.POSTGRES_PASSWORD;
 
-    const containerName = 'writing-postgres';
+    const containerName = 'fictionlab-postgres';
 
     // Determine if backup is compressed (based on file extension)
     const isCompressed = backupPath.endsWith('.gz') || backupPath.endsWith('.dump');

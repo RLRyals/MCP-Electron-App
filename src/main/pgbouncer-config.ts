@@ -25,7 +25,7 @@ async function fetchScramHashFromPostgres(config: EnvConfig): Promise<string> {
     // Query PostgreSQL for the SCRAM hash
     // Using sh -c for cross-platform compatibility and proper quote handling
     const query = `SELECT rolpassword FROM pg_authid WHERE rolname = '${config.POSTGRES_USER}';`;
-    const command = `docker exec writing-postgres sh -c "psql -U ${config.POSTGRES_USER} -d ${config.POSTGRES_DB} -t -A -c \\"${query}\\""`;
+    const command = `docker exec fictionlab-postgres sh -c "psql -U ${config.POSTGRES_USER} -d ${config.POSTGRES_DB} -t -A -c \\"${query}\\""`;
 
     const { stdout } = await execAsync(command);
     const scramHash = stdout.trim();
