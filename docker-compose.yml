@@ -43,8 +43,8 @@ services:
     ports:
       - "6432:6432"
     volumes:
-      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      - ${DOCKER_DIR}/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ${DOCKER_DIR}/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     depends_on:
       postgres:
         condition: service_healthy
