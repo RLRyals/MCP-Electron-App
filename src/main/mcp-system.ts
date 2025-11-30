@@ -376,15 +376,69 @@ async function validateMountPaths(): Promise<{ success: boolean; error?: string 
 }
 
 /**
- * Stop existing containers to release ports
+ * Kill process using a specific port (Linux only)
+ */
+async function killProcessOnPort(port: number): Promise<boolean> {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+  
+  try {
+    // Try to find and kill the process using lsof
+    const { stdout } = await execAsync(`lsof -ti :${port}`, { timeout: 5000 });
+    const pids = stdout.trim().split('\n').filter(p => p);
+    
+    if (pids.length > 0) {
+      for (const pid of pids) {
+        try {
+          await execAsync(`kill -9 ${pid}`, { timeout: 5000 });
+          logWithCategory('info', LogCategory.DOCKER, `Killed process ${pid} using port ${port}`);
+        } catch (killError) {
+          logWithCategory('warn', LogCategory.DOCKER, `Could not kill process ${pid}`, killError);
+        }
+      }
+      return true;
+    }
+  } catch (error) {
+    // lsof might not find anything or might not be installed
+    logWithCategory('debug', LogCategory.DOCKER, `Could not find process on port ${port}`, error);
+  }
+  
+  return false;
+}
+
+/**
+ * Stop existing containers to release ports - AGGRESSIVE cleanup
  */
 export async function stopExistingContainers(): Promise<void> {
   const coreFile = getDockerComposeFilePath('core');
-  logWithCategory('info', LogCategory.DOCKER, 'Stopping and removing existing containers...');
+  logWithCategory('info', LogCategory.DOCKER, 'Performing aggressive cleanup of existing containers...');
 
   try {
-    // First, force remove any orphaned containers by name (from failed installations or V1 docker-compose)
-    // This handles containers that might not be tracked by the current compose project
+    // Step 1: Find and stop ALL containers with fictionlab in the name or using our images
+    logWithCategory('info', LogCategory.DOCKER, 'Searching for all FictionLab-related containers...');
+    try {
+      const { stdout } = await execAsync('docker ps -a --format "{{.Names}}"', { timeout: 10000 });
+      const allContainers = stdout.trim().split('\n').filter(name => name.includes('fictionlab'));
+      
+      if (allContainers.length > 0) {
+        logWithCategory('info', LogCategory.DOCKER, `Found ${allContainers.length} FictionLab containers: ${allContainers.join(', ')}`);
+        
+        // Force remove all of them
+        for (const name of allContainers) {
+          try {
+            await execAsync(`docker rm -f ${name}`, { timeout: 10000 });
+            logWithCategory('info', LogCategory.DOCKER, `Forcefully removed container: ${name}`);
+          } catch (error: any) {
+            logWithCategory('warn', LogCategory.DOCKER, `Could not remove ${name}: ${error.message}`);
+          }
+        }
+      }
+    } catch (error) {
+      logWithCategory('debug', LogCategory.DOCKER, 'Could not list containers', error);
+    }
+
+    // Step 2: Also try to remove by specific names (in case they're not running)
     const containerNames = [
       'fictionlab-postgres',
       'fictionlab-pgbouncer', 
@@ -396,37 +450,109 @@ export async function stopExistingContainers(): Promise<void> {
     for (const name of containerNames) {
       try {
         await execAsync(`docker rm -f ${name}`, { timeout: 10000 });
-        logWithCategory('info', LogCategory.DOCKER, `Removed orphaned container: ${name}`);
+        logWithCategory('info', LogCategory.DOCKER, `Removed container: ${name}`);
       } catch (error: any) {
-        // Container doesn't exist or already removed - this is fine
+        // Container doesn't exist - that's fine
         if (!error.message.includes('No such container')) {
           logWithCategory('debug', LogCategory.DOCKER, `Could not remove ${name}: ${error.message}`);
         }
       }
     }
 
-    // Then try to stop containers gracefully using compose
+    // Step 3: Use docker-compose to clean up any compose-managed containers
     try {
-      await execDockerCompose(coreFile, 'stop', []);
-      logWithCategory('info', LogCategory.DOCKER, 'Containers stopped');
-      // Wait for containers to fully stop
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    } catch (stopError: any) {
-      logWithCategory('warn', LogCategory.DOCKER, 'Stop command encountered an issue (may be safe to ignore)', stopError);
+      await execDockerCompose(coreFile, 'down', ['--remove-orphans', '--volumes']);
+      logWithCategory('info', LogCategory.DOCKER, 'Docker Compose cleanup completed');
+    } catch (composeError: any) {
+      logWithCategory('warn', LogCategory.DOCKER, 'Compose cleanup encountered an issue (may be safe to ignore)', composeError);
     }
 
-    // Then remove containers and orphans (without removing volumes to preserve data)
-    await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
-    logWithCategory('info', LogCategory.DOCKER, 'Cleanup completed');
-
-    // Wait longer for ports to be fully released
-    logWithCategory('info', LogCategory.DOCKER, 'Waiting for ports to be released...');
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Step 4: Wait for ports to be released with multiple retries
+    const maxRetries = 3;
+    const config = await envConfig.loadEnvConfig();
+    const requiredPorts = [
+      config.POSTGRES_PORT,
+      6432, // pgbouncer
+      config.MCP_CONNECTOR_PORT,
+      config.HTTP_SSE_PORT,
+      config.DB_ADMIN_PORT,
+      config.TYPING_MIND_PORT
+    ];
+    
+    for (let retry = 0; retry < maxRetries; retry++) {
+      const waitTime = process.platform === 'linux' ? 5000 : 3000;
+      logWithCategory('info', LogCategory.DOCKER, `Waiting ${waitTime}ms for ports to be released (attempt ${retry + 1}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      
+      // Check if ports are free
+      const portCheckResult = await envConfig.checkAllPortsAndSuggestAlternatives(config);
+      
+      if (!portCheckResult.hasConflicts) {
+        logWithCategory('info', LogCategory.DOCKER, 'All ports are now free');
+        return; // Success!
+      }
+      
+      const conflictPorts = portCheckResult.conflicts.map(c => c.port);
+      logWithCategory('warn', LogCategory.DOCKER, 
+        `Ports still in use: ${conflictPorts.join(', ')} (attempt ${retry + 1}/${maxRetries})`);
+      
+      // On Linux, try to kill processes using the ports (last resort)
+      if (process.platform === 'linux' && retry === maxRetries - 1) {
+        logWithCategory('warn', LogCategory.DOCKER, 'Attempting to kill processes using required ports...');
+        for (const port of conflictPorts) {
+          await killProcessOnPort(port);
+        }
+        // Wait again after killing processes
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+    
+    // Final check
+    const finalCheck = await envConfig.checkAllPortsAndSuggestAlternatives(config);
+    if (finalCheck.hasConflicts) {
+      logWithCategory('warn', LogCategory.DOCKER, 
+        `Warning: Some ports are still in use after cleanup: ${finalCheck.conflicts.map(c => c.port).join(', ')}`);
+    }
+    
   } catch (error: any) {
-    logWithCategory('warn', LogCategory.DOCKER, 'Cleanup encountered an issue (may be safe to ignore)', error);
-    // Continue anyway - containers might not exist yet
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    logWithCategory('warn', LogCategory.DOCKER, 'Cleanup encountered an issue', error);
+    // Wait a bit anyway
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
+}
+
+/**
+ * Identify what process is using a specific port (Linux only)
+ */
+async function identifyPortUser(port: number): Promise<string | null> {
+  if (process.platform !== 'linux') {
+    return null;
+  }
+  
+  try {
+    // Try lsof first (most detailed)
+    try {
+      const { stdout } = await execAsync(`lsof -i :${port} -n -P`, { timeout: 5000 });
+      if (stdout.trim()) {
+        return stdout.trim();
+      }
+    } catch (lsofError) {
+      // lsof might not be installed, try ss
+      try {
+        const { stdout } = await execAsync(`ss -lptn sport = :${port}`, { timeout: 5000 });
+        if (stdout.trim()) {
+          return stdout.trim();
+        }
+      } catch (ssError) {
+        // Neither command worked
+        logWithCategory('debug', LogCategory.DOCKER, `Could not identify port ${port} user: lsof and ss both failed`);
+      }
+    }
+  } catch (error) {
+    logWithCategory('debug', LogCategory.DOCKER, `Error identifying port ${port} user`, error);
+  }
+  
+  return null;
 }
 
 /**
@@ -441,6 +567,18 @@ export async function checkPortConflicts(): Promise<{ success: boolean; conflict
   if (result.hasConflicts) {
     const conflictPorts = result.conflicts.map(c => c.port);
     logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${conflictPorts.join(', ')}`);
+    
+    // On Linux, try to identify what's using the ports
+    if (process.platform === 'linux') {
+      for (const conflict of result.conflicts) {
+        const portUser = await identifyPortUser(conflict.port);
+        if (portUser) {
+          logWithCategory('info', LogCategory.DOCKER, 
+            `Port ${conflict.port} is being used by:\n${portUser}`);
+        }
+      }
+    }
+    
     return { 
       success: false, 
       conflicts: conflictPorts,
@@ -878,7 +1016,13 @@ export async function startMCPSystem(
       portCheck = await checkPortConflicts();
       
       if (!portCheck.success) {
-        const conflictMsg = `Port conflicts persisting after cleanup: ${portCheck.conflicts.join(', ')}. Please stop other applications using these ports or change the ports in the Setup Wizard.`;
+        const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}.\n\n` +
+          `The application attempted to free these ports automatically but was unable to do so.\n\n` +
+          `Please try one of the following:\n` +
+          `1. Restart your computer to clear all port locks\n` +
+          `2. Change the ports in the Setup Wizard (Environment Configuration step)\n` +
+          `3. Check the logs for more details about what might be using these ports`;
+        
         logWithCategory('error', LogCategory.DOCKER, conflictMsg);
         return {
           success: false,
