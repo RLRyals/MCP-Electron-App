@@ -186,24 +186,6 @@ async function initializeDockerDirectory(): Promise<void> {
       }
     }
 
-    // Copy init.sql for PostgreSQL initialization
-    const sourceInitSql = path.join(resourcesPath, 'init.sql');
-    const destInitSql = path.join(dockerDir, 'init.sql');
-
-    if (fs.existsSync(sourceInitSql)) {
-      await fs.copy(sourceInitSql, destInitSql, { overwrite: true });
-      logWithCategory('info', LogCategory.DOCKER, 'Copied init.sql to writable location');
-    } else {
-      // Fallback check
-      const altInitSql = path.join(resourcesPath, 'resources', 'init.sql');
-      if (fs.existsSync(altInitSql)) {
-        await fs.copy(altInitSql, destInitSql, { overwrite: true });
-        logWithCategory('info', LogCategory.DOCKER, 'Copied init.sql from resources subdirectory');
-      } else {
-        logWithCategory('warn', LogCategory.DOCKER, `Source init.sql not found at ${sourceInitSql}`);
-      }
-    }
-
   } catch (error) {
     logWithCategory('error', LogCategory.DOCKER, 'Failed to initialize Docker directory', error);
     throw error;
@@ -338,6 +320,18 @@ async function ensureDockerComposeFiles(): Promise<void> {
     await cloneMCPRepository();
   } else {
     logWithCategory('info', LogCategory.DOCKER, 'MCP-Writing-Servers repository already exists');
+  }
+
+  // Copy init.sql from repository to docker directory
+  // This ensures it's in a writable location and works on all systems
+  const sourceInitSql = path.join(repoPath, 'init.sql');
+  const destInitSql = path.join(getProjectRootDirectory(), 'init.sql');
+
+  if (await fs.pathExists(sourceInitSql)) {
+    await fs.copy(sourceInitSql, destInitSql, { overwrite: true });
+    logWithCategory('info', LogCategory.DOCKER, `Copied init.sql from repository to docker directory`);
+  } else {
+    logWithCategory('warn', LogCategory.DOCKER, `init.sql not found in repository at ${sourceInitSql}`);
   }
 }
 
