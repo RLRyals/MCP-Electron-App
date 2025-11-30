@@ -173,7 +173,7 @@ async function initializeDockerDirectory(): Promise<void> {
     // Copy nginx.conf
     const sourceNginx = path.join(resourcesPath, 'nginx.conf');
     const destNginx = path.join(dockerDir, 'nginx.conf');
-    
+
     if (fs.existsSync(sourceNginx)) {
       await fs.copy(sourceNginx, destNginx, { overwrite: true });
       logWithCategory('info', LogCategory.DOCKER, 'Copied nginx.conf to writable location');
@@ -185,7 +185,7 @@ async function initializeDockerDirectory(): Promise<void> {
         logWithCategory('info', LogCategory.DOCKER, 'Copied nginx.conf from resources subdirectory');
       }
     }
-    
+
   } catch (error) {
     logWithCategory('error', LogCategory.DOCKER, 'Failed to initialize Docker directory', error);
     throw error;
@@ -300,11 +300,38 @@ async function ensureDockerComposeFiles(): Promise<void> {
 
   logWithCategory('info', LogCategory.DOCKER, 'Docker-compose file verified at project root');
 
-  // Also ensure MCP-Writing-Servers repository exists for SQL init files and other data
+  // Also ensure MCP-Writing-Servers repository exists for Docker build context
   const repoPath = getMCPRepositoryDirectory();
-  if (!await fs.pathExists(repoPath)) {
-    logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found, cloning...');
+  const dockerfilePath = path.join(repoPath, 'Dockerfile');
+
+  // Check if repository is actually cloned by verifying Dockerfile exists
+  // Don't just check if directory exists, as getMCPRepositoryDirectory() may create an empty dir
+  const isRepoCloned = await fs.pathExists(dockerfilePath);
+
+  if (!isRepoCloned) {
+    logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found or incomplete, cloning...');
+
+    // Remove the directory if it exists but is empty/incomplete
+    if (await fs.pathExists(repoPath)) {
+      logWithCategory('info', LogCategory.DOCKER, `Removing incomplete repository directory: ${repoPath}`);
+      await fs.remove(repoPath);
+    }
+
     await cloneMCPRepository();
+  } else {
+    logWithCategory('info', LogCategory.DOCKER, 'MCP-Writing-Servers repository already exists');
+  }
+
+  // Copy init.sql from repository to docker directory
+  // This ensures it's in a writable location and works on all systems
+  const sourceInitSql = path.join(repoPath, 'init.sql');
+  const destInitSql = path.join(getProjectRootDirectory(), 'init.sql');
+
+  if (await fs.pathExists(sourceInitSql)) {
+    await fs.copy(sourceInitSql, destInitSql, { overwrite: true });
+    logWithCategory('info', LogCategory.DOCKER, `Copied init.sql from repository to docker directory`);
+  } else {
+    logWithCategory('warn', LogCategory.DOCKER, `init.sql not found in repository at ${sourceInitSql}`);
   }
 }
 
@@ -521,6 +548,8 @@ async function execDockerCompose(
         MCP_CONFIG_FILE_PATH: mcpConfigPath,
         // Repository paths for Docker volume mounting
         MCP_WRITING_SERVERS_DIR: getMCPRepositoryDirectory(),
+        // Docker directory path (contains init.sql, nginx.conf, etc.)
+        DOCKER_DIR: workingDir,
         // nginx.conf path for TypingMind container
         NGINX_CONF_PATH: path.join(workingDir, 'nginx.conf'),
       }
@@ -761,6 +790,18 @@ export async function startMCPSystem(
     }
 
     await initializeDockerDirectory();
+
+    // Ensure MCP-Writing-Servers repository is cloned (contains init.sql and other data files)
+    if (progressCallback) {
+      progressCallback({
+        message: 'Ensuring MCP-Writing-Servers repository...',
+        percent: 10.5,
+        step: 'ensure-repo',
+        status: 'checking',
+      });
+    }
+
+    await ensureDockerComposeFiles();
 
     // Validate all mount paths exist as directories
     if (progressCallback) {
