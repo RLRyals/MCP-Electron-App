@@ -302,9 +302,24 @@ async function ensureDockerComposeFiles(): Promise<void> {
 
   // Also ensure MCP-Writing-Servers repository exists for SQL init files and other data
   const repoPath = getMCPRepositoryDirectory();
-  if (!await fs.pathExists(repoPath)) {
-    logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found, cloning...');
+  const initSqlPath = path.join(repoPath, 'init.sql');
+
+  // Check if repository is actually cloned by verifying critical files exist
+  // Don't just check if directory exists, as getMCPRepositoryDirectory() may create an empty dir
+  const isRepoCloned = await fs.pathExists(initSqlPath);
+
+  if (!isRepoCloned) {
+    logWithCategory('warn', LogCategory.DOCKER, 'MCP-Writing-Servers repository not found or incomplete, cloning...');
+
+    // Remove the directory if it exists but is empty/incomplete
+    if (await fs.pathExists(repoPath)) {
+      logWithCategory('info', LogCategory.DOCKER, `Removing incomplete repository directory: ${repoPath}`);
+      await fs.remove(repoPath);
+    }
+
     await cloneMCPRepository();
+  } else {
+    logWithCategory('info', LogCategory.DOCKER, 'MCP-Writing-Servers repository already exists');
   }
 }
 
@@ -761,6 +776,18 @@ export async function startMCPSystem(
     }
 
     await initializeDockerDirectory();
+
+    // Ensure MCP-Writing-Servers repository is cloned (contains init.sql and other data files)
+    if (progressCallback) {
+      progressCallback({
+        message: 'Ensuring MCP-Writing-Servers repository...',
+        percent: 10.5,
+        step: 'ensure-repo',
+        status: 'checking',
+      });
+    }
+
+    await ensureDockerComposeFiles();
 
     // Validate all mount paths exist as directories
     if (progressCallback) {
