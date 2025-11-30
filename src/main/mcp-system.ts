@@ -96,11 +96,11 @@ export function getMCPWorkingDirectory(): string {
 }
 
 /**
- * Get the project root directory (where docker-compose.yml is located)
- * Cross-platform support for Windows, macOS, and Linux (including AppImage)
+ * Get the bundled resources path (where source docker-compose.yml is located)
+ * This is read-only in packaged apps
  */
-export function getProjectRootDirectory(): string {
-  let projectRoot: string;
+function getBundledResourcesPath(): string {
+  let resourcesPath: string;
   
   if (app.isPackaged) {
     // In packaged app, resources are in the resources directory
@@ -113,42 +113,83 @@ export function getProjectRootDirectory(): string {
     // On Linux AppImage, use process.resourcesPath if available
     // This points to the actual resources directory, not the temp mount
     if (process.platform === 'linux' && process.resourcesPath) {
-      projectRoot = process.resourcesPath;
-      logWithCategory('info', LogCategory.DOCKER, `Using Linux resourcesPath: ${projectRoot}`);
+      resourcesPath = process.resourcesPath;
+      logWithCategory('info', LogCategory.DOCKER, `Using Linux resourcesPath: ${resourcesPath}`);
     } else {
       // Windows and macOS: go from app.asar to parent (resources directory)
-      projectRoot = path.dirname(appPath);
+      resourcesPath = path.dirname(appPath);
     }
   } else {
     // In development, go from src/main -> project root
-    projectRoot = path.join(__dirname, '..', '..');
+    resourcesPath = path.join(__dirname, '..', '..');
   }
   
-  // Normalize the path for consistency across platforms
-  projectRoot = path.normalize(projectRoot);
+  return path.normalize(resourcesPath);
+}
+
+/**
+ * Get the project root directory (runtime location for Docker files)
+ * Returns a writable directory in userData where we copy config files
+ */
+export function getProjectRootDirectory(): string {
+  const userDataPath = app.getPath('userData');
+  const dockerDir = path.join(userDataPath, 'docker');
+  return dockerDir;
+}
+
+/**
+ * Initialize the Docker directory in userData
+ * Copies docker-compose.yml and nginx.conf from bundled resources to writable location
+ */
+async function initializeDockerDirectory(): Promise<void> {
+  const dockerDir = getProjectRootDirectory();
+  const resourcesPath = getBundledResourcesPath();
   
-  logWithCategory('info', LogCategory.DOCKER, `Project root directory: ${projectRoot}`);
+  logWithCategory('info', LogCategory.DOCKER, `Initializing Docker directory at: ${dockerDir}`);
   
-  // Validate that docker-compose.yml exists at this location
-  const composePath = path.join(projectRoot, 'docker-compose.yml');
-  if (!fs.existsSync(composePath)) {
-    logWithCategory('warn', LogCategory.DOCKER, 
-      `docker-compose.yml not found at ${composePath}. Checking alternative paths...`);
+  try {
+    await fs.ensureDir(dockerDir);
     
-    // Try alternative: resources subdirectory (for some packaging configurations)
-    const altPath = path.join(projectRoot, 'resources', 'docker-compose.yml');
-    if (fs.existsSync(altPath)) {
-      projectRoot = path.join(projectRoot, 'resources');
-      logWithCategory('info', LogCategory.DOCKER, `Found docker-compose.yml in resources subdirectory: ${projectRoot}`);
+    // Copy docker-compose.yml
+    const sourceCompose = path.join(resourcesPath, 'docker-compose.yml');
+    const destCompose = path.join(dockerDir, 'docker-compose.yml');
+    
+    // Check if source exists (it should always exist in bundle)
+    if (fs.existsSync(sourceCompose)) {
+      // Always overwrite to ensure updates are applied
+      await fs.copy(sourceCompose, destCompose, { overwrite: true });
+      logWithCategory('info', LogCategory.DOCKER, 'Copied docker-compose.yml to writable location');
     } else {
-      logWithCategory('warn', LogCategory.DOCKER, 
-        `docker-compose.yml not found in either ${composePath} or ${altPath}`);
+      // Fallback check for resources subdirectory
+      const altSource = path.join(resourcesPath, 'resources', 'docker-compose.yml');
+      if (fs.existsSync(altSource)) {
+        await fs.copy(altSource, destCompose, { overwrite: true });
+        logWithCategory('info', LogCategory.DOCKER, 'Copied docker-compose.yml from resources subdirectory');
+      } else {
+        logWithCategory('warn', LogCategory.DOCKER, `Source docker-compose.yml not found at ${sourceCompose}`);
+      }
     }
-  } else {
-    logWithCategory('info', LogCategory.DOCKER, `Verified docker-compose.yml exists at: ${composePath}`);
+    
+    // Copy nginx.conf
+    const sourceNginx = path.join(resourcesPath, 'nginx.conf');
+    const destNginx = path.join(dockerDir, 'nginx.conf');
+    
+    if (fs.existsSync(sourceNginx)) {
+      await fs.copy(sourceNginx, destNginx, { overwrite: true });
+      logWithCategory('info', LogCategory.DOCKER, 'Copied nginx.conf to writable location');
+    } else {
+      // Fallback check
+      const altNginx = path.join(resourcesPath, 'resources', 'nginx.conf');
+      if (fs.existsSync(altNginx)) {
+        await fs.copy(altNginx, destNginx, { overwrite: true });
+        logWithCategory('info', LogCategory.DOCKER, 'Copied nginx.conf from resources subdirectory');
+      }
+    }
+    
+  } catch (error) {
+    logWithCategory('error', LogCategory.DOCKER, 'Failed to initialize Docker directory', error);
+    throw error;
   }
-  
-  return projectRoot;
 }
 
 /**
@@ -696,7 +737,7 @@ export async function startMCPSystem(
       });
     }
 
-    await ensureDockerComposeFiles();
+    await initializeDockerDirectory();
 
     // Validate all mount paths exist as directories
     if (progressCallback) {

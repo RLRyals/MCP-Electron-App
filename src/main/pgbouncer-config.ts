@@ -14,16 +14,7 @@ import { EnvConfig } from './env-config';
 
 const execAsync = promisify(exec);
 
-/**
- * Get the project root directory (where docker-compose.yml is located)
- */
-function getProjectRootDirectory(): string {
-  if (app.isPackaged) {
-    return path.join(path.dirname(app.getAppPath()));
-  } else {
-    return path.join(__dirname, '..', '..');
-  }
-}
+import { getProjectRootDirectory } from './mcp-system';
 
 /**
  * Fetch SCRAM-SHA-256 hash from PostgreSQL for PgBouncer authentication
