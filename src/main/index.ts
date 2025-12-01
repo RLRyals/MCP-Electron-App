@@ -60,6 +60,21 @@ let mainWindow: BrowserWindow | null = null;
 let typingMindWindow: BrowserWindow | null = null;
 
 /**
+ * Get the correct icon path for the current platform and packaging state
+ */
+function getIconPath(): string {
+  const iconFileName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  
+  if (app.isPackaged) {
+    // In packaged apps, resources are in process.resourcesPath
+    return path.join(process.resourcesPath, 'resources', iconFileName);
+  } else {
+    // In development, use relative path from compiled JS location
+    return path.join(__dirname, '../resources', iconFileName);
+  }
+}
+
+/**
  * Create the application menu
  */
 function createMenu(): void {
@@ -235,9 +250,7 @@ function createMenu(): void {
 function createWizardWindow(): void {
   logger.info('Creating setup wizard window...');
 
-  const iconPath = process.platform === 'win32'
-    ? path.join(__dirname, '../resources/icon.ico')
-    : path.join(__dirname, '../resources/icon.png');
+  const iconPath = getIconPath();
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -283,9 +296,7 @@ function createWizardWindow(): void {
 function createMigrationWizardWindow(): void {
   logger.info('Creating migration wizard window...');
 
-  const iconPath = process.platform === 'win32'
-    ? path.join(__dirname, '../resources/icon.ico')
-    : path.join(__dirname, '../resources/icon.png');
+  const iconPath = getIconPath();
 
   mainWindow = new BrowserWindow({
     width: 1000,
@@ -331,9 +342,7 @@ function createMigrationWizardWindow(): void {
 function createWindow(): void {
   logger.info('Creating main window...');
 
-  const iconPath = process.platform === 'win32'
-    ? path.join(__dirname, '../resources/icon.ico')
-    : path.join(__dirname, '../resources/icon.png');
+  const iconPath = getIconPath();
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -386,9 +395,7 @@ function createTypingMindWindow(url: string): void {
     return;
   }
 
-  const iconPath = process.platform === 'win32'
-    ? path.join(__dirname, '../resources/icon.ico')
-    : path.join(__dirname, '../resources/icon.png');
+  const iconPath = getIconPath();
 
   typingMindWindow = new BrowserWindow({
     width: 1400,
