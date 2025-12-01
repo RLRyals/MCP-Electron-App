@@ -97,7 +97,7 @@ async function checkDocker(): Promise<SystemInfo['docker']> {
 
     // Check Docker Compose version
     try {
-      const { stdout: composeVersion } = await execAsync('docker-compose --version');
+      const { stdout: composeVersion } = await execAsync('docker compose version');
       dockerInfo.composeVersion = composeVersion.trim();
     } catch (error) {
       // Docker Compose not installed or different version
@@ -162,12 +162,12 @@ export async function collectSystemInfo(): Promise<SystemInfo> {
 }
 
 /**
- * Get Docker logs from docker-compose
+ * Get Docker logs from Docker Compose
  */
 export async function getDockerLogs(projectPath?: string): Promise<string> {
   try {
     const cwd = projectPath || process.cwd();
-    const { stdout } = await execAsync('docker-compose logs --tail=100', {
+    const { stdout } = await execAsync('docker compose logs --tail=100', {
       cwd,
       timeout: 10000,
     });

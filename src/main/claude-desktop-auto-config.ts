@@ -427,7 +427,7 @@ Setup Instructions:
 
 1. Ensure Docker Services Are Running
    - The MCP servers must be running in Docker
-   - Start services: docker-compose up -d
+   - Start services: docker compose up -d
    - Verify container is running: docker ps | grep mcp-writing-servers
 
 2. Auto-Configure (Recommended)
@@ -463,7 +463,7 @@ Requirements:
 - Database must be accessible from container
 
 Troubleshooting:
-- If servers don't appear, check Docker logs: docker-compose logs mcp-writing-servers
+- If servers don't appear, check Docker logs: docker compose logs mcp-writing-servers
 - Verify container is running: docker ps
 - Test docker exec: docker exec -i mcp-writing-servers node --version
 - Check Claude Desktop logs for connection errors

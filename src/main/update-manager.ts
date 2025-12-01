@@ -274,7 +274,7 @@ export class UpdateManager {
   }
 
   /**
-   * Stop Docker services using docker-compose
+   * Stop Docker services using Docker Compose
    */
   private async stopDockerServices(): Promise<void> {
     const { exec } = require('child_process');
@@ -284,7 +284,7 @@ export class UpdateManager {
     logWithCategory('info', LogCategory.GENERAL, 'Stopping Docker services');
 
     try {
-      await execAsync('docker-compose down', { cwd: this.basePath });
+      await execAsync('docker compose down', { cwd: this.basePath });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       logWithCategory('warn', LogCategory.GENERAL, `Error stopping services: ${errorMsg}`);
@@ -292,7 +292,7 @@ export class UpdateManager {
   }
 
   /**
-   * Start Docker services using docker-compose
+   * Start Docker services using Docker Compose
    */
   private async startDockerServices(): Promise<void> {
     const { exec } = require('child_process');
@@ -301,7 +301,7 @@ export class UpdateManager {
 
     logWithCategory('info', LogCategory.GENERAL, 'Starting Docker services');
 
-    await execAsync('docker-compose up -d', { cwd: this.basePath });
+    await execAsync('docker compose up -d', { cwd: this.basePath });
   }
 
   /**
