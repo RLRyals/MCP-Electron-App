@@ -324,6 +324,8 @@ async function ensureDockerComposeFiles(): Promise<void> {
 
   // Copy init.sql from repository to docker directory
   // This ensures it's in a writable location and works on all systems
+  // Copy init.sql from repository to docker directory
+  // This ensures it's in a writable location and works on all systems
   const sourceInitSql = path.join(repoPath, 'init.sql');
   const destInitSql = path.join(getProjectRootDirectory(), 'init.sql');
 
