@@ -1016,15 +1016,34 @@ export async function startMCPSystem(
       
       // Re-check ports
       portCheck = await checkPortConflicts();
-      
+
       if (!portCheck.success) {
-        const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}.\n\n` +
-          `The application attempted to free these ports automatically but was unable to do so.\n\n` +
+        // Build a detailed error message with process info if available
+        let conflictDetails = '';
+        if (portCheck.details && Array.isArray(portCheck.details)) {
+          for (const detail of portCheck.details) {
+            conflictDetails += `\n• Port ${detail.port} (${detail.name})`;
+            if (detail.processInfo) {
+              conflictDetails += `:\n  ${detail.processInfo.split('\n').join('\n  ')}`;
+            }
+            // Special note for PgBouncer port which cannot be changed
+            if (detail.port === 6432) {
+              conflictDetails += '\n  ⚠️ This port is required by PgBouncer and cannot be changed.';
+              conflictDetails += '\n  You must stop whatever is using port 6432 before starting.';
+            }
+          }
+        }
+
+        const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}.\n` +
+          (conflictDetails ? `\nConflict details:${conflictDetails}\n` : '') +
+          `\nThe application attempted to free these ports automatically but was unable to do so.\n\n` +
           `Please try one of the following:\n` +
-          `1. Restart your computer to clear all port locks\n` +
-          `2. Change the ports in the Setup Wizard (Environment Configuration step)\n` +
-          `3. Check the logs for more details about what might be using these ports`;
-        
+          `1. Stop any other applications using these ports (check details above)\n` +
+          `2. On Linux, run: sudo lsof -i :<port> to see what's using a port\n` +
+          `3. For configurable ports, change them in the Setup Wizard (Environment Configuration step)\n` +
+          `4. Restart your computer to clear all port locks\n` +
+          `5. Check the logs for more details`;
+
         logWithCategory('error', LogCategory.DOCKER, conflictMsg);
         return {
           success: false,

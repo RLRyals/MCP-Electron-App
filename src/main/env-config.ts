@@ -189,10 +189,12 @@ export function validatePassword(password: string): { valid: boolean; error?: st
 }
 
 /**
- * Check if a port is available
+ * Check if a port is available using Node.js net.createServer
+ * Checks a specific host binding
  * @param port Port number to check
+ * @param host Host to bind to (default: '127.0.0.1')
  */
-export function checkPortAvailable(port: number): Promise<boolean> {
+function checkPortOnHost(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
 
@@ -210,8 +212,122 @@ export function checkPortAvailable(port: number): Promise<boolean> {
       resolve(true);
     });
 
-    server.listen(port, '127.0.0.1');
+    server.listen(port, host);
   });
+}
+
+/**
+ * Check if a port is available using Linux ss command
+ * This is more reliable than net.createServer as it checks all interfaces
+ * @param port Port number to check
+ */
+async function checkPortAvailableLinuxSS(port: number): Promise<{ available: boolean; processInfo?: string }> {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  try {
+    // Use ss command to check if port is in use (LISTEN state)
+    // -t: TCP, -l: listening, -n: numeric, -p: show process (may need sudo)
+    const { stdout } = await execAsync(`ss -tlnp sport = :${port} 2>/dev/null || ss -tln sport = :${port}`, {
+      timeout: 5000
+    });
+
+    const lines = stdout.trim().split('\n').filter((line: string) => line && !line.startsWith('State'));
+
+    if (lines.length > 0) {
+      // Port is in use - try to get process info
+      let processInfo: string | undefined;
+
+      // Try lsof for better process identification
+      try {
+        const { stdout: lsofOutput } = await execAsync(`lsof -i :${port} -n -P 2>/dev/null | head -5`, { timeout: 5000 });
+        if (lsofOutput.trim()) {
+          processInfo = lsofOutput.trim();
+        }
+      } catch {
+        // lsof not available or failed, use ss output
+        processInfo = lines.join('\n');
+      }
+
+      return { available: false, processInfo };
+    }
+
+    return { available: true };
+  } catch (error) {
+    // ss command failed, fall back to checking if we see any output indicating usage
+    logger.warn(`ss command failed for port ${port}, falling back to Node.js check`);
+    return { available: true }; // Assume available if ss fails, let Node check confirm
+  }
+}
+
+/**
+ * Check if a port is available using netstat (fallback for systems without ss)
+ * @param port Port number to check
+ */
+async function checkPortAvailableLinuxNetstat(port: number): Promise<{ available: boolean; processInfo?: string }> {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  try {
+    // Use netstat to check if port is in use
+    const { stdout } = await execAsync(`netstat -tlnp 2>/dev/null | grep ":${port} " || true`, {
+      timeout: 5000
+    });
+
+    if (stdout.trim()) {
+      return { available: false, processInfo: stdout.trim() };
+    }
+
+    return { available: true };
+  } catch {
+    return { available: true }; // Assume available if netstat fails
+  }
+}
+
+/**
+ * Check if a port is available (cross-platform)
+ * On Linux: Uses ss/netstat commands for more reliable detection, then confirms with Node.js
+ * On other platforms: Uses Node.js net.createServer on both 0.0.0.0 and 127.0.0.1
+ * @param port Port number to check
+ */
+export async function checkPortAvailable(port: number): Promise<boolean> {
+  // On Linux, use system commands first as they're more reliable
+  if (process.platform === 'linux') {
+    // Try ss first (modern systems), then netstat (older systems)
+    let linuxCheck = await checkPortAvailableLinuxSS(port);
+
+    if (linuxCheck.available) {
+      // Double-check with netstat in case ss missed something
+      linuxCheck = await checkPortAvailableLinuxNetstat(port);
+    }
+
+    if (!linuxCheck.available) {
+      if (linuxCheck.processInfo) {
+        logger.warn(`Port ${port} is in use on Linux. Process info:\n${linuxCheck.processInfo}`);
+      } else {
+        logger.warn(`Port ${port} is in use on Linux`);
+      }
+      return false;
+    }
+  }
+
+  // Check both 0.0.0.0 (all interfaces) and 127.0.0.1 (localhost)
+  // Docker binds to 0.0.0.0 by default, so we must check that
+  const allInterfacesAvailable = await checkPortOnHost(port, '0.0.0.0');
+  if (!allInterfacesAvailable) {
+    logger.warn(`Port ${port} is in use on 0.0.0.0 (all interfaces)`);
+    return false;
+  }
+
+  const localhostAvailable = await checkPortOnHost(port, '127.0.0.1');
+  if (!localhostAvailable) {
+    logger.warn(`Port ${port} is in use on 127.0.0.1 (localhost)`);
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -239,6 +355,7 @@ export interface PortConflict {
   port: number;
   name: string;
   suggested: number;
+  processInfo?: string; // Information about what process is using the port
 }
 
 /**
@@ -250,17 +367,74 @@ export interface PortConflictCheckResult {
   suggestedConfig?: EnvConfig;
 }
 
+// PgBouncer port constant - used by docker-compose.yml
+export const PGBOUNCER_PORT = 6432;
+
+/**
+ * Get information about what process is using a port (Linux only)
+ * @param port Port number to check
+ */
+export async function getPortUsageInfo(port: number): Promise<string | null> {
+  if (process.platform !== 'linux') {
+    return null;
+  }
+
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  try {
+    // Try lsof first for detailed process info
+    try {
+      const { stdout } = await execAsync(`lsof -i :${port} -n -P 2>/dev/null`, { timeout: 5000 });
+      if (stdout.trim()) {
+        return stdout.trim();
+      }
+    } catch {
+      // lsof not available
+    }
+
+    // Try ss with process info
+    try {
+      const { stdout } = await execAsync(`ss -tlnp sport = :${port} 2>/dev/null`, { timeout: 5000 });
+      if (stdout.trim()) {
+        return stdout.trim();
+      }
+    } catch {
+      // ss not available
+    }
+
+    // Try netstat as last resort
+    try {
+      const { stdout } = await execAsync(`netstat -tlnp 2>/dev/null | grep ":${port} "`, { timeout: 5000 });
+      if (stdout.trim()) {
+        return stdout.trim();
+      }
+    } catch {
+      // netstat not available
+    }
+
+    return null;
+  } catch (error) {
+    logger.warn(`Failed to get port usage info for port ${port}`, error);
+    return null;
+  }
+}
+
 /**
  * Check all configured ports for conflicts and suggest alternatives
+ * Includes both configurable ports and hardcoded ports (like PgBouncer 6432)
  * @param config Configuration to check
  */
 export async function checkAllPortsAndSuggestAlternatives(
   config: EnvConfig
 ): Promise<PortConflictCheckResult> {
-  logger.info('Checking all ports for conflicts...');
-  
+  logger.info('Checking all ports for conflicts (including PgBouncer 6432)...');
+
   const conflicts: PortConflict[] = [];
-  const portChecks = [
+
+  // Configurable ports (from EnvConfig)
+  const configurablePortChecks = [
     { port: config.POSTGRES_PORT, name: 'PostgreSQL', key: 'POSTGRES_PORT' as const },
     { port: config.MCP_CONNECTOR_PORT, name: 'MCP Connector', key: 'MCP_CONNECTOR_PORT' as const },
     { port: config.HTTP_SSE_PORT, name: 'HTTP/SSE', key: 'HTTP_SSE_PORT' as const },
@@ -268,12 +442,23 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.TYPING_MIND_PORT, name: 'TypingMind', key: 'TYPING_MIND_PORT' as const },
   ];
 
-  // Check each port
-  for (const check of portChecks) {
+  // Hardcoded ports that must also be checked
+  const hardcodedPortChecks = [
+    { port: PGBOUNCER_PORT, name: 'PgBouncer (connection pooler)' },
+  ];
+
+  // Check configurable ports
+  for (const check of configurablePortChecks) {
     const available = await checkPortAvailable(check.port);
     if (!available) {
       logger.warn(`Port ${check.port} (${check.name}) is already in use`);
-      
+
+      // Get process info for better error message
+      const processInfo = await getPortUsageInfo(check.port);
+      if (processInfo) {
+        logger.info(`Port ${check.port} usage info:\n${processInfo}`);
+      }
+
       // Find next available port
       const suggested = await findNextAvailablePort(check.port + 1);
       if (suggested) {
@@ -281,6 +466,7 @@ export async function checkAllPortsAndSuggestAlternatives(
           port: check.port,
           name: check.name,
           suggested,
+          processInfo: processInfo || undefined,
         });
         logger.info(`Suggested alternative port for ${check.name}: ${suggested}`);
       } else {
@@ -289,17 +475,39 @@ export async function checkAllPortsAndSuggestAlternatives(
           port: check.port,
           name: check.name,
           suggested: check.port, // Keep original if no alternative found
+          processInfo: processInfo || undefined,
         });
       }
     }
   }
 
-  // If conflicts exist, create suggested configuration
+  // Check hardcoded ports (cannot suggest alternatives for these)
+  for (const check of hardcodedPortChecks) {
+    const available = await checkPortAvailable(check.port);
+    if (!available) {
+      logger.warn(`Port ${check.port} (${check.name}) is already in use - THIS PORT CANNOT BE CHANGED`);
+
+      // Get process info for better error message
+      const processInfo = await getPortUsageInfo(check.port);
+      if (processInfo) {
+        logger.info(`Port ${check.port} usage info:\n${processInfo}`);
+      }
+
+      conflicts.push({
+        port: check.port,
+        name: check.name,
+        suggested: check.port, // Cannot change hardcoded ports
+        processInfo: processInfo || undefined,
+      });
+    }
+  }
+
+  // If conflicts exist, create suggested configuration (only for configurable ports)
   let suggestedConfig: EnvConfig | undefined;
   if (conflicts.length > 0) {
     suggestedConfig = { ...config };
     for (const conflict of conflicts) {
-      const check = portChecks.find(c => c.port === conflict.port);
+      const check = configurablePortChecks.find(c => c.port === conflict.port);
       if (check) {
         suggestedConfig[check.key] = conflict.suggested;
       }
