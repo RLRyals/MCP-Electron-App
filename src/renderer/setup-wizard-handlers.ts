@@ -655,23 +655,37 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value)
         };
 
-        // Get current config and ensure password and token are set
+        // Get current config to check if credentials already exist
         const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
+        
+        // Check if .env file actually exists on disk
+        // This is critical to prevent password regeneration
+        const envFileExists = await (window as any).electronAPI.envConfig.fileExists();
+        
+        console.log('Environment file exists:', envFileExists);
+        console.log('Current config has password:', !!currentConfig.POSTGRES_PASSWORD);
+        console.log('Current config has token:', !!currentConfig.MCP_AUTH_TOKEN);
 
-        // If current config has empty or missing credentials, generate new ones
-        // This ensures credentials are never empty when saving
-        if (!currentConfig.POSTGRES_PASSWORD || currentConfig.POSTGRES_PASSWORD.trim() === '') {
-            console.log('Generating new database password for first-time setup...');
+        // CRITICAL: Only generate NEW credentials if this is first-time setup (.env doesn't exist)
+        // If .env exists, ALWAYS use the existing credentials, NEVER regenerate
+        if (!envFileExists) {
+            // First-time setup - generate new credentials
+            console.log('First-time setup detected - generating new credentials...');
             config.POSTGRES_PASSWORD = await (window as any).electronAPI.envConfig.generatePassword(16);
-        } else {
-            config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
-        }
-
-        if (!currentConfig.MCP_AUTH_TOKEN || currentConfig.MCP_AUTH_TOKEN.trim() === '') {
-            console.log('Generating new MCP auth token for first-time setup...');
             config.MCP_AUTH_TOKEN = await (window as any).electronAPI.envConfig.generateToken();
         } else {
+            // .env file exists - ALWAYS use existing credentials from the file
+            console.log('Using existing credentials from .env file');
+            config.POSTGRES_PASSWORD = currentConfig.POSTGRES_PASSWORD;
             config.MCP_AUTH_TOKEN = currentConfig.MCP_AUTH_TOKEN;
+            
+            // If somehow the credentials are empty in an existing .env file, this is an error
+            if (!config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+                throw new Error('POSTGRES_PASSWORD is empty in existing .env file. This indicates a corrupted configuration. Please delete the .env file and restart the setup wizard to generate new credentials.');
+            }
+            if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '') {
+                throw new Error('MCP_AUTH_TOKEN is empty in existing .env file. This indicates a corrupted configuration. Please delete the .env file and restart the setup wizard to generate new credentials.');
+            }
         }
 
         // Final validation: ensure credentials are NEVER empty

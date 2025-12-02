@@ -863,6 +863,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getEnvFilePath: (): Promise<string> => {
       return ipcRenderer.invoke('env:get-env-file-path');
     },
+
+    /**
+     * Check if .env file exists on disk
+     */
+    fileExists: (): Promise<boolean> => {
+      return ipcRenderer.invoke('env:file-exists');
+    },
   },
 
   /**

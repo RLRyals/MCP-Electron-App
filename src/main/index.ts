@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as prerequisites from './prerequisites';
 import logger, { initializeLogger, getRecentLogs, LogCategory, logWithCategory } from './logger';
 import {
@@ -638,6 +639,11 @@ function setupIPC(): void {
 
   ipcMain.handle('env:get-env-file-path', async () => {
     return envConfig.getEnvFilePath();
+  });
+
+  ipcMain.handle('env:file-exists', async () => {
+    const envPath = envConfig.getEnvFilePath();
+    return fs.existsSync(envPath);
   });
 
   ipcMain.handle('env:check-all-ports', async (_, config: envConfig.EnvConfig) => {
