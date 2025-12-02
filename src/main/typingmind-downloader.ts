@@ -433,6 +433,12 @@ export async function downloadTypingMind(
     // 5. Get commit hash for version tracking
     const commitHash = await getCommitHash(tempDir);
 
+    if (!commitHash) {
+      logger.warn('Could not retrieve commit hash, update detection may not work properly');
+    }
+
+    logWithCategory('info', LogCategory.SCRIPT, `Downloaded commit hash: ${commitHash || 'unknown'}`);
+
     // 6. Move files to final location
     progressCallback?.({
       message: 'Installing files...',
@@ -586,19 +592,40 @@ export async function checkForUpdates(): Promise<{
     const metadata = await loadMetadata();
 
     if (!metadata.installed) {
+      logWithCategory('warn', LogCategory.SCRIPT, 'Typing Mind is not installed');
       return { hasUpdate: false, error: 'Typing Mind is not installed' };
     }
 
     // Get latest commit hash from GitHub
+    logWithCategory('info', LogCategory.SCRIPT, `Fetching latest commit from ${REPO_URL}...`);
     const { stdout } = await execAsync(
       `git ls-remote ${REPO_URL} HEAD`,
       { timeout: 10000 }
     );
 
-    const latestCommit = stdout.split('\t')[0];
+    if (!stdout || stdout.trim().length === 0) {
+      throw new Error('No output from git ls-remote command');
+    }
+
+    const latestCommit = stdout.split('\t')[0].trim();
     const currentCommit = metadata.commitHash;
 
+    logWithCategory('info', LogCategory.SCRIPT, `Current commit: ${currentCommit || 'none'}`);
+    logWithCategory('info', LogCategory.SCRIPT, `Latest commit: ${latestCommit}`);
+
+    // If we don't have a current commit hash, assume update is needed
+    if (!currentCommit) {
+      logWithCategory('warn', LogCategory.SCRIPT, 'No commit hash in metadata, assuming update available');
+      return {
+        hasUpdate: true,
+        currentVersion: 'unknown',
+        latestVersion: latestCommit,
+      };
+    }
+
     const hasUpdate = currentCommit !== latestCommit;
+
+    logWithCategory('info', LogCategory.SCRIPT, `Update available: ${hasUpdate}`);
 
     return {
       hasUpdate,
@@ -606,7 +633,7 @@ export async function checkForUpdates(): Promise<{
       latestVersion: latestCommit,
     };
   } catch (error: any) {
-    logger.error('Error checking for updates:', error);
+    logWithCategory('error', LogCategory.SCRIPT, 'Error checking for updates', error);
     return {
       hasUpdate: false,
       error: error.message,
