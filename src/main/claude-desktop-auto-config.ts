@@ -132,7 +132,7 @@ export async function buildClaudeDesktopConfig(): Promise<ClaudeDesktopConfig> {
         '-i',
         '-e',
         'MCP_STDIO_MODE=true',
-        'mcp-writing-servers',
+        'fictionlab-mcp-servers',
         'node',
         server.entryPoint
       ]
@@ -428,7 +428,7 @@ Setup Instructions:
 1. Ensure Docker Services Are Running
    - The MCP servers must be running in Docker
    - Start services: docker compose up -d
-   - Verify container is running: docker ps | grep mcp-writing-servers
+   - Verify container is running: docker ps | grep fictionlab-mcp-servers
 
 2. Auto-Configure (Recommended)
    - Click the "Auto-Configure Claude Desktop" button in the app
@@ -458,14 +458,14 @@ Available MCP Servers:
 ${MCP_SERVERS.map((s, i) => `${i + 1}. ${s.displayName}`).join('\n')}
 
 Requirements:
-- Docker must be running with mcp-writing-servers container
+- Docker must be running with fictionlab-mcp-servers container
 - Docker must be accessible from command line
 - Database must be accessible from container
 
 Troubleshooting:
-- If servers don't appear, check Docker logs: docker compose logs mcp-writing-servers
+- If servers don't appear, check Docker logs: docker compose logs fictionlab-mcp-servers
 - Verify container is running: docker ps
-- Test docker exec: docker exec -i mcp-writing-servers node --version
+- Test docker exec: docker exec -i fictionlab-mcp-servers node --version
 - Check Claude Desktop logs for connection errors
 - Ensure config file has correct JSON format
 
