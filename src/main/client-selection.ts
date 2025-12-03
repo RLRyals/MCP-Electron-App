@@ -20,6 +20,10 @@ export interface ClientMetadata {
   requirements: string[];
   downloadSize: string;
   installation: 'automatic' | 'manual';
+  repoUrl?: string; // Optional repo URL for cloning
+  dependencies?: string[]; // List of dependent repo IDs
+  isCustom?: boolean; // Whether this is a user-added client
+  enabled?: boolean; // Whether this client is enabled
 }
 
 /**
@@ -32,6 +36,14 @@ export interface ClientSelection {
 }
 
 /**
+ * Custom client configuration interface
+ */
+export interface ClientConfig {
+  customClients: ClientMetadata[];
+  overrides: Record<string, Partial<ClientMetadata>>; // Overrides for default clients (e.g. repoUrl)
+}
+
+/**
  * Client installation status interface
  */
 export interface ClientStatus {
@@ -41,12 +53,13 @@ export interface ClientStatus {
   installed: boolean;
   installationDate?: string;
   version?: string;
+  repoUrl?: string;
 }
 
 /**
- * Available MCP clients metadata
+ * Available MCP clients metadata (Defaults)
  */
-export const AVAILABLE_CLIENTS: Record<string, ClientMetadata> = {
+export const DEFAULT_CLIENTS: Record<string, ClientMetadata> = {
   'typingmind': {
     id: 'typingmind',
     name: 'Typing Mind',
@@ -65,7 +78,8 @@ export const AVAILABLE_CLIENTS: Record<string, ClientMetadata> = {
       '~63MB download'
     ],
     downloadSize: '~63MB',
-    installation: 'automatic'
+    installation: 'automatic',
+    repoUrl: 'https://github.com/TypingMind/typingmind.git'
   },
   'claude-desktop': {
     id: 'claude-desktop',
@@ -98,23 +112,160 @@ function getClientSelectionPath(): string {
 }
 
 /**
- * Get all available clients
+ * Get the path to the client configuration file
  */
-export function getAvailableClients(): ClientMetadata[] {
+function getClientConfigPath(): string {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'client-config.json');
+}
+
+/**
+ * Load client configuration (custom clients and overrides)
+ */
+export async function loadClientConfig(): Promise<ClientConfig> {
+  const configPath = getClientConfigPath();
+  try {
+    if (!await fs.pathExists(configPath)) {
+      return { customClients: [], overrides: {} };
+    }
+    return await fs.readJson(configPath);
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to load client config', error);
+    return { customClients: [], overrides: {} };
+  }
+}
+
+/**
+ * Save client configuration
+ */
+export async function saveClientConfig(config: ClientConfig): Promise<void> {
+  const configPath = getClientConfigPath();
+  try {
+    await fs.ensureDir(path.dirname(configPath));
+    await fs.writeJson(configPath, config, { spaces: 2 });
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to save client config', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all available clients (merging defaults with config)
+ */
+export async function getAvailableClients(): Promise<ClientMetadata[]> {
   logWithCategory('info', LogCategory.SYSTEM, 'Getting available clients');
-  return Object.values(AVAILABLE_CLIENTS);
+  
+  const config = await loadClientConfig();
+  const clients: ClientMetadata[] = [];
+
+  // Add default clients with overrides
+  for (const [id, defaultClient] of Object.entries(DEFAULT_CLIENTS)) {
+    const override = config.overrides[id] || {};
+    clients.push({ ...defaultClient, ...override });
+  }
+
+  // Add custom clients
+  clients.push(...config.customClients);
+
+  return clients;
 }
 
 /**
  * Get a specific client by ID
  */
-export function getClientById(clientId: string): ClientMetadata | null {
-  const client = AVAILABLE_CLIENTS[clientId];
+export async function getClientById(clientId: string): Promise<ClientMetadata | null> {
+  const clients = await getAvailableClients();
+  const client = clients.find(c => c.id === clientId);
+  
   if (!client) {
     logWithCategory('warn', LogCategory.SYSTEM, `Client not found: ${clientId}`);
     return null;
   }
   return client;
+}
+
+/**
+ * Add a custom client
+ */
+export async function addCustomClient(client: ClientMetadata): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = await loadClientConfig();
+    
+    // Check if ID already exists
+    if (DEFAULT_CLIENTS[client.id] || config.customClients.find(c => c.id === client.id)) {
+      return { success: false, error: 'Client ID already exists' };
+    }
+
+    client.isCustom = true;
+    config.customClients.push(client);
+    await saveClientConfig(config);
+    
+    logWithCategory('info', LogCategory.SYSTEM, `Added custom client: ${client.name}`);
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Remove a custom client
+ */
+export async function removeCustomClient(clientId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = await loadClientConfig();
+    
+    const initialLength = config.customClients.length;
+    config.customClients = config.customClients.filter(c => c.id !== clientId);
+    
+    if (config.customClients.length === initialLength) {
+      return { success: false, error: 'Custom client not found' };
+    }
+
+    await saveClientConfig(config);
+    
+    // Also remove from selection if present
+    const selection = await loadClientSelection();
+    if (selection && selection.clients.includes(clientId)) {
+      const newClients = selection.clients.filter(id => id !== clientId);
+      await saveClientSelection(newClients);
+    }
+
+    logWithCategory('info', LogCategory.SYSTEM, `Removed custom client: ${clientId}`);
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Update client configuration (e.g. repo URL)
+ */
+export async function updateClientConfig(clientId: string, updates: Partial<ClientMetadata>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = await loadClientConfig();
+    
+    // Check if it's a default client
+    if (DEFAULT_CLIENTS[clientId]) {
+      config.overrides[clientId] = { ...config.overrides[clientId], ...updates };
+    } else {
+      // Check if it's a custom client
+      const index = config.customClients.findIndex(c => c.id === clientId);
+      if (index !== -1) {
+        config.customClients[index] = { ...config.customClients[index], ...updates };
+      } else {
+        return { success: false, error: 'Client not found' };
+      }
+    }
+
+    await saveClientConfig(config);
+    logWithCategory('info', LogCategory.SYSTEM, `Updated client config: ${clientId}`);
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: errorMsg };
+  }
 }
 
 /**
@@ -146,8 +297,11 @@ export async function saveClientSelection(clients: string[]): Promise<{ success:
 
   try {
     // Validate client IDs
+    const availableClients = await getAvailableClients();
+    const availableIds = availableClients.map(c => c.id);
+    
     for (const clientId of clients) {
-      if (!AVAILABLE_CLIENTS[clientId]) {
+      if (!availableIds.includes(clientId)) {
         const error = `Invalid client ID: ${clientId}`;
         logWithCategory('error', LogCategory.SYSTEM, error);
         return { success: false, error };
@@ -181,19 +335,21 @@ export async function saveClientSelection(clients: string[]): Promise<{ success:
 export async function getClientStatus(): Promise<ClientStatus[]> {
   const selection = await loadClientSelection();
   const selectedClients = selection?.clients || [];
+  const availableClients = await getAvailableClients();
 
   const statuses: ClientStatus[] = [];
 
-  for (const [id, metadata] of Object.entries(AVAILABLE_CLIENTS)) {
-    const isSelected = selectedClients.includes(id);
+  for (const client of availableClients) {
+    const isSelected = selectedClients.includes(client.id);
 
     // For now, we just track selection. Installation tracking will be added in future issues
     statuses.push({
-      id,
-      name: metadata.name,
+      id: client.id,
+      name: client.name,
       selected: isSelected,
       installed: false, // Will be implemented in installation issues
-      installationDate: isSelected ? selection?.selectedAt : undefined
+      installationDate: isSelected ? selection?.selectedAt : undefined,
+      repoUrl: client.repoUrl
     });
   }
 

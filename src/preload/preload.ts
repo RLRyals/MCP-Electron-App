@@ -990,6 +990,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /**
    * Client Selection API
    */
+  /**
+   * Client Selection API
+   */
   clientSelection: {
     /**
      * Get all available client options
@@ -1031,6 +1034,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getById: (clientId: string): Promise<ClientMetadata | null> => {
       return ipcRenderer.invoke('client:get-by-id', clientId);
+    },
+
+    /**
+     * Add a custom client
+     */
+    addCustomClient: (client: ClientMetadata): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('client:add-custom', client);
+    },
+
+    /**
+     * Remove a custom client
+     */
+    removeCustomClient: (clientId: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('client:remove-custom', clientId);
+    },
+
+    /**
+     * Update client configuration
+     */
+    updateClientConfig: (clientId: string, updates: Partial<ClientMetadata>): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('client:update-config', clientId, updates);
     },
 
     /**

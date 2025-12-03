@@ -53,12 +53,18 @@ let hasShownOfflineNotification = false;
 /**
  * Initialize the dashboard
  */
+/**
+ * Initialize the dashboard
+ */
 export async function initializeDashboard(): Promise<void> {
   console.log('Initializing dashboard...');
 
   try {
     // Setup event listeners first (so buttons work even if status fails)
     setupDashboardListeners();
+
+    // Update dashboard buttons based on installed clients
+    await updateDashboardButtons();
 
     // Load initial status
     await updateSystemStatus();
@@ -73,6 +79,38 @@ export async function initializeDashboard(): Promise<void> {
     showNotification(`Dashboard initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
     // Still set up event listeners in case of error
     setupDashboardListeners();
+  }
+}
+
+/**
+ * Update dashboard buttons based on installed clients
+ */
+async function updateDashboardButtons(): Promise<void> {
+  try {
+    const selection = await window.electronAPI.clientSelection.getSelection();
+    const selectedClients = selection?.clients || [];
+
+    const openTypingMindBtn = document.getElementById('dashboard-open-typing-mind');
+    const configureTypingMindBtn = document.getElementById('dashboard-configure-typing-mind');
+    const configureClaudeDesktopBtn = document.getElementById('dashboard-configure-claude-desktop');
+
+    if (openTypingMindBtn) {
+      openTypingMindBtn.style.display = selectedClients.includes('typingmind') ? 'inline-flex' : 'none';
+    }
+
+    if (configureTypingMindBtn) {
+      configureTypingMindBtn.style.display = selectedClients.includes('typingmind') ? 'inline-flex' : 'none';
+    }
+
+    if (configureClaudeDesktopBtn) {
+      configureClaudeDesktopBtn.style.display = selectedClients.includes('claude-desktop') ? 'inline-flex' : 'none';
+    }
+
+    // Handle custom clients if needed (future expansion)
+    // For now, we just hide/show the standard buttons
+
+  } catch (error) {
+    console.error('Error updating dashboard buttons:', error);
   }
 }
 

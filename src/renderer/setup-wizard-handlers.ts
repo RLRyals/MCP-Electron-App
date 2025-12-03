@@ -787,75 +787,273 @@ async function initializeClientSelectionStep() {
         `;
     }
 }
-
+/**
+ * Create client selection cards HTML
+ */
 /**
  * Create client selection cards HTML
  */
 function createClientSelectionCards(clients: any[], selectedClients: string[]): string {
-    const cards = clients.map(client => `
-        <div class="prereq-card ${selectedClients.includes(client.id) ? 'success' : ''}" data-client-id="${client.id}">
+    let html = '<div class="client-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">';
+    
+    clients.forEach(client => {
+        const isSelected = selectedClients.includes(client.id);
+        const isCustom = client.isCustom;
+        
+        html += `
+        <div class="prereq-card ${isSelected ? 'success' : ''}" data-client-id="${client.id}" style="position: relative;">
             <div class="prereq-header">
                 <div class="prereq-icon">${client.type === 'web-based' ? '🌐' : '💻'}</div>
                 <div style="flex: 1;">
                     <div class="prereq-title">${client.name}</div>
-                    <div style="margin-top: 5px;">
-                        <span style="display: inline-block; padding: 4px 12px; background: rgba(255, 255, 255, 0.2); border-radius: 12px; font-size: 0.85rem;">${client.type}</span>
-                    </div>
+                    <div class="prereq-status">${client.type === 'web-based' ? 'Web Application' : 'Desktop Application'}</div>
                 </div>
-                <input type="checkbox" class="client-checkbox" data-client-id="${client.id}" ${selectedClients.includes(client.id) ? 'checked' : ''} style="width: 24px; height: 24px; cursor: pointer;">
+                <div class="client-actions" style="display: flex; gap: 5px;">
+                    <button class="icon-btn edit-client-btn" data-id="${client.id}" title="Edit Configuration" style="background: none; border: none; cursor: pointer; color: #aaa;">
+                        ✏️
+                    </button>
+                    ${isCustom ? `
+                    <button class="icon-btn remove-client-btn" data-id="${client.id}" title="Remove Client" style="background: none; border: none; cursor: pointer; color: #aaa;">
+                        🗑️
+                    </button>
+                    ` : ''}
+                </div>
             </div>
-            <div style="margin-top: 15px; opacity: 0.9;">
-                ${client.description}
-            </div>
-            <div style="margin-top: 15px;">
-                <strong>Features:</strong>
-                <ul style="margin: 10px 0; padding-left: 20px;">
-                    ${client.features.map((f: string) => `<li style="margin: 5px 0;">${f}</li>`).join('')}
+            
+            <div class="client-details" style="margin: 15px 0; font-size: 0.9rem; color: #ccc;">
+                <p>${client.description}</p>
+                ${client.repoUrl ? `<p style="margin-top: 5px; font-size: 0.8rem; color: #888;">Repo: ${client.repoUrl}</p>` : ''}
+                ${client.dependencies && client.dependencies.length > 0 ? `<p style="margin-top: 5px; font-size: 0.8rem; color: #888;">Depends on: ${client.dependencies.join(', ')}</p>` : ''}
+                <ul style="margin-top: 10px; padding-left: 20px;">
+                    ${client.features.slice(0, 3).map((f: string) => `<li>${f}</li>`).join('')}
                 </ul>
             </div>
-            <div style="margin-top: 10px;">
-                <strong>Requirements:</strong>
-                <ul style="margin: 10px 0; padding-left: 20px;">
-                    ${client.requirements.map((r: string) => `<li style="margin: 5px 0;">${r}</li>`).join('')}
-                </ul>
-            </div>
-        </div>
-    `).join('');
 
-    return `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
-            ${cards}
+            <div class="client-selection-toggle">
+                <label class="switch">
+                    <input type="checkbox" class="client-checkbox" value="${client.id}" ${isSelected ? 'checked' : ''}>
+                    <span class="slider round"></span>
+                </label>
+                <span style="margin-left: 10px;">${isSelected ? 'Selected' : 'Not Selected'}</span>
+            </div>
         </div>
-        <div style="margin-top: 30px; text-align: right;">
-            <button class="wizard-btn primary" id="save-client-selection-btn">Save Selection</button>
+        `;
+    });
+
+    // Add "Add Custom Client" card
+    html += `
+        <div class="prereq-card dashed-border" id="add-custom-client-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; min-height: 200px; border: 2px dashed rgba(255, 255, 255, 0.2);">
+            <div style="font-size: 2rem; margin-bottom: 10px;">➕</div>
+            <div style="font-weight: 500;">Add Custom Client</div>
+            <div style="font-size: 0.8rem; color: #888; margin-top: 5px;">Configure a new repo to clone</div>
         </div>
-        <div id="client-selection-status" style="margin-top: 20px;"></div>
     `;
+
+    html += '</div>';
+    
+    // Add modal container
+    html += `
+        <div id="client-modal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7);">
+            <div class="modal-content" style="background-color: #1e1e1e; margin: 10% auto; padding: 20px; border: 1px solid #333; width: 500px; border-radius: 10px; color: #fff;">
+                <h2 id="modal-title" style="margin-top: 0;">Add Custom Client</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px;">Name</label>
+                    <input type="text" id="client-name-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px;">Repository URL</label>
+                    <input type="text" id="client-repo-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px;">Dependencies (comma separated IDs)</label>
+                    <input type="text" id="client-deps-input" placeholder="e.g. fictionlab-mcp-servers" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px;">Description</label>
+                    <textarea id="client-desc-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; height: 60px;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button id="modal-cancel-btn" class="wizard-btn secondary">Cancel</button>
+                    <button id="modal-save-btn" class="wizard-btn primary">Save</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return html;
 }
 
 /**
- * Setup client selection event listeners
+ * Setup client selection listeners
  */
 function setupClientSelectionListeners() {
-    // Checkbox change listeners
+    // Checkbox listeners
     document.querySelectorAll('.client-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
+        checkbox.addEventListener('change', async (e) => {
             const target = e.target as HTMLInputElement;
-            const clientId = target.getAttribute('data-client-id');
-            const card = document.querySelector(`.prereq-card[data-client-id="${clientId}"]`);
-
+            const card = target.closest('.prereq-card');
+            const statusSpan = target.parentElement?.nextElementSibling;
+            
             if (target.checked) {
                 card?.classList.add('success');
+                if (statusSpan) statusSpan.textContent = 'Selected';
             } else {
                 card?.classList.remove('success');
+                if (statusSpan) statusSpan.textContent = 'Not Selected';
+            }
+            
+            await saveClientSelection();
+        });
+    });
+
+    // Add Custom Client button
+    const addBtn = document.getElementById('add-custom-client-card');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => showClientModal());
+    }
+
+    // Edit buttons
+    document.querySelectorAll('.edit-client-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const clientId = (e.currentTarget as HTMLElement).getAttribute('data-id');
+            if (clientId) showClientModal(clientId);
+        });
+    });
+
+    // Remove buttons
+    document.querySelectorAll('.remove-client-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const clientId = (e.currentTarget as HTMLElement).getAttribute('data-id');
+            if (clientId && confirm('Are you sure you want to remove this client?')) {
+                await (window as any).electronAPI.clientSelection.removeCustomClient(clientId);
+                await initializeClientSelectionStep();
             }
         });
     });
 
-    // Save button
-    const saveBtn = document.getElementById('save-client-selection-btn');
+    // Modal listeners
+    const modal = document.getElementById('client-modal');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+    const saveBtn = document.getElementById('modal-save-btn');
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (modal) modal.style.display = 'none';
+        });
+    }
+
     if (saveBtn) {
-        saveBtn.addEventListener('click', saveClientSelection);
+        saveBtn.addEventListener('click', async () => {
+            await handleSaveClient();
+        });
+    }
+}
+
+/**
+ * Show client modal (for adding or editing)
+ */
+async function showClientModal(clientId?: string) {
+    const modal = document.getElementById('client-modal');
+    const title = document.getElementById('modal-title');
+    const nameInput = document.getElementById('client-name-input') as HTMLInputElement;
+    const repoInput = document.getElementById('client-repo-input') as HTMLInputElement;
+    const depsInput = document.getElementById('client-deps-input') as HTMLInputElement;
+    const descInput = document.getElementById('client-desc-input') as HTMLTextAreaElement;
+    const saveBtn = document.getElementById('modal-save-btn');
+
+    if (!modal || !title || !nameInput || !repoInput || !depsInput || !descInput || !saveBtn) return;
+
+    if (clientId) {
+        // Edit mode
+        title.textContent = 'Edit Client Configuration';
+        const client = await (window as any).electronAPI.clientSelection.getById(clientId);
+        if (client) {
+            nameInput.value = client.name;
+            nameInput.disabled = !client.isCustom; // Can't rename default clients
+            repoInput.value = client.repoUrl || '';
+            depsInput.value = client.dependencies ? client.dependencies.join(', ') : '';
+            descInput.value = client.description;
+            descInput.disabled = !client.isCustom; // Can't change description of default clients
+            saveBtn.setAttribute('data-id', clientId);
+        }
+    } else {
+        // Add mode
+        title.textContent = 'Add Custom Client';
+        nameInput.value = '';
+        nameInput.disabled = false;
+        repoInput.value = '';
+        depsInput.value = '';
+        descInput.value = '';
+        descInput.disabled = false;
+        saveBtn.removeAttribute('data-id');
+    }
+
+    modal.style.display = 'block';
+}
+
+/**
+ * Handle saving client from modal
+ */
+async function handleSaveClient() {
+    const modal = document.getElementById('client-modal');
+    const nameInput = document.getElementById('client-name-input') as HTMLInputElement;
+    const repoInput = document.getElementById('client-repo-input') as HTMLInputElement;
+    const depsInput = document.getElementById('client-deps-input') as HTMLInputElement;
+    const descInput = document.getElementById('client-desc-input') as HTMLTextAreaElement;
+    const saveBtn = document.getElementById('modal-save-btn');
+
+    if (!modal || !nameInput || !repoInput || !depsInput || !descInput || !saveBtn) return;
+
+    const clientId = saveBtn.getAttribute('data-id');
+    const name = nameInput.value.trim();
+    const repoUrl = repoInput.value.trim();
+    const description = descInput.value.trim();
+    const dependencies = depsInput.value.split(',').map(d => d.trim()).filter(d => d.length > 0);
+
+    if (!repoUrl) {
+        alert('Repository URL is required');
+        return;
+    }
+
+    try {
+        if (clientId) {
+            // Update existing
+            await (window as any).electronAPI.clientSelection.updateClientConfig(clientId, {
+                repoUrl,
+                dependencies,
+                ...(nameInput.disabled ? {} : { name }),
+                ...(descInput.disabled ? {} : { description })
+            });
+        } else {
+            // Add new
+            if (!name) {
+                alert('Name is required');
+                return;
+            }
+            
+            const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            await (window as any).electronAPI.clientSelection.addCustomClient({
+                id,
+                name,
+                type: 'web-based', // Default to web-based for now
+                description,
+                features: ['Custom Client'],
+                requirements: [],
+                downloadSize: 'Unknown',
+                installation: 'automatic',
+                repoUrl,
+                dependencies,
+                isCustom: true
+            });
+        }
+
+        modal.style.display = 'none';
+        await initializeClientSelectionStep();
+    } catch (error) {
+        console.error('Error saving client:', error);
+        alert('Failed to save client: ' + (error instanceof Error ? error.message : String(error)));
     }
 }
 
@@ -868,9 +1066,8 @@ async function saveClientSelection(): Promise<boolean> {
     try {
         // Get selected clients
         const selectedClients: string[] = [];
-        document.querySelectorAll('.client-checkbox:checked').forEach(checkbox => {
-            const clientId = checkbox.getAttribute('data-client-id');
-            if (clientId) selectedClients.push(clientId);
+        document.querySelectorAll('.client-checkbox:checked').forEach((checkbox: any) => {
+            selectedClients.push(checkbox.value);
         });
 
         console.log('Selected clients:', selectedClients);

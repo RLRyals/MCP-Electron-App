@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { app } from 'electron';
 import logger, { logWithCategory, LogCategory } from './logger';
 import { checkGit } from './prerequisites';
+import { getClientById } from './client-selection';
 
 const execAsync = promisify(exec);
 
@@ -53,14 +54,27 @@ export interface TypingMindMetadata {
   commitHash?: string;
 }
 
-// GitHub repository configuration
-const REPO_URL = 'https://github.com/TypingMind/typingmind.git';
+// Default GitHub repository configuration (fallback)
+const DEFAULT_REPO_URL = 'https://github.com/TypingMind/typingmind.git';
 const SPARSE_CHECKOUT_PATH = 'src';
 const TEMP_CLONE_DIR = 'temp-typing-mind-clone';
 
 // Active download process tracking
 let activeProcess: ChildProcess | null = null;
 let isCancelled = false;
+
+/**
+ * Get the repository URL from client configuration
+ */
+async function getRepoUrl(): Promise<string> {
+  try {
+    const client = await getClientById('typingmind');
+    return client?.repoUrl || DEFAULT_REPO_URL;
+  } catch (error) {
+    logger.warn('Failed to get Typing Mind repo URL from config, using default', error);
+    return DEFAULT_REPO_URL;
+  }
+}
 
 /**
  * Get the directory where Typing Mind files are located
@@ -385,7 +399,8 @@ export async function downloadTypingMind(
       status: 'downloading',
     });
 
-    logWithCategory('info', LogCategory.SCRIPT, `Cloning from: ${REPO_URL}`);
+    const repoUrl = await getRepoUrl();
+    logWithCategory('info', LogCategory.SCRIPT, `Cloning from: ${repoUrl}`);
 
     // Initialize git repository
     await executeGitCommand('init', tempDir, progressCallback);
@@ -394,7 +409,7 @@ export async function downloadTypingMind(
     await executeGitCommand('config core.sparseCheckout true', tempDir);
 
     // Add remote
-    await executeGitCommand(`remote add origin ${REPO_URL}`, tempDir);
+    await executeGitCommand(`remote add origin ${repoUrl}`, tempDir);
 
     // Set sparse checkout paths
     const sparseCheckoutFile = path.join(tempDir, '.git', 'info', 'sparse-checkout');
@@ -465,7 +480,7 @@ export async function downloadTypingMind(
       installedAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
       path: installDir,
-      repositoryUrl: REPO_URL,
+      repositoryUrl: repoUrl,
       commitHash: commitHash,
     };
 
@@ -596,10 +611,13 @@ export async function checkForUpdates(): Promise<{
       return { hasUpdate: false, error: 'Typing Mind is not installed' };
     }
 
+    // Get repo URL from config or metadata
+    const repoUrl = await getRepoUrl();
+
     // Get latest commit hash from GitHub
-    logWithCategory('info', LogCategory.SCRIPT, `Fetching latest commit from ${REPO_URL}...`);
+    logWithCategory('info', LogCategory.SCRIPT, `Fetching latest commit from ${repoUrl}...`);
     const { stdout } = await execAsync(
-      `git ls-remote ${REPO_URL} HEAD`,
+      `git ls-remote ${repoUrl} HEAD`,
       { timeout: 10000 }
     );
 

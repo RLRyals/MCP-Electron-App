@@ -789,6 +789,21 @@ function setupIPC(): void {
     return clientSelection.getClientById(clientId);
   });
 
+  ipcMain.handle('client:add-custom', async (_, client: clientSelection.ClientMetadata) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Adding custom client: ${client.name}`);
+    return await clientSelection.addCustomClient(client);
+  });
+
+  ipcMain.handle('client:remove-custom', async (_, clientId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Removing custom client: ${clientId}`);
+    return await clientSelection.removeCustomClient(clientId);
+  });
+
+  ipcMain.handle('client:update-config', async (_, clientId: string, updates: Partial<clientSelection.ClientMetadata>) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Updating client config: ${clientId}`);
+    return await clientSelection.updateClientConfig(clientId, updates);
+  });
+
   ipcMain.handle('client:get-selection-file-path', async () => {
     return clientSelection.getSelectionFilePath();
   });
