@@ -1355,15 +1355,15 @@ export async function restartMCPSystem(
 
 /**
  * Get current system status
- * Uses docker ps to get all MCP-related containers regardless of how they were started
+ * Uses docker ps to get all FictionLab-related containers regardless of how they were started
  */
 export async function getSystemStatus(): Promise<SystemStatus> {
   logWithCategory('info', LogCategory.DOCKER, 'Getting system status...');
 
   try {
-    // Use docker ps to find all MCP-related containers
+    // Use docker ps to find all FictionLab-related containers
     // This works regardless of which compose file was used to start them
-    const { stdout } = await execAsync('docker ps -a --filter "name=mcp-" --filter "name=writing-" --filter "name=typing" --format "{{json .}}"');
+    const { stdout } = await execAsync('docker ps -a --filter \"name=fictionlab-\" --filter \"name=mcp-\" --filter \"name=writing-\" --filter \"name=typing\" --format \"{{json .}}\"');
 
     if (!stdout.trim()) {
       return {
