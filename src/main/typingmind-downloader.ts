@@ -606,7 +606,10 @@ export async function checkForUpdates(): Promise<{
 
     const metadata = await loadMetadata();
 
-    if (!metadata.installed) {
+    // Check if installed using file check, not just metadata
+    // This handles cases where metadata is missing but files exist
+    const installed = await isInstalled();
+    if (!installed) {
       logWithCategory('warn', LogCategory.SCRIPT, 'Typing Mind is not installed');
       return { hasUpdate: false, error: 'Typing Mind is not installed' };
     }
