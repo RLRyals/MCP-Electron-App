@@ -122,6 +122,9 @@ export class DashboardTab {
           <button id="dashboard-configure-claude-desktop" class="action-button secondary" title="Configure Claude Desktop with native stdio servers">
             Configure Claude Desktop
           </button>
+          <button id="dashboard-manage-clients" class="action-button secondary" title="Add, edit, or remove AI clients">
+            Manage Clients
+          </button>
           <button id="dashboard-refresh-status" class="action-button icon-only" title="Refresh the status of all services and update the dashboard">
             🔄
           </button>

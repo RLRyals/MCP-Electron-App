@@ -155,6 +155,18 @@ function setupDashboardListeners(): void {
     configureClaudeDesktopBtn.addEventListener('click', handleConfigureClaudeDesktop);
   }
 
+  const manageClientsBtn = document.getElementById('dashboard-manage-clients');
+  if (manageClientsBtn) {
+    manageClientsBtn.addEventListener('click', () => {
+      (window as any).ClientManagementUI.showClientManager();
+    });
+  }
+
+  // Listen for client updates from the manager
+  window.addEventListener('clients-updated', () => {
+    updateDashboardButtons();
+  });
+
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => updateSystemStatus());
   }
