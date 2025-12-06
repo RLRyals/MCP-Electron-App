@@ -463,7 +463,7 @@ export async function stopExistingContainers(): Promise<void> {
 
     // Step 3: Use docker-compose to clean up any compose-managed containers
     try {
-      await execDockerCompose(coreFile, 'down', ['--remove-orphans', '--volumes']);
+      await execDockerCompose(coreFile, 'down', ['--remove-orphans']);
       logWithCategory('info', LogCategory.DOCKER, 'Docker Compose cleanup completed');
     } catch (composeError: any) {
       logWithCategory('warn', LogCategory.DOCKER, 'Compose cleanup encountered an issue (may be safe to ignore)', composeError);
