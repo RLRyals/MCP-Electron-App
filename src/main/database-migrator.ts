@@ -26,11 +26,14 @@ interface MigrationFile {
 export class DatabaseMigrator {
   private repoPath: string;
   private containerName: string = 'fictionlab-postgres';
-  private dbUser: string = 'postgres';
-  private dbName: string = 'fictionlab_db';
+  private dbUser: string;
+  private dbName: string;
 
-  constructor(repoPath: string) {
+  constructor(repoPath: string, config: envConfig.EnvConfig) {
     this.repoPath = repoPath;
+    // Use configuration values passed from caller
+    this.dbUser = config.POSTGRES_USER;
+    this.dbName = config.POSTGRES_DB;
   }
 
   /**

@@ -11,6 +11,7 @@ import * as fs from 'fs-extra';
 import { app } from 'electron';
 import logger, { logWithCategory, LogCategory } from './logger';
 import * as typingMindDownloader from './typingmind-downloader';
+import * as envConfig from './env-config';
 import * as mcpSystem from './mcp-system';
 import { checkDockerRunning } from './prerequisites';
 import { DatabaseMigrator } from './database-migrator';
@@ -712,7 +713,8 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
     try {
       // We must ensure the repository directory is correct for the migrator
       const repoDir = getRepositoryDirectory('mcp-servers');
-      const migrator = new DatabaseMigrator(repoDir);
+      const config = await envConfig.loadEnvConfig();
+      const migrator = new DatabaseMigrator(repoDir, config);
       
       const migrationResult = await migrator.runMigrations((msg, prog) => {
         // Map 0-100 progress to 95-99% overall
