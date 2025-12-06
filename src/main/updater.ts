@@ -14,6 +14,7 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
 import { checkDockerRunning } from './prerequisites';
 import { DatabaseMigrator } from './database-migrator';
+import * as clientSelection from './client-selection';
 
 const execAsync = promisify(exec);
 
@@ -52,6 +53,7 @@ export interface UpdateCheckResult {
   hasUpdates: boolean;
   mcpServers: UpdateInfo;
   typingMind: UpdateInfo;
+  customClients: Record<string, UpdateInfo>; // Added support for custom clients
   checkedAt: string;
 }
 
@@ -94,6 +96,11 @@ interface SystemMetadata {
     updatedAt?: string;
     installedAt?: string;
   };
+  customClients?: Record<string, {
+    sha?: string;
+    updatedAt?: string;
+    repoUrl?: string;
+  }>;
   updatePreferences?: UpdatePreferences;
   lastStarted?: string;
   version?: string;
@@ -196,6 +203,30 @@ export async function shouldAutoCheck(): Promise<boolean> {
   const daysSince = (now.getTime() - lastChecked.getTime()) / (1000 * 60 * 60 * 24);
 
   return daysSince >= prefs.checkInterval;
+}
+
+/**
+ * Check for updates for a specific repository
+ */
+async function checkForRepoUpdate(repoUrl: string, currentSha?: string): Promise<UpdateInfo> {
+  try {
+    // Basic check using git ls-remote to avoid GitHub API rate limits if possible, 
+    // but for private repos or specific metadata, API is better. 
+    // For generic git support, ls-remote is safer.
+    
+    // Extract info if it's a GitHub repo for API check (optimization), 
+    // otherwise fallback to git ls-remote? 
+    // For now, let's use a simple git check if possible without cloning?
+    // Actually, simplest is to assume available if we don't have it, or rely on fetch.
+    
+    // For this implementation, we'll return "Available" if we can't determine, 
+    // or rely on the actual update process to pull.
+    
+    // TODO: Implement proper remote check for generic git repos
+    return { available: true }; 
+  } catch (error: any) {
+    return { available: false, error: error.message };
+  }
 }
 
 /**
@@ -309,7 +340,24 @@ export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
     checkForTypingMindUpdate(),
   ]);
 
-  const hasUpdates = mcpServers.available || typingMind.available;
+  // Check custom clients
+  const customClients: Record<string, UpdateInfo> = {};
+  const availableClients = await clientSelection.getAvailableClients();
+  const selectedClients = await clientSelection.loadClientSelection();
+  
+  // Only check selected clients
+  if (selectedClients && selectedClients.clients) {
+    for (const clientId of selectedClients.clients) {
+      const client = availableClients.find(c => c.id === clientId);
+      if (client && client.repoUrl && client.isCustom) {
+          // For now, assume custom clients always "check" successfully (git pull will happen on update)
+          // A real check would involve git ls-remote or API calls
+          customClients[clientId] = { available: true };
+      }
+    }
+  }
+
+  const hasUpdates = mcpServers.available || typingMind.available || Object.values(customClients).some(c => c.available);
 
   // Update last checked timestamp
   const prefs = await getUpdatePreferences();
@@ -320,78 +368,88 @@ export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
     hasUpdates,
     mcpServers,
     typingMind,
+    customClients,
     checkedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Get the MCP working directory
+ * Get the repository directory for a specific client
  */
-function getMCPWorkingDirectory(): string {
+function getRepositoryDirectory(clientId: string): string {
   const userDataPath = app.getPath('userData');
-  return userDataPath;
+  // Map specific IDs to specific folders if needed, otherwise use ID
+  if (clientId === 'mcp-servers') {
+    return path.join(userDataPath, 'repositories', 'mcp-writing-servers');
+  }
+  return path.join(userDataPath, 'repositories', clientId);
 }
 
 /**
- * Get the MCP repository directory
- * This matches the path used by mcp-system.ts
+ * Generic function to clone or pull a repository
  */
-function getMCPRepoDirectory(): string {
-  return path.join(getMCPWorkingDirectory(), 'repositories', 'mcp-writing-servers');
-}
-
-/**
- * Clone or pull MCP servers repository
- */
-async function cloneOrPullMCPRepo(progressCallback?: ProgressCallback): Promise<string> {
-  const repoDir = getMCPRepoDirectory();
-  const mcpDir = getMCPWorkingDirectory();
-
-  await fs.ensureDir(mcpDir);
+async function cloneOrPullRepository(
+  repoUrl: string, 
+  targetDir: string, 
+  branch: string = 'main',
+  progressCallback?: ProgressCallback,
+  stepPrefix: string = 'git'
+): Promise<string> {
+  
+  await fs.ensureDir(path.dirname(targetDir));
 
   try {
-    if (await fs.pathExists(path.join(repoDir, '.git'))) {
+    if (await fs.pathExists(path.join(targetDir, '.git'))) {
       // Repository exists, pull latest
-      logWithCategory('info', LogCategory.SYSTEM, 'Pulling latest MCP servers code...');
+      logWithCategory('info', LogCategory.SYSTEM, `Pulling latest code from ${repoUrl}...`);
       progressCallback?.({
-        message: 'Pulling latest code from GitHub...',
-        percent: 20,
-        step: 'git-pull',
+        message: `Pulling updates from ${repoUrl}...`,
+        percent: 20, // Relative progress
+        step: `${stepPrefix}-pull`,
         status: 'downloading',
       });
 
-      await execAsync(`git pull origin ${MCP_SERVERS_BRANCH}`, { cwd: repoDir });
+      // Try pulling
+      try {
+        await execAsync(`git pull origin ${branch}`, { cwd: targetDir });
+      } catch (e) {
+         // Fallback: try checkout branch if pull failed, or just fetch
+         logger.warn(`Git pull failed, trying fetch: ${e}`);
+         await execAsync(`git fetch origin`, { cwd: targetDir });
+         await execAsync(`git reset --hard origin/${branch}`, { cwd: targetDir });
+      }
+      
     } else {
       // Clone fresh
-      logWithCategory('info', LogCategory.SYSTEM, 'Cloning MCP servers repository...');
+      logWithCategory('info', LogCategory.SYSTEM, `Cloning repository ${repoUrl}...`);
       progressCallback?.({
-        message: 'Cloning repository from GitHub...',
-        percent: 20,
-        step: 'git-clone',
+        message: `Cloning ${repoUrl}...`,
+        percent: 20, // Relative progress
+        step: `${stepPrefix}-clone`,
         status: 'downloading',
       });
 
       // Remove directory if it exists but isn't a git repo
-      if (await fs.pathExists(repoDir)) {
-        await fs.remove(repoDir);
+      if (await fs.pathExists(targetDir)) {
+        await fs.remove(targetDir);
       }
 
       await execAsync(
-        `git clone --depth 1 --branch ${MCP_SERVERS_BRANCH} ${MCP_SERVERS_REPO_URL} "${repoDir}"`,
-        { cwd: mcpDir }
+        `git clone --depth 1 --branch ${branch} ${repoUrl} "${targetDir}"`,
+        { cwd: path.dirname(targetDir) } // Clone parent dir
       );
     }
 
     // Get commit SHA
-    const { stdout } = await execAsync('git rev-parse HEAD', { cwd: repoDir });
+    const { stdout } = await execAsync('git rev-parse HEAD', { cwd: targetDir });
     const sha = stdout.trim();
 
-    logWithCategory('info', LogCategory.SYSTEM, `Repository at commit: ${sha}`);
+    logWithCategory('info', LogCategory.SYSTEM, `Repository ${path.basename(targetDir)} at commit: ${sha}`);
     return sha;
 
   } catch (error: any) {
-    logger.error('Error cloning/pulling MCP repository:', error);
-    throw new Error(`Failed to download MCP servers: ${error.message}`);
+    logger.error(`Error cloning/pulling repository ${repoUrl}:`, error);
+    throw new Error(`Failed to update repository: ${error.message}`);
   }
 }
 
@@ -399,7 +457,7 @@ async function cloneOrPullMCPRepo(progressCallback?: ProgressCallback): Promise<
  * Build MCP servers Docker image
  */
 async function buildMCPServersImage(progressCallback?: ProgressCallback): Promise<void> {
-  const repoDir = getMCPRepoDirectory();
+  const repoDir = getRepositoryDirectory('mcp-servers');
 
   try {
     logWithCategory('info', LogCategory.SYSTEM, 'Building MCP servers Docker image...');
@@ -484,7 +542,7 @@ async function rollbackToBackup(): Promise<void> {
 }
 
 /**
- * Update MCP Servers
+ * Update MCP Servers and Custom Clients
  */
 export async function updateMCPServers(progressCallback?: ProgressCallback): Promise<UpdateResult> {
   logWithCategory('info', LogCategory.SYSTEM, 'Starting MCP Servers update...');
@@ -517,17 +575,69 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
 
     await backupCurrentImage();
 
-    // 3. Clone/pull latest code
+    // 3. Clone/pull MCP Servers Code
     progressCallback?.({
-      message: 'Downloading latest code...',
-      percent: 20,
-      step: 'download',
+      message: 'Downloading MCP Servers code...',
+      percent: 15,
+      step: 'download-core',
       status: 'downloading',
     });
 
-    const sha = await cloneOrPullMCPRepo(progressCallback);
+    const mcpRepoDir = getRepositoryDirectory('mcp-servers');
+    const sha = await cloneOrPullRepository(
+        MCP_SERVERS_REPO_URL, 
+        mcpRepoDir, 
+        MCP_SERVERS_BRANCH, 
+        progressCallback,
+        'mcp-servers'
+    );
 
-    // 4. Build new Docker image
+    // 3.5 Clone/pull Custom Clients
+    const selectedClients = await clientSelection.loadClientSelection();
+    const availableClients = await clientSelection.getAvailableClients();
+    const metadata = await loadMetadata();
+    metadata.customClients = metadata.customClients || {};
+
+    if (selectedClients?.clients) {
+        let clientIdx = 0;
+        for (const clientId of selectedClients.clients) {
+            const client = availableClients.find(c => c.id === clientId);
+            if (client && client.repoUrl && client.isCustom) {
+                clientIdx++;
+                progressCallback?.({
+                    message: `Downloading ${client.name}...`,
+                    percent: 15 + (clientIdx * 2),
+                    step: `download-${client.id}`,
+                    status: 'downloading',
+                });
+                
+                try {
+                    const clientDir = getRepositoryDirectory(client.id);
+                    // Determine branch? Default to main for now.
+                    const clientSha = await cloneOrPullRepository(
+                        client.repoUrl,
+                        clientDir,
+                        'main', 
+                        undefined, // don't clutter progress with details
+                        client.id
+                    );
+                    
+                    // Update metadata for this client
+                    metadata.customClients[client.id] = {
+                        sha: clientSha,
+                        updatedAt: new Date().toISOString(),
+                        repoUrl: client.repoUrl
+                    };
+                } catch (e) {
+                    logger.error(`Failed to update custom client ${client.name}:`, e);
+                    // Continue with other clients, don't fail entire update for one custom repo
+                }
+            }
+        }
+    }
+
+    // 4. Build new Docker image (Core MCP Only)
+    // NOTE: Custom clients are currently just cloned, not built into the image unless we change the Dockerfile
     progressCallback?.({
       message: 'Building Docker image...',
       percent: 50,
@@ -545,7 +655,7 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
       status: 'updating',
     });
 
-    const metadata = await loadMetadata();
+    // Update core metadata
     metadata.mcpServers = {
       sha,
       updatedAt: new Date().toISOString(),
@@ -590,7 +700,7 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
       }
     }
 
-    // 7. Run Database Migrations
+    // 7. Run Database Migrations (Defined in database-migrator.ts)
     progressCallback?.({
       message: 'Running database migrations...',
       percent: 95,
@@ -598,9 +708,10 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
       status: 'updating',
     });
 
+
     try {
       // We must ensure the repository directory is correct for the migrator
-      const repoDir = getMCPRepoDirectory();
+      const repoDir = getRepositoryDirectory('mcp-servers');
       const migrator = new DatabaseMigrator(repoDir);
       
       const migrationResult = await migrator.runMigrations((msg, prog) => {
