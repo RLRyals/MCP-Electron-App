@@ -1089,13 +1089,15 @@ export class LogsTab {
    * Parse a log line into a LogEntry
    */
   private parseLogLine(line: string): LogEntry | null {
+    if (typeof line !== 'string') return null;
+
     // Try to parse as JSON first (structured logging)
     try {
       const parsed = JSON.parse(line);
       return {
         timestamp: parsed.timestamp || new Date().toISOString(),
         level: parsed.level || 'info',
-        message: parsed.message || line,
+        message: typeof parsed.message === 'string' ? parsed.message : line,
         source: parsed.source || 'application'
       };
     } catch {
@@ -1104,8 +1106,8 @@ export class LogsTab {
       const levelMatch = line.match(/\\[(ERROR|WARN|INFO|DEBUG)\\]/i);
 
       return {
-        timestamp: timestampMatch ? timestampMatch[1] : new Date().toISOString(),
-        level: levelMatch ? levelMatch[1].toLowerCase() as any : 'info',
+        timestamp: timestampMatch && timestampMatch[1] ? timestampMatch[1] : new Date().toISOString(),
+        level: (levelMatch && levelMatch[1]) ? levelMatch[1].toLowerCase() as any : 'info',
         message: line,
         source: 'application'
       };
