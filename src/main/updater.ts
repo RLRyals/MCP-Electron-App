@@ -13,6 +13,7 @@ import logger, { logWithCategory, LogCategory } from './logger';
 import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpSystem from './mcp-system';
 import { checkDockerRunning } from './prerequisites';
+import { DatabaseMigrator } from './database-migrator';
 
 const execAsync = promisify(exec);
 
@@ -589,7 +590,53 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
       }
     }
 
-    // 7. Complete
+    // 7. Run Database Migrations
+    progressCallback?.({
+      message: 'Running database migrations...',
+      percent: 95,
+      step: 'migrations',
+      status: 'updating',
+    });
+
+    try {
+      // We must ensure the repository directory is correct for the migrator
+      const repoDir = getMCPRepoDirectory();
+      const migrator = new DatabaseMigrator(repoDir);
+      
+      const migrationResult = await migrator.runMigrations((msg, prog) => {
+        // Map 0-100 progress to 95-99% overall
+        const scaledProgress = 95 + (prog * 0.04);
+        progressCallback?.({
+          message: msg,
+          percent: scaledProgress,
+          step: 'migrations',
+          status: 'updating'
+        });
+      });
+
+      if (!migrationResult.success) {
+         logWithCategory('error', LogCategory.SYSTEM, 'Migration failed', migrationResult.error);
+         // Note: We don't rollback for migration failures yet, as that's complex. 
+         // We warn the user instead.
+         return {
+           success: false,
+           message: `Update finished but migrations failed: ${migrationResult.error}. System may be unstable.`,
+           error: migrationResult.error
+         };
+      }
+      
+      logWithCategory('info', LogCategory.SYSTEM, `Migrations executed: ${migrationResult.executed.length}`);
+      
+    } catch (migrationError: any) {
+        logWithCategory('error', LogCategory.SYSTEM, 'Migration error', migrationError);
+         return {
+           success: false,
+           message: `Update finished but migrations failed: ${migrationError.message}.`,
+           error: migrationError.message
+         };
+    }
+
+    // 8. Complete
     progressCallback?.({
       message: 'Update complete!',
       percent: 100,
