@@ -204,7 +204,8 @@ export class DatabaseMigrator {
     await this.executeSql(sqlContent);
 
     // Record as executed
-    await this.executeSql(`INSERT INTO migrations (name) VALUES ('${migration.filename}');`);
+    // This is handled by the SQL file itself, so we don't need to do it here.
+    // await this.executeSql(`INSERT INTO migrations (filename) VALUES ('${migration.filename}');`);
   }
 
   /**
