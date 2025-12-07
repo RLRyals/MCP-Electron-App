@@ -648,6 +648,23 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
 
     await buildMCPServersImage(progressCallback);
 
+    // Force removal of old running containers to ensure fresh start with new image
+    // This is critical when Dockerfile changes (e.g., new ports exposed)
+    progressCallback?.({
+      message: 'Preparing for restart with new image...',
+      percent: 75,
+      step: 'prepare-restart',
+      status: 'updating',
+    });
+
+    try {
+      // Stop any running containers first
+      await mcpSystem.stopExistingContainers();
+      logWithCategory('info', LogCategory.SYSTEM, 'Stopped existing containers to prepare for new image');
+    } catch (error) {
+      logger.warn('Failed to stop existing containers (may be safe to ignore):', error);
+    }
+
     // 5. Update metadata
     progressCallback?.({
       message: 'Updating metadata...',

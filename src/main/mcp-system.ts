@@ -410,6 +410,61 @@ async function killProcessOnPort(port: number): Promise<boolean> {
 }
 
 /**
+ * Attempt to start Docker Desktop
+ * Returns true if Docker was started successfully or is already running
+ */
+async function startDockerDesktop(): Promise<boolean> {
+  try {
+    let command: string;
+    
+    switch (process.platform) {
+      case 'win32':
+        // Windows: Start Docker Desktop
+        command = 'powershell -Command "Start-Process \\"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\\""';
+        break;
+      case 'darwin':
+        // macOS: Open Docker.app
+        command = 'open -a Docker';
+        break;
+      case 'linux':
+        // Linux: Try to start docker service
+        command = 'sudo systemctl start docker';
+        break;
+      default:
+        logWithCategory('warn', LogCategory.DOCKER, `Unsupported platform for auto-start: ${process.platform}`);
+        return false;
+    }
+    
+    logWithCategory('info', LogCategory.DOCKER, `Attempting to start Docker Desktop: ${command}`);
+    await execAsync(command, { timeout: 10000 });
+    
+    // Wait for Docker to actually start (up to 30 seconds)
+    const maxWaitTime = 30000;
+    const checkInterval = 2000;
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitTime) {
+      const dockerStatus = await checkDockerRunning();
+      if (dockerStatus.running) {
+        logWithCategory('info', LogCategory.DOCKER, 'Docker Desktop started successfully');
+        return true;
+      }
+      
+      logWithCategory('info', LogCategory.DOCKER, 'Waiting for Docker to be ready...');
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    }
+    
+    logWithCategory('warn', LogCategory.DOCKER, 'Docker Desktop did not become ready within 30 seconds');
+    return false;
+    
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker Desktop', error);
+    return false;
+  }
+}
+
+
+/**
  * Stop existing containers to release ports - AGGRESSIVE cleanup
  */
 export async function stopExistingContainers(): Promise<void> {
@@ -892,13 +947,32 @@ export async function startMCPSystem(
 
     const dockerStatus = await checkDockerRunning();
     if (!dockerStatus.running) {
-      logWithCategory('error', LogCategory.DOCKER, 'Docker is not running');
-      return {
-        success: false,
-        message: 'Docker is not running. Please start Docker Desktop first.',
-        error: 'DOCKER_NOT_RUNNING',
-      };
+      logWithCategory('warn', LogCategory.DOCKER, 'Docker is not running, attempting to start...');
+      
+      if (progressCallback) {
+        progressCallback({
+          message: 'Starting Docker Desktop...',
+          percent: 7,
+          step: 'start-docker',
+          status: 'starting',
+        });
+      }
+
+      // Attempt to start Docker
+      const dockerStarted = await startDockerDesktop();
+      
+      if (!dockerStarted) {
+        logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker');
+        return {
+          success: false,
+          message: 'Docker is not running and could not be started automatically. Please start Docker Desktop manually and try again.',
+          error: 'DOCKER_NOT_RUNNING',
+        };
+      }
+      
+      logWithCategory('info', LogCategory.DOCKER, 'Docker started successfully');
     }
+
 
     // Verify environment configuration is valid before starting
     const config = await envConfig.loadEnvConfig();
