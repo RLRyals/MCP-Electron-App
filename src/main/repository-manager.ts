@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
 import logger, { logWithCategory, LogCategory } from './logger';
-import { checkGit } from './prerequisites';
+import { checkGit, getFixedEnv } from './prerequisites';
 import { getGitHubCredentialManager, sanitizeUrlForLogging } from './github-credential-manager';
 import {
   CloneOptions,
@@ -25,7 +25,14 @@ import {
 } from '../utils/error-handler';
 import { RetryStrategy, RetryOptions } from '../utils/retry-strategy';
 
-const execAsync = promisify(exec);
+const promisifiedExec = promisify(exec);
+const execAsync = async (command: string, options: any = {}): Promise<{ stdout: string; stderr: string }> => {
+  return promisifiedExec(command, {
+    ...options,
+    encoding: 'utf8',
+    env: getFixedEnv(),
+  }) as unknown as Promise<{ stdout: string; stderr: string }>;
+};
 
 /**
  * RepositoryManager class for managing Git repository operations
@@ -461,7 +468,7 @@ export class RepositoryManager {
         shell: false,
         windowsHide: true,
         env: {
-          ...process.env,
+          ...getFixedEnv(),
           ...credentialEnv,
         },
       });

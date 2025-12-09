@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
+import { getPlatform, getFixedEnv } from './prerequisites';
 import { LogCategory, logWithCategory } from './logger';
 import {
   BuildError,
@@ -17,7 +18,14 @@ import {
 } from '../utils/error-handler';
 import { RetryStrategy } from '../utils/retry-strategy';
 
-const execAsync = promisify(exec);
+const promisifiedExec = promisify(exec);
+const execAsync = async (command: string, options: any = {}): Promise<{ stdout: string; stderr: string }> => {
+  return promisifiedExec(command, {
+    ...options,
+    encoding: 'utf8',
+    env: getFixedEnv(),
+  }) as unknown as Promise<{ stdout: string; stderr: string }>;
+};
 
 /**
  * Progress callback for image loading operations
@@ -297,10 +305,10 @@ async function executeImageLoad(
     // We use spawn to have better control over the process
     return await new Promise<void>((resolve, reject) => {
       // Create gunzip process
-      const gunzip = spawn('gunzip', ['-c', imagePath]);
+      const gunzip = spawn('gunzip', ['-c', imagePath], { env: getFixedEnv() });
 
       // Create docker load process
-      const dockerLoad = spawn('docker', ['load']);
+      const dockerLoad = spawn('docker', ['load'], { env: getFixedEnv() });
 
       let output = '';
       let errorOutput = '';

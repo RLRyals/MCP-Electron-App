@@ -8,6 +8,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LogCategory, logWithCategory, logError } from './logger';
+import { getFixedEnv } from './prerequisites';
 import {
   BuildStep,
   BuildStepType,
@@ -659,7 +660,7 @@ export class BuildOrchestrator {
 
       // Merge environment variables
       const processEnv = {
-        ...process.env,
+        ...getFixedEnv(),
         ...env,
       };
 

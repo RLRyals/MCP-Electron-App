@@ -66,7 +66,7 @@ export async function generatePgBouncerConfig(config: EnvConfig): Promise<{
 
 [pgbouncer]
 listen_addr = *
-listen_port = 6432
+listen_port = ${config.PGBOUNCER_PORT}
 auth_type = scram-sha-256
 auth_file = /etc/pgbouncer/userlist.txt
 admin_users = ${config.POSTGRES_USER}

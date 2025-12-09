@@ -526,7 +526,8 @@ function applySuggestedConfig(config: any) {
         { id: 'mcp-port', key: 'MCP_CONNECTOR_PORT' },
         { id: 'http-port', key: 'HTTP_SSE_PORT' },
         { id: 'db-admin-port', key: 'DB_ADMIN_PORT' },
-        { id: 'typing-mind-port', key: 'TYPING_MIND_PORT' }
+        { id: 'typing-mind-port', key: 'TYPING_MIND_PORT' },
+        { id: 'pgbouncer-port', key: 'PGBOUNCER_PORT' }
     ];
 
     fields.forEach(field => {
@@ -600,9 +601,15 @@ function createEnvironmentConfigForm(config: any): string {
                     <input type="number" id="db-admin-port" value="${config.DB_ADMIN_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
                 </div>
 
+
                 <div>
                     <label style="display: block; margin-bottom: 8px; font-weight: 500;">Typing Mind Port</label>
                     <input type="number" id="typing-mind-port" value="${config.TYPING_MIND_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
+                </div>
+
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">PgBouncer Port</label>
+                    <input type="number" id="pgbouncer-port" value="${config.PGBOUNCER_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
                 </div>
             </div>
 
@@ -652,7 +659,8 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             HTTP_SSE_PORT: parseInt((document.getElementById('http-sse-port') as HTMLInputElement).value),
             DB_ADMIN_PORT: parseInt((document.getElementById('db-admin-port') as HTMLInputElement).value),
             MCP_AUTH_TOKEN: '', // Will be auto-generated
-            TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value)
+            TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value),
+            PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value)
         };
 
         // Get current config to check if credentials already exist

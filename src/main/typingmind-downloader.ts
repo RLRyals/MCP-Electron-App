@@ -10,10 +10,17 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
 import logger, { logWithCategory, LogCategory } from './logger';
-import { checkGit } from './prerequisites';
+import { checkGit, getFixedEnv } from './prerequisites';
 import { getClientById } from './client-selection';
 
-const execAsync = promisify(exec);
+const promisifiedExec = promisify(exec);
+const execAsync = async (command: string, options: any = {}): Promise<{ stdout: string; stderr: string }> => {
+  return promisifiedExec(command, {
+    ...options,
+    encoding: 'utf8',
+    env: getFixedEnv(),
+  }) as unknown as Promise<{ stdout: string; stderr: string }>;
+};
 
 /**
  * Progress callback for download updates
@@ -216,6 +223,7 @@ async function executeGitCommand(
       cwd,
       shell: false,
       windowsHide: true,
+      env: getFixedEnv(),
     });
 
     activeProcess = child;

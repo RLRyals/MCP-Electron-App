@@ -1,8 +1,8 @@
-
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getFixedEnv } from './prerequisites';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
 
@@ -240,7 +240,7 @@ export class DatabaseMigrator {
       }
 
       const { spawn } = require('child_process');
-      const child = spawn('docker', args);
+      const child = spawn('docker', args, { env: getFixedEnv() });
       
       let stdout = '';
       let stderr = '';

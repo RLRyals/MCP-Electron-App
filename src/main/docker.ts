@@ -6,10 +6,17 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getPlatform, checkDockerRunning } from './prerequisites';
+import { getPlatform, checkDockerRunning, getFixedEnv } from './prerequisites';
 import { LogCategory, logWithCategory } from './logger';
 
-const execAsync = promisify(exec);
+const promisifiedExec = promisify(exec);
+const execAsync = async (command: string, options: any = {}): Promise<{ stdout: string; stderr: string }> => {
+  return promisifiedExec(command, {
+    ...options,
+    encoding: 'utf8',
+    env: getFixedEnv(),
+  }) as unknown as Promise<{ stdout: string; stderr: string }>;
+};
 
 /**
  * Docker status interface
@@ -66,7 +73,7 @@ export async function startDockerDesktop(
       logWithCategory('info', LogCategory.DOCKER, `Starting Docker Desktop on Windows: ${dockerPath}`);
 
       // Start Docker Desktop without waiting for it to complete
-      exec(`start "" "${dockerPath}"`, { windowsHide: true }, (error) => {
+      exec(`start "" "${dockerPath}"`, { windowsHide: true, env: getFixedEnv() }, (error) => {
         if (error) {
           logWithCategory('warn', LogCategory.DOCKER, `Error starting Docker Desktop: ${error.message}`);
         }
@@ -76,7 +83,7 @@ export async function startDockerDesktop(
       logWithCategory('info', LogCategory.DOCKER, 'Starting Docker Desktop on macOS');
 
       // Start Docker.app on macOS
-      exec('open -a Docker', (error) => {
+      exec('open -a Docker', { env: getFixedEnv() }, (error) => {
         if (error) {
           logWithCategory('warn', LogCategory.DOCKER, `Error starting Docker Desktop: ${error.message}`);
         }

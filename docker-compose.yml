@@ -40,7 +40,7 @@ services:
     networks:
       - mcp-network
     ports:
-      - "6432:6432"
+      - "${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
     volumes:
       - ${DOCKER_DIR}/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ${DOCKER_DIR}/userlist.txt:/etc/pgbouncer/userlist.txt:ro
@@ -94,7 +94,7 @@ services:
       - "3011:3011"  # NPE Server
       - "3012:3012"  # Workflow Manager
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:${PGBOUNCER_PORT}/${POSTGRES_DB}?sslmode=disable
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=2048"
       # Connection pool configuration to prevent exhaustion

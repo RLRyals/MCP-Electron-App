@@ -41,6 +41,7 @@ async function executeCommand(
     const result = await execAsync(command, {
       timeout: timeoutMs,
       windowsHide: true,
+      env: getFixedEnv(),
     });
     return result;
   } catch (error: any) {
@@ -52,6 +53,41 @@ async function executeCommand(
       message: error.message,
     };
   }
+}
+
+/**
+ * Get environment variables with fixed PATH for macOS
+ * Adds common locations for Docker and other tools
+ */
+export function getFixedEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  
+  if (process.platform === 'darwin') {
+    const commonPaths = [
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin'
+    ];
+    
+    // Safety check for existing PATH
+    const currentPath = env.PATH || '';
+    
+    // Add paths if missing, prioritizing them
+    // We rebuild the PATH to ensure our paths come first
+    const newPath = commonPaths.reduce((acc, p) => {
+      // If path is already there, we don't strictly need to add it, 
+      // but prepending ensures we find our tools first.
+      // Simple strategy: Prepend common paths that aren't at the start.
+      return `${p}:${acc}`;
+    }, currentPath);
+    
+    env.PATH = newPath;
+  }
+  
+  return env;
 }
 
 /**
