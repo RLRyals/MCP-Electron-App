@@ -29,6 +29,7 @@ import { createBuildOrchestrator } from './build-orchestrator';
 import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipeline-orchestrator';
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
 import { pluginManager } from './plugin-manager';
+import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, closeDatabasePool } from './database-connection';
 import type {
   RepositoryCloneRequest,
@@ -381,6 +382,9 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Set main window for plugin view manager
+  pluginViewManager.setMainWindow(mainWindow);
 
   logger.info('Main window created');
 }
@@ -2155,6 +2159,38 @@ function setupIPC(): void {
         error: error.message,
       };
     }
+  });
+
+  // Plugin View IPC handlers
+  ipcMain.handle('plugin:show-view', async (_event, pluginId: string, viewName: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Showing plugin view ${pluginId}:${viewName}`);
+
+    const pluginRegistry = pluginManager.getRegistry();
+    const plugin = pluginRegistry?.getPlugin(pluginId);
+
+    if (!plugin) {
+      throw new Error(`Plugin ${pluginId} not found`);
+    }
+
+    // Get plugin view path
+    const pluginDir = plugin.context.plugin.installPath;
+    const viewPath = path.join(pluginDir, 'dist', 'renderer', 'index.html');
+
+    await pluginViewManager.showPluginView({
+      pluginId,
+      viewName,
+      url: viewPath,
+    });
+  });
+
+  ipcMain.handle('plugin:hide-view', (_event, pluginId: string, viewName: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Hiding plugin view ${pluginId}:${viewName}`);
+    pluginViewManager.hidePluginView(pluginId, viewName);
+  });
+
+  ipcMain.handle('plugin:close-view', (_event, pluginId: string, viewName: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing plugin view ${pluginId}:${viewName}`);
+    pluginViewManager.closePluginView(pluginId, viewName);
   });
 
   logger.info('IPC handlers registered');

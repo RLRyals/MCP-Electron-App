@@ -197,10 +197,12 @@ class PluginManager {
                   label: sub.label,
                   accelerator: sub.accelerator,
                   click: () => {
-                    // Send action to plugin
                     logWithCategory('debug', LogCategory.SYSTEM,
                       `Plugin menu action: ${plugin.id} - ${sub.action}`
                     );
+
+                    // Handle plugin menu action
+                    this.handlePluginMenuAction(plugin.id, sub.action || '');
                   },
                 };
               }
@@ -279,6 +281,25 @@ class PluginManager {
   }
 
   /**
+   * Handle a menu action from a plugin
+   */
+  private handlePluginMenuAction(pluginId: string, action: string): void {
+    if (!this.registry) {
+      return;
+    }
+
+    logWithCategory('info', LogCategory.SYSTEM, `Handling plugin action: ${pluginId} -> ${action}`);
+
+    // Send action to renderer to show plugin UI
+    if (this.mainWindow) {
+      this.mainWindow.webContents.send('plugin-action', {
+        pluginId,
+        action,
+      });
+    }
+  }
+
+  /**
    * Get plugin statistics
    */
   getStatistics() {
@@ -287,6 +308,13 @@ class PluginManager {
     }
 
     return this.registry.getStatistics();
+  }
+
+  /**
+   * Get the plugin registry
+   */
+  getRegistry(): PluginRegistry | null {
+    return this.registry;
   }
 
   /**

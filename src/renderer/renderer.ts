@@ -13,6 +13,7 @@ import { createDashboardTab } from './components/DashboardTab.js';
 import { createDefaultLogsTab } from './components/LogsTab.js';
 import { initializeServicesTab } from './components/ServicesTab.js';
 import { createDatabaseTab } from './components/DatabaseTab.js';
+import { initializePluginHandlers } from './plugin-handlers.js';
 
 // Type definitions for the API exposed by preload script
 interface PrerequisiteStatus {
@@ -757,6 +758,9 @@ window.addEventListener('unhandledrejection', (event) => {
  */
 function init(): void {
   console.log('Renderer process initialized');
+
+  // Initialize plugin handlers
+  initializePluginHandlers();
 
   // Initialize tab navigation system
   const tabNavigation = createDefaultTabNavigation();

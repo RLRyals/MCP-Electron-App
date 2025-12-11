@@ -2023,6 +2023,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('pipeline:progress');
     },
   },
+
+  /**
+   * Plugin system API
+   */
+  plugins: {
+    /**
+     * Show a plugin view
+     */
+    showView: (pluginId: string, viewName: string): Promise<void> => {
+      return ipcRenderer.invoke('plugin:show-view', pluginId, viewName);
+    },
+
+    /**
+     * Hide a plugin view
+     */
+    hideView: (pluginId: string, viewName: string): Promise<void> => {
+      return ipcRenderer.invoke('plugin:hide-view', pluginId, viewName);
+    },
+
+    /**
+     * Close a plugin view
+     */
+    closeView: (pluginId: string, viewName: string): Promise<void> => {
+      return ipcRenderer.invoke('plugin:close-view', pluginId, viewName);
+    },
+
+    /**
+     * Listen for plugin action events
+     */
+    onAction: (callback: (data: { pluginId: string; action: string }) => void): void => {
+      ipcRenderer.on('plugin-action', (_event, data) => callback(data));
+    },
+
+    /**
+     * Remove plugin action listener
+     */
+    removeActionListener: (): void => {
+      ipcRenderer.removeAllListeners('plugin-action');
+    },
+  },
 });
 
 console.log('Preload script loaded successfully');
