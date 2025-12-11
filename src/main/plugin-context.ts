@@ -29,8 +29,8 @@ import {
   MCPServerInfo,
   FileStats,
   DockerContainer,
-  MenuItem,
-  Notification,
+  PluginMenuItem,
+  PluginNotification,
   DialogOptions,
   DialogResult,
   PluginError,
@@ -46,8 +46,8 @@ export function createPluginContext(
   manifest: PluginManifest,
   installPath: string,
   dbPool: Pool,
-  onMenuItemRegister?: (pluginId: string, item: MenuItem) => void,
-  onNotification?: (notification: Notification) => void
+  onMenuItemRegister?: (pluginId: string, item: PluginMenuItem) => void,
+  onNotification?: (notification: PluginNotification) => void
 ): PluginContext {
   const permissions = manifest.permissions || {};
   const dataPath = path.join(app.getPath('userData'), 'plugins', pluginId);
@@ -569,7 +569,7 @@ function createPluginUI(
   const registeredMenuItems: string[] = [];
 
   return {
-    registerMenuItem(item: MenuItem): void {
+    registerMenuItem(item: PluginMenuItem): void {
       registeredMenuItems.push(item.id);
       if (onMenuItemRegister) {
         onMenuItemRegister(pluginId, item);
@@ -589,7 +589,7 @@ function createPluginUI(
       // Implementation would show the view in the main window
     },
 
-    showNotification(notification: Notification): void {
+    showNotification(notification: PluginNotification): void {
       if (onNotification) {
         onNotification(notification);
       }
@@ -648,7 +648,7 @@ function createPluginConfigStorage(pluginId: string, dataPath: string): PluginCo
 
   return {
     get<T = any>(key: string, defaultValue?: T): T {
-      return config[key] !== undefined ? config[key] : defaultValue;
+      return config[key] !== undefined ? config[key] : (defaultValue as T);
     },
 
     async set(key: string, value: any): Promise<void> {
@@ -693,7 +693,8 @@ function createPluginLogger(pluginId: string): PluginLogger {
 
     error(message: string | Error, ...args: any[]): void {
       if (message instanceof Error) {
-        logWithCategory('error', LogCategory.SYSTEM, `${prefix} ${message.message}`, message, ...args);
+        const additionalArgs: any[] = [message, ...args];
+        logWithCategory('error', LogCategory.SYSTEM, `${prefix} ${message.message}`, ...additionalArgs);
       } else {
         logWithCategory('error', LogCategory.SYSTEM, `${prefix} ${message}`, ...args);
       }

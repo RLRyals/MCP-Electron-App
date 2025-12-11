@@ -7,7 +7,6 @@
 
 import { EventEmitter } from 'events';
 import { Pool } from 'pg';
-import { MenuItem, Notification } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 import { PluginLoader } from './plugin-loader';
 import { createPluginContext } from './plugin-context';
@@ -20,6 +19,8 @@ import {
   PluginDiscoveryResult,
   PluginLoadOptions,
   PluginContext,
+  PluginMenuItem,
+  PluginNotification,
 } from '../types/plugin-api';
 
 /**
@@ -30,8 +31,8 @@ export interface PluginRegistryEvents {
   'plugin-activated': (pluginId: string, plugin: PluginState) => void;
   'plugin-deactivated': (pluginId: string) => void;
   'plugin-error': (pluginId: string, error: Error) => void;
-  'menu-item-registered': (pluginId: string, item: MenuItem) => void;
-  'notification': (pluginId: string, notification: Notification) => void;
+  'menu-item-registered': (pluginId: string, item: PluginMenuItem) => void;
+  'notification': (pluginId: string, notification: PluginNotification) => void;
 }
 
 /**
@@ -466,7 +467,7 @@ export class PluginRegistry extends EventEmitter {
   /**
    * Handle menu item registration from plugins
    */
-  private handleMenuItemRegistered(pluginId: string, item: MenuItem): void {
+  private handleMenuItemRegistered(pluginId: string, item: PluginMenuItem): void {
     const state = this.plugins.get(pluginId);
     if (state) {
       state.menuItems.push(item.id);
@@ -478,7 +479,7 @@ export class PluginRegistry extends EventEmitter {
   /**
    * Handle notification from plugins
    */
-  private handleNotification(pluginId: string, notification: Notification): void {
+  private handleNotification(pluginId: string, notification: PluginNotification): void {
     this.emit('notification', pluginId, notification);
   }
 

@@ -11,8 +11,8 @@ import { PluginRegistry } from './plugin-registry';
 import { getDatabasePool, initializeDatabasePool } from './database-connection';
 import {
   PluginState,
-  Notification,
-  MenuItem,
+  PluginNotification,
+  PluginMenuItem,
 } from '../types/plugin-api';
 
 /**
@@ -136,7 +136,7 @@ class PluginManager {
   /**
    * Show a notification from a plugin
    */
-  private showPluginNotification(pluginId: string, notification: Notification): void {
+  private showPluginNotification(pluginId: string, notification: PluginNotification): void {
     if (!this.mainWindow) {
       return;
     }

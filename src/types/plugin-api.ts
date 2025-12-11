@@ -484,7 +484,7 @@ export interface PluginUI {
    * Register a menu item
    * @param item Menu item configuration
    */
-  registerMenuItem(item: MenuItem): void;
+  registerMenuItem(item: PluginMenuItem): void;
 
   /**
    * Remove a menu item
@@ -502,7 +502,7 @@ export interface PluginUI {
    * Show a notification
    * @param notification Notification configuration
    */
-  showNotification(notification: Notification): void;
+  showNotification(notification: PluginNotification): void;
 
   /**
    * Show a dialog
@@ -520,13 +520,13 @@ export interface PluginUI {
 }
 
 /**
- * Menu Item
+ * Plugin Menu Item
  */
-export interface MenuItem {
+export interface PluginMenuItem {
   id: string;
   label: string;
   click?: () => void;
-  submenu?: MenuItem[];
+  submenu?: PluginMenuItem[];
   accelerator?: string;
   role?: string;
   type?: 'normal' | 'separator' | 'checkbox' | 'radio';
@@ -535,9 +535,9 @@ export interface MenuItem {
 }
 
 /**
- * Notification
+ * Plugin Notification
  */
-export interface Notification {
+export interface PluginNotification {
   type: 'info' | 'success' | 'warning' | 'error';
   message: string;
   title?: string;
