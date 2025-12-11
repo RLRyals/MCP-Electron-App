@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getFixedEnv } from '../prerequisites';
 
 const execAsync = promisify(exec);
 
@@ -97,12 +98,12 @@ async function checkDocker(): Promise<SystemInfo['docker']> {
 
     // Check Docker Compose version
     try {
-      const { stdout: composeVersion } = await execAsync('docker compose version');
+      const { stdout: composeVersion } = await execAsync('docker compose version', { env: getFixedEnv() });
       dockerInfo.composeVersion = composeVersion.trim();
     } catch (error) {
       // Docker Compose not installed or different version
       try {
-        const { stdout: composeVersion } = await execAsync('docker compose version');
+        const { stdout: composeVersion } = await execAsync('docker compose version', { env: getFixedEnv() });
         dockerInfo.composeVersion = composeVersion.trim();
       } catch (error2) {
         dockerInfo.composeVersion = 'Not installed';
@@ -170,6 +171,7 @@ export async function getDockerLogs(projectPath?: string): Promise<string> {
     const { stdout } = await execAsync('docker compose logs --tail=100', {
       cwd,
       timeout: 10000,
+      env: getFixedEnv(),
     });
     return stdout;
   } catch (error) {

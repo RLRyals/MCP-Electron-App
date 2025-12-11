@@ -11,6 +11,7 @@ import * as path from 'path';
 import { app, dialog } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
+import { getFixedEnv } from './prerequisites';
 
 const execAsync = promisify(exec);
 
@@ -132,7 +133,7 @@ export async function createBackup(
       maxBuffer: 100 * 1024 * 1024, // 100MB buffer
       timeout: 300000, // 5 minutes timeout
       env: {
-        ...process.env,
+        ...getFixedEnv(),
         PGPASSWORD: password,
       },
     });
@@ -202,7 +203,7 @@ export async function restoreBackup(
     const containerBackupPath = `/tmp/${path.basename(backupPath)}`;
     logWithCategory('info', LogCategory.SYSTEM, `Copying backup to container: ${containerBackupPath}`);
 
-    await execAsync(`docker cp "${backupPath}" ${containerName}:${containerBackupPath}`);
+    await execAsync(`docker cp "${backupPath}" ${containerName}:${containerBackupPath}`, { env: getFixedEnv() });
 
     // If drop existing flag is set, drop and recreate the database
     if (dropExisting) {
@@ -211,19 +212,19 @@ export async function restoreBackup(
       // Terminate all connections to the database
       const terminateCmd = `docker exec ${containerName} psql -U ${user} -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${database}' AND pid <> pg_backend_pid();"`;
       await execAsync(terminateCmd, {
-        env: { ...process.env, PGPASSWORD: password },
+        env: { ...getFixedEnv(), PGPASSWORD: password },
       });
 
       // Drop database
       const dropCmd = `docker exec ${containerName} dropdb -U ${user} --if-exists ${database}`;
       await execAsync(dropCmd, {
-        env: { ...process.env, PGPASSWORD: password },
+        env: { ...getFixedEnv(), PGPASSWORD: password },
       });
 
       // Recreate database
       const createCmd = `docker exec ${containerName} createdb -U ${user} ${database}`;
       await execAsync(createCmd, {
-        env: { ...process.env, PGPASSWORD: password },
+        env: { ...getFixedEnv(), PGPASSWORD: password },
       });
 
       logWithCategory('info', LogCategory.SYSTEM, 'Database recreated successfully');
@@ -246,7 +247,7 @@ export async function restoreBackup(
       maxBuffer: 100 * 1024 * 1024, // 100MB buffer
       timeout: 600000, // 10 minutes timeout
       env: {
-        ...process.env,
+        ...getFixedEnv(),
         PGPASSWORD: password,
       },
     });
@@ -261,7 +262,7 @@ export async function restoreBackup(
 
     // Clean up: remove backup file from container
     try {
-      await execAsync(`docker exec ${containerName} rm ${containerBackupPath}`);
+      await execAsync(`docker exec ${containerName} rm ${containerBackupPath}`, { env: getFixedEnv() });
     } catch (cleanupError) {
       logWithCategory('warn', LogCategory.SYSTEM, 'Failed to clean up temporary backup file in container');
     }

@@ -115,7 +115,7 @@ export class DatabaseMigrator {
    */
   private async checkDatabaseReady(): Promise<boolean> {
     try {
-      await execAsync(`docker exec ${this.containerName} pg_isready -U ${this.dbUser}`);
+      await execAsync(`docker exec ${this.containerName} pg_isready -U ${this.dbUser}`, { env: getFixedEnv() });
       return true;
     } catch (error) {
       logWithCategory('warn', LogCategory.SYSTEM, 'Database container not ready or pg_isready failed');

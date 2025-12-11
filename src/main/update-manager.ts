@@ -7,6 +7,7 @@ import * as path from 'path';
 import logger, { logWithCategory, LogCategory } from './logger';
 import { RepositoryManager } from './repository-manager';
 import Docker from 'dockerode';
+import { getFixedEnv } from './prerequisites';
 
 export interface UpdateCheckResult {
   repositories: {
@@ -284,7 +285,7 @@ export class UpdateManager {
     logWithCategory('info', LogCategory.GENERAL, 'Stopping Docker services');
 
     try {
-      await execAsync('docker compose down', { cwd: this.basePath });
+      await execAsync('docker compose down', { cwd: this.basePath, env: getFixedEnv() });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       logWithCategory('warn', LogCategory.GENERAL, `Error stopping services: ${errorMsg}`);
@@ -301,7 +302,7 @@ export class UpdateManager {
 
     logWithCategory('info', LogCategory.GENERAL, 'Starting Docker services');
 
-    await execAsync('docker compose up -d', { cwd: this.basePath });
+    await execAsync('docker compose up -d', { cwd: this.basePath, env: getFixedEnv() });
   }
 
   /**

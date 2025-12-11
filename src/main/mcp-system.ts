@@ -16,7 +16,7 @@ import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
 import * as pgbouncerConfig from './pgbouncer-config';
-import { checkDockerRunning } from './prerequisites';
+import { checkDockerRunning, getFixedEnv } from './prerequisites';
 
 const execAsync = promisify(exec);
 
@@ -725,14 +725,16 @@ async function execDockerCompose(
     const mcpConfigPath = mcpConfigGenerator.getMCPConfigPath();
 
     // Pass environment variables through the env option (cross-platform compatible)
+    // Use getFixedEnv() to ensure PATH includes common locations for docker on macOS
     const result = await execAsync(fullCommand, {
       cwd: workingDir,
       env: {
-        ...process.env, // Include existing environment variables
+        ...getFixedEnv(), // Use fixed environment with proper PATH for macOS
         POSTGRES_DB: config.POSTGRES_DB,
         POSTGRES_USER: config.POSTGRES_USER,
         POSTGRES_PASSWORD: config.POSTGRES_PASSWORD,
         POSTGRES_PORT: String(config.POSTGRES_PORT),
+        PGBOUNCER_PORT: String(config.PGBOUNCER_PORT),
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
         HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
         DB_ADMIN_PORT: String(config.DB_ADMIN_PORT),
