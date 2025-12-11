@@ -26,15 +26,23 @@ function createClientSelectionCards(clients: any[], selectedClients: string[]): 
         const isSelected = selectedClients.includes(client.id);
         const isCustom = client.isCustom;
         
+        const clientTypeIcon = client.type === 'web-based' ? '🌐' : (client.type === 'electron-app' ? '⚡' : '💻');
+        const clientTypeLabel = client.type === 'web-based' ? 'Web Application' : (client.type === 'electron-app' ? 'Electron Application' : 'Desktop Application');
+
         html += `
         <div class="prereq-card ${isSelected ? 'success' : ''}" data-client-id="${client.id}" style="position: relative;">
             <div class="prereq-header">
-                <div class="prereq-icon">${client.type === 'web-based' ? '🌐' : '💻'}</div>
+                <div class="prereq-icon">${clientTypeIcon}</div>
                 <div style="flex: 1;">
                     <div class="prereq-title">${client.name}</div>
-                    <div class="prereq-status">${client.type === 'web-based' ? 'Web Application' : 'Desktop Application'}</div>
+                    <div class="prereq-status">${clientTypeLabel}</div>
                 </div>
                 <div class="client-actions" style="display: flex; gap: 5px;">
+                    ${client.type === 'electron-app' && client.executablePath ? `
+                    <button class="icon-btn launch-client-btn" data-id="${client.id}" title="Launch Application" style="background: none; border: none; cursor: pointer; color: #4CAF50; font-size: 1.2rem;">
+                        ▶️
+                    </button>
+                    ` : ''}
                     <button class="icon-btn edit-client-btn" data-id="${client.id}" title="Edit Configuration" style="background: none; border: none; cursor: pointer; color: #aaa;">
                         ✏️
                     </button>
@@ -88,8 +96,20 @@ function createClientSelectionCards(clients: any[], selectedClients: string[]): 
                         <input type="text" id="client-name-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
                     </div>
                     <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px;">Type</label>
+                        <select id="client-type-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
+                            <option value="web-based">Web Application</option>
+                            <option value="electron-app">Electron Application</option>
+                            <option value="native">Native Desktop Application</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px;">Repository URL</label>
                         <input type="text" id="client-repo-input" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
+                    </div>
+                    <div style="margin-bottom: 15px;" id="executable-path-container">
+                        <label style="display: block; margin-bottom: 5px;">Executable Path (for Electron apps)</label>
+                        <input type="text" id="client-exec-input" placeholder="e.g. /Applications/BQ-Studio.app or C:\Program Files\BQ-Studio\BQ-Studio.exe" style="width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px;">
                     </div>
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px;">Dependencies (comma separated IDs)</label>
@@ -145,6 +165,45 @@ function setupClientSelectionListeners(
     if (addBtn) {
         addBtn.addEventListener('click', () => showClientModal());
     }
+
+    // Launch buttons
+    container.querySelectorAll('.launch-client-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const clientId = (e.currentTarget as HTMLElement).getAttribute('data-id');
+            if (clientId) {
+                const button = e.currentTarget as HTMLButtonElement;
+                const originalContent = button.innerHTML;
+                button.innerHTML = '⏳';
+                button.disabled = true;
+
+                try {
+                    const result = await (window as any).electronAPI.clientSelection.launchElectronApp(clientId);
+                    if (result.success) {
+                        button.innerHTML = '✅';
+                        setTimeout(() => {
+                            button.innerHTML = originalContent;
+                            button.disabled = false;
+                        }, 2000);
+                    } else {
+                        button.innerHTML = '❌';
+                        alert(`Failed to launch application: ${result.error}`);
+                        setTimeout(() => {
+                            button.innerHTML = originalContent;
+                            button.disabled = false;
+                        }, 2000);
+                    }
+                } catch (error) {
+                    button.innerHTML = '❌';
+                    alert(`Error launching application: ${error}`);
+                    setTimeout(() => {
+                        button.innerHTML = originalContent;
+                        button.disabled = false;
+                    }, 2000);
+                }
+            }
+        });
+    });
 
     // Edit buttons
     container.querySelectorAll('.edit-client-btn').forEach(btn => {
@@ -268,12 +327,25 @@ async function showClientModal(clientId?: string) {
     const modal = document.getElementById('client-modal');
     const title = document.getElementById('modal-title');
     const nameInput = document.getElementById('client-name-input') as HTMLInputElement;
+    const typeInput = document.getElementById('client-type-input') as HTMLSelectElement;
     const repoInput = document.getElementById('client-repo-input') as HTMLInputElement;
+    const execInput = document.getElementById('client-exec-input') as HTMLInputElement;
     const depsInput = document.getElementById('client-deps-input') as HTMLInputElement;
     const descInput = document.getElementById('client-desc-input') as HTMLTextAreaElement;
     const saveBtn = document.getElementById('modal-save-btn');
 
-    if (!modal || !title || !nameInput || !repoInput || !depsInput || !descInput || !saveBtn) return;
+    if (!modal || !title || !nameInput || !typeInput || !repoInput || !execInput || !depsInput || !descInput || !saveBtn) return;
+
+    // Set up type change handler to show/hide executable path field
+    const updateExecutablePathVisibility = () => {
+        const execContainer = document.getElementById('executable-path-container');
+        if (execContainer) {
+            execContainer.style.display = typeInput.value === 'electron-app' ? 'block' : 'none';
+        }
+    };
+
+    typeInput.removeEventListener('change', updateExecutablePathVisibility);
+    typeInput.addEventListener('change', updateExecutablePathVisibility);
 
     if (clientId) {
         // Edit mode
@@ -282,7 +354,10 @@ async function showClientModal(clientId?: string) {
         if (client) {
             nameInput.value = client.name;
             nameInput.disabled = !client.isCustom; // Can't rename default clients
+            typeInput.value = client.type || 'web-based';
+            typeInput.disabled = !client.isCustom; // Can't change type of default clients
             repoInput.value = client.repoUrl || '';
+            execInput.value = client.executablePath || '';
             depsInput.value = client.dependencies ? client.dependencies.join(', ') : '';
             descInput.value = client.description;
             descInput.disabled = !client.isCustom; // Can't change description of default clients
@@ -293,13 +368,17 @@ async function showClientModal(clientId?: string) {
         title.textContent = 'Add Custom Client';
         nameInput.value = '';
         nameInput.disabled = false;
+        typeInput.value = 'web-based';
+        typeInput.disabled = false;
         repoInput.value = '';
+        execInput.value = '';
         depsInput.value = '';
         descInput.value = '';
         descInput.disabled = false;
         saveBtn.removeAttribute('data-id');
     }
 
+    updateExecutablePathVisibility();
     modal.style.display = 'block';
 }
 
@@ -309,51 +388,60 @@ async function showClientModal(clientId?: string) {
 async function handleSaveClient(onRefresh: () => Promise<void>) {
     const modal = document.getElementById('client-modal');
     const nameInput = document.getElementById('client-name-input') as HTMLInputElement;
+    const typeInput = document.getElementById('client-type-input') as HTMLSelectElement;
     const repoInput = document.getElementById('client-repo-input') as HTMLInputElement;
+    const execInput = document.getElementById('client-exec-input') as HTMLInputElement;
     const depsInput = document.getElementById('client-deps-input') as HTMLInputElement;
     const descInput = document.getElementById('client-desc-input') as HTMLTextAreaElement;
     const saveBtn = document.getElementById('modal-save-btn');
 
-    if (!modal || !nameInput || !repoInput || !depsInput || !descInput || !saveBtn) return;
+    if (!modal || !nameInput || !typeInput || !repoInput || !execInput || !depsInput || !descInput || !saveBtn) return;
 
     const clientId = saveBtn.getAttribute('data-id');
     const name = nameInput.value.trim();
+    const type = typeInput.value as 'web-based' | 'native' | 'electron-app';
     const repoUrl = repoInput.value.trim();
+    const executablePath = execInput.value.trim();
     const description = descInput.value.trim();
     const dependencies = depsInput.value.split(',').map(d => d.trim()).filter(d => d.length > 0);
 
-    if (!repoUrl) {
-        alert('Repository URL is required');
+    // Validation
+    if (type === 'electron-app' && !executablePath) {
+        alert('Executable path is required for Electron applications');
         return;
     }
 
     try {
         if (clientId) {
             // Update existing
-            await (window as any).electronAPI.clientSelection.updateClientConfig(clientId, {
+            const updates: any = {
                 repoUrl,
                 dependencies,
+                executablePath: type === 'electron-app' ? executablePath : undefined,
                 ...(nameInput.disabled ? {} : { name }),
+                ...(typeInput.disabled ? {} : { type }),
                 ...(descInput.disabled ? {} : { description })
-            });
+            };
+            await (window as any).electronAPI.clientSelection.updateClientConfig(clientId, updates);
         } else {
             // Add new
             if (!name) {
                 alert('Name is required');
                 return;
             }
-            
+
             const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
             await (window as any).electronAPI.clientSelection.addCustomClient({
                 id,
                 name,
-                type: 'web-based', // Default to web-based for now
+                type,
                 description,
                 features: ['Custom Client'],
                 requirements: [],
                 downloadSize: 'Unknown',
                 installation: 'automatic',
                 repoUrl,
+                executablePath: type === 'electron-app' ? executablePath : undefined,
                 dependencies,
                 isCustom: true
             });

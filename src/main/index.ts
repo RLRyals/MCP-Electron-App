@@ -808,6 +808,11 @@ function setupIPC(): void {
     return clientSelection.getSelectionFilePath();
   });
 
+  ipcMain.handle('client:launch-electron-app', async (_, clientId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `Launching electron app: ${clientId}`);
+    return await clientSelection.launchElectronApp(clientId);
+  });
+
   // Typing Mind downloader IPC handlers
   ipcMain.handle('typingmind:download', async (_event) => {
     logWithCategory('info', LogCategory.SCRIPT, 'IPC: Starting Typing Mind download...');

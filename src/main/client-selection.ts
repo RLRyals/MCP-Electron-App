@@ -5,7 +5,7 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { app } from 'electron';
+import { app, shell } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 
 /**
@@ -14,7 +14,7 @@ import { logWithCategory, LogCategory } from './logger';
 export interface ClientMetadata {
   id: string;
   name: string;
-  type: 'web-based' | 'native';
+  type: 'web-based' | 'native' | 'electron-app';
   description: string;
   features: string[];
   requirements: string[];
@@ -24,6 +24,8 @@ export interface ClientMetadata {
   dependencies?: string[]; // List of dependent repo IDs
   isCustom?: boolean; // Whether this is a user-added client
   enabled?: boolean; // Whether this client is enabled
+  executablePath?: string; // Path to executable for electron-app type
+  launchArgs?: string[]; // Optional launch arguments for electron-app type
 }
 
 /**
@@ -381,4 +383,48 @@ export async function clearClientSelection(): Promise<{ success: boolean; error?
  */
 export function getSelectionFilePath(): string {
   return getClientSelectionPath();
+}
+
+/**
+ * Launch an electron app client
+ */
+export async function launchElectronApp(clientId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const client = await getClientById(clientId);
+
+    if (!client) {
+      return { success: false, error: 'Client not found' };
+    }
+
+    if (client.type !== 'electron-app') {
+      return { success: false, error: 'Client is not an electron app type' };
+    }
+
+    if (!client.executablePath) {
+      return { success: false, error: 'No executable path configured for this client' };
+    }
+
+    // Check if executable exists
+    if (!await fs.pathExists(client.executablePath)) {
+      return { success: false, error: `Executable not found at: ${client.executablePath}` };
+    }
+
+    logWithCategory('info', LogCategory.SYSTEM, `Launching electron app: ${client.name} from ${client.executablePath}`);
+
+    // Use shell.openPath for launching the app on all platforms
+    const result = await shell.openPath(client.executablePath);
+
+    if (result) {
+      // openPath returns empty string on success, error message on failure
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to launch ${client.name}: ${result}`);
+      return { success: false, error: result };
+    }
+
+    logWithCategory('info', LogCategory.SYSTEM, `Successfully launched ${client.name}`);
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logWithCategory('error', LogCategory.SYSTEM, `Error launching electron app: ${errorMsg}`);
+    return { success: false, error: errorMsg };
+  }
 }

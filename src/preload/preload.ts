@@ -1063,6 +1063,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSelectionFilePath: (): Promise<string> => {
       return ipcRenderer.invoke('client:get-selection-file-path');
     },
+
+    /**
+     * Launch an electron app client
+     */
+    launchElectronApp: (clientId: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('client:launch-electron-app', clientId);
+    },
   },
 
   /**
