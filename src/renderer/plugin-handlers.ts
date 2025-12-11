@@ -18,11 +18,22 @@ const ACTION_TO_VIEW_MAP: Record<string, string> = {
 export function initializePluginHandlers(): void {
   console.log('Initializing plugin handlers...');
 
+  // Check if plugin API is available
+  if (!(window as any).electronAPI || !(window as any).electronAPI.plugins) {
+    console.error('Plugin API not available in window.electronAPI');
+    console.log('Available APIs:', Object.keys((window as any).electronAPI || {}));
+    return;
+  }
+
+  console.log('Plugin API found, registering onAction listener...');
+
   // Listen for plugin actions from main process
   (window as any).electronAPI.plugins.onAction((data: { pluginId: string; action: string }) => {
     console.log(`Plugin action received: ${data.pluginId} -> ${data.action}`);
     handlePluginAction(data.pluginId, data.action);
   });
+
+  console.log('Plugin handlers initialized successfully');
 }
 
 /**

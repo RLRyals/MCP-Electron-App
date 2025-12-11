@@ -107,7 +107,14 @@ export class TabNavigation {
    */
   private attachEventListeners(): void {
     this.tabElements.forEach((element, tabId) => {
-      element.addEventListener('click', () => this.switchTab(tabId));
+      // Create handler function to ensure proper binding
+      const clickHandler = (e: Event) => {
+        e.preventDefault();
+        console.log(`Tab clicked: ${tabId}`);
+        this.switchTab(tabId);
+      };
+
+      element.addEventListener('click', clickHandler);
     });
 
     // Keyboard navigation
@@ -126,14 +133,19 @@ export class TabNavigation {
    * Switch to a specific tab
    */
   public switchTab(tabId: string): void {
+    console.log(`switchTab called with: ${tabId}`);
+
     if (!this.tabs.find(t => t.id === tabId)) {
       console.error(`Tab with id "${tabId}" not found`);
       return;
     }
 
     if (this.activeTabId === tabId) {
+      console.log(`Already on tab: ${tabId}`);
       return; // Already on this tab
     }
+
+    console.log(`Switching from ${this.activeTabId} to ${tabId}`);
 
     // Hide current tab
     this.hideTab(this.activeTabId);
