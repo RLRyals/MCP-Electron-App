@@ -123,12 +123,12 @@ class PluginManager {
       }
     });
 
-    this.registry.on('menu-item-registered', (pluginId: string, item: MenuItem) => {
+    this.registry.on('menu-item-registered', (pluginId: string, item: PluginMenuItem) => {
       logWithCategory('debug', LogCategory.SYSTEM, `Plugin ${pluginId} registered menu item: ${item.label}`);
       this.updatePluginMenu();
     });
 
-    this.registry.on('notification', (pluginId: string, notification: Notification) => {
+    this.registry.on('notification', (pluginId: string, notification: PluginNotification) => {
       this.showPluginNotification(pluginId, notification);
     });
   }

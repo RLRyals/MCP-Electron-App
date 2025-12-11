@@ -563,8 +563,8 @@ function createPluginIPC(pluginId: string): PluginIPC {
  */
 function createPluginUI(
   pluginId: string,
-  onMenuItemRegister?: (pluginId: string, item: MenuItem) => void,
-  onNotification?: (notification: Notification) => void
+  onMenuItemRegister?: (pluginId: string, item: PluginMenuItem) => void,
+  onNotification?: (notification: PluginNotification) => void
 ): PluginUI {
   const registeredMenuItems: string[] = [];
 
