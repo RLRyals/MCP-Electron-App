@@ -32,34 +32,53 @@ class PluginViewManager {
     }
 
     const viewKey = `${info.pluginId}:${info.viewName}`;
+    logWithCategory('info', LogCategory.SYSTEM, `Attempting to show plugin view: ${viewKey}`);
+    logWithCategory('debug', LogCategory.SYSTEM, `Plugin view URL: ${info.url}`);
 
-    // Check if view already exists
-    let view = this.views.get(viewKey);
+    try {
+      // Check if view already exists
+      let view = this.views.get(viewKey);
 
-    if (!view) {
-      // Create new BrowserView
-      view = new BrowserView({
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-        },
-      });
+      if (!view) {
+        logWithCategory('debug', LogCategory.SYSTEM, `Creating new BrowserView for ${viewKey}`);
 
-      this.views.set(viewKey, view);
+        // Get preload script path
+        const preloadPath = path.join(__dirname, '../preload/plugin-view-preload.js');
+        logWithCategory('debug', LogCategory.SYSTEM, `Preload path: ${preloadPath}`);
+
+        // Create new BrowserView
+        view = new BrowserView({
+          webPreferences: {
+            preload: preloadPath,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false, // Need to disable sandbox for preload to work properly
+          },
+        });
+
+        this.views.set(viewKey, view);
+      } else {
+        logWithCategory('debug', LogCategory.SYSTEM, `Reusing existing BrowserView for ${viewKey}`);
+      }
+
+      // Add to main window
+      this.mainWindow.addBrowserView(view);
+      logWithCategory('debug', LogCategory.SYSTEM, `Added BrowserView to main window`);
+
+      // Set bounds
+      const bounds = info.bounds || this.getDefaultBounds();
+      view.setBounds(bounds);
+      logWithCategory('debug', LogCategory.SYSTEM, `Set bounds: ${JSON.stringify(bounds)}`);
+
+      // Load plugin UI
+      logWithCategory('debug', LogCategory.SYSTEM, `Loading plugin UI from: ${info.url}`);
+      await view.webContents.loadFile(info.url);
+      logWithCategory('info', LogCategory.SYSTEM, `Successfully showing plugin view: ${viewKey}`);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to show plugin view ${viewKey}: ${error.message}`);
+      logWithCategory('error', LogCategory.SYSTEM, `Error stack: ${error.stack}`);
+      throw error;
     }
-
-    // Add to main window
-    this.mainWindow.addBrowserView(view);
-
-    // Set bounds
-    const bounds = info.bounds || this.getDefaultBounds();
-    view.setBounds(bounds);
-
-    // Load plugin UI
-    await view.webContents.loadFile(info.url);
-
-    logWithCategory('info', LogCategory.SYSTEM, `Showing plugin view: ${viewKey}`);
   }
 
   /**

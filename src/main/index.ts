@@ -2163,24 +2163,44 @@ function setupIPC(): void {
 
   // Plugin View IPC handlers
   ipcMain.handle('plugin:show-view', async (_event, pluginId: string, viewName: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Showing plugin view ${pluginId}:${viewName}`);
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, `IPC: Showing plugin view ${pluginId}:${viewName}`);
 
-    const pluginRegistry = pluginManager.getRegistry();
-    const plugin = pluginRegistry?.getPlugin(pluginId);
+      const pluginRegistry = pluginManager.getRegistry();
+      const plugin = pluginRegistry?.getPlugin(pluginId);
 
-    if (!plugin) {
-      throw new Error(`Plugin ${pluginId} not found`);
+      if (!plugin) {
+        const error = `Plugin ${pluginId} not found`;
+        logWithCategory('error', LogCategory.SYSTEM, error);
+        throw new Error(error);
+      }
+
+      // Get plugin view path
+      const pluginDir = plugin.context.plugin.installPath;
+      const viewPath = path.join(pluginDir, 'dist', 'renderer', 'index.html');
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Plugin directory: ${pluginDir}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `View path: ${viewPath}`);
+
+      // Check if file exists
+      if (!fs.existsSync(viewPath)) {
+        const error = `Plugin renderer not found at: ${viewPath}`;
+        logWithCategory('error', LogCategory.SYSTEM, error);
+        throw new Error(error);
+      }
+
+      await pluginViewManager.showPluginView({
+        pluginId,
+        viewName,
+        url: viewPath,
+      });
+
+      logWithCategory('info', LogCategory.SYSTEM, `Plugin view shown successfully: ${pluginId}:${viewName}`);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to show plugin view: ${error.message}`);
+      logWithCategory('error', LogCategory.SYSTEM, `Error stack: ${error.stack}`);
+      throw error;
     }
-
-    // Get plugin view path
-    const pluginDir = plugin.context.plugin.installPath;
-    const viewPath = path.join(pluginDir, 'dist', 'renderer', 'index.html');
-
-    await pluginViewManager.showPluginView({
-      pluginId,
-      viewName,
-      url: viewPath,
-    });
   });
 
   ipcMain.handle('plugin:hide-view', (_event, pluginId: string, viewName: string) => {
