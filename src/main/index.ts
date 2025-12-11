@@ -28,6 +28,8 @@ import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
 import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipeline-orchestrator';
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
+import { pluginManager } from './plugin-manager';
+import { initializeDatabasePool, closeDatabasePool } from './database-connection';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -2078,6 +2080,83 @@ function setupIPC(): void {
     }
   );
 
+  // ============================================================================
+  // Plugin Management IPC Handlers
+  // ============================================================================
+
+  ipcMain.handle('plugins:get-all', async () => {
+    try {
+      return {
+        success: true,
+        plugins: pluginManager.getAllPlugins(),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  ipcMain.handle('plugins:get-statistics', async () => {
+    try {
+      return {
+        success: true,
+        statistics: pluginManager.getStatistics(),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  ipcMain.handle('plugins:activate', async (_event, pluginId: string) => {
+    try {
+      await pluginManager.activatePlugin(pluginId);
+      return {
+        success: true,
+        message: `Plugin ${pluginId} activated`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  ipcMain.handle('plugins:deactivate', async (_event, pluginId: string) => {
+    try {
+      await pluginManager.deactivatePlugin(pluginId);
+      return {
+        success: true,
+        message: `Plugin ${pluginId} deactivated`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  ipcMain.handle('plugins:reload', async (_event, pluginId: string) => {
+    try {
+      await pluginManager.reloadPlugin(pluginId);
+      return {
+        success: true,
+        message: `Plugin ${pluginId} reloaded`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
   logger.info('IPC handlers registered');
 }
 
@@ -2155,6 +2234,27 @@ app.whenReady().then(async () => {
     // Show main application window
     createWindow();
 
+    // Initialize plugin system after main window is created
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin system...');
+
+      // Initialize database pool first
+      await initializeDatabasePool();
+
+      // Initialize plugin manager
+      await pluginManager.initialize();
+
+      // Set main window reference for plugin UI interactions
+      if (mainWindow) {
+        pluginManager.setMainWindow(mainWindow);
+      }
+
+      logWithCategory('info', LogCategory.SYSTEM, 'Plugin system initialized successfully');
+    } catch (error) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error initializing plugin system:', error);
+      // Non-fatal, just log and continue
+    }
+
     // Auto-check for updates on startup (only for non-first-run)
     try {
       const shouldCheck = await updater.shouldAutoCheck();
@@ -2201,8 +2301,23 @@ app.on('window-all-closed', () => {
 });
 
 // Handle app before quit
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   logger.info('App is quitting...');
+
+  // Clean up plugin system
+  try {
+    logWithCategory('info', LogCategory.SYSTEM, 'Cleaning up plugin system...');
+    await pluginManager.cleanup();
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error cleaning up plugin system:', error);
+  }
+
+  // Close database connection pool
+  try {
+    await closeDatabasePool();
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error closing database pool:', error);
+  }
 });
 
 // Log any unhandled errors

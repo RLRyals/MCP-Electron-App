@@ -1,0 +1,38 @@
+{
+  "id": "hello-world",
+  "name": "Hello World Plugin",
+  "version": "1.0.0",
+  "description": "A simple example plugin that demonstrates the FictionLab plugin API",
+  "author": "FictionLab Team",
+  "fictionLabVersion": ">=0.1.0",
+  "pluginType": "utility",
+  "entry": {
+    "main": "dist/index.js"
+  },
+  "permissions": {
+    "database": false,
+    "mcp": [],
+    "fileSystem": "readonly",
+    "network": false,
+    "childProcesses": false
+  },
+  "ui": {
+    "mainView": "HelloWorldView",
+    "menuItems": [
+      {
+        "label": "Hello World",
+        "submenu": [
+          {
+            "label": "Show Hello Message",
+            "accelerator": "CmdOrCtrl+Shift+H",
+            "action": "show-hello"
+          },
+          {
+            "label": "About Plugin",
+            "action": "show-about"
+          }
+        ]
+      }
+    ]
+  }
+}

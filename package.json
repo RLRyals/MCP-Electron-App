@@ -29,6 +29,8 @@
     "dotenv": "^16.3.1",
     "electron-log": "^5.1.2",
     "fs-extra": "^11.2.0",
+    "pg": "^8.11.0",
+    "semver": "^7.5.4",
     "simple-git": "^3.21.0"
   },
   "devDependencies": {
@@ -36,6 +38,8 @@
     "@types/dockerode": "^3.3.45",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.19.25",
+    "@types/pg": "^8.10.0",
+    "@types/semver": "^7.5.0",
     "electron": "^28.2.3",
     "electron-builder": "^24.13.3",
     "typescript": "^5.9.3"
