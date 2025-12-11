@@ -64,6 +64,9 @@ class PluginViewManager {
         },
       });
 
+      // Open DevTools for debugging (can be removed later)
+      window.webContents.openDevTools({ mode: 'detach' });
+
       // Store the window
       this.windows.set(windowKey, window);
 
@@ -73,9 +76,24 @@ class PluginViewManager {
         this.windows.delete(windowKey);
       });
 
-      // Load plugin UI
-      logWithCategory('debug', LogCategory.SYSTEM, `Loading plugin UI from: ${info.url}`);
-      await window.loadFile(info.url);
+      // Listen for console messages from the plugin window
+      window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+        const levelStr = ['log', 'warn', 'error'][level] || 'log';
+        logWithCategory('debug', LogCategory.SYSTEM, `[Plugin ${windowKey}] [${levelStr}] ${message} (${sourceId}:${line})`);
+      });
+
+      // Listen for load failures
+      window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+        logWithCategory('error', LogCategory.SYSTEM, `Plugin window failed to load: ${errorDescription} (${errorCode}) - ${validatedURL}`);
+      });
+
+      // Load plugin UI with view name as query parameter
+      const urlWithView = `${info.url}?view=${encodeURIComponent(info.viewName)}`;
+      logWithCategory('debug', LogCategory.SYSTEM, `Loading plugin UI from: ${urlWithView}`);
+
+      // Use loadURL with file:// protocol to support query parameters
+      const fileUrl = `file:///${info.url.replace(/\\/g, '/')}?view=${encodeURIComponent(info.viewName)}`;
+      await window.loadURL(fileUrl);
 
       // Show window once loaded
       window.show();
