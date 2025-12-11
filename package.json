@@ -81,7 +81,9 @@
           ]
         }
       ],
-      "icon": "resources/icons/icon.ico"
+      "icon": "resources/icons/icon.ico",
+      "signingHashAlgorithms": ["sha256"],
+      "sign": null
     },
     "nsis": {
       "oneClick": false,
