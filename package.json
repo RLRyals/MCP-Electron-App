@@ -40,7 +40,7 @@
     "@types/node": "^20.19.25",
     "@types/pg": "^8.10.0",
     "@types/semver": "^7.5.0",
-    "electron": "^28.2.3",
+    "electron": "^28.3.3",
     "electron-builder": "^24.13.3",
     "typescript": "^5.9.3"
   },
@@ -82,7 +82,9 @@
         }
       ],
       "icon": "resources/icons/icon.ico",
-      "signingHashAlgorithms": ["sha256"],
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
       "sign": null
     },
     "nsis": {
