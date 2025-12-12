@@ -9,9 +9,54 @@
 
 .top-bar {
   display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Top bar rows (for Windows two-row layout) */
+.top-bar-row {
+  display: flex;
   align-items: center;
   gap: var(--spacing-lg);
   justify-content: space-between;
+  width: 100%;
+}
+
+.top-bar-main-row {
+  height: 40px;
+  padding: 0 var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.top-bar-title-row {
+  height: 32px;
+  padding: 0 var(--spacing-lg);
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* Single-row layout (Mac/Linux) - when no .top-bar-row */
+.top-bar > .top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  min-width: 0;
+}
+
+.top-bar > .top-bar-center {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.top-bar > .top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
 }
 
 /* ========================================
@@ -93,12 +138,18 @@
 }
 
 .top-bar-title {
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Title in title row (Windows two-row layout) */
+.top-bar-title-row .top-bar-title {
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 /* Breadcrumb navigation */

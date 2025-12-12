@@ -69,26 +69,56 @@ export class TopBar {
     // Check if we're on Windows (frameless window)
     const isWindows = navigator.platform.toLowerCase().includes('win');
 
-    this.container.innerHTML = `
-      <div class="top-bar-left">
-        <div class="top-bar-logo">
-          <img src="icon.png" alt="FictionLab" style="width: 24px; height: 24px;">
+    if (isWindows) {
+      // Two-row layout for Windows
+      this.container.innerHTML = `
+        <div class="top-bar-row top-bar-main-row">
+          <div class="top-bar-left">
+            <div class="top-bar-logo">
+              <img src="icon.png" alt="FictionLab" style="width: 24px; height: 24px;">
+            </div>
+            ${this.renderMainMenu()}
+          </div>
+
+          <div class="top-bar-center">
+            ${actions ? this.renderActions(actions) : ''}
+          </div>
+
+          <div class="top-bar-right">
+            ${global?.projectSelector ? this.renderProjectSelector() : ''}
+            ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
+            ${global?.userMenu ? this.renderUserMenu() : ''}
+            ${this.renderWindowControls()}
+          </div>
         </div>
-        ${isWindows ? this.renderMainMenu() : ''}
-        ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
-      </div>
 
-      <div class="top-bar-center">
-        ${actions ? this.renderActions(actions) : ''}
-      </div>
+        ${title || breadcrumb ? `
+          <div class="top-bar-row top-bar-title-row">
+            ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
+          </div>
+        ` : ''}
+      `;
+    } else {
+      // Single-row layout for Mac/Linux
+      this.container.innerHTML = `
+        <div class="top-bar-left">
+          <div class="top-bar-logo">
+            <img src="icon.png" alt="FictionLab" style="width: 24px; height: 24px;">
+          </div>
+          ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
+        </div>
 
-      <div class="top-bar-right">
-        ${global?.projectSelector ? this.renderProjectSelector() : ''}
-        ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
-        ${global?.userMenu ? this.renderUserMenu() : ''}
-        ${isWindows ? this.renderWindowControls() : ''}
-      </div>
-    `;
+        <div class="top-bar-center">
+          ${actions ? this.renderActions(actions) : ''}
+        </div>
+
+        <div class="top-bar-right">
+          ${global?.projectSelector ? this.renderProjectSelector() : ''}
+          ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
+          ${global?.userMenu ? this.renderUserMenu() : ''}
+        </div>
+      `;
+    }
   }
 
   /**

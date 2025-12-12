@@ -6,6 +6,7 @@
  */
 
 import { Pool } from 'pg';
+import { BrowserWindow, ipcMain } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 
 export interface WorkflowStep {
@@ -271,47 +272,38 @@ export class WorkflowEngine {
   }
 
   /**
-   * Execute a single workflow step
+   * Execute a single workflow step by calling plugin action via IPC
    */
   private async executeStep(step: WorkflowStep, config: Record<string, any>): Promise<any> {
-    // TODO: Implement actual plugin action execution
-    // For now, return mock data
-    logWithCategory('debug', LogCategory.SYSTEM, `[MOCK] Executing plugin action: ${step.pluginId}.${step.action}`, config);
+    const ipcChannel = `plugin:${step.pluginId}:${step.action}`;
 
-    // Simulate async operation
-    await new Promise(resolve => setTimeout(resolve, 100));
+    logWithCategory('info', LogCategory.SYSTEM, `Executing plugin action: ${step.pluginId}.${step.action}`);
+    logWithCategory('debug', LogCategory.SYSTEM, `IPC channel: ${ipcChannel}`, config);
 
-    // Mock result based on action type
-    if (step.action === 'new-series') {
-      return {
-        success: true,
-        result: {
-          seriesId: `series-${Date.now()}`,
-          name: config.name || 'New Series',
-          createdAt: new Date().toISOString(),
-        },
-      };
-    } else if (step.action === 'generate-outline') {
-      return {
-        success: true,
-        result: {
-          outlineId: `outline-${Date.now()}`,
-          seriesId: config.seriesId,
-          bookCount: config.bookCount || 1,
-        },
-      };
-    } else if (step.action === 'draft-chapter') {
-      return {
-        success: true,
-        result: {
-          draftId: `draft-${Date.now()}`,
-          chapterNumber: config.chapterNumber,
-          wordCount: 2500,
-        },
-      };
+    try {
+      // We need to get the handler that was registered by the plugin
+      // Unfortunately, Electron doesn't expose a direct way to call IPC handlers from main process
+      // So we need to create a mock IpcMainInvokeEvent
+      const mockEvent = {} as any;
+
+      // Get all registered listeners for this channel
+      const listeners = ipcMain.listeners(ipcChannel);
+
+      if (listeners.length === 0) {
+        throw new Error(`No plugin handler registered for channel: ${ipcChannel}`);
+      }
+
+      // Call the first (and should be only) handler
+      const handler = listeners[0] as any;
+      const result = await handler(mockEvent, config);
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Plugin action completed: ${step.pluginId}.${step.action}`, result);
+
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Plugin action failed: ${step.pluginId}.${step.action}`, error);
+      throw new Error(`Plugin action ${step.pluginId}.${step.action} failed: ${error.message}`);
     }
-
-    return { success: true, result: {} };
   }
 
   /**
