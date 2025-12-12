@@ -68,6 +68,9 @@ export class TopBar {
 
     this.container.innerHTML = `
       <div class="top-bar-left">
+        <div class="top-bar-logo">
+          <img src="icon.png" alt="FictionLab" style="width: 24px; height: 24px;">
+        </div>
         ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
       </div>
 
@@ -106,7 +109,7 @@ export class TopBar {
       return `<div class="top-bar-title">${this.escapeHtml(title)}</div>`;
     }
 
-    return '<div class="top-bar-title">FictionLab</div>';
+    return '';
   }
 
   /**

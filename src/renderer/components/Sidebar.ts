@@ -98,10 +98,6 @@ export class Sidebar {
    */
   private render(): void {
     this.container.innerHTML = `
-      <div class="sidebar-header">
-        <div class="sidebar-logo">FL</div>
-      </div>
-
       <nav class="sidebar-navigation">
         ${this.renderPrimaryNavigation()}
         ${this.renderPinnedPlugins()}
