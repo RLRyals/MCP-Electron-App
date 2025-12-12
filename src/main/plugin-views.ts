@@ -56,6 +56,7 @@ class PluginViewManager {
         parent: this.mainWindow || undefined,
         modal: false,
         show: false, // Don't show until ready
+        autoHideMenuBar: true, // Hide menu bar in plugin windows
         webPreferences: {
           preload: preloadPath,
           nodeIntegration: false,
@@ -64,8 +65,10 @@ class PluginViewManager {
         },
       });
 
-      // Open DevTools for debugging (can be removed later)
-      window.webContents.openDevTools({ mode: 'detach' });
+      // Open DevTools in development mode only
+      if (!require('electron').app.isPackaged) {
+        window.webContents.openDevTools({ mode: 'detach' });
+      }
 
       // Store the window
       this.windows.set(windowKey, window);
