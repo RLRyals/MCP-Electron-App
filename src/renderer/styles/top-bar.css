@@ -1,0 +1,475 @@
+/**
+ * Top Bar CSS
+ * Contextual top bar with breadcrumbs, actions, and global controls
+ */
+
+/* ========================================
+   Top Bar Layout
+   ======================================== */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  justify-content: space-between;
+}
+
+/* ========================================
+   Top Bar Left (Title & Breadcrumb)
+   ======================================== */
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  min-width: 0; /* Fix for text overflow */
+}
+
+.top-bar-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Breadcrumb navigation */
+.top-bar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.breadcrumb-item:hover {
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.breadcrumb-item.active {
+  color: var(--color-text-primary);
+  cursor: default;
+}
+
+.breadcrumb-separator {
+  color: var(--color-text-tertiary);
+  font-size: 0.8rem;
+}
+
+/* ========================================
+   Top Bar Center (Contextual Actions)
+   ======================================== */
+
+.top-bar-center {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+/* Action button */
+.top-bar-action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.top-bar-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.2);
+}
+
+.top-bar-action:active {
+  transform: scale(0.98);
+}
+
+.top-bar-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.top-bar-action:disabled:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  box-shadow: none;
+}
+
+/* Primary action button (highlighted) */
+.top-bar-action.primary {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.top-bar-action.primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 0 12px rgba(0, 212, 170, 0.4);
+}
+
+/* Danger action button (for destructive actions) */
+.top-bar-action.danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #FCA5A5;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.top-bar-action.danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: rgba(220, 38, 38, 0.5);
+  color: #FEE2E2;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.3);
+}
+
+/* Action icon */
+.action-icon {
+  font-size: 1rem;
+}
+
+/* Action group (for related actions) */
+.action-group {
+  display: flex;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.action-group .top-bar-action {
+  border-radius: 0;
+}
+
+.action-group .top-bar-action:first-child {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+
+.action-group .top-bar-action:last-child {
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* ========================================
+   Top Bar Right (Global Controls)
+   ======================================== */
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Project/Series Selector
+   ======================================== */
+
+.project-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.project-selector:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+}
+
+.project-selector-icon {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.project-selector-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-selector-arrow {
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary);
+  margin-left: auto;
+}
+
+/* Dropdown for project selector */
+.project-dropdown {
+  position: absolute;
+  top: calc(100% + var(--spacing-sm));
+  right: var(--spacing-lg);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  max-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+
+.project-dropdown.open {
+  display: block;
+}
+
+.project-dropdown-item {
+  padding: var(--spacing-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.project-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.project-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.project-dropdown-item.active {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+}
+
+/* ========================================
+   Environment Indicator
+   ======================================== */
+
+.environment-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.environment-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+.environment-dot.healthy {
+  background: #10B981;
+  box-shadow: 0 0 8px #10B981;
+}
+
+.environment-dot.warning {
+  background: #F59E0B;
+  box-shadow: 0 0 8px #F59E0B;
+}
+
+.environment-dot.error {
+  background: #EF4444;
+  box-shadow: 0 0 8px #EF4444;
+}
+
+.environment-text {
+  font-weight: 500;
+}
+
+/* ========================================
+   User Menu
+   ======================================== */
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.user-menu:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--color-bg-primary);
+}
+
+.user-name {
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ========================================
+   Search Bar (optional)
+   ======================================== */
+
+.top-bar-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex: 1;
+  max-width: 400px;
+  transition: all var(--transition-fast);
+}
+
+.top-bar-search:focus-within {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.2);
+}
+
+.top-bar-search-icon {
+  font-size: 1rem;
+  color: var(--color-text-tertiary);
+}
+
+.top-bar-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.top-bar-search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* ========================================
+   Responsive Adjustments
+   ======================================== */
+
+@media (max-width: 1023px) {
+  .top-bar {
+    gap: var(--spacing-md);
+  }
+
+  .top-bar-center {
+    gap: var(--spacing-xs);
+  }
+
+  .top-bar-action {
+    padding: var(--spacing-sm);
+  }
+
+  .top-bar-action .action-label {
+    display: none; /* Hide labels on smaller screens */
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .top-bar-search {
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 767px) {
+  .top-bar {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+
+  .top-bar-breadcrumb {
+    display: none;
+  }
+
+  .project-selector {
+    min-width: auto;
+    max-width: 150px;
+  }
+
+  .project-selector-text {
+    display: none;
+  }
+
+  .environment-text {
+    display: none;
+  }
+
+  .top-bar-search {
+    display: none; /* Hide search on mobile */
+  }
+}
+
+/* ========================================
+   Loading State
+   ======================================== */
+
+.top-bar-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.top-bar-loading .loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
