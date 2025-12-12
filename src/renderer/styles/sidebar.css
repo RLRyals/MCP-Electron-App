@@ -220,11 +220,22 @@
 .nav-children {
   max-height: 0;
   overflow: hidden;
-  transition: max-height var(--transition-normal);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease-out,
+    transform 0.2s ease-out;
 }
 
 .nav-children.expanded {
   max-height: 500px; /* Arbitrary large value */
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s ease-in 0.1s,
+    transform 0.3s ease-in 0.1s;
 }
 
 .nav-children .nav-item {

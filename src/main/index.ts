@@ -30,7 +30,7 @@ import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipe
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
 import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
-import { initializeDatabasePool, closeDatabasePool } from './database-connection';
+import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -2261,6 +2261,154 @@ function setupIPC(): void {
   ipcMain.handle('plugin:close-view', (_event, pluginId: string, viewName: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing plugin view ${pluginId}:${viewName}`);
     pluginViewManager.closePluginView(pluginId, viewName);
+  });
+
+  // ========================================
+  // Workflow IPC Handlers
+  // ========================================
+
+  ipcMain.handle('workflows:list', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing workflows');
+    try {
+      const pool = getDatabasePool();
+      const result = await pool.query(
+        `SELECT id, name, description, steps, target_type, target_id, status, version,
+                run_count, success_count, failure_count, last_run_at, last_run_status,
+                created_at, updated_at
+         FROM workflows
+         ORDER BY updated_at DESC`
+      );
+      return result.rows;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error listing workflows:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:get', async (_event, workflowId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting workflow ${workflowId}`);
+    try {
+      const pool = getDatabasePool();
+      const result = await pool.query(
+        'SELECT * FROM workflows WHERE id = $1',
+        [workflowId]
+      );
+      return result.rows[0] || null;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error getting workflow:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:execute', async (_event, workflowId: string, initialContext?: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Executing workflow ${workflowId}`);
+    try {
+      const pool = getDatabasePool();
+      const { WorkflowEngine } = await import('./workflow-engine');
+      const engine = new WorkflowEngine(pool);
+
+      const result = await engine.executeWorkflow(workflowId, initialContext || {}, 'manual');
+
+      logWithCategory('info', LogCategory.SYSTEM, `Workflow execution completed: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error executing workflow:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:cancel', async (_event, runId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Cancelling workflow run ${runId}`);
+    try {
+      const pool = getDatabasePool();
+      const { WorkflowEngine } = await import('./workflow-engine');
+      const engine = new WorkflowEngine(pool);
+
+      await engine.cancelWorkflow(runId);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error cancelling workflow:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:get-runs', async (_event, workflowId: string, limit?: number) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting workflow runs for ${workflowId}`);
+    try {
+      const pool = getDatabasePool();
+      const { WorkflowEngine } = await import('./workflow-engine');
+      const engine = new WorkflowEngine(pool);
+
+      const runs = await engine.getWorkflowRuns(workflowId, limit);
+      return runs;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error getting workflow runs:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:delete', async (_event, workflowId: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting workflow ${workflowId}`);
+    try {
+      const pool = getDatabasePool();
+      await pool.query('DELETE FROM workflows WHERE id = $1', [workflowId]);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error deleting workflow:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:create', async (_event, workflow: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Creating new workflow');
+    try {
+      const pool = getDatabasePool();
+      const result = await pool.query(
+        `INSERT INTO workflows (name, description, steps, target_type, status)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [
+          workflow.name,
+          workflow.description || null,
+          JSON.stringify(workflow.steps),
+          workflow.target_type || null,
+          workflow.status || 'draft'
+        ]
+      );
+      return result.rows[0];
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error creating workflow:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('workflows:update', async (_event, workflowId: string, updates: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating workflow ${workflowId}`);
+    try {
+      const pool = getDatabasePool();
+      const result = await pool.query(
+        `UPDATE workflows
+         SET name = COALESCE($1, name),
+             description = COALESCE($2, description),
+             steps = COALESCE($3, steps),
+             status = COALESCE($4, status),
+             target_type = COALESCE($5, target_type)
+         WHERE id = $6
+         RETURNING *`,
+        [
+          updates.name || null,
+          updates.description || null,
+          updates.steps ? JSON.stringify(updates.steps) : null,
+          updates.status || null,
+          updates.target_type || null,
+          workflowId
+        ]
+      );
+      return result.rows[0];
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error updating workflow:', error);
+      throw error;
+    }
   });
 
   logger.info('IPC handlers registered');

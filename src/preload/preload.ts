@@ -2084,6 +2084,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('plugin-action');
     },
   },
+
+  /**
+   * Workflows API
+   */
+  workflows: {
+    /**
+     * List all workflows
+     */
+    list: (): Promise<any[]> => {
+      return ipcRenderer.invoke('workflows:list');
+    },
+
+    /**
+     * Get a specific workflow by ID
+     */
+    get: (workflowId: string): Promise<any> => {
+      return ipcRenderer.invoke('workflows:get', workflowId);
+    },
+
+    /**
+     * Execute a workflow
+     */
+    execute: (workflowId: string, initialContext?: any): Promise<any> => {
+      return ipcRenderer.invoke('workflows:execute', workflowId, initialContext);
+    },
+
+    /**
+     * Cancel a running workflow
+     */
+    cancel: (runId: string): Promise<any> => {
+      return ipcRenderer.invoke('workflows:cancel', runId);
+    },
+
+    /**
+     * Get workflow execution history
+     */
+    getRuns: (workflowId: string, limit?: number): Promise<any[]> => {
+      return ipcRenderer.invoke('workflows:get-runs', workflowId, limit);
+    },
+
+    /**
+     * Delete a workflow
+     */
+    delete: (workflowId: string): Promise<any> => {
+      return ipcRenderer.invoke('workflows:delete', workflowId);
+    },
+
+    /**
+     * Create a new workflow
+     */
+    create: (workflow: any): Promise<any> => {
+      return ipcRenderer.invoke('workflows:create', workflow);
+    },
+
+    /**
+     * Update an existing workflow
+     */
+    update: (workflowId: string, updates: any): Promise<any> => {
+      return ipcRenderer.invoke('workflows:update', workflowId, updates);
+    },
+  },
 });
 
 console.log('Preload script loaded successfully');

@@ -135,7 +135,9 @@ export class ViewRouter {
 
     // Mount the view
     try {
-      this.container.innerHTML = ''; // Clear container
+      // Show loading state
+      this.showLoadingView();
+
       await view.mount(this.container, params);
 
       this.currentViewId = viewId;
@@ -319,6 +321,18 @@ export class ViewRouter {
    */
   public getCurrentViewId(): string | null {
     return this.currentViewId;
+  }
+
+  /**
+   * Show a loading view
+   */
+  private showLoadingView(): void {
+    this.container.innerHTML = `
+      <div class="view-loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading...</div>
+      </div>
+    `;
   }
 
   /**
