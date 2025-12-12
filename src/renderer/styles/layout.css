@@ -36,8 +36,8 @@
   --top-bar-min-height: 40px;
 
   /* Z-index layers */
-  --z-sidebar: 100;
-  --z-top-bar: 90;
+  --z-sidebar: 90;
+  --z-top-bar: 100;
   --z-modal: 1000;
   --z-tooltip: 1100;
 
@@ -102,6 +102,7 @@ body {
   z-index: var(--z-sidebar);
   transition: width var(--transition-normal);
   overflow: hidden;
+  padding-top: 40px; /* Push sidebar content down to avoid overlap with top bar */
 }
 
 .sidebar.collapsed {
@@ -118,6 +119,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-width: 0; /* Fix for flexbox overflow */
+  padding-top: 80px; /* Add space for fixed top bar (40px main row + 32px title row + some buffer) */
 }
 
 /* ========================================
@@ -132,6 +134,10 @@ body {
   z-index: var(--z-top-bar);
   flex-shrink: 0;
   -webkit-app-region: drag; /* Make top bar draggable on Windows frameless window */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 /* Make interactive elements in top bar non-draggable */
