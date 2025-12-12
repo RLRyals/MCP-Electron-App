@@ -56,6 +56,42 @@
   color: var(--color-accent);
 }
 
+/* Window Controls (Windows frameless window) */
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: var(--spacing-sm);
+  height: 100%;
+}
+
+.window-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  padding: 0;
+}
+
+.window-control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.window-control-btn.close:hover {
+  background: #e81123;
+  color: white;
+}
+
+.window-control-btn svg {
+  width: 10px;
+  height: 10px;
+}
+
 .top-bar-title {
   font-size: 1.3rem;
   font-weight: 600;

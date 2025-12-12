@@ -355,6 +355,8 @@ function createWindow(): void {
     minHeight: 600,
     title: 'FictionLab',
     icon: iconPath,
+    frame: process.platform !== 'win32', // Frameless on Windows, native frame on Mac/Linux
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default', // Native macOS style
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -503,6 +505,29 @@ function setupIPC(): void {
       arch: process.arch,
       version: process.version,
     };
+  });
+
+  // Window controls (for frameless window on Windows)
+  ipcMain.handle('window:minimize', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.minimize();
+    }
+  });
+
+  ipcMain.handle('window:maximize', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.restore();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.handle('window:close', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close();
+    }
   });
 
   // Prerequisites checks

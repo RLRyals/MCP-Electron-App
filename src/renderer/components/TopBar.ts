@@ -66,11 +66,15 @@ export class TopBar {
   private render(): void {
     const { title, breadcrumb, actions, global } = this.currentConfig;
 
+    // Check if we're on Windows (frameless window)
+    const isWindows = navigator.platform.toLowerCase().includes('win');
+
     this.container.innerHTML = `
       <div class="top-bar-left">
         <div class="top-bar-logo">
           <img src="icon.png" alt="FictionLab" style="width: 24px; height: 24px;">
         </div>
+        ${isWindows ? this.renderMainMenu() : ''}
         ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
       </div>
 
@@ -82,6 +86,7 @@ export class TopBar {
         ${global?.projectSelector ? this.renderProjectSelector() : ''}
         ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
         ${global?.userMenu ? this.renderUserMenu() : ''}
+        ${isWindows ? this.renderWindowControls() : ''}
       </div>
     `;
   }
@@ -110,6 +115,56 @@ export class TopBar {
     }
 
     return '';
+  }
+
+  /**
+   * Render main menu (Windows only - for frameless window)
+   */
+  private renderMainMenu(): string {
+    const menuItems = [
+      { id: 'file', label: 'File' },
+      { id: 'edit', label: 'Edit' },
+      { id: 'view', label: 'View' },
+      { id: 'plugins', label: 'Plugins' },
+      { id: 'diagnostics', label: 'Diagnostics' },
+      { id: 'help', label: 'Help' },
+    ];
+
+    return `
+      <nav class="top-bar-menu">
+        ${menuItems.map(item => `
+          <div class="menu-item" data-menu-id="${item.id}">
+            ${item.label}
+          </div>
+        `).join('')}
+      </nav>
+    `;
+  }
+
+  /**
+   * Render window controls (minimize, maximize, close) for Windows
+   */
+  private renderWindowControls(): string {
+    return `
+      <div class="window-controls">
+        <button class="window-control-btn minimize" data-window-action="minimize" title="Minimize">
+          <svg width="10" height="1" viewBox="0 0 10 1">
+            <rect width="10" height="1" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="window-control-btn maximize" data-window-action="maximize" title="Maximize">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <rect x="0" y="0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
+        <button class="window-control-btn close" data-window-action="close" title="Close">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1"/>
+            <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
+      </div>
+    `;
   }
 
   /**
@@ -238,6 +293,15 @@ export class TopBar {
         console.log('[TopBar] User menu clicked');
         this.emit('user-menu-clicked');
       }
+
+      // Handle window controls (minimize, maximize, close)
+      const windowControlBtn = target.closest('.window-control-btn') as HTMLElement;
+      if (windowControlBtn) {
+        const action = windowControlBtn.dataset.windowAction;
+        if (action) {
+          this.handleWindowControl(action);
+        }
+      }
     });
 
     // Close dropdowns when clicking outside
@@ -266,6 +330,31 @@ export class TopBar {
     const dropdown = this.container.querySelector('#project-dropdown');
     if (dropdown) {
       dropdown.classList.remove('open');
+    }
+  }
+
+  /**
+   * Handle window control actions (minimize, maximize, close)
+   */
+  private handleWindowControl(action: string): void {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) {
+      console.error('[TopBar] electronAPI not available');
+      return;
+    }
+
+    switch (action) {
+      case 'minimize':
+        electronAPI.window?.minimize();
+        break;
+      case 'maximize':
+        electronAPI.window?.maximize();
+        break;
+      case 'close':
+        electronAPI.window?.close();
+        break;
+      default:
+        console.warn('[TopBar] Unknown window action:', action);
     }
   }
 

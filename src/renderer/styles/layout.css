@@ -133,6 +133,19 @@ body {
   padding: 0 var(--spacing-lg);
   z-index: var(--z-top-bar);
   flex-shrink: 0;
+  -webkit-app-region: drag; /* Make top bar draggable on Windows frameless window */
+}
+
+/* Make interactive elements in top bar non-draggable */
+.top-bar button,
+.top-bar input,
+.top-bar select,
+.top-bar .menu-item,
+.top-bar .window-control-btn,
+.top-bar .nav-item,
+.top-bar .project-selector,
+.top-bar .user-menu {
+  -webkit-app-region: no-drag;
 }
 
 /* ========================================

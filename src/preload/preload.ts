@@ -2145,6 +2145,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return ipcRenderer.invoke('workflows:update', workflowId, updates);
     },
   },
+
+  /**
+   * Window controls API (for frameless window on Windows)
+   */
+  window: {
+    /**
+     * Minimize the window
+     */
+    minimize: (): Promise<void> => {
+      return ipcRenderer.invoke('window:minimize');
+    },
+
+    /**
+     * Maximize/restore the window
+     */
+    maximize: (): Promise<void> => {
+      return ipcRenderer.invoke('window:maximize');
+    },
+
+    /**
+     * Close the window
+     */
+    close: (): Promise<void> => {
+      return ipcRenderer.invoke('window:close');
+    },
+  },
 });
 
 console.log('Preload script loaded successfully');
