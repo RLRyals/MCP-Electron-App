@@ -294,6 +294,13 @@ export class Sidebar {
         }
       }
     });
+
+    // Listen for pinned plugins changes from PluginsLauncher
+    window.addEventListener('pinned-plugins-changed', () => {
+      this.pinnedPlugins = this.loadPinnedPlugins();
+      this.render();
+      this.attachEventListeners();
+    });
   }
 
   /**
