@@ -102,7 +102,6 @@ body {
   z-index: var(--z-sidebar);
   transition: width var(--transition-normal);
   overflow: hidden;
-  padding-top: 40px; /* Push sidebar content down to avoid overlap with top bar */
 }
 
 .sidebar.collapsed {
@@ -162,6 +161,7 @@ body {
   overflow-x: hidden;
   padding: var(--spacing-lg);
   position: relative;
+  margin-top: 80px; /* Push content down below the fixed top bar */
 }
 
 /* Custom scrollbar for content area */
