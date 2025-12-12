@@ -6,10 +6,11 @@
 
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
-import { initializeDatabaseTab } from '../components/DatabaseTab.js';
+import { DatabaseTab } from '../components/DatabaseTab.js';
 
 export class DatabaseView implements View {
   private container: HTMLElement | null = null;
+  private databaseTab: DatabaseTab | null = null;
 
   /**
    * Mount the database view
@@ -17,24 +18,17 @@ export class DatabaseView implements View {
   async mount(container: HTMLElement): Promise<void> {
     this.container = container;
 
-    // Get the existing database HTML from the old tab panel
-    const oldDatabasePanel = document.getElementById('tab-panel-database');
-    if (oldDatabasePanel) {
-      container.innerHTML = oldDatabasePanel.innerHTML;
-    } else {
-      // Fallback: create basic database structure
-      container.innerHTML = `
-        <div id="database-container">
-          <div class="database-content">
-            <!-- Database content will be initialized by DatabaseTab -->
-          </div>
-        </div>
-      `;
-    }
+    // Create the database card container that DatabaseTab expects
+    container.innerHTML = `
+      <div id="database-card" style="display: block;">
+        <!-- Database content will be initialized by DatabaseTab -->
+      </div>
+    `;
 
     // Initialize the existing database functionality
     try {
-      await initializeDatabaseTab();
+      this.databaseTab = new DatabaseTab();
+      await this.databaseTab.initialize();
       console.log('[DatabaseView] Database tab initialized');
     } catch (error) {
       console.error('[DatabaseView] Failed to initialize database:', error);
@@ -51,6 +45,11 @@ export class DatabaseView implements View {
    * Unmount the database view
    */
   async unmount(): Promise<void> {
+    // Cleanup database tab
+    if (this.databaseTab && typeof (this.databaseTab as any).destroy === 'function') {
+      (this.databaseTab as any).destroy();
+    }
+    this.databaseTab = null;
     this.container = null;
   }
 

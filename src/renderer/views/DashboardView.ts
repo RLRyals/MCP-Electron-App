@@ -6,10 +6,11 @@
 
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
-import { initializeDashboard } from '../components/DashboardTab.js';
+import { DashboardTab } from '../components/DashboardTab.js';
 
 export class DashboardView implements View {
   private container: HTMLElement | null = null;
+  private dashboardTab: DashboardTab | null = null;
 
   /**
    * Mount the dashboard view
@@ -17,25 +18,17 @@ export class DashboardView implements View {
   async mount(container: HTMLElement): Promise<void> {
     this.container = container;
 
-    // Get the existing dashboard HTML from the old tab panel
-    // We'll clone it to preserve the structure
-    const oldDashboardPanel = document.getElementById('tab-panel-dashboard');
-    if (oldDashboardPanel) {
-      container.innerHTML = oldDashboardPanel.innerHTML;
-    } else {
-      // Fallback: create basic dashboard structure
-      container.innerHTML = `
-        <div id="dashboard-container">
-          <div class="dashboard-content">
-            <!-- Dashboard content will be initialized by DashboardTab -->
-          </div>
-        </div>
-      `;
-    }
+    // Create the dashboard card container that DashboardTab expects
+    container.innerHTML = `
+      <div id="dashboard-card" style="display: block;">
+        <!-- Dashboard content will be initialized by DashboardTab -->
+      </div>
+    `;
 
     // Initialize the existing dashboard functionality
     try {
-      await initializeDashboard();
+      this.dashboardTab = new DashboardTab();
+      this.dashboardTab.initialize();
       console.log('[DashboardView] Dashboard initialized');
     } catch (error) {
       console.error('[DashboardView] Failed to initialize dashboard:', error);
@@ -52,7 +45,11 @@ export class DashboardView implements View {
    * Unmount the dashboard view
    */
   async unmount(): Promise<void> {
-    // Cleanup if needed
+    // Cleanup dashboard tab
+    if (this.dashboardTab && typeof (this.dashboardTab as any).destroy === 'function') {
+      (this.dashboardTab as any).destroy();
+    }
+    this.dashboardTab = null;
     this.container = null;
   }
 

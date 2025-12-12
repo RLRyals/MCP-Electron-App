@@ -12,7 +12,7 @@
 
 export class PluginContainer {
   private container: HTMLElement;
-  private webview: Electron.WebviewTag | null = null;
+  private webview: any = null; // Electron webview tag (no proper TypeScript definitions)
   private currentPluginId: string | null = null;
   private loadTimeout: NodeJS.Timeout | null = null;
   private readonly LOAD_TIMEOUT_MS = 30000; // 30 seconds

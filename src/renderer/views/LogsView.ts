@@ -6,10 +6,11 @@
 
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
-import { initializeLogsTab } from '../components/LogsTab.js';
+import { LogsTab } from '../components/LogsTab.js';
 
 export class LogsView implements View {
   private container: HTMLElement | null = null;
+  private logsTab: LogsTab | null = null;
 
   /**
    * Mount the logs view
@@ -17,24 +18,16 @@ export class LogsView implements View {
   async mount(container: HTMLElement): Promise<void> {
     this.container = container;
 
-    // Get the existing logs HTML from the old tab panel
-    const oldLogsPanel = document.getElementById('tab-panel-logs');
-    if (oldLogsPanel) {
-      container.innerHTML = oldLogsPanel.innerHTML;
-    } else {
-      // Fallback: create basic logs structure
-      container.innerHTML = `
-        <div id="logs-container">
-          <div class="logs-content">
-            <!-- Logs content will be initialized by LogsTab -->
-          </div>
-        </div>
-      `;
-    }
+    // Create the logs card container that LogsTab expects
+    const logsCard = document.createElement('div');
+    logsCard.id = 'logs-card';
+    logsCard.style.display = 'block';
+    container.appendChild(logsCard);
 
     // Initialize the existing logs functionality
     try {
-      await initializeLogsTab();
+      this.logsTab = new LogsTab({ containerId: 'logs-card' });
+      await this.logsTab.initialize();
       console.log('[LogsView] Logs tab initialized');
     } catch (error) {
       console.error('[LogsView] Failed to initialize logs:', error);
@@ -51,6 +44,11 @@ export class LogsView implements View {
    * Unmount the logs view
    */
   async unmount(): Promise<void> {
+    // Cleanup logs tab
+    if (this.logsTab && typeof (this.logsTab as any).destroy === 'function') {
+      (this.logsTab as any).destroy();
+    }
+    this.logsTab = null;
     this.container = null;
   }
 
