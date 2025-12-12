@@ -1,0 +1,17 @@
+{
+  "name": "claude-code-executor-plugin",
+  "version": "1.0.0",
+  "description": "FictionLab plugin for executing Claude Code skills",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc index.ts --outDir . --module commonjs --target es2020 --esModuleInterop --skipLibCheck --resolveJsonModule",
+    "watch": "tsc index.ts --outDir . --module commonjs --target es2020 --esModuleInterop --skipLibCheck --resolveJsonModule --watch"
+  },
+  "keywords": ["fictionlab", "plugin", "claude-code", "ai-writing"],
+  "author": "BQ Studio Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

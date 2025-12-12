@@ -1,0 +1,81 @@
+{
+  "id": "claude-code-executor",
+  "name": "Claude Code Executor",
+  "version": "1.0.0",
+  "description": "Executes Claude Code CLI skills in headless mode for AI-powered writing workflows",
+  "author": "BQ Studio Team",
+  "fictionLabVersion": ">=0.1.0",
+  "pluginType": "execution-engine",
+
+  "entry": {
+    "main": "index.js"
+  },
+
+  "permissions": {
+    "childProcesses": true,
+    "fileSystem": true,
+    "database": ["plugin_claude_code_executor"],
+    "mcp": ["workflow-manager", "character-planning-server"],
+    "network": false,
+    "docker": false,
+    "clipboard": false,
+    "dialogs": true
+  },
+
+  "dependencies": {
+    "mcpServers": [
+      {
+        "id": "workflow-manager",
+        "version": ">=1.0.0",
+        "optional": false
+      }
+    ],
+    "fictionlabApi": "^1.0.0"
+  },
+
+  "ui": {
+    "menuItems": [
+      {
+        "label": "Claude Code",
+        "submenu": [
+          {
+            "label": "Check CLI Status",
+            "action": "check-cli-status"
+          },
+          {
+            "label": "Settings",
+            "action": "show-settings"
+          }
+        ]
+      }
+    ],
+    "settingsPanel": "ClaudeCodeSettings"
+  },
+
+  "configSchema": {
+    "claudeCodePath": {
+      "type": "string",
+      "default": "",
+      "description": "Custom path to Claude Code CLI (leave empty for auto-detection)",
+      "required": false
+    },
+    "maxConcurrentExecutions": {
+      "type": "number",
+      "default": 1,
+      "description": "Maximum number of concurrent skill executions",
+      "required": false
+    },
+    "defaultWorkspace": {
+      "type": "string",
+      "default": "",
+      "description": "Default workspace directory for skill execution",
+      "required": false
+    },
+    "enableDetailedLogging": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable detailed logging for debugging",
+      "required": false
+    }
+  }
+}
