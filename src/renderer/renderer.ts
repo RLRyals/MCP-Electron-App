@@ -7,7 +7,11 @@
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
 import { initializeDashboard } from './dashboard-handlers.js';
-import { createDefaultTabNavigation } from './components/TabNavigation.js';
+// NEW: Dashboard redesign imports
+import { Sidebar } from './components/Sidebar.js';
+import { TopBar } from './components/TopBar.js';
+import { ViewRouter } from './components/ViewRouter.js';
+// Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
 import { createDashboardTab } from './components/DashboardTab.js';
 import { createDefaultLogsTab } from './components/LogsTab.js';
@@ -754,30 +758,92 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 /**
+ * Migrate old tab state to new view state
+ */
+function migrateOldTabState(): void {
+  try {
+    const oldTab = localStorage.getItem('fictionlab-active-tab');
+    if (oldTab) {
+      const mapping: Record<string, string> = {
+        dashboard: 'dashboard',
+        setup: 'settings-setup',
+        database: 'settings-database',
+        services: 'settings-services',
+        logs: 'settings-logs',
+      };
+      const newView = mapping[oldTab] || 'dashboard';
+      localStorage.setItem('fictionlab-active-view', newView);
+      localStorage.removeItem('fictionlab-active-tab');
+      console.log('[Migration] Migrated tab state from', oldTab, 'to', newView);
+    }
+  } catch (error) {
+    console.error('[Migration] Failed to migrate tab state:', error);
+  }
+}
+
+/**
  * Initialize the renderer process
  */
 function init(): void {
-  console.log('Renderer process initialized');
+  console.log('Renderer process initialized - NEW DASHBOARD LAYOUT');
 
-  // Initialize plugin handlers
+  // Migrate old tab state if needed
+  migrateOldTabState();
+
+  // Initialize plugin handlers (still needed)
   initializePluginHandlers();
 
-  // Initialize tab navigation system
-  const tabNavigation = createDefaultTabNavigation();
-  tabNavigation.initialize();
+  // NEW: Initialize the new dashboard components
+  const sidebar = new Sidebar({
+    container: document.getElementById('sidebar')!,
+    defaultView: 'dashboard',
+  });
 
-  // Initialize dashboard tab component
+  const topBar = new TopBar({
+    container: document.getElementById('top-bar')!,
+  });
+
+  const viewRouter = new ViewRouter({
+    container: document.getElementById('content-area')!,
+    sidebar,
+    topBar,
+  });
+
+  // Initialize components
+  sidebar.initialize();
+  topBar.initialize();
+  viewRouter.initialize();
+
+  // Connect sidebar navigation to router
+  sidebar.on('navigate', (viewId: string) => {
+    viewRouter.navigateTo(viewId);
+  });
+
+  // Connect top bar actions to active view
+  topBar.on('action-clicked', (actionId: string) => {
+    const activeView = viewRouter.getActiveView();
+    if (activeView?.handleAction) {
+      activeView.handleAction(actionId);
+    }
+  });
+
+  // Store viewRouter globally for plugin handlers
+  (window as any).__viewRouter__ = viewRouter;
+
+  console.log('[Renderer] Dashboard components initialized successfully');
+
+  // Legacy: Keep dashboard tab initialization for backward compatibility
   const dashboardTab = createDashboardTab();
   dashboardTab.initialize();
 
-  // Initialize logs tab component
+  // Legacy: Initialize logs tab component
   const logsTab = createDefaultLogsTab();
 
-  // Declare servicesTab and databaseTab variables to initialize them when needed
+  // Legacy: Declare servicesTab and databaseTab variables
   let servicesTab: any = null;
   let databaseTab: any = null;
 
-  // Listen for tab changes to initialize LogsTab, ServicesTab, and DatabaseTab when first shown
+  // Legacy: Listen for tab changes (for any remaining old tab functionality)
   window.addEventListener('tab-changed', async (e: Event) => {
     const customEvent = e as CustomEvent;
     if (customEvent.detail.tabId === 'logs' && !logsTab['isInitialized']) {

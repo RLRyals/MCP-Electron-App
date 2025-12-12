@@ -61,16 +61,21 @@ async function handlePluginAction(pluginId: string, action: string): Promise<voi
   }
 
   try {
-    // Check if the plugin API has the showView method
-    if (!(window as any).electronAPI?.plugins?.showView) {
-      throw new Error('Plugin showView API not available');
+    // NEW: Use ViewRouter to navigate to plugin view instead of separate window
+    const viewRouter = (window as any).__viewRouter__;
+    if (!viewRouter) {
+      throw new Error('ViewRouter not initialized');
     }
 
-    console.log(`Attempting to show plugin view: ${pluginId}:${viewName}`);
+    console.log(`Navigating to plugin view: ${pluginId}:${viewName}`);
 
-    // Show the plugin view
-    await (window as any).electronAPI.plugins.showView(pluginId, viewName);
-    console.log(`Successfully showing plugin view: ${pluginId}:${viewName}`);
+    // Navigate to the plugin view (will be embedded in main window)
+    await viewRouter.navigateTo('plugin', {
+      pluginId,
+      viewName,
+    });
+
+    console.log(`Successfully navigated to plugin view: ${pluginId}:${viewName}`);
   } catch (error) {
     console.error(`Failed to show plugin view:`, error);
 
@@ -78,7 +83,7 @@ async function handlePluginAction(pluginId: string, action: string): Promise<voi
     showPluginNotification(
       'error',
       'Plugin View Error',
-      `Unable to show ${viewName}. The plugin view system may not be fully initialized yet.`
+      `Unable to show ${viewName}. ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }
@@ -98,24 +103,26 @@ function showPluginNotification(type: 'info' | 'error' | 'success', title: strin
 
 /**
  * Close a plugin view
+ * DEPRECATED: With new dashboard design, plugins are embedded in main window
+ * and navigation is handled by ViewRouter
  */
 export async function closePluginView(pluginId: string, viewName: string): Promise<void> {
-  try {
-    await (window as any).electronAPI.plugins.closeView(pluginId, viewName);
-    console.log(`Closed plugin view: ${pluginId}:${viewName}`);
-  } catch (error) {
-    console.error(`Failed to close plugin view:`, error);
+  console.log(`[DEPRECATED] closePluginView called for ${pluginId}:${viewName} - navigating to dashboard instead`);
+  const viewRouter = (window as any).__viewRouter__;
+  if (viewRouter) {
+    await viewRouter.navigateTo('dashboard');
   }
 }
 
 /**
  * Hide a plugin view
+ * DEPRECATED: With new dashboard design, plugins are embedded in main window
+ * and navigation is handled by ViewRouter
  */
 export async function hidePluginView(pluginId: string, viewName: string): Promise<void> {
-  try {
-    await (window as any).electronAPI.plugins.hideView(pluginId, viewName);
-    console.log(`Hidden plugin view: ${pluginId}:${viewName}`);
-  } catch (error) {
-    console.error(`Failed to hide plugin view:`, error);
+  console.log(`[DEPRECATED] hidePluginView called for ${pluginId}:${viewName} - use ViewRouter.back() instead`);
+  const viewRouter = (window as any).__viewRouter__;
+  if (viewRouter) {
+    await viewRouter.back();
   }
 }

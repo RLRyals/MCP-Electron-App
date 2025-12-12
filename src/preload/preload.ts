@@ -2029,23 +2029,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   plugins: {
     /**
-     * Show a plugin view
+     * Get plugin view URL for embedding (NEW)
+     * Returns the URL and metadata for loading a plugin view in the main window
+     */
+    getViewUrl: (pluginId: string, viewName: string): Promise<{ pluginId: string; viewName: string; url: string; metadata: any }> => {
+      return ipcRenderer.invoke('plugin:get-view-url', pluginId, viewName);
+    },
+
+    /**
+     * List all plugins
+     */
+    list: (): Promise<any[]> => {
+      return ipcRenderer.invoke('plugin:list');
+    },
+
+    /**
+     * Show a plugin view (DEPRECATED - kept for compatibility)
+     * @deprecated Use ViewRouter navigation instead
      */
     showView: (pluginId: string, viewName: string): Promise<void> => {
+      console.warn('[DEPRECATED] plugins.showView - use ViewRouter.navigateTo instead');
       return ipcRenderer.invoke('plugin:show-view', pluginId, viewName);
     },
 
     /**
-     * Hide a plugin view
+     * Hide a plugin view (DEPRECATED - kept for compatibility)
+     * @deprecated Use ViewRouter navigation instead
      */
     hideView: (pluginId: string, viewName: string): Promise<void> => {
+      console.warn('[DEPRECATED] plugins.hideView - use ViewRouter.back() instead');
       return ipcRenderer.invoke('plugin:hide-view', pluginId, viewName);
     },
 
     /**
-     * Close a plugin view
+     * Close a plugin view (DEPRECATED - kept for compatibility)
+     * @deprecated Use ViewRouter navigation instead
      */
     closeView: (pluginId: string, viewName: string): Promise<void> => {
+      console.warn('[DEPRECATED] plugins.closeView - use ViewRouter navigation instead');
       return ipcRenderer.invoke('plugin:close-view', pluginId, viewName);
     },
 

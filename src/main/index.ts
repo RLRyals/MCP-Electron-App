@@ -2162,8 +2162,58 @@ function setupIPC(): void {
   });
 
   // Plugin View IPC handlers
+  // NEW: Get plugin view URL for embedding in main window
+  ipcMain.handle('plugin:get-view-url', async (_event, pluginId: string, viewName: string) => {
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting plugin view URL ${pluginId}:${viewName}`);
+
+      const pluginRegistry = pluginManager.getRegistry();
+      const plugin = pluginRegistry?.getPlugin(pluginId);
+
+      if (!plugin) {
+        const error = `Plugin ${pluginId} not found`;
+        logWithCategory('error', LogCategory.SYSTEM, error);
+        throw new Error(error);
+      }
+
+      // Get plugin view path
+      const pluginDir = plugin.context.plugin.installPath;
+      const viewPath = path.join(pluginDir, 'dist', 'renderer', 'index.html');
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Plugin directory: ${pluginDir}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `View path: ${viewPath}`);
+
+      // Check if file exists
+      if (!fs.existsSync(viewPath)) {
+        const error = `Plugin renderer not found at: ${viewPath}`;
+        logWithCategory('error', LogCategory.SYSTEM, error);
+        throw new Error(error);
+      }
+
+      const result = {
+        pluginId,
+        viewName,
+        url: viewPath,
+        metadata: {
+          name: plugin.manifest.name,
+          version: plugin.manifest.version,
+          description: plugin.manifest.description,
+        },
+      };
+
+      logWithCategory('info', LogCategory.SYSTEM, `Plugin view URL retrieved successfully: ${pluginId}:${viewName}`);
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to get plugin view URL: ${error.message}`);
+      logWithCategory('error', LogCategory.SYSTEM, `Error stack: ${error.stack}`);
+      throw error;
+    }
+  });
+
+  // DEPRECATED: Old plugin:show-view handler (kept for backward compatibility)
   ipcMain.handle('plugin:show-view', async (_event, pluginId: string, viewName: string) => {
     try {
+      logWithCategory('warn', LogCategory.SYSTEM, `[DEPRECATED] plugin:show-view called - use ViewRouter instead`);
       logWithCategory('info', LogCategory.SYSTEM, `IPC: Showing plugin view ${pluginId}:${viewName}`);
 
       const pluginRegistry = pluginManager.getRegistry();

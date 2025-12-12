@@ -1,0 +1,391 @@
+/**
+ * Plugins Launcher CSS
+ * Styles for the plugin grid/list view, search, and actions
+ */
+
+/* ========================================
+   Plugins Launcher Container
+   ======================================== */
+
+.plugins-launcher {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--spacing-lg);
+}
+
+/* ========================================
+   Plugins Header (Search & Controls)
+   ======================================== */
+
+.plugins-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.plugins-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.plugins-search:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px rgba(0, 212, 170, 0.2);
+}
+
+.search-icon {
+  color: var(--color-text-tertiary);
+  font-size: 1.2rem;
+}
+
+#plugin-search {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+}
+
+#plugin-search::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.plugins-controls {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+}
+
+.view-toggle {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.view-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+}
+
+.view-toggle.active {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+}
+
+/* ========================================
+   Plugins Container
+   ======================================== */
+
+.plugins-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px; /* Prevent shadow clipping */
+}
+
+/* Grid layout */
+.plugins-container.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  align-content: start;
+}
+
+/* List layout */
+.plugins-container.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ========================================
+   Plugin Card
+   ======================================== */
+
+.plugin-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.plugin-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 12px rgba(0, 212, 170, 0.15);
+  transform: translateY(-2px);
+}
+
+.plugin-card.inactive {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.plugin-card.inactive:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* List view layout */
+.plugins-container.list .plugin-card {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* ========================================
+   Plugin Icon
+   ======================================== */
+
+.plugin-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--color-accent-dim);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.plugins-container.list .plugin-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 1.5rem;
+}
+
+/* ========================================
+   Plugin Info
+   ======================================== */
+
+.plugin-info {
+  flex: 1;
+  min-width: 0; /* Fix for text overflow */
+}
+
+.plugin-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plugin-description {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-sm) 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.plugins-container.list .plugin-description {
+  -webkit-line-clamp: 1;
+}
+
+.plugin-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 0.85rem;
+}
+
+.plugin-version {
+  color: var(--color-text-tertiary);
+}
+
+.plugin-status {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+.plugin-status.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+}
+
+.plugin-status.inactive {
+  background: rgba(107, 114, 128, 0.2);
+  color: #9CA3AF;
+}
+
+/* ========================================
+   Plugin Actions
+   ======================================== */
+
+.plugin-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.plugins-container.grid .plugin-actions {
+  margin-top: auto;
+}
+
+.plugin-action-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.plugin-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.plugin-action-btn.primary {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.plugin-action-btn.primary:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 12px rgba(0, 212, 170, 0.4);
+}
+
+.plugin-action-btn.pinned {
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+
+.plugins-empty {
+  grid-column: 1 / -1; /* Span all columns in grid */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  text-align: center;
+  min-height: 400px;
+}
+
+.empty-icon {
+  font-size: 5rem;
+  margin-bottom: var(--spacing-lg);
+  opacity: 0.5;
+}
+
+.plugins-empty h3 {
+  font-size: 1.5rem;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.plugins-empty p {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ========================================
+   Responsive Adjustments
+   ======================================== */
+
+@media (max-width: 1023px) {
+  .plugins-container.grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .plugins-header {
+    flex-direction: column;
+  }
+
+  .plugins-search {
+    width: 100%;
+  }
+
+  .plugins-container.grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plugin-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .plugin-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.5rem;
+  }
+
+  .plugin-description {
+    -webkit-line-clamp: 1;
+  }
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes pluginCardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.plugin-card {
+  animation: pluginCardAppear 0.3s ease;
+}
+
+/* Stagger animation for cards */
+.plugin-card:nth-child(1) { animation-delay: 0s; }
+.plugin-card:nth-child(2) { animation-delay: 0.05s; }
+.plugin-card:nth-child(3) { animation-delay: 0.1s; }
+.plugin-card:nth-child(4) { animation-delay: 0.15s; }
+.plugin-card:nth-child(5) { animation-delay: 0.2s; }
+.plugin-card:nth-child(6) { animation-delay: 0.25s; }
