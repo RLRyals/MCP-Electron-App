@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell, Event, ContextMenuParams } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as prerequisites from './prerequisites';
@@ -60,8 +60,8 @@ import type {
   PipelineStatusResponse,
 } from '../types/ipc';
 
-let mainWindow: BrowserWindow | null = null;
-let typingMindWindow: BrowserWindow | null = null;
+let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
+let typingMindWindow: InstanceType<typeof BrowserWindow> | null = null;
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -431,12 +431,12 @@ function createTypingMindWindow(url: string): void {
   });
 
   // Set up context menu with spell check support
-  typingMindWindow.webContents.on('context-menu', (_event, params) => {
+  typingMindWindow.webContents.on('context-menu', (_event: Event, params: ContextMenuParams) => {
     const menu = Menu.buildFromTemplate([
       // Add spelling suggestions if there's a misspelled word
       ...(params.misspelledWord && params.dictionarySuggestions.length > 0
         ? [
-            ...params.dictionarySuggestions.slice(0, 5).map(suggestion => ({
+            ...params.dictionarySuggestions.slice(0, 5).map((suggestion: string) => ({
               label: suggestion,
               click: () => typingMindWindow?.webContents.replaceMisspelling(suggestion),
             })),

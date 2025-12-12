@@ -100,7 +100,6 @@ export class Sidebar {
     this.container.innerHTML = `
       <div class="sidebar-header">
         <div class="sidebar-logo">FL</div>
-        <div class="sidebar-title">FictionLab</div>
       </div>
 
       <nav class="sidebar-navigation">

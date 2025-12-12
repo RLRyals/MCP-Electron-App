@@ -2,7 +2,7 @@
   "name": "fictionlab",
   "version": "0.1.0",
   "description": "AI-powered writing workspace for authors - your creative laboratory",
-  "main": "dist/main/index.js",
+  "main": "dist/main/bootstrap.js",
   "author": "FictionLab",
   "license": "MIT",
   "private": true,
