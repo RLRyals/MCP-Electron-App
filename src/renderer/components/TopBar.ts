@@ -56,7 +56,10 @@ export class TopBar {
   public setContext(viewId: string, config: TopBarConfig): void {
     this.currentConfig = config;
     this.render();
-    this.attachEventListeners();
+    // Listeners are now attached in initialize() or valid only for static elements
+    // For dynamic elements re-rendered in render(), we might need re-attachment if we don't use delegation
+    // But TopBar uses delegation on this.container for most things!
+    // this.attachEventListeners(); <- REMOVED to prevent duplication
     console.log('[TopBar] Context updated for view:', viewId, config);
   }
 
@@ -280,6 +283,11 @@ export class TopBar {
    * Attach event listeners
    */
   private attachEventListeners(): void {
+    // Action button clicks
+    // Remove existing listener if any (simplistic approach, or just ensure we don't add multiple)
+    // Since we are using event delegation on this.container, we only need to attach ONCE.
+    // We'll trust strict initialization.
+    
     // Action button clicks
     this.container.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;

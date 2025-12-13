@@ -42,8 +42,16 @@ export class DashboardTab {
 
     // Setup event listeners (imported from dashboard-handlers)
     // This must happen AFTER render() so the buttons exist in the DOM
+    // This must happen AFTER render() so the buttons exist in the DOM
     if (typeof (window as any).setupDashboardHandlers === 'function') {
-      (window as any).setupDashboardHandlers();
+      try {
+        console.log('[DashboardTab] Calling setupDashboardHandlers...');
+        (window as any).setupDashboardHandlers();
+      } catch (err) {
+        console.error('Error executing setupDashboardHandlers:', err);
+      }
+    } else {
+      console.error('setupDashboardHandlers is not a function on window object. Dashboard buttons may not work.');
     }
 
     // Start auto-refresh

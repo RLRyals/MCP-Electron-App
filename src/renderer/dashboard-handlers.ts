@@ -103,9 +103,11 @@ export async function setupDashboardHandlers(): Promise<void> {
     await checkAndAutoStartSystem();
 
     // Start polling (if not already started)
+    // Start polling (if not already started)
     if (!statusPollingInterval) {
       startStatusPolling();
     }
+    console.log('Dashboard handlers setup completed successfully');
   } catch (error) {
     console.error('Failed to setup dashboard handlers:', error);
     showNotification(`Dashboard setup failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -151,6 +153,7 @@ async function updateDashboardButtons(): Promise<void> {
  * Setup all dashboard event listeners
  */
 function setupDashboardListeners(): void {
+  console.log('[DashboardHandlers] setupDashboardListeners called');
   // Quick Actions
   const startBtn = document.getElementById('dashboard-start-system');
   const stopBtn = document.getElementById('dashboard-stop-system');
@@ -164,7 +167,13 @@ function setupDashboardListeners(): void {
   const openBackupFolderBtn = document.getElementById('dashboard-open-backup-folder');
 
   if (startBtn) {
-    startBtn.addEventListener('click', handleStartSystem);
+    console.log('[DashboardHandlers] Attaching listener to start button');
+    startBtn.addEventListener('click', (e) => {
+      console.log('[DashboardHandlers] Start button clicked');
+      handleStartSystem();
+    });
+  } else {
+    console.error('[DashboardHandlers] Start button NOT found during setup');
   }
 
   if (stopBtn) {
