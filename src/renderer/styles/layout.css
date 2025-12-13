@@ -161,7 +161,6 @@ body {
   overflow-x: hidden;
   padding: var(--spacing-lg);
   position: relative;
-  margin-top: 80px; /* Push content down below the fixed top bar */
 }
 
 /* Custom scrollbar for content area */

@@ -26,17 +26,14 @@
   height: 40px;
   padding: 0 var(--spacing-md);
   flex-shrink: 0;
-  margin-left: -240px; /* Move window controls and icons left by sidebar width */
-  padding-left: 240px; /* Add padding to maintain spacing */
 }
 
 .top-bar-title-row {
-  height: 32px;
+  height: 40px;
   padding: 0 var(--spacing-lg);
   background: rgba(0, 0, 0, 0.15);
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
-  margin-top: 8px; /* Push the main area menus down */
 }
 
 /* Single-row layout (Mac/Linux) - when no .top-bar-row */
@@ -85,8 +82,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  margin-right: var(--spacing-lg);
-  margin-left: -200px; /* Move menu items to the left */
+  margin-right: auto;
 }
 
 .menu-item {
