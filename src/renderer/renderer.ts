@@ -6,7 +6,7 @@
 
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
-import { initializeDashboard } from './dashboard-handlers.js';
+import { initializeDashboard, setupDashboardHandlers } from './dashboard-handlers.js';
 // NEW: Dashboard redesign imports
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
