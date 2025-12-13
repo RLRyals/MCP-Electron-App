@@ -12,7 +12,6 @@ import { app } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
 import * as clientSelection from './client-selection';
-import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
 import * as pgbouncerConfig from './pgbouncer-config';
@@ -346,7 +345,6 @@ async function validateMountPaths(): Promise<{ success: boolean; error?: string 
   
   const pathsToValidate = [
     { name: 'MCP Repository', path: getMCPRepositoryDirectory() },
-    { name: 'TypingMind', path: typingMindDownloader.getTypingMindDirectory() },
     { name: 'Project Root', path: getProjectRootDirectory() },
   ];
   
@@ -532,8 +530,7 @@ export async function stopExistingContainers(): Promise<void> {
       6432, // pgbouncer
       config.MCP_CONNECTOR_PORT,
       config.HTTP_SSE_PORT,
-      config.DB_ADMIN_PORT,
-      config.TYPING_MIND_PORT
+      config.DB_ADMIN_PORT
     ];
     
     for (let retry = 0; retry < maxRetries; retry++) {
@@ -680,16 +677,8 @@ async function determineServicesToStart(): Promise<{
     logWithCategory('info', LogCategory.DOCKER, 'MCP Connector will be started');
   }
 
-  // Start Typing Mind if selected AND files are downloaded
-  if (selectedClients.includes('typingmind')) {
-    const isInstalled = await typingMindDownloader.isInstalled();
-    if (isInstalled) {
-      services.typingMind = true;
-      logWithCategory('info', LogCategory.DOCKER, 'Typing Mind will be started');
-    } else {
-      logWithCategory('warn', LogCategory.DOCKER, 'Typing Mind selected but not installed');
-    }
-  }
+  // Note: TypingMind is no longer a Docker service - it uses typingmind.com directly
+  // No need to start a local TypingMind container
 
   return services;
 }
@@ -739,16 +728,12 @@ async function execDockerCompose(
         HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
         DB_ADMIN_PORT: String(config.DB_ADMIN_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
-        TYPING_MIND_PORT: String(config.TYPING_MIND_PORT),
-        TYPING_MIND_DIR: typingMindDownloader.getTypingMindDirectory(),
         // Path to MCP config file for Docker volume mounting
         MCP_CONFIG_FILE_PATH: mcpConfigPath,
         // Repository paths for Docker volume mounting
         MCP_WRITING_SERVERS_DIR: getMCPRepositoryDirectory(),
-        // Docker directory path (contains init.sql, nginx.conf, etc.)
+        // Docker directory path (contains init.sql, etc.)
         DOCKER_DIR: workingDir,
-        // nginx.conf path for TypingMind container
-        NGINX_CONF_PATH: path.join(workingDir, 'nginx.conf'),
       }
     });
     return result;
@@ -1521,12 +1506,9 @@ export async function getServiceUrls(): Promise<ServiceUrls> {
   const selection = await clientSelection.loadClientSelection();
   const urls: ServiceUrls = {};
 
-  // Add Typing Mind URL if selected and installed
+  // Add Typing Mind URL if selected (uses typingmind.com directly)
   if (selection?.clients.includes('typingmind')) {
-    const isInstalled = await typingMindDownloader.isInstalled();
-    if (isInstalled) {
-      urls.typingMind = `http://localhost:${config.TYPING_MIND_PORT}`;
-    }
+    urls.typingMind = 'https://www.typingmind.com';
   }
 
   // Add MCP Connector URL if needed
@@ -1599,12 +1581,6 @@ export async function getDetailedServiceStatus(): Promise<DetailedSystemStatus> 
         containerName: 'fictionlab-mcp-servers',
         port: 3001, // Primary port
         url: undefined, // Internal service
-      },
-      {
-        serviceName: 'TypingMind UI',
-        containerName: 'fictionlab-typingmind',
-        port: config.TYPING_MIND_PORT,
-        url: serviceUrls.typingMind,
       },
     ];
 

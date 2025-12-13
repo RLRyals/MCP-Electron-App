@@ -966,12 +966,13 @@ async function initializeDownloadStep() {
 
     // Initialize the downloads object at the start of the build process if it doesn't exist
     // This allows the validation to pass while the build is in progress
+    // Note: typingMindCompleted is set to true since we use typingmind.com directly (no download needed)
     // Note: dockerImagesCompleted is set to true since Docker images aren't used yet
     if (!wizardState.data.downloads) {
         console.log('Initializing downloads state object...');
         const initResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             downloads: {
-                typingMindCompleted: false,
+                typingMindCompleted: true,  // Set to true since we use typingmind.com directly
                 dockerImagesCompleted: true  // Set to true since Docker images aren't used yet
             }
         });

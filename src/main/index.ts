@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, Event, ContextMenuParams } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as prerequisites from './prerequisites';
@@ -61,7 +61,6 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
-let typingMindWindow: InstanceType<typeof BrowserWindow> | null = null;
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -394,93 +393,13 @@ function createWindow(): void {
 /**
  * Create the Typing Mind window
  */
-function createTypingMindWindow(url: string): void {
-  logger.info('Creating Typing Mind window...');
+function openTypingMindInBrowser(url: string): void {
+  logger.info(`Opening Typing Mind in default browser: ${url}`);
 
-  // If window already exists, focus it and navigate to URL
-  if (typingMindWindow && !typingMindWindow.isDestroyed()) {
-    typingMindWindow.focus();
-    typingMindWindow.loadURL(url);
-    return;
-  }
-
-  const iconPath = getIconPath();
-
-  typingMindWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 768,
-    icon: iconPath,
-    title: 'Typing Mind - FictionLab',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      spellcheck: true, // Enable spell checking
-    },
-    show: false, // Don't show until ready
+  // Open in default browser
+  shell.openExternal(url).catch((error) => {
+    logger.error('Failed to open Typing Mind in browser', error);
   });
-
-  // Load the Typing Mind URL
-  typingMindWindow.loadURL(url);
-
-  // Show window when ready to avoid visual flash
-  typingMindWindow.once('ready-to-show', () => {
-    logger.info('Typing Mind window ready to show');
-    typingMindWindow?.show();
-  });
-
-  // Set up context menu with spell check support
-  typingMindWindow.webContents.on('context-menu', (_event: Event, params: ContextMenuParams) => {
-    const menu = Menu.buildFromTemplate([
-      // Add spelling suggestions if there's a misspelled word
-      ...(params.misspelledWord && params.dictionarySuggestions.length > 0
-        ? [
-            ...params.dictionarySuggestions.slice(0, 5).map((suggestion: string) => ({
-              label: suggestion,
-              click: () => typingMindWindow?.webContents.replaceMisspelling(suggestion),
-            })),
-            { type: 'separator' as const },
-          ]
-        : []
-      ),
-      // Standard editing menu items
-      ...(params.isEditable
-        ? [
-            { role: 'undo' as const },
-            { role: 'redo' as const },
-            { type: 'separator' as const },
-            { role: 'cut' as const },
-            { role: 'copy' as const },
-            { role: 'paste' as const },
-            { role: 'pasteAndMatchStyle' as const },
-            { role: 'selectAll' as const },
-          ]
-        : params.selectionText
-        ? [
-            { role: 'copy' as const },
-          ]
-        : []
-      ),
-    ]);
-
-    if (menu.items.length > 0) {
-      menu.popup();
-    }
-  });
-
-  // Open DevTools in development mode
-  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
-    typingMindWindow.webContents.openDevTools();
-  }
-
-  typingMindWindow.on('closed', () => {
-    typingMindWindow = null;
-  });
-
-  logger.info('Typing Mind window created');
 }
 
 import { registerImportHandlers } from './handlers/import-handlers';
@@ -932,12 +851,12 @@ function setupIPC(): void {
   });
 
   ipcMain.handle('typingmind:open-window', async (_, url: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening Typing Mind window at ${url}...`);
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening Typing Mind in browser at ${url}...`);
     try {
-      createTypingMindWindow(url);
+      openTypingMindInBrowser(url);
       return { success: true };
     } catch (error) {
-      logWithCategory('error', LogCategory.ERROR, 'Failed to open Typing Mind window', error);
+      logWithCategory('error', LogCategory.ERROR, 'Failed to open Typing Mind in browser', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),

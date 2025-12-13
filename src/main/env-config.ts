@@ -23,8 +23,8 @@ export interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
   PGBOUNCER_PORT: number;
+  TYPING_MIND_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -40,8 +40,8 @@ export const DEFAULT_CONFIG: EnvConfig = {
   HTTP_SSE_PORT: 3001,
   DB_ADMIN_PORT: 3010,
   MCP_AUTH_TOKEN: '',
-  TYPING_MIND_PORT: 8080,
   PGBOUNCER_PORT: 6432,
+  TYPING_MIND_PORT: 8080,
   GITHUB_TOKEN: '',
 };
 
@@ -447,7 +447,6 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.MCP_CONNECTOR_PORT, name: 'MCP Connector', key: 'MCP_CONNECTOR_PORT' as const },
     { port: config.HTTP_SSE_PORT, name: 'HTTP/SSE', key: 'HTTP_SSE_PORT' as const },
     { port: config.DB_ADMIN_PORT, name: 'DB Admin', key: 'DB_ADMIN_PORT' as const },
-    { port: config.TYPING_MIND_PORT, name: 'TypingMind', key: 'TYPING_MIND_PORT' as const },
     { port: config.PGBOUNCER_PORT, name: 'PgBouncer', key: 'PGBOUNCER_PORT' as const },
   ];
 
@@ -577,9 +576,6 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'MCP_AUTH_TOKEN':
           config.MCP_AUTH_TOKEN = unquotedValue;
           break;
-        case 'TYPING_MIND_PORT':
-          config.TYPING_MIND_PORT = parseInt(unquotedValue, 10);
-          break;
         case 'PGBOUNCER_PORT':
           config.PGBOUNCER_PORT = parseInt(unquotedValue, 10);
           break;
@@ -684,7 +680,6 @@ export function formatEnvFile(config: EnvConfig): string {
     `HTTP_SSE_PORT=${config.HTTP_SSE_PORT}`,
     `DB_ADMIN_PORT=${config.DB_ADMIN_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
-    `TYPING_MIND_PORT=${config.TYPING_MIND_PORT}`,
     `PGBOUNCER_PORT=${config.PGBOUNCER_PORT}`,
   ];
 
@@ -772,11 +767,6 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const dbAdminPortValidation = validatePort(config.DB_ADMIN_PORT);
   if (!dbAdminPortValidation.valid) {
     errors.push(`DB Admin port: ${dbAdminPortValidation.error}`);
-  }
-
-  const typingMindPortValidation = validatePort(config.TYPING_MIND_PORT);
-  if (!typingMindPortValidation.valid) {
-    errors.push(`Typing Mind port: ${typingMindPortValidation.error}`);
   }
 
   const pgBouncerPortValidation = validatePort(config.PGBOUNCER_PORT);
