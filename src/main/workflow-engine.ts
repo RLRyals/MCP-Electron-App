@@ -415,4 +415,75 @@ export class WorkflowEngine {
 
     return result.rows;
   }
+  /**
+   * Import a workflow from a JSON file
+   */
+  async importWorkflow(sourcePath: string): Promise<string> {
+    logWithCategory('info', LogCategory.SYSTEM, `Importing workflow from ${sourcePath}...`);
+    const fs = require('fs-extra');
+    
+    try {
+      // 1. Read file
+      if (!await fs.pathExists(sourcePath)) {
+        throw new Error(`Source path does not exist: ${sourcePath}`);
+      }
+      
+      const workflow = await fs.readJson(sourcePath);
+      
+      // 2. Validate basic structure
+      if (!workflow.name || !workflow.steps || !Array.isArray(workflow.steps)) {
+        throw new Error('Invalid workflow format: missing name or steps');
+      }
+      
+      // 3. Insert into database
+      // If ID exists, we upsert, otherwise insert
+      let query = '';
+      let params: any[] = [];
+      
+      if (workflow.id) {
+        query = `
+          INSERT INTO workflows (id, name, description, target_type, target_id, steps, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            target_type = EXCLUDED.target_type,
+            target_id = EXCLUDED.target_id,
+            steps = EXCLUDED.steps,
+            updated_at = NOW()
+          RETURNING id
+        `;
+        params = [
+          workflow.id,
+          workflow.name,
+          workflow.description || '',
+          workflow.target_type || 'global',
+          workflow.target_id || null,
+          JSON.stringify(workflow.steps),
+          workflow.status || 'draft'
+        ];
+      } else {
+        query = `
+          INSERT INTO workflows (name, description, target_type, target_id, steps, status)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+        params = [
+          workflow.name,
+          workflow.description || '',
+          workflow.target_type || 'global',
+          workflow.target_id || null,
+          JSON.stringify(workflow.steps),
+          workflow.status || 'draft'
+        ];
+      }
+      
+      const result = await this.dbPool.query(query, params);
+      return result.rows[0].id;
+      
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Failed to import workflow:', error);
+      throw error;
+    }
+  }
 }

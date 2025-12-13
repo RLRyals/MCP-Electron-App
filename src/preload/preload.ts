@@ -1397,6 +1397,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Import API
+   */
+  import: {
+    /**
+     * Import a plugin from a directory
+     * Returns the plugin ID
+     */
+    plugin: (path: string): Promise<string> => {
+      return ipcRenderer.invoke('import:plugin', path);
+    },
+
+    /**
+     * Import a workflow from a JSON file
+     * Returns the workflow ID
+     */
+    workflow: (path: string): Promise<string> => {
+      return ipcRenderer.invoke('import:workflow', path);
+    },
+  },
+
+  /**
+   * Dialog API
+   */
+  dialog: {
+    /**
+     * Show open dialog
+     */
+    showOpenDialog: (options: any): Promise<any> => {
+      return ipcRenderer.invoke('dialog:show-open-dialog', options);
+    },
+  },
+
+  /**
    * Database Administration API (MCP Tools)
    */
   databaseAdmin: {

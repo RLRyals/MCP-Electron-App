@@ -483,12 +483,18 @@ function createTypingMindWindow(url: string): void {
   logger.info('Typing Mind window created');
 }
 
+import { registerImportHandlers } from './handlers/import-handlers';
+
 /**
  * Set up IPC handlers for communication between main and renderer processes
  */
 function setupIPC(): void {
+  // Register import handlers
+  registerImportHandlers();
+
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {
+
     logger.info('Received ping from renderer');
     return 'pong';
   });

@@ -395,6 +395,58 @@ class PluginManager {
   }
 
   /**
+   * Import a plugin from a local directory
+   * 
+   * @param sourcePath Path to the plugin directory to import
+   * @returns The imported plugin ID
+   */
+  async importPlugin(sourcePath: string): Promise<string> {
+    logWithCategory('info', LogCategory.SYSTEM, `Importing plugin from ${sourcePath}...`);
+    
+    // Lazy load fs-extra and path to avoid circular deps or startup cost
+    const fs = require('fs-extra');
+    const path = require('path');
+    
+    try {
+      // 1. Validate source
+      if (!await fs.pathExists(sourcePath)) {
+        throw new Error(`Source path does not exist: ${sourcePath}`);
+      }
+      
+      const manifestPath = path.join(sourcePath, 'plugin.json');
+      if (!await fs.pathExists(manifestPath)) {
+        throw new Error('No plugin.json found in source directory');
+      }
+      
+      const manifest = await fs.readJson(manifestPath);
+      if (!manifest.id) {
+        throw new Error('Plugin manifest missing ID');
+      }
+      
+      // 2. Determine destination
+      // Using app.getPath('userData') directly as we know that's where loader looks
+      const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+      const destPath = path.join(pluginsDir, manifest.id);
+      
+      // 3. Copy plugin
+      logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
+      await fs.copy(sourcePath, destPath, { overwrite: true });
+      
+      // 4. Reload plugins
+      if (this.registry) {
+        // If plugin was already loaded, we might need to unload it first?
+        // simple approach: discover and load all (which updates existing)
+        await this.registry.discoverAndLoadAll();
+      }
+      
+      return manifest.id;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Failed to import plugin:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if plugin system is initialized
    */
   isInitialized(): boolean {

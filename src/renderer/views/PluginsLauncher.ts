@@ -284,6 +284,7 @@ export class PluginsLauncher implements View {
       title: 'Plugins',
       actions: [
         { id: 'refresh', label: 'Refresh', icon: '🔄' },
+        { id: 'import', label: 'Import Plugin', icon: '📥' },
         { id: 'manage', label: 'Manage Plugins', icon: '⚙️' },
       ],
       global: {
@@ -296,13 +297,36 @@ export class PluginsLauncher implements View {
   /**
    * Handle action from top bar
    */
-  handleAction(actionId: string): void {
+  async handleAction(actionId: string): Promise<void> {
     switch (actionId) {
       case 'refresh':
         this.loadPlugins().then(() => {
           this.render();
           this.attachEventListeners();
         });
+        break;
+      case 'import':
+        try {
+          const electronAPI = (window as any).electronAPI;
+          const result = await electronAPI.dialog.showOpenDialog({
+            title: 'Import Plugin',
+            properties: ['openDirectory'],
+            buttonLabel: 'Import Plugin',
+          });
+          
+          if (!result.canceled && result.filePaths.length > 0) {
+            const path = result.filePaths[0];
+            await electronAPI.import.plugin(path);
+            // Refresh list
+            await this.loadPlugins();
+            this.render();
+            this.attachEventListeners();
+            alert('Plugin imported successfully!');
+          }
+        } catch (error: any) {
+          console.error('[PluginsLauncher] Import failed:', error);
+          alert(`Import failed: ${error.message}`);
+        }
         break;
       case 'manage':
         // TODO: Open plugin management dialog

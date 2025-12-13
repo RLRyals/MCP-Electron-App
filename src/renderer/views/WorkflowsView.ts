@@ -353,6 +353,7 @@ export class WorkflowsView implements View {
       title: 'Workflows',
       actions: [
         { id: 'create', label: 'Create Workflow', icon: '➕', variant: 'primary' },
+        { id: 'import', label: 'Import Workflow', icon: '📥' },
         { id: 'refresh', label: 'Refresh', icon: '🔄' },
       ],
       global: {
@@ -365,10 +366,34 @@ export class WorkflowsView implements View {
   /**
    * Handle action from top bar
    */
-  handleAction(actionId: string): void {
+  async handleAction(actionId: string): Promise<void> {
     switch (actionId) {
       case 'create':
         this.createWorkflow();
+        break;
+      case 'import':
+        try {
+          const electronAPI = (window as any).electronAPI;
+          const result = await electronAPI.dialog.showOpenDialog({
+            title: 'Import Workflow',
+            filters: [{ name: 'JSON Files', extensions: ['json'] }],
+            properties: ['openFile'],
+            buttonLabel: 'Import Workflow',
+          });
+          
+          if (!result.canceled && result.filePaths.length > 0) {
+            const path = result.filePaths[0];
+            await electronAPI.import.workflow(path);
+            this.showNotification('success', 'Import Successful', 'Workflow imported successfully');
+            // Refresh list
+            await this.loadWorkflows();
+            this.render();
+            this.attachEventListeners();
+          }
+        } catch (error: any) {
+          console.error('[WorkflowsView] Import failed:', error);
+          this.showNotification('error', 'Import Failed', error.message);
+        }
         break;
       case 'refresh':
         this.loadWorkflows().then(() => {
