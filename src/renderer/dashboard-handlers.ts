@@ -83,6 +83,39 @@ export async function initializeDashboard(): Promise<void> {
 }
 
 /**
+ * Setup dashboard handlers (for use by DashboardTab component)
+ * This is called after the dashboard DOM is rendered
+ */
+export async function setupDashboardHandlers(): Promise<void> {
+  console.log('Setting up dashboard handlers...');
+
+  try {
+    // Setup event listeners
+    setupDashboardListeners();
+
+    // Update dashboard buttons based on installed clients
+    await updateDashboardButtons();
+
+    // Load initial status
+    await updateSystemStatus();
+
+    // Check if system needs to be auto-started after wizard completion
+    await checkAndAutoStartSystem();
+
+    // Start polling (if not already started)
+    if (!statusPollingInterval) {
+      startStatusPolling();
+    }
+  } catch (error) {
+    console.error('Failed to setup dashboard handlers:', error);
+    showNotification(`Dashboard setup failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+  }
+}
+
+// Expose setupDashboardHandlers globally for DashboardTab component
+(window as any).setupDashboardHandlers = setupDashboardHandlers;
+
+/**
  * Update dashboard buttons based on installed clients
  */
 async function updateDashboardButtons(): Promise<void> {

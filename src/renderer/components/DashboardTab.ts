@@ -40,6 +40,12 @@ export class DashboardTab {
     // Render the dashboard structure
     this.render();
 
+    // Setup event listeners (imported from dashboard-handlers)
+    // This must happen AFTER render() so the buttons exist in the DOM
+    if (typeof (window as any).setupDashboardHandlers === 'function') {
+      (window as any).setupDashboardHandlers();
+    }
+
     // Start auto-refresh
     this.startAutoRefresh();
 

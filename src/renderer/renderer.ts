@@ -961,11 +961,9 @@ function init(): void {
     // Don't show notification - this is not critical
   });
 
-  // Initialize dashboard (main control interface)
-  initializeDashboard().catch(err => {
-    console.error('Critical error initializing dashboard:', err);
-    showNotification('Failed to initialize dashboard. Please check the console for details.', 'error');
-  });
+  // NOTE: Dashboard initialization moved to DashboardTab.initialize()
+  // This ensures event listeners are attached after the DOM is rendered
+  // The old initializeDashboard() call here was running before the dashboard buttons existed
 
   // Set up Docker control event listeners
   const startButton = document.getElementById('start-docker');
