@@ -833,28 +833,28 @@ function init(): void {
     // Handle menu actions
     switch (menuId) {
       case 'file':
-        // Show file menu
+        // Show file menu - could open a dropdown menu in the future
         console.log('[Renderer] File menu clicked');
         break;
       case 'edit':
-        // Show edit menu
+        // Show edit menu - could open a dropdown menu in the future
         console.log('[Renderer] Edit menu clicked');
         break;
       case 'view':
-        // Show view menu
+        // Show view menu - could open a dropdown menu in the future
         console.log('[Renderer] View menu clicked');
         break;
       case 'plugins':
         // Navigate to plugins view
-        viewRouter.navigateTo('plugins-launcher');
+        viewRouter.navigateTo('plugins');
         break;
       case 'diagnostics':
-        // Navigate to diagnostics view
-        viewRouter.navigateTo('diagnostics');
+        // Navigate to setup view which contains diagnostics/system checks
+        viewRouter.navigateTo('settings-setup');
         break;
       case 'help':
-        // Show help menu or navigate to help
-        console.log('[Renderer] Help menu clicked');
+        // Navigate to help view
+        viewRouter.navigateTo('help');
         break;
       default:
         console.warn('[Renderer] Unknown menu:', menuId);

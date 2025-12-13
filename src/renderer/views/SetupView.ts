@@ -7,6 +7,8 @@
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
 import { initializeSetupTab } from '../components/SetupTab.js';
+import { loadEnvConfig, setupEnvConfigListeners } from '../env-config-handlers.js';
+import { loadClientOptions, setupClientSelectionListeners } from '../client-selection-handlers.js';
 
 export class SetupView implements View {
   private container: HTMLElement | null = null;
@@ -36,6 +38,15 @@ export class SetupView implements View {
     try {
       await initializeSetupTab();
       console.log('[SetupView] Setup tab initialized');
+
+      // Re-setup event listeners for forms that were just copied into the view
+      setupEnvConfigListeners();
+      loadEnvConfig();
+
+      setupClientSelectionListeners();
+      loadClientOptions();
+
+      console.log('[SetupView] Form event listeners attached');
     } catch (error) {
       console.error('[SetupView] Failed to initialize setup:', error);
       container.innerHTML = `
