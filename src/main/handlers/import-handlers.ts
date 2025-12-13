@@ -10,22 +10,31 @@ import { getDatabasePool } from '../database-connection';
 export function registerImportHandlers() {
   // Import Plugin
   ipcMain.handle('import:plugin', async (event, sourcePath: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Import plugin request for ${sourcePath}`);
     try {
-      return await pluginManager.importPlugin(sourcePath);
+      const id = await pluginManager.importPlugin(sourcePath);
+      logWithCategory('info', LogCategory.SYSTEM, `IPC: Import plugin success, ID: ${id}`);
+      return id;
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Import plugin failed via IPC', error);
+      logWithCategory('error', LogCategory.SYSTEM, 'IPC: Import plugin failed', { error: error.message, stack: error.stack });
       throw error;
     }
   });
 
   // Import Workflow
   ipcMain.handle('import:workflow', async (event, sourcePath: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Import workflow request for ${sourcePath}`);
     try {
       const dbPool = getDatabasePool();
+      if (!dbPool) {
+        throw new Error('Database pool not initialized');
+      }
       const workflowEngine = new WorkflowEngine(dbPool);
-      return await workflowEngine.importWorkflow(sourcePath);
+      const id = await workflowEngine.importWorkflow(sourcePath);
+      logWithCategory('info', LogCategory.SYSTEM, `IPC: Import workflow success, ID: ${id}`);
+      return id;
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Import workflow failed via IPC', error);
+      logWithCategory('error', LogCategory.SYSTEM, 'IPC: Import workflow failed', { error: error.message, stack: error.stack });
       throw error;
     }
   });
