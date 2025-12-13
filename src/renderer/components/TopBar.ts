@@ -79,22 +79,21 @@ export class TopBar {
             </div>
             ${this.renderMainMenu()}
           </div>
-
-          <div class="top-bar-center">
-            ${actions ? this.renderActions(actions) : ''}
-          </div>
-
-          <div class="top-bar-right">
-            ${global?.projectSelector ? this.renderProjectSelector() : ''}
-            ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
-            ${global?.userMenu ? this.renderUserMenu() : ''}
-            ${this.renderWindowControls()}
-          </div>
         </div>
 
         ${title || breadcrumb ? `
           <div class="top-bar-row top-bar-title-row">
             ${this.renderTitleOrBreadcrumb(title, breadcrumb)}
+            <div class="top-bar-center">
+            ${actions ? this.renderActions(actions) : ''}
+          </div>
+
+            <div class="top-bar-right">
+              ${global?.projectSelector ? this.renderProjectSelector() : ''}
+              ${global?.environmentIndicator ? this.renderEnvironmentIndicator() : ''}
+              ${global?.userMenu ? this.renderUserMenu() : ''}
+              ${this.renderWindowControls()}
+            </div>
           </div>
         ` : ''}
       `;
@@ -330,6 +329,16 @@ export class TopBar {
         const action = windowControlBtn.dataset.windowAction;
         if (action) {
           this.handleWindowControl(action);
+        }
+      }
+
+      // Handle menu item clicks
+      const menuItem = target.closest('.menu-item') as HTMLElement;
+      if (menuItem) {
+        const menuId = menuItem.dataset.menuId;
+        if (menuId) {
+          console.log('[TopBar] Menu clicked:', menuId);
+          this.emit('menu-clicked', menuId);
         }
       }
     });

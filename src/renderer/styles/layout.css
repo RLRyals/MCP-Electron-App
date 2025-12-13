@@ -32,7 +32,7 @@
   /* Layout dimensions */
   --sidebar-width: 240px;
   --sidebar-width-collapsed: 60px;
-  --top-bar-height: auto; /* Auto height for flexible two-row layout */
+  --top-bar-height: 80px; /* Default height for Windows two-row layout (40px * 2) */
   --top-bar-min-height: 40px;
 
   /* Z-index layers */
@@ -83,6 +83,7 @@ body {
 
 .app-container {
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -93,8 +94,11 @@ body {
    ======================================== */
 
 .sidebar {
+  position: fixed;
+  left: 0;
+  top: var(--top-bar-height);
   width: var(--sidebar-width);
-  height: 100vh;
+  height: calc(100vh - var(--top-bar-height));
   background: var(--color-bg-tertiary);
   border-right: 1px solid var(--color-border);
   display: flex;
@@ -118,7 +122,13 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-width: 0; /* Fix for flexbox overflow */
-  padding-top: 80px; /* Add space for fixed top bar (40px main row + 32px title row + some buffer) */
+  margin-left: var(--sidebar-width); /* Make space for sidebar */
+  margin-top: var(--top-bar-height); /* Make space for fixed top bar */
+  transition: margin-left var(--transition-normal);
+}
+
+.sidebar.collapsed ~ .main-content {
+  margin-left: var(--sidebar-width-collapsed);
 }
 
 /* ========================================
