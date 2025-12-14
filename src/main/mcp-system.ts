@@ -1671,23 +1671,45 @@ export async function viewServiceLogs(
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
 
   try {
-    // Map service names to actual container names (from docker-compose.yml)
-    const containerNameMap: { [key: string]: string } = {
-      'postgres': 'fictionlab-postgres',
-      'mcp-writing-servers': 'fictionlab-mcp-servers',
-      'mcp-connector': 'fictionlab-mcp-connector',
-      'typing-mind': 'fictionlab-typingmind',
-    };
+    // Check if Docker is available (for Windows/Docker-based deployments)
+    const dockerAvailable = await checkDockerRunning();
 
-    const containerName = containerNameMap[serviceName] || serviceName;
+    if (dockerAvailable) {
+      // Docker is available - use docker logs
+      const containerNameMap: { [key: string]: string } = {
+        'postgres': 'fictionlab-postgres',
+        'mcp-writing-servers': 'fictionlab-mcp-servers',
+        'mcp-connector': 'fictionlab-mcp-connector',
+        'typing-mind': 'fictionlab-typingmind',
+      };
 
-    // Use docker logs directly instead of docker-compose since we just need to read logs
-    const { stdout } = await execAsync(`docker logs --tail ${tail} ${containerName}`);
+      const containerName = containerNameMap[serviceName] || serviceName;
 
-    return {
-      success: true,
-      logs: stdout,
-    };
+      // Use docker logs directly instead of docker-compose since we just need to read logs
+      const { stdout } = await execAsync(`docker logs --tail ${tail} ${containerName}`);
+
+      return {
+        success: true,
+        logs: stdout,
+      };
+    } else {
+      // Docker not available - use native electron logs (for Mac native deployment)
+      logWithCategory('info', LogCategory.SYSTEM, 'Docker not available, reading native logs');
+
+      // Import logger functions
+      const { getRecentLogs } = await import('./logger');
+
+      // Get recent logs from the electron-log file
+      const logLines = getRecentLogs(tail);
+      const logs = logLines.join('\n');
+
+      // Filter logs by service if needed (look for service-specific log entries)
+      // For now, return all logs since the native deployment logs everything together
+      return {
+        success: true,
+        logs: logs || 'No logs available',
+      };
+    }
 
   } catch (error: any) {
     logWithCategory('error', LogCategory.DOCKER, `Failed to get logs for ${serviceName}`, error);

@@ -261,7 +261,7 @@ async function showClientManager() {
                 <div class="modal-content" style="background-color: #1e1e1e; margin: 5% auto; padding: 20px; border: 1px solid #333; width: 80%; max-width: 1000px; max-height: 90vh; overflow-y: auto; border-radius: 10px; color: #fff;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="margin: 0;">Manage Clients</h2>
-                        <button id="client-manager-close-btn" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                        <button id="client-manager-close-btn" style="background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; padding: 5px 10px; min-width: 30px; min-height: 30px; display: flex; align-items: center; justify-content: center;">&times;</button>
                     </div>
                     <div id="client-manager-content">
                         Loading...
