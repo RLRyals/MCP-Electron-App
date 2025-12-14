@@ -821,8 +821,7 @@ async function init(): Promise<void> {
     topBar,
   });
 
-  // Initialize components
-  sidebar.initialize();
+  // Initialize components (but don't navigate yet)
   topBar.initialize();
   await viewRouter.initialize();
 
@@ -830,6 +829,14 @@ async function init(): Promise<void> {
   sidebar.on('navigate', (viewId: string) => {
     viewRouter.navigateTo(viewId);
   });
+
+  // Initialize sidebar and navigate to initial view
+  sidebar.initialize();
+
+  // Get initial view and navigate to it
+  const savedView = localStorage.getItem('fictionlab-active-view');
+  const initialView = savedView || 'dashboard';
+  await viewRouter.navigateTo(initialView);
 
   // Connect top bar actions to active view
   topBar.on('action-clicked', (actionId: string) => {
