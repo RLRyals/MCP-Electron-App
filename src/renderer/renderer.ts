@@ -821,17 +821,24 @@ async function init(): Promise<void> {
     topBar,
   });
 
-  // Initialize components (but don't navigate yet)
+  // Initialize components
   topBar.initialize();
-  await viewRouter.initialize();
 
-  // Connect sidebar navigation to router
+  // Initialize sidebar but prevent navigation during setup
+  let isViewRouterReady = false;
   sidebar.on('navigate', (viewId: string) => {
-    viewRouter.navigateTo(viewId);
+    if (isViewRouterReady) {
+      viewRouter.navigateTo(viewId);
+    } else {
+      console.log('[Renderer] Navigation blocked - ViewRouter not ready yet');
+    }
   });
 
-  // Initialize sidebar and navigate to initial view
   sidebar.initialize();
+
+  // Initialize ViewRouter (async - registers all views)
+  await viewRouter.initialize();
+  isViewRouterReady = true;
 
   // Get initial view and navigate to it
   const savedView = localStorage.getItem('fictionlab-active-view');
