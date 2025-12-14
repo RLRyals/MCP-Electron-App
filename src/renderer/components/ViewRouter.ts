@@ -54,8 +54,8 @@ export class ViewRouter {
   /**
    * Initialize the router
    */
-  public initialize(): void {
-    this.registerDefaultViews();
+  public async initialize(): Promise<void> {
+    await this.registerDefaultViews();
     console.log('[ViewRouter] Initialized');
   }
 
@@ -81,7 +81,7 @@ export class ViewRouter {
 
       // New views
       const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
-      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact');
+      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact.js');
       const { LibraryView } = await import('../views/LibraryView.js');
       this.registerView('plugins', PluginsLauncher);
       this.registerView('workflows', WorkflowsViewReact);

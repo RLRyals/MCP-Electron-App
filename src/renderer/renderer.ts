@@ -790,7 +790,7 @@ function migrateOldTabState(): void {
 /**
  * Initialize the renderer process
  */
-function init(): void {
+async function init(): Promise<void> {
   console.log('Renderer process initialized - NEW DASHBOARD LAYOUT');
 
   // Migrate old tab state if needed
@@ -824,7 +824,7 @@ function init(): void {
   // Initialize components
   sidebar.initialize();
   topBar.initialize();
-  viewRouter.initialize();
+  await viewRouter.initialize();
 
   // Connect sidebar navigation to router
   sidebar.on('navigate', (viewId: string) => {
