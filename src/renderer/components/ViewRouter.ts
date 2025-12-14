@@ -87,6 +87,12 @@ export class ViewRouter {
       this.registerView('workflows', WorkflowsView);
       this.registerView('library', LibraryView);
 
+      // Help and About views
+      const { HelpView } = await import('../views/HelpView.js');
+      const { AboutView } = await import('../views/AboutView.js');
+      this.registerView('help', HelpView);
+      this.registerView('about', AboutView);
+
       console.log('[ViewRouter] Default views registered');
     } catch (error) {
       console.error('[ViewRouter] Failed to register views:', error);
@@ -139,6 +145,9 @@ export class ViewRouter {
       this.showLoadingView();
 
       await view.mount(this.container, params);
+
+      // Clear loading state after successful mount
+      // (view.mount already populated container with its content)
 
       this.currentViewId = viewId;
 

@@ -18,6 +18,9 @@ export class LogsView implements View {
   async mount(container: HTMLElement): Promise<void> {
     this.container = container;
 
+    // Clear any existing content (like loading spinner)
+    container.innerHTML = '';
+
     // Create the logs card container that LogsTab expects
     const logsCard = document.createElement('div');
     logsCard.id = 'logs-card';

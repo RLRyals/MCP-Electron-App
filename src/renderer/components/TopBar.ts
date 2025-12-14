@@ -347,7 +347,25 @@ export class TopBar {
         const menuId = menuItem.dataset.menuId;
         if (menuId) {
           console.log('[TopBar] Menu clicked:', menuId);
-          this.emit('menu-clicked', menuId);
+
+          // Show dropdown menu for File, Edit, View
+          if (['file', 'edit', 'view'].includes(menuId)) {
+            this.showMenuDropdown(menuId, menuItem);
+          } else {
+            // For other menus, emit the event
+            this.emit('menu-clicked', menuId);
+          }
+        }
+      }
+
+      // Handle dropdown menu item clicks
+      const dropdownItem = target.closest('.menu-dropdown-item') as HTMLElement;
+      if (dropdownItem) {
+        const action = dropdownItem.dataset.action;
+        if (action) {
+          console.log('[TopBar] Dropdown action:', action);
+          this.emit('menu-action', action);
+          this.closeAllDropdowns();
         }
       }
     });
@@ -355,6 +373,20 @@ export class TopBar {
     // Close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
+
+      // Close menu dropdowns if clicking outside
+      if (!target.closest('.menu-item') && !target.closest('.menu-dropdown')) {
+        const dropdowns = document.querySelectorAll('.menu-dropdown');
+        dropdowns.forEach(dropdown => {
+          const menuElement = (dropdown as any).__menuElement;
+          if (menuElement) {
+            menuElement.classList.remove('active');
+          }
+          dropdown.remove();
+        });
+      }
+
+      // Close project selector if clicking outside
       if (!target.closest('.project-selector') && !target.closest('.project-dropdown')) {
         this.closeProjectSelector();
       }
@@ -379,6 +411,118 @@ export class TopBar {
     if (dropdown) {
       dropdown.classList.remove('open');
     }
+  }
+
+  /**
+   * Show dropdown menu for File, Edit, View menus
+   */
+  private showMenuDropdown(menuId: string, menuElement: HTMLElement): void {
+    // Close any existing dropdowns
+    this.closeAllDropdowns();
+
+    // Get menu items based on menuId
+    const menuItems = this.getMenuItems(menuId);
+    if (menuItems.length === 0) return;
+
+    // Create dropdown element
+    const dropdown = document.createElement('div');
+    dropdown.className = 'menu-dropdown';
+    dropdown.id = `menu-dropdown-${menuId}`;
+
+    // Position dropdown below menu item
+    const rect = menuElement.getBoundingClientRect();
+    dropdown.style.position = 'absolute';
+    dropdown.style.top = `${rect.bottom}px`;
+    dropdown.style.left = `${rect.left}px`;
+
+    // Add menu items
+    dropdown.innerHTML = menuItems.map(item => {
+      if (item.separator) {
+        return '<div class="menu-dropdown-separator"></div>';
+      }
+      const disabledClass = item.disabled ? 'disabled' : '';
+      const shortcut = item.shortcut ? `<span class="menu-shortcut">${item.shortcut}</span>` : '';
+      return `
+        <div class="menu-dropdown-item ${disabledClass}" data-action="${item.action}">
+          <span class="menu-item-label">${item.label}</span>
+          ${shortcut}
+        </div>
+      `;
+    }).join('');
+
+    // Add to DOM
+    document.body.appendChild(dropdown);
+
+    // Mark menu as active
+    menuElement.classList.add('active');
+
+    // Store reference for cleanup
+    (dropdown as any).__menuElement = menuElement;
+  }
+
+  /**
+   * Get menu items for a specific menu
+   */
+  private getMenuItems(menuId: string): Array<{label: string, action: string, shortcut?: string, disabled?: boolean, separator?: boolean}> {
+    switch (menuId) {
+      case 'file':
+        return [
+          { label: 'New Project', action: 'file-new-project', shortcut: 'Ctrl+N' },
+          { label: 'Open Project', action: 'file-open-project', shortcut: 'Ctrl+O' },
+          { separator: true } as any,
+          { label: 'Save', action: 'file-save', shortcut: 'Ctrl+S', disabled: true },
+          { label: 'Save As...', action: 'file-save-as', shortcut: 'Ctrl+Shift+S', disabled: true },
+          { separator: true } as any,
+          { label: 'Export...', action: 'file-export' },
+          { separator: true } as any,
+          { label: 'Exit', action: 'file-exit', shortcut: 'Alt+F4' },
+        ];
+
+      case 'edit':
+        return [
+          { label: 'Undo', action: 'edit-undo', shortcut: 'Ctrl+Z', disabled: true },
+          { label: 'Redo', action: 'edit-redo', shortcut: 'Ctrl+Y', disabled: true },
+          { separator: true } as any,
+          { label: 'Cut', action: 'edit-cut', shortcut: 'Ctrl+X', disabled: true },
+          { label: 'Copy', action: 'edit-copy', shortcut: 'Ctrl+C', disabled: true },
+          { label: 'Paste', action: 'edit-paste', shortcut: 'Ctrl+V', disabled: true },
+          { separator: true } as any,
+          { label: 'Preferences', action: 'edit-preferences', shortcut: 'Ctrl+,' },
+        ];
+
+      case 'view':
+        return [
+          { label: 'Dashboard', action: 'view-dashboard', shortcut: 'Ctrl+1' },
+          { label: 'Workflows', action: 'view-workflows', shortcut: 'Ctrl+2' },
+          { label: 'Library', action: 'view-library', shortcut: 'Ctrl+3' },
+          { label: 'Plugins', action: 'view-plugins', shortcut: 'Ctrl+4' },
+          { separator: true } as any,
+          { label: 'Settings', action: 'view-settings' },
+          { separator: true } as any,
+          { label: 'Reload', action: 'view-reload', shortcut: 'Ctrl+R' },
+        ];
+
+      default:
+        return [];
+    }
+  }
+
+  /**
+   * Close all dropdown menus
+   */
+  private closeAllDropdowns(): void {
+    // Close menu dropdowns
+    const dropdowns = document.querySelectorAll('.menu-dropdown');
+    dropdowns.forEach(dropdown => {
+      const menuElement = (dropdown as any).__menuElement;
+      if (menuElement) {
+        menuElement.classList.remove('active');
+      }
+      dropdown.remove();
+    });
+
+    // Close project selector
+    this.closeProjectSelector();
   }
 
   /**

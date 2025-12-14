@@ -243,11 +243,17 @@ interface ListBackupsResult {
 interface ElectronAPI {
   ping: () => Promise<string>;
   getAppVersion: () => Promise<string>;
+  getAppInfo?: () => Promise<any>;
   getPlatformInfo: () => Promise<{
     platform: string;
     arch: string;
     version: string;
   }>;
+  window?: {
+    minimize: () => Promise<void>;
+    maximize: () => Promise<void>;
+    close: () => Promise<void>;
+  };
   prerequisites: {
     checkDocker: () => Promise<PrerequisiteStatus>;
     checkDockerRunning: () => Promise<PrerequisiteStatus>;
@@ -838,18 +844,6 @@ function init(): void {
     console.log('[Renderer] Menu clicked:', menuId);
     // Handle menu actions
     switch (menuId) {
-      case 'file':
-        // Show file menu - could open a dropdown menu in the future
-        console.log('[Renderer] File menu clicked');
-        break;
-      case 'edit':
-        // Show edit menu - could open a dropdown menu in the future
-        console.log('[Renderer] Edit menu clicked');
-        break;
-      case 'view':
-        // Show view menu - could open a dropdown menu in the future
-        console.log('[Renderer] View menu clicked');
-        break;
       case 'plugins':
         // Navigate to plugins view
         viewRouter.navigateTo('plugins');
@@ -864,6 +858,61 @@ function init(): void {
         break;
       default:
         console.warn('[Renderer] Unknown menu:', menuId);
+    }
+  });
+
+  // Connect top bar menu action clicks (from dropdown menus)
+  topBar.on('menu-action', (action: string) => {
+    console.log('[Renderer] Menu action:', action);
+
+    // Handle menu actions
+    switch (action) {
+      // File menu
+      case 'file-new-project':
+        // TODO: Implement new project
+        console.log('New project clicked');
+        break;
+      case 'file-open-project':
+        // TODO: Implement open project
+        console.log('Open project clicked');
+        break;
+      case 'file-export':
+        // TODO: Implement export
+        console.log('Export clicked');
+        break;
+      case 'file-exit':
+        if (window.electronAPI?.window?.close) {
+          window.electronAPI.window.close();
+        }
+        break;
+
+      // Edit menu
+      case 'edit-preferences':
+        viewRouter.navigateTo('settings-setup');
+        break;
+
+      // View menu
+      case 'view-dashboard':
+        viewRouter.navigateTo('dashboard');
+        break;
+      case 'view-workflows':
+        viewRouter.navigateTo('workflows');
+        break;
+      case 'view-library':
+        viewRouter.navigateTo('library');
+        break;
+      case 'view-plugins':
+        viewRouter.navigateTo('plugins');
+        break;
+      case 'view-settings':
+        viewRouter.navigateTo('settings-setup');
+        break;
+      case 'view-reload':
+        window.location.reload();
+        break;
+
+      default:
+        console.warn('[Renderer] Unknown menu action:', action);
     }
   });
 

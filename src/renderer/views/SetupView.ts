@@ -290,6 +290,34 @@ export class SetupView implements View {
             </div>
 
             <div class="form-group">
+              <label for="http-sse-port">
+                HTTP/SSE Port
+                <span class="tooltip" title="Port for HTTP/SSE MCP server endpoints">ⓘ</span>
+              </label>
+              <div class="input-with-indicator">
+                <input type="number" id="http-sse-port" name="HTTP_SSE_PORT" min="1024" max="65535" required>
+                <span class="port-indicator" id="http-sse-port-indicator">
+                  <span class="loading">⏳</span>
+                </span>
+              </div>
+              <span class="validation-error" id="http-sse-port-error"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="db-admin-port">
+                DB Admin Port
+                <span class="tooltip" title="Port for database administration interface">ⓘ</span>
+              </label>
+              <div class="input-with-indicator">
+                <input type="number" id="db-admin-port" name="DB_ADMIN_PORT" min="1024" max="65535" required>
+                <span class="port-indicator" id="db-admin-port-indicator">
+                  <span class="loading">⏳</span>
+                </span>
+              </div>
+              <span class="validation-error" id="db-admin-port-error"></span>
+            </div>
+
+            <div class="form-group">
               <label for="mcp-auth-token">
                 MCP Auth Token
                 <span class="tooltip" title="Authentication token for MCP services (required for TypingMind connection)">ⓘ</span>
