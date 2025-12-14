@@ -111,6 +111,7 @@ export class ViewRouter {
       console.error('[ViewRouter] Failed to register PluginsLauncher:', error);
     }
 
+    // WorkflowsViewReact (React is loaded from CDN in index.html)
     try {
       const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact.js');
       this.registerView('workflows', WorkflowsViewReact);
