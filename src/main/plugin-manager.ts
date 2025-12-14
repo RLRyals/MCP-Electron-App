@@ -227,18 +227,12 @@ class PluginManager {
       const insertIndex = viewMenuIndex !== -1 ? viewMenuIndex + 1 : menu.items.length;
 
       const newMenu = Menu.buildFromTemplate([
-        ...menu.items.slice(0, insertIndex).map(item => ({
-          label: item.label,
-          submenu: item.submenu,
-        })),
+        ...menu.items.slice(0, insertIndex),
         {
           label: 'Plugins',
           submenu: pluginMenuItems,
         },
-        ...menu.items.slice(insertIndex).map(item => ({
-          label: item.label,
-          submenu: item.submenu,
-        })),
+        ...menu.items.slice(insertIndex),
       ]);
 
       Menu.setApplicationMenu(newMenu);
@@ -252,10 +246,7 @@ class PluginManager {
               submenu: pluginMenuItems,
             };
           }
-          return {
-            label: item.label,
-            submenu: item.submenu,
-          };
+          return item;
         })
       );
 
