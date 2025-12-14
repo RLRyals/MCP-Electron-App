@@ -793,6 +793,12 @@ function init(): void {
   // Initialize plugin handlers (still needed)
   initializePluginHandlers();
 
+  // Ensure dashboard handlers are available globally
+  // This executes the module code that sets window.setupDashboardHandlers
+  if (setupDashboardHandlers) {
+    (window as any).setupDashboardHandlers = setupDashboardHandlers;
+  }
+
   // NEW: Initialize the new dashboard components
   const sidebar = new Sidebar({
     container: document.getElementById('sidebar')!,
