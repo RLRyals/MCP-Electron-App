@@ -261,13 +261,10 @@ export class DashboardTab {
             </div>
             <div class="service-card-body">
               <div class="service-info">
-                <span id="typing-mind-port-display" class="service-detail">Port: 3000</span>
+                <span class="service-detail">Opens typingmind.com</span>
               </div>
               <div class="service-actions">
-                <button class="service-action-btn view-logs-btn" data-service="typing-mind" title="View recent Typing Mind logs for troubleshooting">
-                  View Logs
-                </button>
-                <button class="service-action-btn open-browser-btn" data-url="" title="Open Typing Mind interface in your default web browser">
+                <button class="service-action-btn open-browser-btn" data-url="https://www.typingmind.com" title="Open TypingMind in your default web browser">
                   Open Browser
                 </button>
               </div>

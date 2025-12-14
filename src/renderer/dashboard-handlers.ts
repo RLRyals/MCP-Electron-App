@@ -554,8 +554,7 @@ function updateMCPConnectorCard(status: MCPSystemStatus, config: EnvConfig, urls
 /**
  * Update Typing Mind service card
  */
-function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: ServiceUrls): void {
-  const container = status.containers.find(c => c.name.includes('typingmind'));
+function updateTypingMindCard(_status: MCPSystemStatus, _config: EnvConfig, urls: ServiceUrls): void {
   const card = document.getElementById('typing-mind-card');
 
   // Show/hide card based on whether Typing Mind is configured
@@ -565,24 +564,13 @@ function updateTypingMindCard(status: MCPSystemStatus, config: EnvConfig, urls: 
 
       const statusIcon = document.getElementById('typing-mind-status-icon');
       const statusText = document.getElementById('typing-mind-status-text');
-      const portText = document.getElementById('typing-mind-port-display');
       const openBrowserBtn = card.querySelector('.open-browser-btn') as HTMLButtonElement;
 
-      if (statusIcon && statusText && portText) {
-        portText.textContent = `Port: ${config.TYPING_MIND_PORT}`;
-
-        // Typing Mind may not have health checks configured
-        // Show as healthy if running and health is 'healthy', 'none', or 'unknown'
-        if (container?.running && (container.health === 'healthy' || container.health === 'none' || container.health === 'unknown')) {
-          statusIcon.innerHTML = '<span class="status-dot status-green"></span>';
-          statusText.textContent = 'Healthy';
-        } else if (container?.running && (container.health === 'starting' || container.health === 'unhealthy')) {
-          statusIcon.innerHTML = '<span class="status-dot status-yellow"></span>';
-          statusText.textContent = container.health === 'starting' ? 'Starting...' : 'Unhealthy';
-        } else {
-          statusIcon.innerHTML = '<span class="status-dot status-red"></span>';
-          statusText.textContent = 'Offline';
-        }
+      // TypingMind now uses typingmind.com directly (no local container)
+      if (statusIcon && statusText) {
+        // Always show as "Ready" since it's just a link to typingmind.com
+        statusIcon.innerHTML = '<span class="status-dot status-green"></span>';
+        statusText.textContent = 'Ready';
       }
 
       // Update the Open Browser button data-url attribute

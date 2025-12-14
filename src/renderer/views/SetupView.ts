@@ -292,7 +292,7 @@ export class SetupView implements View {
             <div class="form-group">
               <label for="mcp-auth-token">
                 MCP Auth Token
-                <span class="tooltip" title="Authentication token for MCP services">ⓘ</span>
+                <span class="tooltip" title="Authentication token for MCP services (required for TypingMind connection)">ⓘ</span>
               </label>
               <div class="input-with-buttons">
                 <input type="password" id="mcp-auth-token" name="MCP_AUTH_TOKEN" required>
@@ -304,20 +304,6 @@ export class SetupView implements View {
                 </button>
               </div>
               <span class="validation-error" id="mcp-auth-token-error"></span>
-            </div>
-
-            <div class="form-group">
-              <label for="typing-mind-port">
-                Typing Mind Port
-                <span class="tooltip" title="Port for Typing Mind web interface">ⓘ</span>
-              </label>
-              <div class="input-with-indicator">
-                <input type="number" id="typing-mind-port" name="TYPING_MIND_PORT" min="1024" max="65535" required>
-                <span class="port-indicator" id="typing-mind-port-indicator">
-                  <span class="loading">⏳</span>
-                </span>
-              </div>
-              <span class="validation-error" id="typing-mind-port-error"></span>
             </div>
           </div>
 
