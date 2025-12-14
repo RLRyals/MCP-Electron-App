@@ -64,39 +64,83 @@ export class ViewRouter {
    */
   private async registerDefaultViews(): Promise<void> {
     // Import and register view classes dynamically
+    // Each import is wrapped individually so one failure doesn't break others
+
+    // Dashboard view (existing DashboardTab)
     try {
-      // Dashboard view (existing DashboardTab)
       const { DashboardView } = await import('../views/DashboardView.js');
       this.registerView('dashboard', DashboardView);
-
-      // Settings views (wrappers for existing tab components)
-      const { SetupView } = await import('../views/SetupView.js');
-      const { DatabaseView } = await import('../views/DatabaseView.js');
-      const { ServicesView } = await import('../views/ServicesView.js');
-      const { LogsView } = await import('../views/LogsView.js');
-      this.registerView('settings-setup', SetupView);
-      this.registerView('settings-database', DatabaseView);
-      this.registerView('settings-services', ServicesView);
-      this.registerView('settings-logs', LogsView);
-
-      // New views
-      const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
-      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact.js');
-      const { LibraryView } = await import('../views/LibraryView.js');
-      this.registerView('plugins', PluginsLauncher);
-      this.registerView('workflows', WorkflowsViewReact);
-      this.registerView('library', LibraryView);
-
-      // Help and About views
-      const { HelpView } = await import('../views/HelpView.js');
-      const { AboutView } = await import('../views/AboutView.js');
-      this.registerView('help', HelpView);
-      this.registerView('about', AboutView);
-
-      console.log('[ViewRouter] Default views registered');
     } catch (error) {
-      console.error('[ViewRouter] Failed to register views:', error);
+      console.error('[ViewRouter] Failed to register DashboardView:', error);
     }
+
+    // Settings views (wrappers for existing tab components)
+    try {
+      const { SetupView } = await import('../views/SetupView.js');
+      this.registerView('settings-setup', SetupView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register SetupView:', error);
+    }
+
+    try {
+      const { DatabaseView } = await import('../views/DatabaseView.js');
+      this.registerView('settings-database', DatabaseView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register DatabaseView:', error);
+    }
+
+    try {
+      const { ServicesView } = await import('../views/ServicesView.js');
+      this.registerView('settings-services', ServicesView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register ServicesView:', error);
+    }
+
+    try {
+      const { LogsView } = await import('../views/LogsView.js');
+      this.registerView('settings-logs', LogsView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register LogsView:', error);
+    }
+
+    // New views
+    try {
+      const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
+      this.registerView('plugins', PluginsLauncher);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register PluginsLauncher:', error);
+    }
+
+    try {
+      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact.js');
+      this.registerView('workflows', WorkflowsViewReact);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register WorkflowsViewReact:', error);
+    }
+
+    try {
+      const { LibraryView } = await import('../views/LibraryView.js');
+      this.registerView('library', LibraryView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register LibraryView:', error);
+    }
+
+    // Help and About views
+    try {
+      const { HelpView } = await import('../views/HelpView.js');
+      this.registerView('help', HelpView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register HelpView:', error);
+    }
+
+    try {
+      const { AboutView } = await import('../views/AboutView.js');
+      this.registerView('about', AboutView);
+    } catch (error) {
+      console.error('[ViewRouter] Failed to register AboutView:', error);
+    }
+
+    console.log('[ViewRouter] View registration complete');
   }
 
   /**
