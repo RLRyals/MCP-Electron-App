@@ -103,6 +103,24 @@ export enum BuildErrorCode {
   SYSTEM_TIMEOUT = 4005,
   SYSTEM_RESOURCE_UNAVAILABLE = 4006,
   SYSTEM_UNKNOWN_ERROR = 4999,
+
+  // Database/PostgreSQL errors (5000-5099)
+  DB_CONNECTION_FAILED = 5000,
+  DB_AUTH_FAILED = 5001,
+  DB_SASL_AUTH_FAILED = 5002,
+  DB_TIMEOUT = 5003,
+  DB_NETWORK_ERROR = 5004,
+  DB_POOL_EXHAUSTED = 5005,
+  DB_QUERY_FAILED = 5006,
+  DB_PERMISSION_DENIED = 5007,
+
+  // MCP Server errors (5100-5199)
+  MCP_CONNECTION_FAILED = 5100,
+  MCP_TOOL_FAILED = 5101,
+  MCP_AUTH_FAILED = 5102,
+  MCP_TIMEOUT = 5103,
+  MCP_SERVER_UNAVAILABLE = 5104,
+  MCP_INVALID_RESPONSE = 5105,
 }
 
 /**
@@ -553,6 +571,184 @@ export const ERROR_METADATA_REGISTRY: Map<BuildErrorCode, ErrorMetadata> = new M
       recoveryActions: [RecoveryAction.RETRY, RecoveryAction.ABORT],
     },
   ],
+
+  // Database errors
+  [
+    BuildErrorCode.DB_CONNECTION_FAILED,
+    {
+      code: BuildErrorCode.DB_CONNECTION_FAILED,
+      category: ErrorCategory.NETWORK,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'Failed to connect to the database',
+      technicalMessage: 'Database connection failed',
+      suggestedActions: [
+        'Check that PostgreSQL container is running: docker ps | grep postgres',
+        'Verify database credentials in environment configuration',
+        'Restart the FictionLab system from the Dashboard',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.DB_AUTH_FAILED,
+    {
+      code: BuildErrorCode.DB_AUTH_FAILED,
+      category: ErrorCategory.AUTHENTICATION,
+      severity: ErrorSeverity.CRITICAL,
+      retryBehavior: RetryBehavior.USER_INTERVENTION,
+      userMessage: 'Database authentication failed',
+      technicalMessage: 'PostgreSQL authentication credentials invalid',
+      suggestedActions: [
+        'Verify database password in Setup Wizard → Environment Configuration',
+        'Check PostgreSQL logs: docker logs fictionlab-postgres',
+        'Reset database credentials and restart the system',
+      ],
+      recoveryActions: [RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.DB_SASL_AUTH_FAILED,
+    {
+      code: BuildErrorCode.DB_SASL_AUTH_FAILED,
+      category: ErrorCategory.AUTHENTICATION,
+      severity: ErrorSeverity.CRITICAL,
+      retryBehavior: RetryBehavior.USER_INTERVENTION,
+      userMessage: 'Database SASL authentication failed',
+      technicalMessage: 'PostgreSQL SASL/SCRAM authentication failed - credentials may be incorrect or auth method mismatch',
+      suggestedActions: [
+        'Linux users: Run diagnostic script: ./linux-db-diagnostic.sh',
+        'Check MCP container logs: docker logs fictionlab-mcp-servers',
+        'Verify environment variables: docker exec fictionlab-mcp-servers env | grep POSTGRES',
+        'Ensure PostgreSQL is using scram-sha-256 auth method',
+        'Restart Docker services: docker compose down && docker compose up -d',
+        'See LINUX_DB_FIX.md for detailed troubleshooting steps',
+      ],
+      recoveryActions: [RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.DB_TIMEOUT,
+    {
+      code: BuildErrorCode.DB_TIMEOUT,
+      category: ErrorCategory.TIMEOUT,
+      severity: ErrorSeverity.MEDIUM,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'Database query timed out',
+      technicalMessage: 'Database operation exceeded timeout limit',
+      suggestedActions: [
+        'Check database performance and load',
+        'Verify network connectivity to PostgreSQL container',
+        'Consider increasing query timeout in configuration',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.DB_NETWORK_ERROR,
+    {
+      code: BuildErrorCode.DB_NETWORK_ERROR,
+      category: ErrorCategory.NETWORK,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'Database network error',
+      technicalMessage: 'Network connection to database failed',
+      suggestedActions: [
+        'Check Docker network: docker network ls',
+        'Verify containers can communicate: docker exec fictionlab-mcp-servers ping fictionlab-postgres',
+        'Restart Docker services to recreate network',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.DB_POOL_EXHAUSTED,
+    {
+      code: BuildErrorCode.DB_POOL_EXHAUSTED,
+      category: ErrorCategory.RESOURCE,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'Database connection pool exhausted',
+      technicalMessage: 'All database connections in use',
+      suggestedActions: [
+        'Check active connections: docker exec fictionlab-postgres psql -U writer -d mcp_writing_db -c "SELECT count(*) FROM pg_stat_activity;"',
+        'Increase max_connections in PostgreSQL configuration',
+        'Enable PgBouncer connection pooling',
+        'Close unused connections or restart services',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+
+  // MCP Server errors
+  [
+    BuildErrorCode.MCP_CONNECTION_FAILED,
+    {
+      code: BuildErrorCode.MCP_CONNECTION_FAILED,
+      category: ErrorCategory.NETWORK,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'Failed to connect to MCP server',
+      technicalMessage: 'MCP server connection failed',
+      suggestedActions: [
+        'Check MCP containers: docker ps | grep mcp',
+        'Verify MCP Connector is running on correct port',
+        'Check MCP server logs: docker logs fictionlab-mcp-servers',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.MCP_TOOL_FAILED,
+    {
+      code: BuildErrorCode.MCP_TOOL_FAILED,
+      category: ErrorCategory.UNKNOWN,
+      severity: ErrorSeverity.MEDIUM,
+      retryBehavior: RetryBehavior.RETRY,
+      userMessage: 'MCP tool execution failed',
+      technicalMessage: 'MCP tool call returned an error',
+      suggestedActions: [
+        'Check MCP server logs for tool-specific errors',
+        'Verify tool parameters are correct',
+        'Ensure required database tables exist',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.MCP_AUTH_FAILED,
+    {
+      code: BuildErrorCode.MCP_AUTH_FAILED,
+      category: ErrorCategory.AUTHENTICATION,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.USER_INTERVENTION,
+      userMessage: 'MCP authentication failed',
+      technicalMessage: 'MCP auth token invalid or missing',
+      suggestedActions: [
+        'Verify MCP_AUTH_TOKEN in environment configuration',
+        'Ensure token matches in both client and server',
+        'Regenerate token in Setup Wizard if needed',
+      ],
+      recoveryActions: [RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
+  [
+    BuildErrorCode.MCP_SERVER_UNAVAILABLE,
+    {
+      code: BuildErrorCode.MCP_SERVER_UNAVAILABLE,
+      category: ErrorCategory.RESOURCE,
+      severity: ErrorSeverity.HIGH,
+      retryBehavior: RetryBehavior.RETRY_WITH_BACKOFF,
+      userMessage: 'MCP server is unavailable',
+      technicalMessage: 'MCP server not responding or not running',
+      suggestedActions: [
+        'Check if MCP containers are running: docker ps',
+        'Restart MCP services from Dashboard',
+        'Check container health: docker inspect fictionlab-mcp-servers',
+      ],
+      recoveryActions: [RecoveryAction.RETRY, RecoveryAction.USER_INPUT, RecoveryAction.ABORT],
+    },
+  ],
 ]);
 
 /**
@@ -597,6 +793,52 @@ export class ErrorHandler {
    */
   private static detectErrorCode(message: string, stack: string): BuildErrorCode {
     const lowerMessage = message.toLowerCase();
+
+    // Database/PostgreSQL errors (check first as they're critical)
+    if (lowerMessage.includes('sasl') && lowerMessage.includes('auth')) {
+      return BuildErrorCode.DB_SASL_AUTH_FAILED;
+    }
+    if (lowerMessage.includes('postgres') || lowerMessage.includes('pg_') || lowerMessage.includes('database')) {
+      if (lowerMessage.includes('auth') || lowerMessage.includes('password') || lowerMessage.includes('credential')) {
+        return BuildErrorCode.DB_AUTH_FAILED;
+      }
+      if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
+        return BuildErrorCode.DB_TIMEOUT;
+      }
+      if (lowerMessage.includes('connection') && (lowerMessage.includes('refused') || lowerMessage.includes('failed'))) {
+        return BuildErrorCode.DB_CONNECTION_FAILED;
+      }
+      if (lowerMessage.includes('network') || lowerMessage.includes('enotfound') || lowerMessage.includes('could not resolve')) {
+        return BuildErrorCode.DB_NETWORK_ERROR;
+      }
+      if (lowerMessage.includes('pool') || lowerMessage.includes('max connections') || lowerMessage.includes('too many connections')) {
+        return BuildErrorCode.DB_POOL_EXHAUSTED;
+      }
+      if (lowerMessage.includes('permission denied') || lowerMessage.includes('access denied')) {
+        return BuildErrorCode.DB_PERMISSION_DENIED;
+      }
+      return BuildErrorCode.DB_CONNECTION_FAILED;
+    }
+
+    // MCP errors
+    if (lowerMessage.includes('mcp')) {
+      if (lowerMessage.includes('auth') || lowerMessage.includes('token')) {
+        return BuildErrorCode.MCP_AUTH_FAILED;
+      }
+      if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
+        return BuildErrorCode.MCP_TIMEOUT;
+      }
+      if (lowerMessage.includes('unavailable') || lowerMessage.includes('not running') || lowerMessage.includes('not responding')) {
+        return BuildErrorCode.MCP_SERVER_UNAVAILABLE;
+      }
+      if (lowerMessage.includes('connection') && lowerMessage.includes('fail')) {
+        return BuildErrorCode.MCP_CONNECTION_FAILED;
+      }
+      if (lowerMessage.includes('tool') && lowerMessage.includes('fail')) {
+        return BuildErrorCode.MCP_TOOL_FAILED;
+      }
+      return BuildErrorCode.MCP_CONNECTION_FAILED;
+    }
 
     // Git errors
     if (lowerMessage.includes('git')) {
