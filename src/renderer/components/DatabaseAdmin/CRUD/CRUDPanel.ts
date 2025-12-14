@@ -83,6 +83,12 @@ export class CRUDPanel {
     const collapseIcon = this.container.querySelector('.collapse-icon');
 
     if (collapseBtn && queryBuilderContent) {
+      // Set collapsed by default
+      queryBuilderContent.classList.add('collapsed');
+      if (collapseIcon) {
+        collapseIcon.textContent = '▶';
+      }
+
       collapseBtn.addEventListener('click', () => {
         const isCollapsed = queryBuilderContent.classList.toggle('collapsed');
         if (collapseIcon) {

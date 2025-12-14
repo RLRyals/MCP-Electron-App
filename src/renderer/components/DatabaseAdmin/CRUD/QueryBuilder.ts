@@ -101,21 +101,38 @@ export class QueryBuilder {
 
     this.container.innerHTML = `
       <div class="query-builder">
-        <div class="query-builder-header">
-          <div class="query-builder-title">
-            <h4>Query Builder - ${this.escapeHtml(this.tableName)}</h4>
-            <p class="query-builder-subtitle">Build and execute queries visually</p>
+        <!-- Quick Controls Bar -->
+        <div class="query-quick-controls">
+          <div class="quick-control-group">
+            <label>Limit:</label>
+            <input
+              type="number"
+              id="quick-limit"
+              class="quick-input"
+              value="${this.limit}"
+              min="1"
+              max="10000"
+            />
           </div>
           <button id="execute-query" class="action-button primary execute-query-btn">
             ▶ Execute Query
           </button>
         </div>
 
-        ${this.renderColumnSelector()}
-        ${this.renderWhereClauseBuilder()}
-        ${this.renderOrderByBuilder()}
-        ${this.renderPaginationControls()}
-        ${this.renderSqlPreview()}
+        <!-- Advanced Options (Collapsible) -->
+        <div class="query-advanced-section">
+          <button class="query-advanced-toggle" id="toggle-advanced">
+            <span class="toggle-icon">▶</span>
+            Advanced Query Options
+          </button>
+          <div class="query-advanced-content" id="advanced-content">
+            ${this.renderColumnSelector()}
+            ${this.renderWhereClauseBuilder()}
+            ${this.renderOrderByBuilder()}
+            ${this.renderPaginationControls()}
+            ${this.renderSqlPreview()}
+          </div>
+        </div>
       </div>
     `;
 
@@ -366,6 +383,28 @@ export class QueryBuilder {
     const executeBtn = this.container.querySelector('#execute-query');
     if (executeBtn) {
       executeBtn.addEventListener('click', () => this.executeQuery());
+    }
+
+    // Quick limit input
+    const quickLimitInput = this.container.querySelector('#quick-limit') as HTMLInputElement;
+    if (quickLimitInput) {
+      quickLimitInput.addEventListener('change', () => {
+        this.limit = parseInt(quickLimitInput.value) || 10;
+        this.render();
+      });
+    }
+
+    // Advanced toggle
+    const toggleBtn = this.container.querySelector('#toggle-advanced');
+    const advancedContent = this.container.querySelector('#advanced-content');
+    const toggleIcon = this.container.querySelector('.toggle-icon');
+
+    if (toggleBtn && advancedContent && toggleIcon) {
+      toggleBtn.addEventListener('click', () => {
+        const isExpanded = advancedContent.classList.toggle('expanded');
+        toggleIcon.textContent = isExpanded ? '▼' : '▶';
+        toggleBtn.classList.toggle('active', isExpanded);
+      });
     }
 
     // Column selection
