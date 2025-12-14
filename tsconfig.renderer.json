@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "ES2020",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "jsx": "react-jsx"
   },
   "include": [
     "src/renderer/**/*"

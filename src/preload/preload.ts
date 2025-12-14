@@ -636,6 +636,27 @@ interface MigrationValidationResult {
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
+   * Generic IPC invoke method for any channel
+   */
+  invoke: (channel: string, ...args: any[]): Promise<any> => {
+    return ipcRenderer.invoke(channel, ...args);
+  },
+
+  /**
+   * Generic IPC on method for event listeners
+   */
+  on: (channel: string, callback: (...args: any[]) => void): void => {
+    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+  },
+
+  /**
+   * Remove all listeners for a channel
+   */
+  removeAllListeners: (channel: string): void => {
+    ipcRenderer.removeAllListeners(channel);
+  },
+
+  /**
    * Send a ping to the main process and receive a pong
    */
   ping: (): Promise<string> => {

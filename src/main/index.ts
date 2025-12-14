@@ -31,6 +31,8 @@ import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
 import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
+import { WorkflowExecutor } from './workflow/workflow-executor';
+import { MCPWorkflowClient } from './workflow/mcp-workflow-client';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -2358,6 +2360,226 @@ function setupIPC(): void {
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, 'Error updating workflow:', error);
       throw error;
+    }
+  });
+
+  // ========================================
+  // Workflow Execution Engine IPC Handlers
+  // ========================================
+
+  const workflowExecutor = new WorkflowExecutor();
+  const workflowClient = new MCPWorkflowClient();
+
+  // Start workflow execution
+  ipcMain.handle('workflow:start', async (_event, options: {
+    workflowDefId: string;
+    version?: string;
+    seriesId: number;
+    userId: number;
+    startPhase?: number;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Starting workflow execution: ${options.workflowDefId}`);
+    try {
+      const instanceId = await workflowExecutor.startWorkflow(options);
+      return { success: true, instanceId };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to start workflow: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Stop workflow execution
+  ipcMain.handle('workflow:stop', async (_event, instanceId: number) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Stopping workflow instance: ${instanceId}`);
+    try {
+      workflowExecutor.stopWorkflow(instanceId);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to stop workflow: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Approve workflow phase
+  ipcMain.handle('workflow:approve-phase', async (_event, instanceId: number, phaseNumber: number) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Approving phase ${phaseNumber} for instance ${instanceId}`);
+    try {
+      const success = workflowExecutor.approvePhase(instanceId, phaseNumber);
+      return { success };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to approve phase: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Reject workflow phase
+  ipcMain.handle('workflow:reject-phase', async (_event, instanceId: number, phaseNumber: number, reason: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Rejecting phase ${phaseNumber} for instance ${instanceId}: ${reason}`);
+    try {
+      const success = workflowExecutor.rejectPhase(instanceId, phaseNumber, reason);
+      return { success };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to reject phase: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get workflow execution state
+  ipcMain.handle('workflow:get-state', async (_event, instanceId: number) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Getting workflow state: ${instanceId}`);
+    try {
+      const state = workflowExecutor.getWorkflowState(instanceId);
+      return state || null;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to get workflow state: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get all running workflows
+  ipcMain.handle('workflow:get-running', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting running workflows');
+    try {
+      const workflows = workflowExecutor.getRunningWorkflows();
+      return workflows;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to get running workflows: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get workflow definitions
+  ipcMain.handle('workflow:get-definitions', async (_event, filters?: {
+    tags?: string[];
+    is_system?: boolean;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting workflow definitions');
+    try {
+      const definitions = await workflowClient.getWorkflowDefinitions(filters);
+      return definitions;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to get workflow definitions: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get specific workflow definition
+  ipcMain.handle('workflow:get-definition', async (_event, workflowDefId: string, version?: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: Getting workflow definition: ${workflowDefId} v${version || 'latest'}`);
+    try {
+      const definition = await workflowClient.getWorkflowDefinition(workflowDefId, version);
+      return definition;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to get workflow definition: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import workflow from folder
+  ipcMain.handle('workflow:import-from-folder', async (_event, folderPath: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow from folder: ${folderPath}`);
+    try {
+      const { FolderImporter } = await import('./workflow/folder-importer');
+      const importer = new FolderImporter();
+      return await importer.importFromFolder(folderPath);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import workflow: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Check workflow dependencies
+  ipcMain.handle('workflow:check-dependencies', async (_event, dependencies: any) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Checking workflow dependencies');
+    try {
+      const { DependencyResolver } = await import('./workflow/dependency-resolver');
+      const resolver = new DependencyResolver();
+      return await resolver.checkDependencies(dependencies);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to check dependencies: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import workflow definition directly
+  ipcMain.handle('workflow:import-definition', async (_event, workflow: any) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow definition: ${workflow.name}`);
+    try {
+      return await workflowClient.importWorkflowDefinition(workflow);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import workflow definition: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get installed agents
+  ipcMain.handle('workflow:get-installed-agents', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting installed agents');
+    try {
+      const { DependencyResolver } = await import('./workflow/dependency-resolver');
+      const resolver = new DependencyResolver();
+      return await resolver.getInstalledAgents();
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to get installed agents: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Get installed skills
+  ipcMain.handle('workflow:get-installed-skills', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting installed skills');
+    try {
+      const { DependencyResolver } = await import('./workflow/dependency-resolver');
+      const resolver = new DependencyResolver();
+      return await resolver.getInstalledSkills();
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to get installed skills: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Forward workflow events to renderer
+  workflowExecutor.on('phase-started', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('workflow:phase-started', data);
+    }
+  });
+
+  workflowExecutor.on('phase-completed', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('workflow:phase-completed', data);
+    }
+  });
+
+  workflowExecutor.on('phase-failed', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('workflow:phase-failed', data);
+    }
+  });
+
+  workflowExecutor.on('approval-required', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('workflow:approval-required', data);
+    }
+  });
+
+  workflowExecutor.on('phase-event', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('workflow:phase-event', data);
     }
   });
 

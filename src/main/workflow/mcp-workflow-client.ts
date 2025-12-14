@@ -5,7 +5,7 @@
  * Uses the same pattern as other MCP clients in the system
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import * as path from 'path';
 import { app } from 'electron';
 import { logWithCategory, LogCategory } from '../logger';
@@ -380,6 +380,29 @@ export class MCPWorkflowClient {
     return await this.callTool('advance_to_phase', {
       workflow_id: workflowId,
       target_phase: targetPhase
+    });
+  }
+
+  /**
+   * Export workflow package for sharing/marketplace
+   */
+  async exportWorkflowPackage(
+    workflowDefId: string,
+    options?: {
+      version?: string;
+      includeAgents?: boolean;
+      includeSkills?: boolean;
+      exportFormat?: 'json' | 'yaml';
+      outputPath?: string;
+    }
+  ): Promise<any> {
+    return await this.callTool('export_workflow_package', {
+      workflow_def_id: workflowDefId,
+      version: options?.version,
+      include_agents: options?.includeAgents ?? true,
+      include_skills: options?.includeSkills ?? true,
+      export_format: options?.exportFormat || 'yaml',
+      output_path: options?.outputPath
     });
   }
 }

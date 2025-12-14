@@ -24,12 +24,14 @@
     "clean": "rm -rf dist out"
   },
   "dependencies": {
+    "@xyflow/react": "^12.10.0",
     "axios": "^1.13.2",
     "dockerode": "^4.0.9",
     "dotenv": "^16.3.1",
     "electron-log": "^5.1.2",
     "fs-extra": "^11.2.0",
     "pg": "^8.11.0",
+    "reactflow": "^11.11.4",
     "semver": "^7.5.4",
     "simple-git": "^3.21.0"
   },
@@ -41,6 +43,8 @@
     "@types/jsdom": "^27.0.0",
     "@types/node": "^20.19.25",
     "@types/pg": "^8.10.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "@types/semver": "^7.5.0",
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3",
