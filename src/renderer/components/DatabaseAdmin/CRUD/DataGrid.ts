@@ -113,7 +113,9 @@ export class DataGrid {
           // Object response - check for 'records' key first (MCP standard format)
           if (result.data.records && Array.isArray(result.data.records)) {
             console.log('[DataGrid] ✓ Found records in MCP format, length:', result.data.records.length);
-            console.log('[DataGrid] ✓ First record:', JSON.stringify(result.data.records[0]).substring(0, 200));
+            if (result.data.records.length > 0) {
+              console.log('[DataGrid] ✓ First record:', JSON.stringify(result.data.records[0]).substring(0, 200));
+            }
             records = result.data.records;
             totalCount = result.data.total_count || result.data.count || records.length;
             console.log('[DataGrid] ✓ Total count:', totalCount);
@@ -206,7 +208,9 @@ export class DataGrid {
         console.log('[DataGrid] ✓ Successfully loaded:', this.data.length, 'records');
         console.log('[DataGrid] ✓ Total records:', this.totalRecords);
         console.log('[DataGrid] ✓ Columns:', this.columns.map(c => c.name).join(', '));
-        console.log('[DataGrid] ✓ First record sample:', JSON.stringify(this.data[0]).substring(0, 200));
+        if (this.data.length > 0) {
+          console.log('[DataGrid] ✓ First record sample:', JSON.stringify(this.data[0]).substring(0, 200));
+        }
         console.log('[DataGrid] ========== RENDERING GRID ==========');
 
         this.render();
