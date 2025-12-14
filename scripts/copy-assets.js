@@ -58,6 +58,22 @@ function copyAssets() {
       console.warn(`  ⚠ Warning: icon.png not found at ${iconSrc}`);
     }
 
+    // Copy vendor directory (React bundles for offline use)
+    const srcVendor = path.join(srcRenderer, 'vendor');
+    const distVendor = path.join(distRenderer, 'vendor');
+    if (fs.existsSync(srcVendor)) {
+      ensureDirSync(distVendor);
+      const vendorFiles = fs.readdirSync(srcVendor);
+      for (const file of vendorFiles) {
+        if (file.endsWith('.js')) {
+          const srcPath = path.join(srcVendor, file);
+          const destPath = path.join(distVendor, file);
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`  ✓ Copied vendor/${file}`);
+        }
+      }
+    }
+
     // Copy all icon files from resources to dist/resources
     console.log('Copying resources directory...');
     const srcResources = path.join(__dirname, '..', 'resources');

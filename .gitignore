@@ -12,6 +12,7 @@ build/
 *.js
 !scripts/*.js
 !docker/mcp-writing-servers-templates/*.js
+!src/renderer/vendor/*.js
 *.js.map
 *.d.ts
 *.d.ts.map
