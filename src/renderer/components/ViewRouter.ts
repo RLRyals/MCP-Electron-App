@@ -81,10 +81,10 @@ export class ViewRouter {
 
       // New views
       const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
-      const { WorkflowsView } = await import('../views/WorkflowsView.js');
+      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact');
       const { LibraryView } = await import('../views/LibraryView.js');
       this.registerView('plugins', PluginsLauncher);
-      this.registerView('workflows', WorkflowsView);
+      this.registerView('workflows', WorkflowsViewReact);
       this.registerView('library', LibraryView);
 
       // Help and About views
