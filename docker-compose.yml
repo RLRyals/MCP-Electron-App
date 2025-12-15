@@ -40,7 +40,7 @@ services:
     networks:
       - mcp-network
     ports:
-      - "${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
+      - "${PGBOUNCER_PORT}:6432"
     volumes:
       - ${DOCKER_DIR}/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ${DOCKER_DIR}/userlist.txt:/etc/pgbouncer/userlist.txt:ro

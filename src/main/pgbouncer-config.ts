@@ -61,12 +61,14 @@ export async function generatePgBouncerConfig(config: EnvConfig): Promise<{
 
     // Generate pgbouncer.ini content
     // Use container hostname for cross-platform compatibility
+    // IMPORTANT: listen_port must always be 6432 inside the container
+    // The external port mapping in docker-compose.yml handles external access
     const iniContent = `[databases]
 * = host=postgres port=5432 dbname=${config.POSTGRES_DB}
 
 [pgbouncer]
 listen_addr = *
-listen_port = ${config.PGBOUNCER_PORT}
+listen_port = 6432
 auth_type = scram-sha-256
 auth_file = /etc/pgbouncer/userlist.txt
 admin_users = ${config.POSTGRES_USER}

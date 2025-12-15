@@ -1320,6 +1320,35 @@ export async function startMCPSystem(
       }
     }
 
+    // Force MCP servers to refresh database connections after startup on Linux
+    // This prevents stale IP address caching that causes ECONNREFUSED errors
+    // See: LINUX_CONNECTION_REFRESH_FIX.md
+    if (process.platform === 'linux') {
+      logWithCategory('info', LogCategory.DOCKER, 'Linux detected: Refreshing MCP servers database connections...');
+
+      if (progressCallback) {
+        progressCallback({
+          message: 'Refreshing database connections...',
+          percent: 95,
+          step: 'refresh-connections',
+          status: 'checking',
+        });
+      }
+
+      try {
+        // Restart the MCP servers container to force fresh DNS resolution and connection pool
+        await execAsync('docker restart fictionlab-mcp-servers', { timeout: 30000 });
+
+        // Wait for container to be fully ready with new connections
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        logWithCategory('info', LogCategory.DOCKER, 'MCP servers database connections refreshed successfully');
+      } catch (error) {
+        logWithCategory('warn', LogCategory.DOCKER, 'Could not refresh MCP servers connections (non-fatal)', error);
+        // Non-fatal - continue anyway as this is just an optimization
+      }
+    }
+
     logWithCategory('info', LogCategory.DOCKER, 'MCP system started successfully');
 
     return {
