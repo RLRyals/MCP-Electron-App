@@ -14,7 +14,7 @@ import { ViewRouter } from './components/ViewRouter.js';
 import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
-import { createDashboardTab } from './components/DashboardTab.js';
+// import { createDashboardTab } from './components/DashboardTab.js'; // No longer used with new ViewRouter
 import { createDefaultLogsTab } from './components/LogsTab.js';
 import { initializeServicesTab } from './components/ServicesTab.js';
 import { createDatabaseTab } from './components/DatabaseTab.js';
@@ -941,8 +941,9 @@ async function init(): Promise<void> {
   console.log('[Renderer] Dashboard components initialized successfully');
 
   // Legacy: Keep dashboard tab initialization for backward compatibility
-  const dashboardTab = createDashboardTab();
-  dashboardTab.initialize();
+  // DISABLED: DashboardTab is no longer used with the new ViewRouter-based dashboard
+  // const dashboardTab = createDashboardTab();
+  // dashboardTab.initialize();
 
   // Legacy: Initialize logs tab component
   const logsTab = createDefaultLogsTab();

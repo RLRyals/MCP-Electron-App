@@ -27,6 +27,9 @@ export class SetupView implements View {
       await initializeSetupTab();
       console.log('[SetupView] Setup tab initialized');
 
+      // Load app info (version, platform, etc.) now that the elements exist
+      await this.loadAppInfo();
+
       // Re-setup event listeners for forms that were just rendered
       setupEnvConfigListeners();
       loadEnvConfig();
@@ -351,6 +354,42 @@ export class SetupView implements View {
    */
   async unmount(): Promise<void> {
     this.container = null;
+  }
+
+  /**
+   * Load app info (version, platform, architecture, node version)
+   */
+  private async loadAppInfo(): Promise<void> {
+    try {
+      // Get app version
+      const version = await (window as any).electronAPI.getAppVersion();
+      const versionElement = document.getElementById('app-version');
+      if (versionElement) {
+        versionElement.textContent = version;
+      }
+
+      // Get platform info
+      const platformInfo = await (window as any).electronAPI.getPlatformInfo();
+
+      const platformElement = document.getElementById('platform');
+      if (platformElement) {
+        platformElement.textContent = platformInfo.platform;
+      }
+
+      const archElement = document.getElementById('architecture');
+      if (archElement) {
+        archElement.textContent = platformInfo.arch;
+      }
+
+      const nodeVersionElement = document.getElementById('node-version');
+      if (nodeVersionElement) {
+        nodeVersionElement.textContent = platformInfo.version;
+      }
+
+      console.log('[SetupView] App info loaded successfully');
+    } catch (error) {
+      console.error('[SetupView] Error loading app info:', error);
+    }
   }
 
   /**

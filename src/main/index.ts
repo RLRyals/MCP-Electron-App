@@ -2055,6 +2055,24 @@ function setupIPC(): void {
     }
   });
 
+  // Alias for plugins:get-all (for backwards compatibility with 'plugin:list')
+  ipcMain.handle('plugin:list', async () => {
+    try {
+      const plugins = pluginManager.getAllPlugins();
+      // Sanitize plugin data - only return serializable fields
+      return plugins.map(plugin => ({
+        id: plugin.id,
+        manifest: plugin.manifest,
+        status: plugin.status,
+        error: plugin.error,
+        // Don't include 'instance' or 'context' as they contain non-serializable functions
+      }));
+    } catch (error: any) {
+      logger.error('Error getting plugin list:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle('plugins:get-statistics', async () => {
     try {
       return {
