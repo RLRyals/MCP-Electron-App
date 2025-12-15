@@ -250,7 +250,7 @@ const WorkflowsApp: React.FC = () => {
               <WorkflowCanvas
                 workflow={selectedWorkflow}
                 executionStatus={executionStatus}
-                onNodeClick={(nodeId, phase) => {
+                onNodeClick={(nodeId: string, phase: any) => {
                   console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
                 }}
               />

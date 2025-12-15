@@ -11,6 +11,7 @@ import { initializeDashboard, setupDashboardHandlers } from './dashboard-handler
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { ViewRouter } from './components/ViewRouter.js';
+import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
 import { createDashboardTab } from './components/DashboardTab.js';
@@ -838,6 +839,10 @@ async function init(): Promise<void> {
 
   // Initialize ViewRouter (async - registers all views)
   await viewRouter.initialize();
+
+  // Register React-based views manually (import map only works in static imports)
+  viewRouter.registerView('workflows', WorkflowsViewReact);
+
   isViewRouterReady = true;
 
   // Get initial view and navigate to it

@@ -98,10 +98,9 @@ export class ViewRouter {
 
       // New views
       await register('plugins', () => import('../views/PluginsLauncher.js'), 'PluginsLauncher');
-      
-      // Use React-based Workflows view
-      await register('workflows', () => import('../views/WorkflowsViewReact.js'), 'WorkflowsViewReact');
-      
+
+      // Note: WorkflowsViewReact is registered manually in renderer.ts (uses React via import map)
+
       await register('library', () => import('../views/LibraryView.js'), 'LibraryView');
 
       // Help and About views

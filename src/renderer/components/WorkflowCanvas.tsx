@@ -23,9 +23,9 @@ import ReactFlow, {
   BackgroundVariant,
   MarkerType,
 } from 'reactflow';
-import 'reactflow/dist/style.css';
+// Note: reactflow styles are loaded via <link> tag in index.html
 
-import { PhaseNode, PhaseNodeData } from './nodes/PhaseNode';
+import { PhaseNode, PhaseNodeData } from './nodes/PhaseNode.js';
 
 // Register custom node types
 const nodeTypes = {

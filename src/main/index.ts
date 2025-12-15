@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import * as electron from 'electron';
+const { app, BrowserWindow, ipcMain, Menu, shell } = electron;
 import * as path from 'path';
 import * as fs from 'fs';
 import * as prerequisites from './prerequisites';

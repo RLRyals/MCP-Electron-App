@@ -103,14 +103,20 @@ function copyAssets() {
         const rfWrapperContent = `
 const ReactFlowLib = window.ReactFlow;
 export default ReactFlowLib;
-export const { 
-  Controls, 
-  Background, 
-  useNodesState, 
-  useEdgesState, 
-  addEdge, 
-  BackgroundVariant, 
-  MarkerType 
+export const {
+  Controls,
+  Background,
+  Handle,
+  Position,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  BackgroundVariant,
+  MarkerType,
+  Node,
+  Edge,
+  Connection,
+  NodeProps
 } = ReactFlowLib;
 `;
         fs.writeFileSync(rfWrapperPath, rfWrapperContent);
