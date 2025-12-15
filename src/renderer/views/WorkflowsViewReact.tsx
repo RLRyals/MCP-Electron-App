@@ -42,7 +42,13 @@ const WorkflowsApp: React.FC = () => {
 
       const result = await electronAPI.invoke('workflow:get-definitions');
       console.log('[WorkflowsViewReact] Loaded workflows:', result);
-      setWorkflows(result || []);
+
+      // Handle empty array (server not available) vs actual workflows
+      if (Array.isArray(result)) {
+        setWorkflows(result);
+      } else {
+        setWorkflows([]);
+      }
     } catch (error) {
       console.error('[WorkflowsViewReact] Failed to load workflows:', error);
       setWorkflows([]);
@@ -86,7 +92,9 @@ const WorkflowsApp: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const workflow = await electronAPI.invoke('workflow:get-definition', workflowId);
-      console.log('[WorkflowsViewReact] Selected workflow:', workflow);
+
+      console.log('[WorkflowsViewReact] Selected workflow:', workflow.name);
+
       setSelectedWorkflow(workflow);
       // Reset execution status when switching workflows
       setExecutionStatus(new Map());
@@ -236,24 +244,38 @@ const WorkflowsApp: React.FC = () => {
                 borderRadius: '8px',
               }}>
                 <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>
-                  {selectedWorkflow.name}
+                  {String(selectedWorkflow.name || 'Unnamed Workflow')}
                 </div>
-                {selectedWorkflow.description && (
+                {selectedWorkflow.description && typeof selectedWorkflow.description === 'string' && (
                   <div style={{ fontSize: '14px', color: '#6b7280' }}>
                     {selectedWorkflow.description}
                   </div>
                 )}
                 <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-                  Version {selectedWorkflow.version} • {selectedWorkflow.phases_json?.length || 0} phases
+                  Version {String(selectedWorkflow.version || '1.0')} • {selectedWorkflow.phases_json?.length || 0} phases
                 </div>
               </div>
-              <WorkflowCanvas
-                workflow={selectedWorkflow}
-                executionStatus={executionStatus}
-                onNodeClick={(nodeId: string, phase: any) => {
-                  console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
-                }}
-              />
+              {(() => {
+                try {
+                  return (
+                    <WorkflowCanvas
+                      workflow={{
+                        id: selectedWorkflow.id,
+                        name: String(selectedWorkflow.name),
+                        version: String(selectedWorkflow.version),
+                        phases_json: selectedWorkflow.phases_json || []
+                      }}
+                      executionStatus={executionStatus}
+                      onNodeClick={(nodeId: string, phase: any) => {
+                        console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
+                      }}
+                    />
+                  );
+                } catch (error) {
+                  console.error('[WorkflowsViewReact] Error rendering WorkflowCanvas:', error);
+                  return <div style={{ padding: '20px', color: 'red' }}>Error rendering workflow: {String(error)}</div>;
+                }
+              })()}
             </>
           ) : (
             <div style={{

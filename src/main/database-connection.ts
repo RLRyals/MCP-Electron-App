@@ -124,3 +124,23 @@ export async function testDatabaseConnection(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Get database connection URL for external processes (like MCP servers)
+ *
+ * Builds a PostgreSQL connection URL from the current environment configuration
+ */
+export async function getDatabaseUrl(): Promise<string> {
+  try {
+    const config = await envConfig.loadEnvConfig();
+
+    // Build PostgreSQL connection URL
+    // Format: postgresql://user:password@host:port/database
+    const url = `postgresql://${config.POSTGRES_USER}:${config.POSTGRES_PASSWORD}@localhost:${config.POSTGRES_PORT}/${config.POSTGRES_DB}`;
+
+    return url;
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to build database URL:', error);
+    throw new Error(`Failed to build database URL: ${error.message}`);
+  }
+}

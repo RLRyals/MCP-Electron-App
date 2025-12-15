@@ -122,13 +122,13 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
 
       <div style={headerStyle}>
         <span style={{ fontSize: '16px' }}>{getTypeIcon()}</span>
-        <div style={labelStyle}>{data.label}</div>
+        <div style={labelStyle}>{String(data.label || 'Unnamed Phase')}</div>
       </div>
 
-      <div style={agentStyle}>Agent: {data.phase.agent}</div>
+      <div style={agentStyle}>Agent: {String(data.phase.agent || 'Unknown')}</div>
 
       {data.phase.skill && (
-        <div style={skillStyle}>Skill: {data.phase.skill}</div>
+        <div style={skillStyle}>Skill: {String(data.phase.skill)}</div>
       )}
 
       {data.phase.gate && (
@@ -143,7 +143,7 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
         </div>
       )}
 
-      <div style={statusBadgeStyle}>{data.status.replace('_', ' ')}</div>
+      <div style={statusBadgeStyle}>{String(data.status || 'pending').replace('_', ' ')}</div>
 
       <Handle
         type="source"

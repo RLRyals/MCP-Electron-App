@@ -9,6 +9,7 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import { app } from 'electron';
 import { logWithCategory, LogCategory } from '../logger';
+import { getDatabaseUrl } from '../database-connection';
 
 export interface WorkflowDefinition {
   id: string;
@@ -50,7 +51,7 @@ export class MCPWorkflowClient {
   constructor() {
     // Path to workflow-manager MCP server
     const userDataPath = app.getPath('userData');
-    const mcpServersDir = path.join(userDataPath, 'MCP-Writing-Servers');
+    const mcpServersDir = path.join(userDataPath, 'repositories', 'mcp-writing-servers');
     this.mcpServerPath = path.join(
       mcpServersDir,
       'src',
@@ -64,11 +65,20 @@ export class MCPWorkflowClient {
    * Call MCP tool via stdio
    */
   private async callTool(toolName: string, args: any): Promise<any> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const requestId = ++this.requestId;
 
       logWithCategory('debug', LogCategory.WORKFLOW,
         `Calling MCP tool: ${toolName} (request ${requestId})`);
+
+      // Get database URL for the MCP server
+      let databaseUrl: string;
+      try {
+        databaseUrl = await getDatabaseUrl();
+      } catch (error: any) {
+        reject(new Error(`Failed to get database URL: ${error.message}`));
+        return;
+      }
 
       // Spawn MCP server in stdio mode
       const mcpProcess = spawn('node', [this.mcpServerPath], {
@@ -76,7 +86,7 @@ export class MCPWorkflowClient {
         env: {
           ...process.env,
           MCP_STDIO_MODE: 'true',
-          DATABASE_URL: process.env.DATABASE_URL // Pass from env
+          DATABASE_URL: databaseUrl
         }
       });
 

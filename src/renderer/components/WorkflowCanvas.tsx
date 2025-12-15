@@ -86,13 +86,26 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         y: Math.floor(index / 5) * 200,
       };
 
+      // Create a sanitized phase object with only the fields we need
+      // This prevents React from trying to render nested objects
+      const sanitizedPhase = {
+        id: phase.id,
+        name: String(phase.name || 'Unnamed'),
+        type: phase.type,
+        agent: String(phase.agent || 'Unknown'),
+        skill: phase.skill ? String(phase.skill) : undefined,
+        description: String(phase.description || ''),
+        gate: Boolean(phase.gate),
+        requiresApproval: Boolean(phase.requiresApproval),
+      };
+
       return {
         id: phase.id.toString(),
         type: phase.type,
         position,
         data: {
-          label: phase.name,
-          phase,
+          label: String(phase.name || 'Unnamed'),
+          phase: sanitizedPhase,
           status,
         },
       };

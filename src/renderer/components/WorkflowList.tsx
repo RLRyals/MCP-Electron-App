@@ -118,8 +118,12 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
       <div style={containerStyle}>
         <div style={emptyStateStyle}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
-          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>No workflows found</div>
-          <div style={{ fontSize: '12px' }}>Import a workflow to get started</div>
+          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>No workflows available</div>
+          <div style={{ fontSize: '12px', lineHeight: '1.6', maxWidth: '250px', margin: '0 auto' }}>
+            No workflow definitions found.
+            <br /><br />
+            Click "Import Workflow" to import workflow definitions from a folder.
+          </div>
         </div>
       </div>
     );
@@ -149,10 +153,10 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                 }}
               >
                 <div style={workflowNameStyle(isSelected)}>
-                  {workflow.name}
-                  <span style={badgeStyle(isSelected)}>v{workflow.version}</span>
+                  {String(workflow.name || 'Unnamed')}
+                  <span style={badgeStyle(isSelected)}>v{String(workflow.version || '1.0')}</span>
                 </div>
-                {workflow.description && (
+                {workflow.description && typeof workflow.description === 'string' && (
                   <div style={{
                     fontSize: '12px',
                     color: isSelected ? 'rgba(255,255,255,0.9)' : '#4b5563',
@@ -165,11 +169,11 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                 <div style={workflowMetaStyle(isSelected)}>
                   {workflow.phases_json?.length || 0} phases
                 </div>
-                {workflow.tags && workflow.tags.length > 0 && (
+                {workflow.tags && Array.isArray(workflow.tags) && workflow.tags.length > 0 && (
                   <div style={tagsContainerStyle}>
                     {workflow.tags.map((tag, idx) => (
                       <span key={idx} style={tagStyle(isSelected)}>
-                        {tag}
+                        {String(tag)}
                       </span>
                     ))}
                   </div>
@@ -202,10 +206,10 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                 }}
               >
                 <div style={workflowNameStyle(isSelected)}>
-                  {workflow.name}
-                  <span style={badgeStyle(isSelected)}>v{workflow.version}</span>
+                  {String(workflow.name || 'Unnamed')}
+                  <span style={badgeStyle(isSelected)}>v{String(workflow.version || '1.0')}</span>
                 </div>
-                {workflow.description && (
+                {workflow.description && typeof workflow.description === 'string' && (
                   <div style={{
                     fontSize: '12px',
                     color: isSelected ? 'rgba(255,255,255,0.9)' : '#4b5563',
@@ -218,11 +222,11 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                 <div style={workflowMetaStyle(isSelected)}>
                   {workflow.phases_json?.length || 0} phases
                 </div>
-                {workflow.tags && workflow.tags.length > 0 && (
+                {workflow.tags && Array.isArray(workflow.tags) && workflow.tags.length > 0 && (
                   <div style={tagsContainerStyle}>
                     {workflow.tags.map((tag, idx) => (
                       <span key={idx} style={tagStyle(isSelected)}>
-                        {tag}
+                        {String(tag)}
                       </span>
                     ))}
                   </div>

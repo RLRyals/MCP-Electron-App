@@ -101,23 +101,27 @@ function copyAssets() {
         // Generate ESM wrapper for ReactFlow
         const rfWrapperPath = path.join(distVendor, 'reactflow.js');
         const rfWrapperContent = `
+// ReactFlow UMD build exports to window.ReactFlow
 const ReactFlowLib = window.ReactFlow;
-export default ReactFlowLib;
-export const {
-  Controls,
-  Background,
-  Handle,
-  Position,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  BackgroundVariant,
-  MarkerType,
-  Node,
-  Edge,
-  Connection,
-  NodeProps
-} = ReactFlowLib;
+
+// The default export should be the main ReactFlow component
+// In UMD build, the main component might be at ReactFlowLib.default or just ReactFlowLib
+export default ReactFlowLib.default || ReactFlowLib;
+
+// Export named exports from the library
+export const Controls = ReactFlowLib.Controls;
+export const Background = ReactFlowLib.Background;
+export const Handle = ReactFlowLib.Handle;
+export const Position = ReactFlowLib.Position;
+export const useNodesState = ReactFlowLib.useNodesState;
+export const useEdgesState = ReactFlowLib.useEdgesState;
+export const addEdge = ReactFlowLib.addEdge;
+export const BackgroundVariant = ReactFlowLib.BackgroundVariant;
+export const MarkerType = ReactFlowLib.MarkerType;
+export const Node = ReactFlowLib.Node;
+export const Edge = ReactFlowLib.Edge;
+export const Connection = ReactFlowLib.Connection;
+export const NodeProps = ReactFlowLib.NodeProps;
 `;
         fs.writeFileSync(rfWrapperPath, rfWrapperContent);
         console.log('  ✓ Generated vendor/reactflow.js wrapper');
