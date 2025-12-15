@@ -12,11 +12,11 @@
 
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import type { View } from '../components/ViewRouter';
-import type { TopBarConfig } from '../components/TopBar';
-import { WorkflowList, WorkflowListItem } from '../components/WorkflowList';
-import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog';
+import type { View } from '../components/ViewRouter.js';
+import type { TopBarConfig } from '../components/TopBar.js';
+import { WorkflowList, WorkflowListItem } from '../components/WorkflowList.js';
+import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
+import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 
 // Main React Component
 const WorkflowsApp: React.FC = () => {
