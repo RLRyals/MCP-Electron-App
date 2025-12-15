@@ -10,8 +10,9 @@
  * - Real-time status updates
  */
 
-import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom/client';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import * as ReactDOM from 'react-dom/client';
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
 import { WorkflowList, WorkflowListItem } from '../components/WorkflowList.js';
