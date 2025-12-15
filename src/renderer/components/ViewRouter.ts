@@ -44,6 +44,7 @@ export class ViewRouter {
   private history: string[] = [];
   private historyIndex: number = -1;
   private maxHistorySize: number = 20;
+  private initPromise: Promise<void> | null = null;
 
   constructor(options: ViewRouterOptions) {
     this.container = options.container;
@@ -54,94 +55,63 @@ export class ViewRouter {
   /**
    * Initialize the router
    */
-  public async initialize(): Promise<void> {
-    await this.registerDefaultViews();
-    console.log('[ViewRouter] Initialized');
+  public initialize(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.registerDefaultViews().then(() => {
+        console.log('[ViewRouter] Initialized');
+      });
+    }
+    return this.initPromise;
   }
 
   /**
    * Register default views
    */
+  /**
+   * Register default views
+   */
   private async registerDefaultViews(): Promise<void> {
     // Import and register view classes dynamically
-    // Each import is wrapped individually so one failure doesn't break others
-
-    // Dashboard view (existing DashboardTab)
-    try {
-      const { DashboardView } = await import('../views/DashboardView.js');
-      this.registerView('dashboard', DashboardView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register DashboardView:', error);
-    }
-
-    // Settings views (wrappers for existing tab components)
-    try {
-      const { SetupView } = await import('../views/SetupView.js');
-      this.registerView('settings-setup', SetupView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register SetupView:', error);
-    }
+    const register = async (id: string, importFn: () => Promise<any>, exportName: string) => {
+      try {
+        const module = await importFn();
+        const ViewClass = module[exportName];
+        if (ViewClass) {
+          this.registerView(id, ViewClass);
+        } else {
+          console.error(`[ViewRouter] Failed to register view ${id}: Export ${exportName} not found`);
+        }
+      } catch (error) {
+        console.error(`[ViewRouter] Failed to register view ${id}:`, error);
+      }
+    };
 
     try {
-      const { DatabaseView } = await import('../views/DatabaseView.js');
-      this.registerView('settings-database', DatabaseView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register DatabaseView:', error);
-    }
+      // Dashboard view (existing DashboardTab)
+      await register('dashboard', () => import('../views/DashboardView.js'), 'DashboardView');
 
-    try {
-      const { ServicesView } = await import('../views/ServicesView.js');
-      this.registerView('settings-services', ServicesView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register ServicesView:', error);
-    }
+      // Settings views (wrappers for existing tab components)
+      await register('settings-setup', () => import('../views/SetupView.js'), 'SetupView');
+      await register('settings-database', () => import('../views/DatabaseView.js'), 'DatabaseView');
+      await register('settings-services', () => import('../views/ServicesView.js'), 'ServicesView');
+      await register('settings-logs', () => import('../views/LogsView.js'), 'LogsView');
 
-    try {
-      const { LogsView } = await import('../views/LogsView.js');
-      this.registerView('settings-logs', LogsView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register LogsView:', error);
-    }
+      // New views
+      await register('plugins', () => import('../views/PluginsLauncher.js'), 'PluginsLauncher');
+      
+      // Use React-based Workflows view
+      await register('workflows', () => import('../views/WorkflowsViewReact.js'), 'WorkflowsViewReact');
+      
+      await register('library', () => import('../views/LibraryView.js'), 'LibraryView');
 
-    // New views
-    try {
-      const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
-      this.registerView('plugins', PluginsLauncher);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register PluginsLauncher:', error);
-    }
+      // Help and About views
+      await register('help', () => import('../views/HelpView.js'), 'HelpView');
+      await register('about', () => import('../views/AboutView.js'), 'AboutView');
 
-    // WorkflowsViewReact (React is bundled locally in vendor/)
-    try {
-      const { WorkflowsViewReact } = await import('../views/WorkflowsViewReact.js');
-      this.registerView('workflows', WorkflowsViewReact);
+      console.log('[ViewRouter] Default views registration process completed');
     } catch (error) {
-      console.error('[ViewRouter] Failed to register WorkflowsViewReact:', error);
+      console.error('[ViewRouter] general error during view registration:', error);
     }
-
-    try {
-      const { LibraryView } = await import('../views/LibraryView.js');
-      this.registerView('library', LibraryView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register LibraryView:', error);
-    }
-
-    // Help and About views
-    try {
-      const { HelpView } = await import('../views/HelpView.js');
-      this.registerView('help', HelpView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register HelpView:', error);
-    }
-
-    try {
-      const { AboutView } = await import('../views/AboutView.js');
-      this.registerView('about', AboutView);
-    } catch (error) {
-      console.error('[ViewRouter] Failed to register AboutView:', error);
-    }
-
-    console.log('[ViewRouter] View registration complete');
   }
 
   /**
