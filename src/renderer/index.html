@@ -1472,7 +1472,16 @@
     <script src="vendor/reactflow.umd.js"></script>
 
     <!-- Import map for local React (ESM wrappers around UMD globals) -->
-    <script type="importmap" src="import-map.json"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "./vendor/react.js",
+            "react-dom/client": "./vendor/react-dom-client.js",
+            "react/jsx-runtime": "./vendor/react-jsx-runtime.js",
+            "reactflow": "./vendor/reactflow.js"
+        }
+    }
+    </script>
 
     <script src="client-management-ui.js"></script>
     <script type="module" src="renderer.js"></script>
