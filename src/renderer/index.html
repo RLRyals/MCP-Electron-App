@@ -1465,7 +1465,11 @@
         </div>
     </div>
 
-    <!-- Import map for local React (works offline) -->
+    <!-- Load React UMD builds first (sets window.React and window.ReactDOM) -->
+    <script src="vendor/react.umd.js"></script>
+    <script src="vendor/react-dom.umd.js"></script>
+
+    <!-- Import map for local React (ESM wrappers around UMD globals) -->
     <script type="importmap">
     {
       "imports": {
