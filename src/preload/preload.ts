@@ -644,9 +644,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   /**
    * Generic IPC on method for event listeners
+   * Note: We store wrapper functions in a WeakMap to enable proper cleanup with off()
    */
   on: (channel: string, callback: (...args: any[]) => void): void => {
-    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    const wrapper = (_event: any, ...args: any[]) => callback(...args);
+    // Store mapping between callback and wrapper for cleanup
+    if (!(window as any).__ipcListeners) {
+      (window as any).__ipcListeners = new Map();
+    }
+    if (!(window as any).__ipcListeners.has(channel)) {
+      (window as any).__ipcListeners.set(channel, new Map());
+    }
+    (window as any).__ipcListeners.get(channel).set(callback, wrapper);
+    ipcRenderer.on(channel, wrapper);
+  },
+
+  /**
+   * Remove a specific listener for a channel
+   */
+  off: (channel: string, callback: (...args: any[]) => void): void => {
+    // Retrieve the wrapper function from our mapping
+    if ((window as any).__ipcListeners?.has(channel)) {
+      const channelListeners = (window as any).__ipcListeners.get(channel);
+      const wrapper = channelListeners.get(callback);
+      if (wrapper) {
+        ipcRenderer.removeListener(channel, wrapper);
+        channelListeners.delete(callback);
+      }
+    }
   },
 
   /**

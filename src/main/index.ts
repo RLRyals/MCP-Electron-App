@@ -34,6 +34,7 @@ import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import { WorkflowExecutor } from './workflow/workflow-executor';
 import { MCPWorkflowClient } from './workflow/mcp-workflow-client';
+import { workflowCache } from './workflow/workflow-cache';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -2482,10 +2483,25 @@ function setupIPC(): void {
   ipcMain.handle('workflow:get-definitions', async (_event, filters?: {
     tags?: string[];
     is_system?: boolean;
+    skipCache?: boolean;
   }) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting workflow definitions');
     try {
+      // Check cache first (unless skipCache is true)
+      if (!filters?.skipCache) {
+        const cached = workflowCache.getList();
+        if (cached) {
+          logWithCategory('debug', LogCategory.WORKFLOW, 'Returning cached workflow definitions');
+          return cached;
+        }
+      }
+
+      // Cache miss or cache skipped - fetch from MCP server
       const definitions = await workflowClient.getWorkflowDefinitions(filters);
+
+      // Cache the result
+      workflowCache.setList(definitions);
+
       return definitions;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW,
@@ -2495,15 +2511,52 @@ function setupIPC(): void {
   });
 
   // Get specific workflow definition
-  ipcMain.handle('workflow:get-definition', async (_event, workflowDefId: string, version?: string) => {
+  ipcMain.handle('workflow:get-definition', async (_event, workflowDefId: string, version?: string, skipCache?: boolean) => {
     logWithCategory('info', LogCategory.WORKFLOW,
       `IPC: Getting workflow definition: ${workflowDefId} v${version || 'latest'}`);
     try {
+      // Check cache first (unless skipCache is true)
+      if (!skipCache) {
+        const cached = workflowCache.get(workflowDefId, version);
+        if (cached) {
+          logWithCategory('debug', LogCategory.WORKFLOW, 'Returning cached workflow definition');
+          return cached;
+        }
+      }
+
+      // Cache miss or cache skipped - fetch from MCP server
       const definition = await workflowClient.getWorkflowDefinition(workflowDefId, version);
+
+      // Cache the result if found
+      if (definition) {
+        workflowCache.set(workflowDefId, definition.version, definition);
+      }
+
       return definition;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW,
         `Failed to get workflow definition: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Update workflow node positions
+  ipcMain.handle('workflow:update-positions', async (_event, data: {
+    workflowId: string;
+    positions: Record<string, { x: number; y: number }>;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Updating node positions for workflow: ${data.workflowId}`);
+    try {
+      await workflowClient.updateNodePositions(data.workflowId, data.positions);
+
+      // Invalidate cache for this workflow so next fetch gets updated positions
+      workflowCache.invalidate(data.workflowId);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to update node positions: ${error.message}`);
       throw error;
     }
   });
@@ -2514,7 +2567,12 @@ function setupIPC(): void {
     try {
       const { FolderImporter } = await import('./workflow/folder-importer');
       const importer = new FolderImporter();
-      return await importer.importFromFolder(folderPath);
+      const result = await importer.importFromFolder(folderPath);
+
+      // Invalidate cache after successful import
+      workflowCache.invalidateAll();
+
+      return result;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to import workflow: ${error.message}`);
       throw error;
@@ -2538,7 +2596,12 @@ function setupIPC(): void {
   ipcMain.handle('workflow:import-definition', async (_event, workflow: any) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow definition: ${workflow.name}`);
     try {
-      return await workflowClient.importWorkflowDefinition(workflow);
+      const result = await workflowClient.importWorkflowDefinition(workflow);
+
+      // Invalidate cache after successful import
+      workflowCache.invalidateAll();
+
+      return result;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to import workflow definition: ${error.message}`);
       throw error;

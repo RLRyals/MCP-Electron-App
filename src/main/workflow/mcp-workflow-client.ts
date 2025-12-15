@@ -235,6 +235,22 @@ export class MCPWorkflowClient {
   }
 
   /**
+   * Update node positions in workflow definition
+   */
+  async updateNodePositions(
+    workflowDefId: string,
+    positions: Record<string, { x: number; y: number }>
+  ): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Updating node positions for workflow: ${workflowDefId}`);
+
+    await this.callTool('update_workflow_positions', {
+      workflow_def_id: workflowDefId,
+      positions
+    });
+  }
+
+  /**
    * Create workflow version
    */
   async createWorkflowVersion(

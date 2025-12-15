@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
@@ -26,13 +26,8 @@ const WorkflowsApp: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [executionStatus, setExecutionStatus] = useState<Map<number, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
 
-  // Load workflows on mount
-  useEffect(() => {
-    loadWorkflows();
-    setupEventListeners();
-  }, []);
-
-  const loadWorkflows = async () => {
+  // Load workflows function (can be reused)
+  const loadWorkflows = useCallback(async () => {
     try {
       const electronAPI = (window as any).electronAPI;
       if (!electronAPI || !electronAPI.invoke) {
@@ -53,40 +48,67 @@ const WorkflowsApp: React.FC = () => {
       console.error('[WorkflowsViewReact] Failed to load workflows:', error);
       setWorkflows([]);
     }
-  };
+  }, []);
 
-  const setupEventListeners = () => {
+  // Load workflows on mount and setup event listeners with proper cleanup
+  useEffect(() => {
+    loadWorkflows();
+
+    // Setup event listeners with stable function references
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI || !electronAPI.on) return;
+    if (!electronAPI || !electronAPI.on || !electronAPI.off) return;
 
-    // Listen for workflow phase updates
-    electronAPI.on('workflow:phase-started', (data: any) => {
+    const handlePhaseStarted = (data: any) => {
       console.log('[WorkflowsViewReact] Phase started:', data);
       setExecutionStatus(prev => {
+        // Only create new Map if value actually changed
+        const existing = prev.get(data.phaseNumber);
+        if (existing === 'in_progress') return prev;
+
         const newMap = new Map(prev);
         newMap.set(data.phaseNumber, 'in_progress');
         return newMap;
       });
-    });
+    };
 
-    electronAPI.on('workflow:phase-completed', (data: any) => {
+    const handlePhaseCompleted = (data: any) => {
       console.log('[WorkflowsViewReact] Phase completed:', data);
       setExecutionStatus(prev => {
+        // Only create new Map if value actually changed
+        const existing = prev.get(data.phaseNumber);
+        if (existing === 'completed') return prev;
+
         const newMap = new Map(prev);
         newMap.set(data.phaseNumber, 'completed');
         return newMap;
       });
-    });
+    };
 
-    electronAPI.on('workflow:phase-failed', (data: any) => {
+    const handlePhaseFailed = (data: any) => {
       console.log('[WorkflowsViewReact] Phase failed:', data);
       setExecutionStatus(prev => {
+        // Only create new Map if value actually changed
+        const existing = prev.get(data.phaseNumber);
+        if (existing === 'failed') return prev;
+
         const newMap = new Map(prev);
         newMap.set(data.phaseNumber, 'failed');
         return newMap;
       });
-    });
-  };
+    };
+
+    // Register listeners
+    electronAPI.on('workflow:phase-started', handlePhaseStarted);
+    electronAPI.on('workflow:phase-completed', handlePhaseCompleted);
+    electronAPI.on('workflow:phase-failed', handlePhaseFailed);
+
+    // Cleanup on unmount
+    return () => {
+      electronAPI.off('workflow:phase-started', handlePhaseStarted);
+      electronAPI.off('workflow:phase-completed', handlePhaseCompleted);
+      electronAPI.off('workflow:phase-failed', handlePhaseFailed);
+    };
+  }, []);
 
   const handleSelectWorkflow = async (workflowId: string) => {
     try {
