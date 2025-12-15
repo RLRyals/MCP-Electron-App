@@ -21,10 +21,10 @@ function copyAssets() {
     // Ensure dist/renderer directory exists
     ensureDirSync(distRenderer);
 
-    // Copy HTML and CSS files
+    // Copy HTML, CSS, and JSON files (like import-map.json)
     const files = fs.readdirSync(srcRenderer);
     for (const file of files) {
-      if (file.endsWith('.html') || file.endsWith('.css')) {
+      if (file.endsWith('.html') || file.endsWith('.css') || file.endsWith('.json')) {
         const srcPath = path.join(srcRenderer, file);
         const destPath = path.join(distRenderer, file);
         fs.copyFileSync(srcPath, destPath);
