@@ -94,9 +94,33 @@ services:
       - "3011:3011"  # NPE Server
       - "3012:3012"  # Workflow Manager
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:${PGBOUNCER_PORT}/${POSTGRES_DB}?sslmode=disable
+      # PRIMARY: Use PgBouncer for connection pooling (internal Docker network port)
+      # CRITICAL: Use container name and INTERNAL port (6432), NOT the external ${PGBOUNCER_PORT} variable
+      # This fixes SASL auth failures on Linux where external port mapping differs from internal networking
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fictionlab-pgbouncer:6432/${POSTGRES_DB}?sslmode=disable
+
+      # FALLBACK: Direct PostgreSQL connection (if PgBouncer is disabled)
+      # Use container name fictionlab-postgres and internal port 5432
+      DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fictionlab-postgres:5432/${POSTGRES_DB}?sslmode=disable
+
+      # Individual connection params (for services that build their own connection strings)
+      # These use PgBouncer by default for connection pooling
+      POSTGRES_HOST: fictionlab-pgbouncer
+      POSTGRES_PORT: 6432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+      # Alternative direct connection params (fallback)
+      DB_HOST: fictionlab-postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+
       NODE_ENV: production
       NODE_OPTIONS: "--max-old-space-size=2048"
+
       # Connection pool configuration to prevent exhaustion
       DB_POOL_MAX: 5          # Max connections per server (10 servers × 5 = 50 total)
       DB_POOL_MIN: 1          # Minimum connections per server
@@ -104,6 +128,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     # Keep container running for stdio connections via docker exec
     stdin_open: true
     tty: true
