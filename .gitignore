@@ -81,3 +81,7 @@ ehthumbs_vista.db
 .claude/settings.local.json
 .claude/settings.local.json
 .claude/CLAUDE.MD
+.claude/agents/*
+.claude/skills/*
+.claude/genre-packs/*
+.claude/templates/*
