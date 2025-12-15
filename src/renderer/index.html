@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="styles/plugins-launcher.css">
     <link rel="stylesheet" href="styles/workflows.css">
     <link rel="stylesheet" href="styles/library.css">
+    <link rel="stylesheet" href="styles/reactflow.css">
 
     <!-- Legacy Styles (still needed for content) -->
     <link rel="stylesheet" href="styles/database.css">
@@ -1468,6 +1469,7 @@
     <!-- Load React UMD builds first (sets window.React and window.ReactDOM) -->
     <script src="vendor/react.umd.js"></script>
     <script src="vendor/react-dom.umd.js"></script>
+    <script src="vendor/reactflow.umd.js"></script>
 
     <!-- Import map for local React (ESM wrappers around UMD globals) -->
     <script type="importmap">
@@ -1475,7 +1477,8 @@
       "imports": {
         "react": "./vendor/react.js",
         "react-dom/client": "./vendor/react-dom-client.js",
-        "react/jsx-runtime": "./vendor/react-jsx-runtime.js"
+        "react/jsx-runtime": "./vendor/react-jsx-runtime.js",
+        "reactflow": "./vendor/reactflow.js"
       }
     }
     </script>

@@ -74,6 +74,54 @@ function copyAssets() {
       }
     }
 
+    // Copy ReactFlow from node_modules
+    try {
+      const reactFlowPath = path.join(__dirname, '..', 'node_modules', 'reactflow', 'dist');
+      if (fs.existsSync(reactFlowPath)) {
+        ensureDirSync(distVendor);
+
+        // Copy UMD build
+        const rfUmdSrc = path.join(reactFlowPath, 'umd', 'index.js');
+        const rfUmdDest = path.join(distVendor, 'reactflow.umd.js');
+        if (fs.existsSync(rfUmdSrc)) {
+          fs.copyFileSync(rfUmdSrc, rfUmdDest);
+          console.log('  ✓ Copied reactflow.umd.js from node_modules');
+        }
+
+        // Copy CSS
+        const rfCssSrc = path.join(reactFlowPath, 'style.css');
+        const distStyles = path.join(distRenderer, 'styles');
+        const rfCssDest = path.join(distStyles, 'reactflow.css');
+        if (fs.existsSync(rfCssSrc)) {
+          ensureDirSync(distStyles);
+          fs.copyFileSync(rfCssSrc, rfCssDest);
+          console.log('  ✓ Copied reactflow.css from node_modules');
+        }
+
+        // Generate ESM wrapper for ReactFlow
+        const rfWrapperPath = path.join(distVendor, 'reactflow.js');
+        const rfWrapperContent = `
+const ReactFlowLib = window.ReactFlow;
+export default ReactFlowLib;
+export const { 
+  Controls, 
+  Background, 
+  useNodesState, 
+  useEdgesState, 
+  addEdge, 
+  BackgroundVariant, 
+  MarkerType 
+} = ReactFlowLib;
+`;
+        fs.writeFileSync(rfWrapperPath, rfWrapperContent);
+        console.log('  ✓ Generated vendor/reactflow.js wrapper');
+      } else {
+        console.warn('  ⚠ Warning: node_modules/reactflow not found');
+      }
+    } catch (err) {
+      console.warn('  ⚠ Failed to copy ReactFlow assets:', err.message);
+    }
+
     // Copy all icon files from resources to dist/resources
     console.log('Copying resources directory...');
     const srcResources = path.join(__dirname, '..', 'resources');
