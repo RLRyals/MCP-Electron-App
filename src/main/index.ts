@@ -2634,6 +2634,63 @@ function setupIPC(): void {
     }
   });
 
+  // Export workflow to Claude Code format
+  ipcMain.handle('workflow:export-claude-code', async (_event, workflowId: string, options?: any) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Exporting workflow to Claude Code format: ${workflowId}`);
+    try {
+      const { ClaudeCodeExporter } = await import('./workflow/exporters/claude-code-exporter');
+      const exporter = new ClaudeCodeExporter();
+      const result = await exporter.export(workflowId, options);
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to export workflow: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // List exportable workflows
+  ipcMain.handle('workflow:list-exportable', async (_event, filters?: any) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Listing exportable workflows');
+    try {
+      const { ClaudeCodeExporter } = await import('./workflow/exporters/claude-code-exporter');
+      const exporter = new ClaudeCodeExporter();
+      return await exporter.listExportableWorkflows(filters);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to list exportable workflows: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Validate exported workflow package
+  ipcMain.handle('workflow:validate-export', async (_event, exportPath: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Validating export package: ${exportPath}`);
+    try {
+      const { ClaudeCodeExporter } = await import('./workflow/exporters/claude-code-exporter');
+      const exporter = new ClaudeCodeExporter();
+      return await exporter.validateExport(exportPath);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to validate export: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Shell operations
+  ipcMain.handle('shell:open-path', async (_event, path: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening path: ${path}`);
+    try {
+      const result = await shell.openPath(path);
+      if (result) {
+        // openPath returns empty string on success, error message on failure
+        logWithCategory('error', LogCategory.SYSTEM, `Failed to open path: ${result}`);
+        throw new Error(result);
+      }
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to open path: ${error.message}`);
+      throw error;
+    }
+  });
+
   // Forward workflow events to renderer
   workflowExecutor.on('phase-started', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {

@@ -18,12 +18,14 @@ import type { TopBarConfig } from '../components/TopBar.js';
 import { WorkflowList, WorkflowListItem } from '../components/WorkflowList.js';
 import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
+import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 
 // Main React Component
 const WorkflowsApp: React.FC = () => {
   const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowListItem | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [executionStatus, setExecutionStatus] = useState<Map<number, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
 
   // Load workflows function (can be reused)
@@ -230,6 +232,13 @@ const WorkflowsApp: React.FC = () => {
           📥 Import Workflow
         </button>
         <button
+          style={buttonStyle('secondary', !selectedWorkflow)}
+          onClick={() => setShowExportDialog(true)}
+          disabled={!selectedWorkflow}
+        >
+          📤 Export Workflow
+        </button>
+        <button
           style={buttonStyle('primary', !selectedWorkflow)}
           onClick={handleStartWorkflow}
           disabled={!selectedWorkflow}
@@ -319,6 +328,16 @@ const WorkflowsApp: React.FC = () => {
         <WorkflowImportDialog
           onImport={handleImport}
           onClose={() => setShowImportDialog(false)}
+        />
+      )}
+
+      {/* Export Dialog */}
+      {showExportDialog && selectedWorkflow && (
+        <WorkflowExportDialog
+          workflowId={selectedWorkflow.id}
+          workflowName={String(selectedWorkflow.name)}
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
         />
       )}
     </div>
