@@ -1,0 +1,219 @@
+id: image-generation-workflow
+name: Book Cover Image Generation Workflow
+version: 1.0.0
+description: Generate book cover images using multimodal AI with quality review gates
+phases:
+  - id: 0
+    name: Concept Development
+    fullName: Generate Visual Concept from Book Description
+    type: planning
+    agent: visual-concept-agent
+    skill: image-concept-skill
+    description: Analyze book description, genre, and target audience to create detailed visual concept
+    process:
+      - Read book metadata and description from database
+      - Analyze genre conventions and visual tropes
+      - Research competitive titles for visual inspiration
+      - Generate detailed concept document with style references
+      - Create mood board with color palette and composition notes
+    output: Visual concept document with style references and mood board
+    mcp: series-planning-server (read book metadata), visual-assets-server (store concept)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 100 }
+
+  - id: 1
+    name: Prompt Engineering
+    fullName: Create Optimized Image Generation Prompts
+    type: planning
+    agent: prompt-engineer-agent
+    description: Convert visual concept into optimized prompts for image generation models
+    process:
+      - Extract key visual elements from concept document
+      - Research effective prompting techniques for target model (DALL-E, Midjourney, Stable Diffusion)
+      - Create multiple prompt variations with different emphasis
+      - Include technical parameters (aspect ratio, style modifiers, negative prompts)
+      - Generate prompt iteration strategy
+    output: Set of optimized image generation prompts with technical parameters
+    mcp: visual-assets-server (store prompts)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 200 }
+
+  - id: 2
+    name: Human Review - Concept Approval
+    fullName: Review Visual Concept and Prompts
+    type: user
+    agent: User
+    description: Human review of visual concept and prompts before generation
+    process:
+      - Review visual concept document
+      - Evaluate prompt quality and alignment with book themes
+      - Provide feedback on style direction
+      - Approve or request revisions
+    output: Approval decision with optional feedback
+    mcp: workflow-manager (record approval)
+    gate: false
+    requiresApproval: true
+    position: { x: 100, y: 300 }
+
+  - id: 3
+    name: Image Generation
+    fullName: Generate Cover Images with Multimodal AI
+    type: writing
+    agent: image-generation-agent
+    skill: multimodal-image-generation
+    description: Generate multiple cover image variations using approved prompts
+    process:
+      - Connect to image generation API (DALL-E 3, Midjourney, or Stable Diffusion)
+      - Generate 5-10 variations per approved prompt
+      - Download and store images with metadata
+      - Create thumbnails and preview grid
+      - Tag images with generation parameters
+    output: Collection of generated cover images with metadata
+    mcp: visual-assets-server (store images), ai-service-tracker-server (log API usage)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 400 }
+
+  - id: 4
+    name: Quality Assessment
+    fullName: Automated Quality Gate for Generated Images
+    type: gate
+    agent: quality-assessment-agent
+    description: Automated quality checks for generated images
+    process:
+      - Check image resolution and technical quality
+      - Verify text readability (if any text present)
+      - Detect common AI artifacts (distorted hands, faces, text)
+      - Evaluate composition balance
+      - Check color palette coherence
+      - Score each image on quality metrics
+    output: Quality scores and pass/fail decisions per image
+    mcp: visual-assets-server (update image metadata with scores)
+    gate: true
+    gateCondition: At least 3 images must score 80+ on quality assessment
+    requiresApproval: false
+    position: { x: 100, y: 500 }
+
+  - id: 5
+    name: Image Selection
+    fullName: Curate Best Images for Final Review
+    type: planning
+    agent: curation-agent
+    description: Select top candidates from quality-passing images
+    process:
+      - Filter images that passed quality gate
+      - Rank by quality score and aesthetic appeal
+      - Consider genre appropriateness
+      - Select top 3-5 candidates for human review
+      - Prepare comparison view
+    output: Curated shortlist of top image candidates
+    mcp: visual-assets-server (mark curated images)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 600 }
+
+  - id: 6
+    name: Final Review - Image Selection
+    fullName: Human Selection of Final Cover Image
+    type: user
+    agent: User
+    description: Human review and selection of final cover image
+    process:
+      - Review curated shortlist of cover images
+      - Evaluate alignment with book themes and market expectations
+      - Consider typography placement possibilities
+      - Select final image or request new generation with feedback
+    output: Selected cover image ID with feedback
+    mcp: workflow-manager (record selection), visual-assets-server (mark selected image)
+    gate: false
+    requiresApproval: true
+    position: { x: 100, y: 700 }
+
+  - id: 7
+    name: Typography Design
+    fullName: Add Title and Author Text to Cover
+    type: writing
+    agent: typography-agent
+    skill: cover-typography-skill
+    description: Design and apply title, author name, and other text elements
+    process:
+      - Analyze selected image for text placement zones
+      - Select appropriate fonts for genre and style
+      - Design title treatment with effects (shadows, outlines, etc.)
+      - Add author name and series information if applicable
+      - Create variations with different text placements
+      - Generate high-resolution final composites
+    output: Final cover designs with typography applied
+    mcp: visual-assets-server (store final covers), typography-assets-server (store font metadata)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 800 }
+
+  - id: 8
+    name: Final Approval
+    fullName: Human Approval of Complete Cover Design
+    type: user
+    agent: User
+    description: Final human approval of complete cover with typography
+    process:
+      - Review final cover design with all text elements
+      - Verify readability at thumbnail size
+      - Check alignment with brand guidelines
+      - Approve for publication or request typography adjustments
+    output: Final approval decision
+    mcp: workflow-manager (record final approval), visual-assets-server (mark approved for publication)
+    gate: false
+    requiresApproval: true
+    position: { x: 100, y: 900 }
+
+  - id: 9
+    name: Export and Archive
+    fullName: Export Cover in Multiple Formats and Archive
+    type: planning
+    agent: export-agent
+    description: Generate all required formats and archive design files
+    process:
+      - Export cover in multiple formats (JPEG, PNG, PDF)
+      - Generate sizes for different platforms (Amazon, IngramSpark, etc.)
+      - Create social media preview images
+      - Archive all source files and generation metadata
+      - Update book metadata with cover file paths
+    output: Complete cover package with all formats and archived sources
+    mcp: visual-assets-server (store exports), series-planning-server (update book metadata)
+    gate: false
+    requiresApproval: false
+    position: { x: 100, y: 1000 }
+
+dependencies:
+  agents:
+    - visual-concept-agent
+    - prompt-engineer-agent
+    - image-generation-agent
+    - quality-assessment-agent
+    - curation-agent
+    - typography-agent
+    - export-agent
+  skills:
+    - image-concept-skill
+    - multimodal-image-generation
+    - cover-typography-skill
+  mcpServers:
+    - workflow-manager
+    - series-planning-server
+    - visual-assets-server
+    - ai-service-tracker-server
+    - typography-assets-server
+  subWorkflows: []
+
+metadata:
+  author: FictionLab
+  created: "2025-12-16T00:00:00Z"
+  updated: "2025-12-16T00:00:00Z"
+  tags:
+    - image-generation
+    - book-covers
+    - multimodal
+    - quality-gates
+    - publishing

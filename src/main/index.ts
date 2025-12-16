@@ -403,6 +403,7 @@ function openTypingMindInBrowser(url: string): void {
 }
 
 import { registerImportHandlers } from './handlers/import-handlers';
+import { registerExportHandlers } from './handlers/export-handlers';
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -410,6 +411,9 @@ import { registerImportHandlers } from './handlers/import-handlers';
 function setupIPC(): void {
   // Register import handlers
   registerImportHandlers();
+
+  // Register export handlers
+  registerExportHandlers();
 
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {
