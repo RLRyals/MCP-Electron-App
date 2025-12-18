@@ -2674,6 +2674,73 @@ function setupIPC(): void {
     }
   });
 
+  // ========================================
+  // Project and Series Management IPC Handlers
+  // ========================================
+
+  // Project handlers
+  ipcMain.handle('project:create', async (_event, data: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Creating project: ${data.name}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.createProject(data);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to create project: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('project:list', async () => {
+    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing projects');
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.listProjects();
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to list projects: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('project:get', async (_event, id: number) => {
+    logWithCategory('debug', LogCategory.SYSTEM, `IPC: Getting project ${id}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.getProject(id);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to get project: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('project:update', async (_event, id: number, data: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating project ${id}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      await projectManager.updateProject(id, data);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to update project: ${error.message}`);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('project:delete', async (_event, id: number) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting project ${id}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      await projectManager.deleteProject(id);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to delete project: ${error.message}`);
+      throw error;
+    }
+  });
+
   // Shell operations
   ipcMain.handle('shell:open-path', async (_event, path: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening path: ${path}`);

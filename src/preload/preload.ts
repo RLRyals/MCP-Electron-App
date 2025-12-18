@@ -2250,6 +2250,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return ipcRenderer.invoke('window:close');
     },
   },
+
+  /**
+   * Shell API for opening files/folders
+   */
+  shell: {
+    /**
+     * Open a file or folder in the default application
+     */
+    openPath: (path: string): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('shell:open-path', path);
+    },
+  },
 });
 
 console.log('Preload script loaded successfully');

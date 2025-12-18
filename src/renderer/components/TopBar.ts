@@ -9,6 +9,8 @@
  * - Responsive action grouping
  */
 
+import { appState } from '../store/app-state.js';
+
 export interface TopBarAction {
   id: string;
   label: string;
@@ -61,6 +63,20 @@ export class TopBar {
     // But TopBar uses delegation on this.container for most things!
     // this.attachEventListeners(); <- REMOVED to prevent duplication
     console.log('[TopBar] Context updated for view:', viewId, config);
+  }
+
+  /**
+   * Refresh project selector display (call when state changes)
+   */
+  public async refreshProjectSelector(): Promise<void> {
+    console.log('[TopBar] Refreshing project selector display');
+    this.render();
+
+    // If dropdown is currently open, repopulate it
+    const dropdown = this.container.querySelector('#project-dropdown') as HTMLElement;
+    if (dropdown && dropdown.style.display === 'block') {
+      await this.populateProjectDropdown();
+    }
   }
 
   /**
@@ -227,20 +243,48 @@ export class TopBar {
    * Render project/series selector
    */
   private renderProjectSelector(): string {
-    // TODO: Get actual project data from state management
-    const currentProject = 'No Project Selected';
+    // Get app state
+    let activeSeries: any = null;
+    let activeProject: any = null;
+
+    try {
+      activeSeries = appState.getActiveSeries();
+      activeProject = appState.getActiveProject();
+      console.log('[TopBar] renderProjectSelector - activeProject:', activeProject);
+      console.log('[TopBar] renderProjectSelector - activeSeries:', activeSeries);
+      console.log('[TopBar] renderProjectSelector - activeProjectId:', appState.getActiveProjectId());
+      console.log('[TopBar] renderProjectSelector - projects in state:', appState.getState().projects);
+    } catch (error) {
+      console.error('[TopBar] Failed to access app state:', error);
+    }
+
+    let displayText = 'No Project Selected';
+    if (activeSeries) {
+      displayText = activeProject
+        ? `${activeProject.name || activeProject.project_name} / ${activeSeries.name}`
+        : activeSeries.name;
+    } else if (activeProject) {
+      displayText = activeProject.name || activeProject.project_name || 'Unnamed Project';
+    }
+
+    console.log('[TopBar] renderProjectSelector - displayText:', displayText);
 
     return `
       <div class="project-selector" data-action="toggle-project-selector">
         <span class="project-selector-icon">📁</span>
-        <span class="project-selector-text">${this.escapeHtml(currentProject)}</span>
+        <span class="project-selector-text">${this.escapeHtml(displayText)}</span>
         <span class="project-selector-arrow">▼</span>
       </div>
-      <div class="project-dropdown" id="project-dropdown">
-        <div class="project-dropdown-item active" data-project-id="none">
-          No Project Selected
+      <div class="project-dropdown" id="project-dropdown" style="display: none;">
+        <div class="project-dropdown-header">
+          <button class="project-dropdown-action" data-action="create-project">
+            + Create New Project
+          </button>
         </div>
-        <!-- Dynamic project items will be inserted here -->
+        <div class="project-dropdown-divider"></div>
+        <div class="project-dropdown-items" id="project-dropdown-items">
+          <!-- Will be populated dynamically -->
+        </div>
       </div>
     `;
   }
@@ -249,11 +293,32 @@ export class TopBar {
    * Render environment indicator
    */
   private renderEnvironmentIndicator(): string {
-    // TODO: Get actual environment status from system health check
-    const status: 'healthy' | 'warning' | 'error' = 'healthy';
-    const statusText = status === 'healthy' ? 'All Systems Operational' :
-                      status === 'warning' ? 'Some Issues Detected' :
-                      'System Error';
+    // Get actual system status from DOM (updated by dashboard handlers)
+    const statusTextElement = document.getElementById('dashboard-status-text');
+    const statusIndicator = document.getElementById('dashboard-status-indicator');
+
+    let status: 'healthy' | 'warning' | 'error' = 'error';
+    let statusText = 'Status Unknown';
+
+    if (statusTextElement && statusIndicator) {
+      const currentStatusText = statusTextElement.textContent || '';
+
+      // Map dashboard status to environment indicator status
+      if (currentStatusText === 'System Ready') {
+        status = 'healthy';
+        statusText = 'All Systems Operational';
+      } else if (currentStatusText === 'System Starting' || currentStatusText === 'System Degraded') {
+        status = 'warning';
+        statusText = currentStatusText;
+      } else if (currentStatusText === 'System Offline') {
+        status = 'error';
+        statusText = 'System Offline';
+      } else {
+        // Unknown status
+        status = 'error';
+        statusText = currentStatusText || 'Status Unknown';
+      }
+    }
 
     return `
       <div class="environment-indicator">
@@ -315,15 +380,22 @@ export class TopBar {
         this.toggleProjectSelector();
       }
 
+      // Handle create project
+      const createProjectBtn = target.closest('[data-action="create-project"]');
+      if (createProjectBtn) {
+        console.log('[TopBar] Create project clicked');
+        this.emit('create-project');
+        this.closeProjectSelector();
+      }
+
       // Handle project selection
-      const projectItem = target.closest('.project-dropdown-item') as HTMLElement;
+      const projectItem = target.closest('[data-action="select-project"]') as HTMLElement;
       if (projectItem) {
-        const projectId = projectItem.dataset.projectId;
-        if (projectId) {
-          console.log('[TopBar] Project selected:', projectId);
-          this.emit('project-selected', projectId);
-          this.closeProjectSelector();
-        }
+        const projectId = parseInt(projectItem.dataset.projectId || '0');
+        const projectName = projectItem.dataset.projectName || '';
+        console.log('[TopBar] Project selected:', projectId);
+        this.emit('project-selected', { projectId, projectName });
+        this.closeProjectSelector();
       }
 
       // Handle user menu toggle
@@ -396,10 +468,18 @@ export class TopBar {
   /**
    * Toggle project selector dropdown
    */
-  private toggleProjectSelector(): void {
-    const dropdown = this.container.querySelector('#project-dropdown');
-    if (dropdown) {
-      dropdown.classList.toggle('open');
+  private async toggleProjectSelector(): Promise<void> {
+    const dropdown = this.container.querySelector('#project-dropdown') as HTMLElement;
+    if (!dropdown) return;
+
+    const isOpen = dropdown.style.display === 'block';
+
+    if (isOpen) {
+      dropdown.style.display = 'none';
+    } else {
+      // Populate dropdown with projects and series
+      await this.populateProjectDropdown();
+      dropdown.style.display = 'block';
     }
   }
 
@@ -407,9 +487,64 @@ export class TopBar {
    * Close project selector dropdown
    */
   private closeProjectSelector(): void {
-    const dropdown = this.container.querySelector('#project-dropdown');
+    const dropdown = this.container.querySelector('#project-dropdown') as HTMLElement;
     if (dropdown) {
-      dropdown.classList.remove('open');
+      dropdown.style.display = 'none';
+    }
+  }
+
+  /**
+   * Populate project dropdown with real data
+   */
+  private async populateProjectDropdown(): Promise<void> {
+    const container = this.container.querySelector('#project-dropdown-items');
+    if (!container) return;
+
+    try {
+      const electronAPI = (window as any).electronAPI;
+
+      // Fetch projects
+      console.log('[TopBar] Fetching projects from backend...');
+      const projects = await electronAPI.invoke('project:list');
+      console.log('[TopBar] Received projects:', projects);
+      const activeProjectId = appState.getActiveProjectId();
+      console.log('[TopBar] Active project ID:', activeProjectId);
+
+      let html = '';
+
+      if (projects.length === 0) {
+        html = `
+          <div class="project-dropdown-empty">
+            No projects yet. Create one to get started!
+          </div>
+        `;
+      } else {
+        projects.forEach((project: any) => {
+          const isActive = project.id === activeProjectId;
+          // Handle both project.name and project.project_name (database field)
+          const projectName = project.name || project.project_name || 'Unnamed Project';
+          const folderPath = project.folder_path || project.folder_location || '';
+
+          html += `
+            <div class="project-dropdown-project ${isActive ? 'active' : ''}"
+                 data-action="select-project"
+                 data-project-id="${project.id}"
+                 data-project-name="${this.escapeHtml(projectName)}">
+              ${isActive ? '✓ ' : ''}${this.escapeHtml(projectName)}
+              <div class="project-dropdown-path">${this.escapeHtml(folderPath)}</div>
+            </div>
+          `;
+        });
+      }
+
+      container.innerHTML = html;
+    } catch (error) {
+      console.error('[TopBar] Failed to populate project dropdown:', error);
+      container.innerHTML = `
+        <div class="project-dropdown-error">
+          Failed to load projects
+        </div>
+      `;
     }
   }
 
@@ -606,6 +741,7 @@ export class TopBar {
 
   /**
    * Update environment indicator status
+   * This method is called by the dashboard handlers when status changes
    */
   public updateEnvironmentStatus(status: 'healthy' | 'warning' | 'error', text?: string): void {
     const indicator = this.container.querySelector('.environment-indicator');
@@ -614,13 +750,25 @@ export class TopBar {
       const textEl = indicator.querySelector('.environment-text');
 
       if (dot) {
-        dot.className = `environment-dot ${status}`;
+        // Remove all status classes first
+        dot.classList.remove('healthy', 'warning', 'error');
+        // Add the new status class
+        dot.classList.add(status);
       }
 
       if (textEl && text) {
         textEl.textContent = text;
       }
     }
+  }
+
+  /**
+   * Refresh environment indicator based on current system status
+   * Called periodically to sync TopBar with dashboard status
+   */
+  public refreshEnvironmentIndicator(): void {
+    // Re-render to pick up latest status from DOM
+    this.render();
   }
 
   /**

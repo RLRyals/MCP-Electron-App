@@ -19,6 +19,18 @@ import { WorkflowList, WorkflowListItem } from '../components/WorkflowList.js';
 import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
+import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
+import { SeriesCreationDialog } from '../components/SeriesCreationDialog.js';
+import { getActiveSeriesId, appState } from '../store/app-state.js';
+import type { Project } from '../../types/project.js';
+
+// Temporary stub - series management is now in MCP-Writing-Servers
+interface Series {
+  id: number;
+  name: string;
+  description?: string;
+  project_id?: number | null;
+}
 
 // Main React Component
 const WorkflowsApp: React.FC = () => {
@@ -26,6 +38,9 @@ const WorkflowsApp: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowListItem | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [showSeriesDialog, setShowSeriesDialog] = useState(false);
+  const [seriesDialogContext, setSeriesDialogContext] = useState<{ projectId: number; projectName: string } | null>(null);
   const [executionStatus, setExecutionStatus] = useState<Map<number, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
 
   // Load workflows function (can be reused)
@@ -55,6 +70,61 @@ const WorkflowsApp: React.FC = () => {
   // Load workflows on mount and setup event listeners with proper cleanup
   useEffect(() => {
     loadWorkflows();
+
+    // Load app state
+    appState.refresh().catch(error => {
+      console.error('[WorkflowsViewReact] Failed to load app state:', error);
+    });
+
+    // Subscribe to TopBar events
+    const topBar = (window as any).topBar;
+    if (topBar) {
+      topBar.on('create-project', () => {
+        console.log('[WorkflowsViewReact] Create project event');
+        setShowProjectDialog(true);
+      });
+
+      topBar.on('project-selected', async (data: { projectId: number; projectName: string }) => {
+        console.log('[WorkflowsViewReact] Project selected event:', data);
+
+        // Refresh app state to ensure projects are loaded
+        console.log('[WorkflowsViewReact] Calling appState.refresh()...');
+        await appState.refresh();
+        console.log('[WorkflowsViewReact] appState.refresh() completed');
+        console.log('[WorkflowsViewReact] Projects in state after refresh:', appState.getState().projects);
+
+        // Set active project
+        console.log('[WorkflowsViewReact] Setting active project to:', data.projectId);
+        appState.setActiveProject(data.projectId);
+        console.log('[WorkflowsViewReact] Active project ID after set:', appState.getActiveProjectId());
+        console.log('[WorkflowsViewReact] Active project object:', appState.getActiveProject());
+
+        // Refresh TopBar to show selected project
+        console.log('[WorkflowsViewReact] Calling topBar.refreshProjectSelector()...');
+        await topBar.refreshProjectSelector();
+        console.log('[WorkflowsViewReact] topBar.refreshProjectSelector() completed');
+
+        if (typeof (window as any).showNotification === 'function') {
+          (window as any).showNotification(`Project "${data.projectName}" selected`, 'success');
+        }
+      });
+
+      topBar.on('create-series', (data: { projectId: number; projectName: string }) => {
+        console.log('[WorkflowsViewReact] Create series event:', data);
+        setSeriesDialogContext(data);
+        setShowSeriesDialog(true);
+      });
+
+      topBar.on('series-selected', async (data: { seriesId: number; seriesName: string }) => {
+        console.log('[WorkflowsViewReact] Series selected event:', data);
+        appState.setActiveSeries(data.seriesId);
+        topBar.refreshProjectSelector();
+
+        if (typeof (window as any).showNotification === 'function') {
+          (window as any).showNotification(`Series "${data.seriesName}" selected`, 'success');
+        }
+      });
+    }
 
     // Setup event listeners with stable function references
     const electronAPI = (window as any).electronAPI;
@@ -153,11 +223,23 @@ const WorkflowsApp: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
 
-      // TODO: Get actual seriesId and userId from app context
+      // Get active project ID from app state
+      const activeProjectId = appState.getActiveProjectId();
+
+      // Validate project is selected
+      if (!activeProjectId) {
+        if (typeof (window as any).showNotification === 'function') {
+          (window as any).showNotification('Please select a project first (use the project selector in the top bar)', 'error');
+        } else {
+          alert('Please select a project first (use the project selector in the top bar)');
+        }
+        return;
+      }
+
       const instanceId = await electronAPI.invoke('workflow:start', {
         workflowDefId: selectedWorkflow.id,
-        seriesId: 1,
-        userId: 1,
+        projectId: activeProjectId,
+        userId: 1, // TODO: Get from user session
       });
 
       console.log('[WorkflowsViewReact] Started workflow instance:', instanceId);
@@ -171,6 +253,46 @@ const WorkflowsApp: React.FC = () => {
       if (typeof (window as any).showNotification === 'function') {
         (window as any).showNotification(`Failed to start workflow: ${error.message}`, 'error');
       }
+    }
+  };
+
+  const handleProjectCreated = async (project: Project) => {
+    console.log('[WorkflowsViewReact] Project created:', project);
+
+    // Add project to app state
+    appState.addProject(project);
+
+    // Set as active project
+    appState.setActiveProject(project.id);
+
+    // Refresh TopBar display
+    const topBar = (window as any).topBar;
+    if (topBar && typeof topBar.refreshProjectSelector === 'function') {
+      await topBar.refreshProjectSelector();
+    }
+
+    if (typeof (window as any).showNotification === 'function') {
+      (window as any).showNotification(`Project "${project.name}" created successfully`, 'success');
+    }
+  };
+
+  const handleSeriesCreated = async (series: Series) => {
+    console.log('[WorkflowsViewReact] Series created:', series);
+
+    // Refresh app state
+    await appState.refresh();
+
+    // Auto-select the newly created series
+    appState.setActiveSeries(series.id);
+
+    // Refresh TopBar display
+    const topBar = (window as any).topBar;
+    if (topBar && typeof topBar.refreshProjectSelector === 'function') {
+      topBar.refreshProjectSelector();
+    }
+
+    if (typeof (window as any).showNotification === 'function') {
+      (window as any).showNotification(`Series "${series.name}" created successfully and selected`, 'success');
     }
   };
 
@@ -338,6 +460,27 @@ const WorkflowsApp: React.FC = () => {
           workflowName={String(selectedWorkflow.name)}
           isOpen={showExportDialog}
           onClose={() => setShowExportDialog(false)}
+        />
+      )}
+
+      {/* Project Creation Dialog */}
+      <ProjectCreationDialog
+        isOpen={showProjectDialog}
+        onClose={() => setShowProjectDialog(false)}
+        onProjectCreated={handleProjectCreated}
+      />
+
+      {/* Series Creation Dialog */}
+      {seriesDialogContext && (
+        <SeriesCreationDialog
+          projectId={seriesDialogContext.projectId}
+          projectName={seriesDialogContext.projectName}
+          isOpen={showSeriesDialog}
+          onClose={() => {
+            setShowSeriesDialog(false);
+            setSeriesDialogContext(null);
+          }}
+          onSeriesCreated={handleSeriesCreated}
         />
       )}
     </div>

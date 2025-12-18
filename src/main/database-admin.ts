@@ -118,11 +118,18 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       };
     }
 
+    // DEBUG: Log the full response structure
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse type: ${typeof mcpResponse}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse keys: ${Object.keys(mcpResponse).join(', ')}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse.result exists: ${!!mcpResponse.result}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse.content exists: ${!!mcpResponse.content}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Full mcpResponse: ${JSON.stringify(mcpResponse).substring(0, 1000)}`);
+
     // The response can come in two formats:
     // 1. JSON-RPC format: { jsonrpc: "2.0", result: { content: [...] }, id: ... }
     // 2. Direct format: { content: [...] }
     let contentArray: Array<{ type: string; text: string }> | undefined;
-    
+
     if (mcpResponse.result?.content) {
       // JSON-RPC format
       contentArray = mcpResponse.result.content;
@@ -267,6 +274,7 @@ export async function queryRecords(params: {
   limit?: number;
   offset?: number;
 }): Promise<DatabaseOperationResult> {
+  logWithCategory('info', LogCategory.SYSTEM, `Querying records from table ${params.table}`);
   return callMCPTool('db_query_records', params);
 }
 

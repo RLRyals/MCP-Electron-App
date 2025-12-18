@@ -816,6 +816,9 @@ async function init(): Promise<void> {
     container: document.getElementById('top-bar')!,
   });
 
+  // Make topBar globally accessible for dashboard handlers
+  (window as any).topBar = topBar;
+
   const viewRouter = new ViewRouter({
     container: document.getElementById('content-area')!,
     sidebar,

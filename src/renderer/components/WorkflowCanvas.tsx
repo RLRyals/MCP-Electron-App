@@ -205,17 +205,17 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
   // Handle node drag stop - save new positions
   const onNodeDragStop: NodeDragHandler = useCallback(
-    (_event, _node) => {
+    (_event, _node, currentNodes) => {
       if (!workflow) return;
 
-      // Collect all current node positions
+      // Collect all current node positions from React Flow's current state
       const positions: Record<string, { x: number; y: number }> = {};
-      nodesRef.current.forEach(node => {
+      currentNodes.forEach(node => {
         const phaseId = (node.data as PhaseNodeData).phase.id;
         positions[phaseId] = { x: node.position.x, y: node.position.y };
       });
 
-      console.log('[WorkflowCanvas] Node dragged, saving positions...');
+      console.log('[WorkflowCanvas] Node dragged, saving positions:', positions);
       setIsSaving(true);
       savePositions(workflow.id, positions);
     },

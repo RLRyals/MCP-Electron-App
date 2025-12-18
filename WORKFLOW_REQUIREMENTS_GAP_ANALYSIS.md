@@ -1,17 +1,77 @@
 # FictionLab Workflow System - Requirements Gap Analysis
 
-**Date:** 2025-12-13
-**Status:** Comprehensive assessment of what's done vs. what's needed
+**Date:** 2025-12-15 (UPDATED)
+**Status:** Comprehensive assessment with accurate implementation status
 
 ---
 
 ## 🎯 Core Requirements
 
+0. **CRITICAL BUGFIXES** - Fix blocking issues (position saving)
 1. **Import workflows from folders** (marketplace-ready)
 2. **Create visual workflow graphs** (list, select, visualize)
+2A. **WORKFLOW PORTABILITY** - Export to Claude Code, OpenAI, other platforms
 3. **Run workflows** (execute with Claude Code)
 4. **Visualize execution status** (real-time agent positions)
 5. **Edit workflows with version control** (update skills/agents)
+7. **MARKETPLACE & SHARING** - Local and cloud workflow sharing
+8. **EXECUTION ENHANCEMENTS** - Resume, progress, loops, gates
+
+---
+
+## 🐛 REQUIREMENT 0: CRITICAL BUGFIXES
+
+### What's BROKEN ⚠️
+
+**Position Saving Bug (CRITICAL)**
+- **Location:** `src/renderer/components/WorkflowCanvas.tsx:213-216`
+- **Status:** Positions NOT being saved when user drags nodes
+- **Root Cause:** `onNodeDragStop` reads from `nodesRef.current` which contains STALE positions
+  - `nodesRef` only updates when `nodesWithStatus` recomputes
+  - `nodesWithStatus` only depends on `baseNodes` and `executionStatus`
+  - When user drags node, React Flow updates positions internally
+  - But dependency chain doesn't trigger recompute → ref stays stale
+  - Save operation sends old positions to database
+
+### What's NEEDED ❌
+
+**Priority:** CRITICAL (blocks basic drag-to-arrange functionality)
+**Estimated Effort:** 30 minutes
+
+**Fix:** Use React Flow's current state parameter instead of stale ref
+
+```typescript
+// File: src/renderer/components/WorkflowCanvas.tsx, lines 207-223
+// CHANGE THIS:
+const onNodeDragStop: NodeDragHandler = useCallback(
+  (_event, _node) => {
+    if (!workflow) return;
+    const positions: Record<string, { x: number; y: number }> = {};
+    nodesRef.current.forEach(node => {  // ❌ STALE DATA
+      const phaseId = (node.data as PhaseNodeData).phase.id;
+      positions[phaseId] = { x: node.position.x, y: node.position.y };
+    });
+    savePositions(workflow.id, positions);
+  },
+  [workflow, savePositions]
+);
+
+// TO THIS:
+const onNodeDragStop: NodeDragHandler = useCallback(
+  (_event, _node, currentNodes) => {  // ✅ Use third parameter
+    if (!workflow) return;
+    const positions: Record<string, { x: number; y: number }> = {};
+    currentNodes.forEach(node => {  // ✅ Current React Flow state
+      const phaseId = (node.data as PhaseNodeData).phase.id;
+      positions[phaseId] = { x: node.position.x, y: node.position.y };
+    });
+    savePositions(workflow.id, positions);
+  },
+  [workflow, savePositions]
+);
+```
+
+**Impact:** Once fixed, positions will save correctly to database via MCP server
 
 ---
 
@@ -26,18 +86,28 @@
 - ✅ `WorkflowImportResult` - Import operation result
 
 **Parser:**
-- ✅ `WorkflowParser` - Parses YAML, JSON, HTML
+- ✅ `WorkflowParser` (src/main/parsers/workflow-parser.ts) - Parses YAML, JSON, HTML
 - ✅ Dependency extraction from phases
 - ✅ Export to YAML/JSON
 
-**Existing Infrastructure:**
+**Import System (FULLY IMPLEMENTED!):**
+- ✅ **FolderImporter** (src/main/workflow/folder-importer.ts) - Complete workflow import
+- ✅ **DependencyResolver** (src/main/workflow/dependency-resolver.ts) - Checks installed components
+- ✅ **WorkflowImportDialog** (src/renderer/components/WorkflowImportDialog.tsx) - UI component
+- ✅ Component installation to correct paths (agents → userData/agents, skills → ~/.claude/skills)
+- ✅ IPC handler `workflow:import-from-folder`
+- ✅ Database recording in workflow_imports table
+
+**Infrastructure:**
 - ✅ Plugin system with component installation
 - ✅ File operations (fs-extra)
 - ✅ User data paths (Electron userData)
 
 ### What's NEEDED ❌
 
-**1. Marketplace Folder Structure Definition**
+**Priority:** LOW (core functionality complete, only polish needed)
+
+**1. Marketplace Folder Structure (ALREADY DEFINED)**
 ```
 marketplace/
 ├── workflows/
@@ -175,13 +245,28 @@ export const PATHS = {
 - ✅ Workflow parsing from multiple formats
 - ✅ Phase extraction with positions
 
-**Existing Infrastructure:**
+**React Flow Visualization (FULLY IMPLEMENTED!):**
+- ✅ **WorkflowCanvas.tsx** (src/renderer/components/WorkflowCanvas.tsx) - Complete React Flow integration
+- ✅ **Drag-and-drop node positioning** - Live repositioning with mouse
+- ⚠️ **Position persistence** - BROKEN (see Requirement 0 for bugfix)
+- ✅ **Custom PhaseNode components** (src/renderer/components/nodes/PhaseNode.tsx) - Status colors, icons, badges
+- ✅ **WorkflowList** (src/renderer/components/WorkflowList.tsx) - Sidebar with workflow selection
+- ✅ **WorkflowsViewReact** (src/renderer/views/WorkflowsViewReact.tsx) - Main view with toolbar
+- ✅ **Animated edges** - Green for completed, animated for in-progress
+- ✅ **Background grid** with zoom/pan controls
+- ✅ **Auto-layout algorithm** - 250px horizontal, 200px vertical spacing
+- ✅ **IPC handlers** - `workflow:get-definitions`, `workflow:update-positions`
+
+**Infrastructure:**
 - ✅ Renderer process with React support
 - ✅ IPC communication (main ↔ renderer)
+- ✅ React Flow library installed and configured
 
 ### What's NEEDED ❌
 
-**1. Graph Generator** (`src/main/workflow-graph-generator.ts`)
+**Priority:** MEDIUM (core visualization complete, enhancements needed)
+
+**1. Three-Level Drill-Down UI** (2-3 days)
 ```typescript
 class WorkflowGraphGenerator {
   // Convert WorkflowDefinition → WorkflowGraph
@@ -303,6 +388,254 @@ npm install @types/reactflow --save-dev
 
 ---
 
+## 🚀 REQUIREMENT 2A: WORKFLOW PORTABILITY (NEW!)
+
+### What's DONE ✅
+
+**Export Capability:**
+- ✅ WorkflowParser has `exportToYAML()` and `exportToJSON()` methods
+- ✅ MCPWorkflowClient has `exportWorkflowPackage()` method
+- ✅ **ClaudeCodeExporter COMPLETE** (src/main/workflow/exporters/claude-code-exporter.ts)
+- ✅ Full agent + skill + workflow structure export
+- ✅ IPC handlers for renderer integration (3 handlers)
+- ✅ Comprehensive documentation (README.md, USAGE_EXAMPLES.md)
+
+**Claude Code Exporter Features:**
+- ✅ Exports workflows to `~/.claude/exports/{workflow-name}-{date}/`
+- ✅ Copies all referenced agents (from userData/agents/)
+- ✅ Copies all referenced skills (from ~/.claude/skills/)
+- ✅ Supports both YAML and JSON formats
+- ✅ Generates comprehensive README with installation instructions
+- ✅ Validates export package structure
+- ✅ Lists all exportable workflows with filtering
+- ✅ Full error handling and logging
+- ✅ Preserves all 15 agents and 8+ skills
+- ✅ Works with Claude Code CLI + Task tool
+
+**Export Structure:**
+```
+~/.claude/exports/{workflow-name}-{date}/
+├── workflows/
+│   └── {workflow-id}.yaml          # Workflow definition
+├── agents/                          # Agent personas (15 total)
+│   ├── market-research-agent.md
+│   ├── series-architect-agent.md
+│   └── ... (all referenced agents)
+├── skills/                          # Executable skills (8+ total)
+│   ├── series-planning-skill.md
+│   ├── book-planning-skill.md
+│   └── ... (all referenced skills)
+└── README.md                        # Complete documentation
+```
+
+**IPC Handlers:**
+- ✅ `workflow:export-claude-code` - Export workflow to Claude Code format
+- ✅ `workflow:list-exportable` - List all exportable workflows
+- ✅ `workflow:validate-export` - Validate export package structure
+
+### What's NEEDED ❌
+
+**Priority:** MEDIUM - Core export complete, only UI integration needed
+**Estimated Effort:** 5-7 days
+
+**1. UI Integration** (1-2 days)
+
+Add export functionality to workflow UI:
+
+```typescript
+// File: src/renderer/components/WorkflowExportDialog.tsx (NEW)
+// - Export dialog component with format/path options
+// - Progress tracking during export
+// - Success/error feedback
+
+// File: src/renderer/components/WorkflowsViewReact.tsx (MODIFY)
+// - Add "Export to Claude Code" button to workflow cards
+// - Integrate WorkflowExportDialog
+```
+
+**Implementation Steps:**
+1. Create WorkflowExportDialog component
+2. Add export button to WorkflowsViewReact
+3. Wire up IPC calls to backend
+4. Add success/error notifications
+5. Test with 12-phase pipeline workflow
+
+**2. OpenAI Skills Format Research & Exporter** (2-3 days)
+
+```typescript
+// File: src/main/workflow/exporters/openai-exporter.ts (NEW)
+class OpenAISkillsExporter {
+  async export(workflowId: string, outputPath: string): Promise<void> {
+    // 1. Research OpenAI Skills specification (announced Dec 2024)
+    // 2. Compare format to Claude Code skills
+    // 3. Map workflow phases → OpenAI skills
+    // 4. Export with OpenAI-compatible structure
+    // 5. Document any incompatibilities
+  }
+}
+```
+
+**3. Generic JSON/YAML Exporter** (1 day)
+
+Universal fallback format for future AI tools:
+
+```typescript
+// File: src/main/workflow/exporters/generic-exporter.ts (NEW)
+class GenericWorkflowExporter {
+  async export(workflowId: string, format: 'json' | 'yaml'): Promise<string> {
+    // 1. Export workflow with complete metadata
+    // 2. Platform-agnostic structure
+    // 3. Include:
+    //    - Workflow definition
+    //    - All phases with dependencies
+    //    - Agent/skill references
+    //    - Execution order
+    //    - Quality gates
+    // 4. Documentation for importing to new platforms
+  }
+}
+```
+
+**4. Export Framework & UI** (2-3 days)
+
+```tsx
+// File: src/renderer/components/WorkflowExportDialog.tsx (NEW)
+interface ExportPlatform {
+  id: string;
+  name: string;
+  description: string;
+  exporter: WorkflowExporter;
+}
+
+export const WorkflowExportDialog: React.FC<{
+  workflow: WorkflowDefinition;
+  onClose: () => void;
+}> = ({ workflow, onClose }) => {
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('claude-code');
+  const [outputPath, setOutputPath] = useState<string>('');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const platforms: ExportPlatform[] = [
+    { id: 'claude-code', name: 'Claude Code (Full)', description: 'Agents + Skills + Workflows' },
+    { id: 'openai-skills', name: 'OpenAI Skills', description: 'Compatible with OpenAI ecosystem' },
+    { id: 'json', name: 'Generic JSON', description: 'Universal format for future tools' },
+    { id: 'yaml', name: 'Generic YAML', description: 'Human-readable universal format' },
+  ];
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    await window.electron.invoke('workflow:export', {
+      workflowId: workflow.id,
+      platform: selectedPlatform,
+      outputPath
+    });
+    setIsExporting(false);
+    // Show success notification with "Open folder" button
+  };
+
+  return (
+    <Dialog>
+      <h2>Export Workflow: {workflow.name}</h2>
+
+      <PlatformSelector
+        platforms={platforms}
+        selected={selectedPlatform}
+        onChange={setSelectedPlatform}
+      />
+
+      <PathSelector
+        value={outputPath}
+        onChange={setOutputPath}
+        placeholder="Select export location..."
+      />
+
+      <ExportPreview
+        workflow={workflow}
+        platform={selectedPlatform}
+      />
+
+      <Button onClick={handleExport} disabled={!outputPath || isExporting}>
+        {isExporting ? 'Exporting...' : 'Export Workflow'}
+      </Button>
+    </Dialog>
+  );
+};
+```
+
+**5. Export Manager** (1-2 days)
+
+Plugin-based architecture for exporters:
+
+```typescript
+// File: src/main/workflow/exporters/export-manager.ts (NEW)
+interface WorkflowExporter {
+  platformName: string;
+  export(workflow: WorkflowDefinition, options: ExportOptions): Promise<ExportResult>;
+  validate(workflow: WorkflowDefinition): ValidationResult;
+}
+
+class ExportManager {
+  private exporters = new Map<string, WorkflowExporter>();
+
+  registerExporter(exporter: WorkflowExporter): void {
+    this.exporters.set(exporter.platformName, exporter);
+  }
+
+  async export(workflowId: string, platform: string, options: ExportOptions): Promise<void> {
+    const exporter = this.exporters.get(platform);
+    if (!exporter) throw new Error(`No exporter for platform: ${platform}`);
+
+    const workflow = await workflowClient.getWorkflowDefinition(workflowId);
+    const validation = exporter.validate(workflow);
+
+    if (!validation.isValid) {
+      // Warn user about incompatibilities
+    }
+
+    await exporter.export(workflow, options);
+  }
+
+  getSupportedPlatforms(): string[] {
+    return Array.from(this.exporters.keys());
+  }
+}
+```
+
+**6. IPC Handlers** (included in framework)
+
+```typescript
+// File: src/main/handlers/workflow-handlers.ts (MODIFY)
+ipcMain.handle('workflow:export', async (event, data: {
+  workflowId: string;
+  platform: string;
+  outputPath: string;
+}) => {
+  return await exportManager.export(data.workflowId, data.platform, {
+    outputPath: data.outputPath
+  });
+});
+
+ipcMain.handle('workflow:get-export-platforms', async () => {
+  return exportManager.getSupportedPlatforms();
+});
+```
+
+**7. Future Platform Research** (1 day - deferred)
+
+- **Antigravity Workflows** - Research format specification
+- **MSTY** - Research automation format
+- **Typing Mind** - Already has agents/prompts, may be compatible
+- Document compatibility and implementation requirements
+
+### **Implementation Priority**
+
+1. **CRITICAL (Now):** Claude Code Full Export (Option C)
+2. **HIGH (Next):** OpenAI Skills Export + Generic JSON/YAML
+3. **MEDIUM (Later):** Export UI Framework
+4. **FUTURE:** Antigravity/MSTY after format research
+
+---
+
 ## ✅ REQUIREMENT 3: Run Workflows
 
 ### What's DONE ✅
@@ -311,19 +644,37 @@ npm install @types/reactflow --save-dev
 - ✅ `WorkflowInstance` - Runtime execution state
 - ✅ `PhaseExecution` - Individual phase tracking
 - ✅ `WorkflowExecutionResult` - Execution outcome
+- ✅ Complete MCP workflow-manager types (src/types/mcp-workflow-manager.ts)
 
-**Existing Infrastructure:**
-- ✅ Basic workflow engine (`workflow-engine.ts`)
-- ✅ IPC handlers
-- ✅ PostgreSQL connection (can be adapted)
+**Execution Engine (FULLY IMPLEMENTED!):**
+- ✅ **WorkflowExecutor** (src/main/workflow/workflow-executor.ts) - Complete execution engine with EventEmitter
+- ✅ **ClaudeCodeExecutor** (src/main/workflow/claude-code-executor.ts) - Headless Claude Code skill execution
+- ✅ **MCP Workflow Client** (src/main/workflow/mcp-workflow-client.ts) - 20+ MCP operations
+- ✅ **Phase-by-phase execution** - Sequential workflow execution
+- ✅ **Quality gate logic** - executeGatePhase (auto-passes currently, needs validation logic)
+- ✅ **Approval gates** - executeUserPhase with pause/resume
+- ✅ **Sub-workflow execution** - startSubWorkflow via MCP
+- ✅ **Version locking** - Prevents editing running workflows
+- ✅ **Phase execution tracking** - Updates to database via MCP
+- ✅ **Error handling** - Phase failure tracking
+- ✅ **IPC events** - phase-started, phase-completed, phase-failed, approval-required
+
+**Infrastructure:**
+- ✅ PostgreSQL connection for workflow runs
+- ✅ MCP workflow-manager server (SQLite) - External dependency
+- ✅ IPC handlers for execution control
+- ✅ EventEmitter for real-time UI updates
 
 **Agent/Skill Definitions:**
-- ✅ 12+ agents in `.claude/agents/`
-- ✅ 7+ skills in `.claude/skills/`
+- ✅ 15 agents in `.claude/agents/` (markdown with YAML frontmatter)
+- ✅ 8+ skills in `.claude/skills/` (multi-phase structure)
+- ✅ Genre pack system for writing conventions
 
 ### What's NEEDED ❌
 
-**1. Workflow Manager MCP Database** (`src/main/mcp/workflow-manager-mcp.ts`)
+**Priority:** MEDIUM (core execution works, enhancements needed)
+
+**1. Loop Phase Implementation** (1-2 days)
 ```typescript
 // SQLite database (NOT PostgreSQL)
 import Database from 'better-sqlite3';
@@ -623,12 +974,178 @@ npm install @types/better-sqlite3 --save-dev
 - ✅ `WorkflowStatus` - draft, ready, in_progress, paused, complete, failed
 - ✅ `PhaseExecution` - Tracks execution state
 
+**Real-Time Execution Tracking (FULLY IMPLEMENTED!):**
+- ✅ **IPC Events** - phase-started, phase-completed, phase-failed, approval-required emitted by WorkflowExecutor
+- ✅ **Event Listeners** in WorkflowsViewReact.tsx - Captures and processes execution events
+- ✅ **Status Map in UI** - Tracks execution status for each phase
+- ✅ **Color-coded Nodes** - Gray (pending), blue (running), green (complete), red (failed)
+- ✅ **Pulse Animation** - Current phase pulses to show active execution
+- ✅ **Animated Edges** - Edges animate during execution to show flow
+- ✅ **EventEmitter Architecture** - WorkflowExecutor emits events as phases progress
+
 **Database Schema:**
 - ✅ Defined in `mcp-workflow-manager.ts`
+- ✅ Phase execution tracking to database
 
 ### What's NEEDED ❌
 
-**1. Real-Time Status Updates** (`src/main/workflow-status-emitter.ts`)
+**Priority:** MEDIUM (basic visualization works, enhancements needed)
+
+**1. User Input & Agent Interaction** (3-4 days) **CRITICAL FOR ACTUAL USE**
+
+During workflow execution, users need to:
+- **View agent outputs** - See what the agent produced in each phase
+- **Provide input** - Respond to agent questions, provide feedback
+- **Approve/reject outputs** - Quality control at approval gates
+- **Edit agent outputs** - Refine results before moving to next phase
+- **Communicate with running agents** - Send messages during execution
+
+```typescript
+// File: src/renderer/components/WorkflowExecutionPanel.tsx (NEW)
+interface WorkflowExecutionPanelProps {
+  instanceId: string;
+  workflow: WorkflowDefinition;
+  onApprove: (phaseId: number) => void;
+  onReject: (phaseId: number, reason: string) => void;
+}
+
+export const WorkflowExecutionPanel: React.FC<WorkflowExecutionPanelProps> = ({
+  instanceId,
+  workflow,
+  onApprove,
+  onReject
+}) => {
+  const [currentPhase, setCurrentPhase] = useState<number | null>(null);
+  const [phaseOutput, setPhaseOutput] = useState<string>('');
+  const [userInput, setUserInput] = useState<string>('');
+
+  return (
+    <div className="execution-panel">
+      {/* Current phase info */}
+      <PhaseHeader phase={currentPhase} />
+
+      {/* Agent output display */}
+      <OutputViewer content={phaseOutput} editable={true} />
+
+      {/* User input area */}
+      <InputBox
+        value={userInput}
+        onChange={setUserInput}
+        placeholder="Provide feedback or answer agent questions..."
+        onSend={handleSendInput}
+      />
+
+      {/* Approval controls */}
+      {currentPhase?.requiresApproval && (
+        <ApprovalControls
+          onApprove={() => onApprove(currentPhase.id)}
+          onReject={(reason) => onReject(currentPhase.id, reason)}
+        />
+      )}
+
+      {/* Live logs */}
+      <LogViewer logs={executionLogs} />
+    </div>
+  );
+};
+```
+
+**Key Features Needed:**
+
+1. **Output Display** - Show agent outputs in readable format (markdown, text, JSON)
+2. **Output Editing** - Allow users to edit agent outputs before approval
+3. **Input Prompt** - Detect when agent is asking for input and show prompt
+4. **Approval UI** - Clear approve/reject buttons with optional feedback
+5. **Live Streaming** - Stream agent output in real-time during execution
+6. **Phase History** - Show outputs from previous phases for context
+7. **Error Display** - Show errors clearly with retry options
+
+**IPC Handlers Needed:**
+
+```typescript
+// Get phase output
+ipcMain.handle('workflow:get-phase-output', async (event, instanceId, phaseId) => {
+  const output = await workflowMCP.getPhaseOutput(instanceId, phaseId);
+  return output;
+});
+
+// Send user input to running agent
+ipcMain.handle('workflow:send-user-input', async (event, instanceId, input) => {
+  await claudeCodeExecutor.sendInput(instanceId, input);
+});
+
+// Approve phase
+ipcMain.handle('workflow:approve-phase', async (event, instanceId, phaseId, editedOutput) => {
+  await workflowExecutor.approvePhase(instanceId, phaseId, editedOutput);
+});
+
+// Reject phase
+ipcMain.handle('workflow:reject-phase', async (event, instanceId, phaseId, reason) => {
+  await workflowExecutor.rejectPhase(instanceId, phaseId, reason);
+});
+```
+
+**Backend Support Needed:**
+
+```typescript
+// File: src/main/workflow/workflow-executor.ts (MODIFY)
+class WorkflowExecutor {
+  // Add input handling
+  async sendUserInput(instanceId: string, input: string): Promise<void> {
+    const session = this.activeSessions.get(instanceId);
+    if (session?.claudeProcess) {
+      session.claudeProcess.stdin.write(input + '\n');
+    }
+  }
+
+  // Add output capture
+  private capturePhaseOutput(instanceId: string, phaseId: number, output: string): void {
+    this.emit('phase-output', { instanceId, phaseId, output });
+    // Store in database
+    this.workflowMCP.updatePhaseExecution(phaseId, { output });
+  }
+
+  // Enhanced approval with edited output
+  async approvePhase(
+    instanceId: string,
+    phaseId: number,
+    editedOutput?: string
+  ): Promise<void> {
+    if (editedOutput) {
+      // Store edited version
+      await this.workflowMCP.updatePhaseExecution(phaseId, {
+        output: editedOutput,
+        edited: true
+      });
+    }
+    // Resume workflow
+    this.resumeFromApproval(instanceId, phaseId);
+  }
+}
+```
+
+**Why This Is Critical:**
+
+- ✅ Without this, workflows run blind - users can't see what's happening
+- ✅ Can't provide input for user-approval phases
+- ✅ Can't review and edit agent outputs before moving forward
+- ✅ Can't answer agent questions during execution
+- ✅ No way to debug or understand what went wrong
+
+**Example User Flow:**
+
+1. User starts workflow execution
+2. Workflow runs Phase 1 (Market Research Agent)
+3. Agent output appears in ExecutionPanel in real-time
+4. Agent asks: "Which genre should we focus on?"
+5. User types response in input box → sent to agent
+6. Agent completes with final output
+7. Phase requires approval → Approve/Reject buttons appear
+8. User reviews output, makes minor edits
+9. User clicks "Approve" → workflow continues to Phase 2
+10. Process repeats for each phase
+
+**2. Enhanced Progress Panel** (2 days)
 ```typescript
 class WorkflowStatusEmitter {
   constructor(
