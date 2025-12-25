@@ -37,6 +37,7 @@ import { workflowCache } from './workflow/workflow-cache';
 import { ContextManager } from './workflow/context-manager';
 import { getProviderManager } from './llm/provider-manager';
 import type { LLMProviderConfig } from '../types/llm-providers';
+import { PTYManager } from './pty-manager';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -919,6 +920,19 @@ function setupIPC(): void {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop configuration instructions...');
     const { getConfigurationInstructions } = await import('./claude-desktop-auto-config');
     return await getConfigurationInstructions();
+  });
+
+  // Claude Code CLI IPC handlers
+  ipcMain.handle('claude-code:get-status', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Code CLI status...');
+    const { ClaudeCodeDetector } = await import('./claude-code-detector');
+    const detector = new ClaudeCodeDetector();
+    return await detector.getStatus();
+  });
+
+  ipcMain.handle('claude-code:open-install-page', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening Claude Code installation page...');
+    await shell.openExternal('https://www.anthropic.com/claude-code');
   });
 
   // Docker Images IPC handlers
@@ -2396,12 +2410,25 @@ function setupIPC(): void {
   // Workflow Execution Engine IPC Handlers
   // ========================================
 
-  const workflowExecutor = new WorkflowExecutor();
+  // Use persistent MCP client for fast workflow operations (no process spawning overhead)
+  const workflowExecutor = new WorkflowExecutor(persistentMCPClient);
 
   // Forward workflow events to renderer
   workflowExecutor.on('workflow:user-input-required', (data) => {
     if (mainWindow) {
       mainWindow.webContents.send('workflow:user-input-required', data);
+
+      // Also send prompt to Claude Code terminal if it exists
+      // Format the prompt for Claude Code to display
+      const promptText = `\r\n\x1b[1;33m[Workflow Input Required]\x1b[0m\r\n` +
+                        `\x1b[36m${data.prompt || 'Please provide input'}\x1b[0m\r\n` +
+                        `\x1b[90m(Node: ${data.nodeName})\x1b[0m\r\n` +
+                        `\x1b[32m>\x1b[0m `;
+
+      mainWindow.webContents.send('terminal:write-prompt', {
+        requestId: data.requestId,
+        prompt: promptText
+      });
     }
   });
 
@@ -2886,15 +2913,54 @@ function setupIPC(): void {
     logWithCategory('debug', LogCategory.WORKFLOW,
       `IPC: Updating node ${data.nodeId} in workflow: ${data.workflowId}`);
     try {
-      logWithCategory('info', LogCategory.WORKFLOW,
-        `Updating node ${data.nodeId} in workflow ${data.workflowId}`);
+      const pool = getDatabasePool();
 
-      // Call MCP update_node_data tool
-      await workflowClient.callTool('update_node_data', {
-        workflow_def_id: data.workflowId,
-        node_id: data.nodeId,
-        updates: data.updates
-      });
+      // Get current workflow definition
+      const workflowResult = await pool.query(
+        `SELECT graph_json FROM workflow_definitions
+         WHERE id = $1
+         ORDER BY version DESC LIMIT 1`,
+        [data.workflowId]
+      );
+
+      if (workflowResult.rows.length === 0) {
+        throw new Error(`Workflow not found: ${data.workflowId}`);
+      }
+
+      const row = workflowResult.rows[0];
+
+      // Parse graph_json
+      const graphJson = typeof row.graph_json === 'string'
+        ? JSON.parse(row.graph_json)
+        : row.graph_json;
+
+      if (!graphJson || !graphJson.nodes) {
+        throw new Error('Workflow has no graph_json or nodes');
+      }
+
+      // Find and update the node
+      const nodeIndex = graphJson.nodes.findIndex((n: any) => String(n.id) === String(data.nodeId));
+      if (nodeIndex === -1) {
+        throw new Error(`Node not found: ${data.nodeId}`);
+      }
+
+      // Merge updates into the node
+      graphJson.nodes[nodeIndex] = {
+        ...graphJson.nodes[nodeIndex],
+        ...data.updates
+      };
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Updating node ${data.nodeId}: ${JSON.stringify(data.updates).substring(0, 200)}`);
+
+      // Save back to database
+      await pool.query(
+        `UPDATE workflow_definitions
+         SET graph_json = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [JSON.stringify(graphJson), data.workflowId]
+      );
 
       // Invalidate cache for this workflow
       workflowCache.invalidate(data.workflowId);
@@ -2905,7 +2971,36 @@ function setupIPC(): void {
       return { success: true };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW,
-        `Failed to update node: ${error.message}`);
+        `Failed to update node: ${error.message}`, error);
+      throw error;
+    }
+  });
+
+  // Delete workflow definition (all versions)
+  ipcMain.handle('workflow:delete', async (_event, workflowDefId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Deleting workflow: ${workflowDefId}`);
+    try {
+      const pool = getDatabasePool();
+
+      // Delete all versions of the workflow - use 'id' column
+      const result = await pool.query(
+        `DELETE FROM workflow_definitions WHERE id = $1 RETURNING id, version`,
+        [workflowDefId]
+      );
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Deleted ${result.rowCount} version(s) of workflow: ${workflowDefId}`);
+
+      // Invalidate cache
+      workflowCache.invalidate(workflowDefId);
+
+      return {
+        success: true,
+        deletedVersions: result.rowCount,
+        workflow_def_id: workflowDefId
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to delete workflow: ${error.message}`);
       throw error;
     }
   });
@@ -2924,6 +3019,83 @@ function setupIPC(): void {
       return result;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to import workflow: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Re-import workflow (delete old versions and import fresh from folder)
+  ipcMain.handle('workflow:reimport', async (_event, workflowDefId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Re-importing workflow: ${workflowDefId}`);
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const pool = getDatabasePool();
+
+      // Try to find the source folder from workflow_imports table
+      let folderPath: string | null = null;
+
+      try {
+        const importRecord = await pool.query(
+          `SELECT source_path FROM workflow_imports WHERE workflow_def_id = $1 ORDER BY imported_at DESC LIMIT 1`,
+          [workflowDefId]
+        );
+
+        if (importRecord.rows.length > 0) {
+          folderPath = importRecord.rows[0].source_path;
+        }
+      } catch (err: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `workflow_imports table not available: ${err.message}`);
+      }
+
+      // If not found in imports table, scan workflows directory
+      if (!folderPath) {
+        const workflowsDir = path.join(__dirname, '..', 'workflows');
+
+        if (fs.existsSync(workflowsDir)) {
+          const folders = fs.readdirSync(workflowsDir, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => path.join(workflowsDir, dirent.name));
+
+          // Check each folder for matching workflow_def_id
+          for (const folder of folders) {
+            const workflowJsonPath = path.join(folder, 'workflow.json');
+            if (fs.existsSync(workflowJsonPath)) {
+              const content = fs.readFileSync(workflowJsonPath, 'utf8');
+              const data = JSON.parse(content);
+              if (data.workflow_def_id === workflowDefId) {
+                folderPath = folder;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (!folderPath) {
+        throw new Error(`Cannot re-import: No source folder found for ${workflowDefId}`);
+      }
+
+      // Delete existing versions - use 'id' column
+      await pool.query(
+        `DELETE FROM workflow_definitions WHERE id = $1`,
+        [workflowDefId]
+      );
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Deleted old versions of ${workflowDefId}, re-importing from ${folderPath}`);
+
+      // Re-import from folder
+      const { FolderImporter } = await import('./workflow/folder-importer');
+      const importer = new FolderImporter();
+      const result = await importer.importFromFolder(folderPath);
+
+      // Invalidate cache
+      workflowCache.invalidateAll();
+
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to re-import workflow: ${error.message}`);
       throw error;
     }
   });
@@ -3091,6 +3263,176 @@ function setupIPC(): void {
       return { success: true, filePath: targetPath };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to write skill: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import agent from single file
+  ipcMain.handle('document:import-agent-file', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing agent from file');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Agent File',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown Files', extensions: ['md'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        buttonLabel: 'Import Agent'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const sourcePath = result.filePaths[0];
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      const fileName = path.basename(sourcePath, '.md');
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Agent imported from: ${sourcePath}`);
+
+      return {
+        canceled: false,
+        fileName,
+        content,
+        sourcePath
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import agent file: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import agents from folder
+  ipcMain.handle('document:import-agent-folder', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing agents from folder');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Agents from Folder',
+        properties: ['openDirectory'],
+        buttonLabel: 'Import Agents'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const folderPath = result.filePaths[0];
+      const files = await fs.readdir(folderPath);
+
+      const agents: Array<{ fileName: string; content: string; sourcePath: string }> = [];
+
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          const filePath = path.join(folderPath, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const fileName = path.basename(file, '.md');
+          agents.push({ fileName, content, sourcePath: filePath });
+        }
+      }
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Imported ${agents.length} agent(s) from: ${folderPath}`);
+
+      return {
+        canceled: false,
+        agents
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import agent folder: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import skill from single file
+  ipcMain.handle('document:import-skill-file', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing skill from file');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Skill File',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown Files', extensions: ['md'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        buttonLabel: 'Import Skill'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const sourcePath = result.filePaths[0];
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      const fileName = path.basename(sourcePath, '.md');
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Skill imported from: ${sourcePath}`);
+
+      return {
+        canceled: false,
+        fileName,
+        content,
+        sourcePath
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import skill file: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import skills from folder
+  ipcMain.handle('document:import-skill-folder', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing skills from folder');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Skills from Folder',
+        properties: ['openDirectory'],
+        buttonLabel: 'Import Skills'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const folderPath = result.filePaths[0];
+      const items = await fs.readdir(folderPath, { withFileTypes: true });
+
+      const skills: Array<{ fileName: string; content: string; sourcePath: string }> = [];
+
+      for (const item of items) {
+        if (item.isFile() && item.name.endsWith('.md')) {
+          // Single .md file
+          const filePath = path.join(folderPath, item.name);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const fileName = path.basename(item.name, '.md');
+          skills.push({ fileName, content, sourcePath: filePath });
+        } else if (item.isDirectory()) {
+          // Check for SKILL.md in subdirectory
+          const skillFilePath = path.join(folderPath, item.name, 'SKILL.md');
+          try {
+            const content = await fs.readFile(skillFilePath, 'utf-8');
+            skills.push({ fileName: item.name, content, sourcePath: skillFilePath });
+          } catch {
+            // No SKILL.md in this directory, skip
+          }
+        }
+      }
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Imported ${skills.length} skill(s) from: ${folderPath}`);
+
+      return {
+        canceled: false,
+        skills
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import skill folder: ${error.message}`);
       throw error;
     }
   });
@@ -3400,35 +3742,207 @@ function setupIPC(): void {
     }
   });
 
-  // Forward workflow events to renderer
-  workflowExecutor.on('phase-started', (data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('workflow:phase-started', data);
+  // Automated Claude Code CLI installation
+  ipcMain.handle('claude:install-cli', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Installing Claude Code CLI');
+    try {
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+
+      // Install via npm globally
+      logWithCategory('info', LogCategory.SYSTEM, 'Running: npm install -g @anthropic-ai/claude-code');
+
+      const { stdout, stderr } = await execAsync('npm install -g @anthropic-ai/claude-code', {
+        timeout: 120000 // 2 minutes timeout
+      });
+
+      logWithCategory('info', LogCategory.SYSTEM, `Installation output: ${stdout}`);
+
+      if (stderr && !stderr.includes('npm WARN')) {
+        logWithCategory('warn', LogCategory.SYSTEM, `Installation warnings: ${stderr}`);
+      }
+
+      return { success: true, message: 'Claude Code CLI installed successfully' };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to install Claude Code CLI: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || 'Installation failed. Make sure npm is installed and you have an internet connection.'
+      };
     }
   });
 
-  workflowExecutor.on('phase-completed', (data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('workflow:phase-completed', data);
+  // Automated Claude Code authentication
+  ipcMain.handle('claude:authenticate', async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Authenticating with Claude');
+    try {
+      const { spawn } = require('child_process');
+
+      // Run claude auth login in interactive mode
+      // This will open a browser for the user to authenticate
+      logWithCategory('info', LogCategory.SYSTEM, 'Running: claude auth login');
+
+      return new Promise((resolve) => {
+        const authProcess = spawn('claude', ['auth', 'login'], {
+          stdio: 'inherit', // Allow browser interaction
+          shell: true
+        });
+
+        authProcess.on('close', (code: number) => {
+          if (code === 0) {
+            logWithCategory('info', LogCategory.SYSTEM, 'Authentication successful');
+            resolve({ success: true, message: 'Authentication successful' });
+          } else {
+            logWithCategory('error', LogCategory.SYSTEM, `Authentication failed with code ${code}`);
+            resolve({
+              success: false,
+              error: `Authentication process exited with code ${code}`
+            });
+          }
+        });
+
+        authProcess.on('error', (error: Error) => {
+          logWithCategory('error', LogCategory.SYSTEM, `Authentication error: ${error.message}`);
+          resolve({
+            success: false,
+            error: error.message
+          });
+        });
+      });
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to authenticate: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || 'Authentication failed'
+      };
     }
   });
 
-  workflowExecutor.on('phase-failed', (data) => {
+  // Forward node-based workflow events to renderer (phase-based system removed)
+  workflowExecutor.on('node-started', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('workflow:phase-failed', data);
+      mainWindow.webContents.send('workflow:node-started', data);
     }
   });
 
-  workflowExecutor.on('approval-required', (data) => {
+  workflowExecutor.on('node-completed', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('workflow:approval-required', data);
+      mainWindow.webContents.send('workflow:node-completed', data);
     }
   });
 
-  workflowExecutor.on('phase-event', (data) => {
+  workflowExecutor.on('node-failed', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('workflow:phase-event', data);
+      mainWindow.webContents.send('workflow:node-failed', data);
     }
+  });
+
+  // Forward Claude Code setup required event to renderer
+  workflowExecutor.on('claude-setup-required', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Forwarding claude-setup-required to renderer: ${data.reason}`);
+      mainWindow.webContents.send('claude-setup-required', data);
+    }
+  });
+
+  // Forward Claude Code output to terminal in real-time
+  workflowExecutor.on('claude-output', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Stream output to terminal via terminal:data event
+      mainWindow.webContents.send('claude-code:stream', data);
+    }
+  });
+
+  // Also listen to provider manager events for claude-setup-required
+  // (from ClaudeCodeCLIAdapter which creates its own executor instance)
+  const providerManager = getProviderManager();
+  providerManager.on('claude-setup-required', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Forwarding claude-setup-required from provider manager to renderer: ${data.reason}`);
+      mainWindow.webContents.send('claude-setup-required', data);
+    }
+  });
+
+  // ========================================
+  // PTY (Terminal) IPC Handlers
+  // ========================================
+
+  const ptyManager = new PTYManager();
+
+  // Forward PTY output to renderer
+  ptyManager.on('terminal:data', (data) => {
+    console.log(`[IPC] Forwarding terminal data to renderer:`, data.data?.substring(0, 50));
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:data', data);
+    }
+  });
+
+  ptyManager.on('terminal:exit', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:exit', data);
+    }
+  });
+
+  ptyManager.on('terminal:error', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:error', data);
+    }
+  });
+
+  // Create terminal session
+  ipcMain.handle('terminal:create', async (_event, options: {
+    id: string;
+    command: string;
+    args: string[];
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    cols?: number;
+    rows?: number;
+  }) => {
+    logWithCategory('info', LogCategory.SYSTEM,
+      `IPC: Creating terminal ${options.id}: ${options.command} ${options.args.join(' ')}`);
+    try {
+      ptyManager.createTerminal(options);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM,
+        `Failed to create terminal: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Send input to terminal
+  ipcMain.handle('terminal:input', async (_event, id: string, data: string) => {
+    console.log(`[IPC] terminal:input received for ${id}:`, data);
+    ptyManager.writeToTerminal(id, data);
+    return { success: true };
+  });
+
+  // Resize terminal
+  ipcMain.handle('terminal:resize', async (_event, id: string, cols: number, rows: number) => {
+    ptyManager.resizeTerminal(id, cols, rows);
+    return { success: true };
+  });
+
+  // Close terminal
+  ipcMain.handle('terminal:close', async (_event, id: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing terminal ${id}`);
+    ptyManager.closeTerminal(id);
+    return { success: true };
+  });
+
+  // Get active terminals
+  ipcMain.handle('terminal:list', async () => {
+    return { terminals: ptyManager.getActiveTerminals() };
+  });
+
+  // Cleanup PTY sessions on app quit
+  app.on('before-quit', () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'Closing all terminal sessions');
+    ptyManager.closeAll();
   });
 
   logger.info('IPC handlers registered');

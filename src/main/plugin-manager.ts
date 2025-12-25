@@ -184,8 +184,14 @@ class PluginManager {
     ];
 
     // Add items from each active plugin
+    logWithCategory('info', LogCategory.SYSTEM, `Building menu for ${activePlugins.length} active plugins`);
+
     for (const plugin of activePlugins) {
+      logWithCategory('info', LogCategory.SYSTEM, `Checking plugin ${plugin.id} for menu items...`);
+
       if (plugin.manifest.ui?.menuItems) {
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${plugin.id} has ${plugin.manifest.ui.menuItems.length} menu items`);
+
         for (const menuItem of plugin.manifest.ui.menuItems) {
           pluginMenuItems.push({
             label: menuItem.label,
@@ -209,6 +215,8 @@ class PluginManager {
             }),
           });
         }
+      } else {
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${plugin.id} has no menu items (ui: ${!!plugin.manifest.ui})`);
       }
     }
 
@@ -274,19 +282,33 @@ class PluginManager {
   /**
    * Handle a menu action from a plugin
    */
-  private handlePluginMenuAction(pluginId: string, action: string): void {
+  private async handlePluginMenuAction(pluginId: string, action: string): Promise<void> {
     if (!this.registry) {
       return;
     }
 
     logWithCategory('info', LogCategory.SYSTEM, `Handling plugin action: ${pluginId} -> ${action}`);
 
-    // Send action to renderer to show plugin UI
-    if (this.mainWindow) {
-      this.mainWindow.webContents.send('plugin-action', {
-        pluginId,
-        action,
-      });
+    // Call the plugin's IPC handler directly
+    const channelName = `plugin:${pluginId}:${action}`;
+
+    try {
+      // Invoke the IPC handler (this simulates what the renderer would do)
+      const result = await this.mainWindow?.webContents.executeJavaScript(
+        `require('electron').ipcRenderer.invoke('${channelName}')`
+      );
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Plugin action ${channelName} completed:`, result);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Plugin action ${channelName} failed:`, error);
+
+      // Show error notification
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('show-notification', {
+          type: 'error',
+          message: `Plugin action failed: ${error.message}`,
+        });
+      }
     }
   }
 
