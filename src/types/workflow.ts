@@ -8,10 +8,33 @@
  * 4. MCP Servers - Data persistence
  */
 
+// Import enhanced node types and LLM providers
+import type { WorkflowNode as EnhancedWorkflowNode } from './workflow-nodes';
+import type { LLMProviderConfig } from './llm-providers';
+import type { WorkflowExecutionContext } from './workflow-context';
+
+// Re-export for convenience
+export type { EnhancedWorkflowNode, LLMProviderConfig, WorkflowExecutionContext };
+export * from './workflow-nodes';
+export * from './llm-providers';
+export * from './workflow-context';
+
 /**
  * Phase types in the workflow
+ * Includes both legacy types and new enhanced node types
  */
-export type PhaseType = 'planning' | 'gate' | 'writing' | 'loop' | 'user' | 'subworkflow';
+export type PhaseType =
+  | 'planning'
+  | 'writing'
+  | 'gate'
+  | 'user-input'
+  | 'user'
+  | 'code'
+  | 'http'
+  | 'file'
+  | 'conditional'
+  | 'loop'
+  | 'subworkflow';
 
 /**
  * Workflow execution status
@@ -79,30 +102,12 @@ export interface WorkflowDefinition {
 
 /**
  * Workflow graph representation (for React Flow visualization)
+ * Uses WorkflowNode from workflow-nodes.ts (the enhanced format)
  */
 export interface WorkflowGraph {
-  nodes: WorkflowNode[];
+  nodes: EnhancedWorkflowNode[];  // Use the new enhanced format
   edges: WorkflowEdge[];
-  metadata: WorkflowMetadata;
-}
-
-/**
- * Visual node in workflow graph
- */
-export interface WorkflowNode {
-  id: string;
-  type: PhaseType;
-  label: string;
-  agent: string;
-  skill?: string;
-  subWorkflowId?: string;
-  data: {
-    phase: WorkflowPhase;
-    status?: PhaseStatus;
-    executionData?: any;
-  };
-  position: { x: number; y: number };
-  style?: Record<string, any>;      // Custom styling
+  metadata?: WorkflowMetadata;
 }
 
 /**
