@@ -63,8 +63,9 @@ export class MCPWorkflowClient {
 
   /**
    * Call MCP tool via stdio
+   * Public for use in IPC handlers for graph-based workflow operations
    */
-  private async callTool(toolName: string, args: any): Promise<any> {
+  public async callTool(toolName: string, args: any): Promise<any> {
     return new Promise(async (resolve, reject) => {
       const requestId = ++this.requestId;
 
@@ -196,18 +197,28 @@ export class MCPWorkflowClient {
     logWithCategory('info', LogCategory.WORKFLOW,
       `Importing workflow: ${workflow.name} v${workflow.version}`);
 
-    return await this.callTool('import_workflow_definition', {
+    const params = {
       id: workflow.id,
       name: workflow.name,
       version: workflow.version,
       description: workflow.description,
-      graph_json: workflow.graph_json,
-      dependencies_json: workflow.dependencies_json,
-      phases_json: workflow.phases_json,
+      graph_json: JSON.stringify(workflow.graph_json),
+      dependencies_json: JSON.stringify(workflow.dependencies_json),
+      phases_json: JSON.stringify(workflow.phases_json),
       tags: workflow.tags || [],
-      marketplace_metadata: workflow.marketplace_metadata || {},
+      marketplace_metadata: JSON.stringify(workflow.marketplace_metadata || {}),
       created_by: workflow.created_by
-    });
+    };
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `MCP import params: ${JSON.stringify(params, null, 2).substring(0, 500)}...`);
+
+    const result = await this.callTool('import_workflow_definition', params);
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `MCP import result: ${JSON.stringify(result)}`);
+
+    return result;
   }
 
   /**
@@ -247,6 +258,24 @@ export class MCPWorkflowClient {
     await this.callTool('update_workflow_positions', {
       workflow_def_id: workflowDefId,
       positions
+    });
+  }
+
+  /**
+   * Update a specific phase in a workflow definition
+   */
+  async updateWorkflowPhase(
+    workflowDefId: string,
+    phaseId: number,
+    updates: Partial<WorkflowPhase>
+  ): Promise<WorkflowPhase> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Updating phase ${phaseId} in workflow: ${workflowDefId}`);
+
+    return await this.callTool('update_workflow_phase', {
+      workflow_def_id: workflowDefId,
+      phase_id: phaseId,
+      updates
     });
   }
 

@@ -168,11 +168,12 @@ export class DependencyResolver {
   }
 
   /**
-   * Get installed agents list
+   * Get installed agents list from ~/.claude/agents/
+   * This is where Claude Code naturally looks for agents
    */
   async getInstalledAgents(): Promise<string[]> {
-    const userDataPath = app.getPath('userData');
-    const agentsDir = path.join(userDataPath, 'agents');
+    const homeDir = require('os').homedir();
+    const agentsDir = path.join(homeDir, '.claude', 'agents');
 
     if (!await fs.pathExists(agentsDir)) {
       return [];

@@ -77,13 +77,16 @@ export class FolderImporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Found workflow file: ${workflowFile}`);
 
-      // 2. Parse workflow definition
+      // 2. Read raw workflow file for graph_json
+      const rawWorkflowData = await fs.readJson(workflowFile);
+
+      // 3. Parse workflow definition (for internal processing)
       const workflow = await this.parser.parseWorkflow(workflowFile);
 
       logWithCategory('info', LogCategory.WORKFLOW,
         `Parsed workflow: ${workflow.name} v${workflow.version}`);
 
-      // 3. Check dependencies
+      // 4. Check dependencies
       const depCheck = await this.depResolver.checkDependencies({
         agents: workflow.dependencies.agents,
         skills: workflow.dependencies.skills,
@@ -106,8 +109,8 @@ export class FolderImporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Installed ${installedCounts.agents} agents, ${installedCounts.skills} skills`);
 
-      // 5. Convert workflow to database format
-      const workflowDefinition = this.convertToWorkflowDefinition(workflow);
+      // 5. Convert workflow to database format (use original graph_json from file)
+      const workflowDefinition = this.convertToWorkflowDefinition(workflow, rawWorkflowData);
 
       // 6. Import workflow definition to database via MCP
       const result = await this.workflowClient.importWorkflowDefinition(workflowDefinition);
@@ -161,9 +164,10 @@ export class FolderImporter {
 
   /**
    * Convert WorkflowDefinition to database format
+   * Uses the original graph_json from the file (already in correct WorkflowNode format)
    */
-  private convertToWorkflowDefinition(workflow: any): any {
-    // Convert phases array to the format expected by database
+  private convertToWorkflowDefinition(workflow: any, rawData: any): any {
+    //Convert phases to a minimal format for database (keeping for compatibility)
     const phases_json = workflow.phases.map((phase: any) => ({
       id: phase.id,
       name: phase.name,
@@ -178,38 +182,24 @@ export class FolderImporter {
       position: phase.position
     }));
 
-    // Create graph_json for visualization
-    const graph_json = {
-      nodes: phases_json.map((phase: any) => ({
-        id: phase.id.toString(),
-        type: phase.type,
-        data: { label: phase.name, phase },
-        position: phase.position
-      })),
-      edges: phases_json.slice(0, -1).map((phase: any, index: number) => ({
-        id: `e${index}-${index + 1}`,
-        source: index.toString(),
-        target: (index + 1).toString()
-      }))
-    };
-
     return {
       id: workflow.id,
       name: workflow.name,
       version: workflow.version,
       description: workflow.description,
-      graph_json,
+      // Use the original graph_json from the file (already in WorkflowNode format!)
+      graph_json: rawData.graph_json,
       dependencies_json: {
         agents: workflow.dependencies.agents,
         skills: workflow.dependencies.skills,
         mcpServers: workflow.dependencies.mcpServers,
         subWorkflows: workflow.dependencies.subWorkflows
       },
-      phases_json,
-      tags: workflow.metadata?.tags || [],
+      phases_json,  // Include for MCP compatibility
+      tags: rawData.tags || workflow.metadata?.tags || [],
       marketplace_metadata: workflow.metadata || {},
       created_by: workflow.metadata?.author || 'FictionLab',
-      is_system: false
+      is_system: rawData.is_system || false
     };
   }
 
