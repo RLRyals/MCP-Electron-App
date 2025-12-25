@@ -7,6 +7,15 @@
   "include": [
     "src/main/**/*",
     "src/preload/**/*",
-    "src/services/**/*"
+    "src/services/**/*",
+    "src/types/**/*"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ]
 }

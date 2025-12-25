@@ -74,6 +74,84 @@ function copyAssets() {
       }
     }
 
+    // Copy xterm assets (JS and CSS)
+    try {
+      const xtermPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'xterm');
+      const fitPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'addon-fit');
+      const webLinksPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'addon-web-links');
+      const distStyles = path.join(distRenderer, 'styles');
+      const distVendor = path.join(distRenderer, 'vendor');
+
+      ensureDirSync(distStyles);
+      ensureDirSync(distVendor);
+
+      // 1. Copy xterm CSS
+      if (fs.existsSync(xtermPkgPath)) {
+        const xtermCssSrc = path.join(xtermPkgPath, 'css', 'xterm.css');
+        const xtermCssDest = path.join(distStyles, 'xterm.css');
+        if (fs.existsSync(xtermCssSrc)) {
+          fs.copyFileSync(xtermCssSrc, xtermCssDest);
+          console.log('  ✓ Copied xterm.css from node_modules');
+        }
+
+        // Copy xterm.js (UMD) and create wrapper
+        const xtermJsSrc = path.join(xtermPkgPath, 'lib', 'xterm.js');
+        const xtermJsDest = path.join(distVendor, 'xterm.umd.js');
+        if (fs.existsSync(xtermJsSrc)) {
+          fs.copyFileSync(xtermJsSrc, xtermJsDest);
+          console.log('  ✓ Copied xterm.js from node_modules');
+
+          const wrapperPath = path.join(distVendor, 'xterm.js');
+          const wrapperContent = `import './xterm.umd.js';\nexport const Terminal = window.Terminal;`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/xterm.js wrapper');
+        }
+      }
+
+      // 2. Copy addon-fit
+      if (fs.existsSync(fitPkgPath)) {
+        const fitJsSrc = path.join(fitPkgPath, 'lib', 'addon-fit.js');
+        const fitJsDest = path.join(distVendor, 'addon-fit.umd.js');
+        if (fs.existsSync(fitJsSrc)) {
+          fs.copyFileSync(fitJsSrc, fitJsDest);
+          console.log('  ✓ Copied addon-fit.js from node_modules');
+
+          // Create a wrapper that handles different UMD export styles
+          const wrapperPath = path.join(distVendor, 'addon-fit.js');
+          // Check if it's exported as default or named export
+          const wrapperContent = `
+import './addon-fit.umd.js';
+// The UMD build might export to window.FitAddon directly or window.FitAddon.FitAddon
+const Plugin = window.FitAddon;
+export const FitAddon = (Plugin.FitAddon || Plugin.default || Plugin);
+`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/addon-fit.js wrapper');
+        }
+      }
+
+      // 3. Copy addon-web-links
+      if (fs.existsSync(webLinksPkgPath)) {
+        const linksJsSrc = path.join(webLinksPkgPath, 'lib', 'addon-web-links.js');
+        const linksJsDest = path.join(distVendor, 'addon-web-links.umd.js');
+        if (fs.existsSync(linksJsSrc)) {
+          fs.copyFileSync(linksJsSrc, linksJsDest);
+          console.log('  ✓ Copied addon-web-links.js from node_modules');
+
+          const wrapperPath = path.join(distVendor, 'addon-web-links.js');
+          const wrapperContent = `
+import './addon-web-links.umd.js';
+const Plugin = window.WebLinksAddon;
+export const WebLinksAddon = (Plugin.WebLinksAddon || Plugin.default || Plugin);
+`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/addon-web-links.js wrapper');
+        }
+      }
+    } catch (err) {
+      console.warn('  ⚠ Failed to copy xterm assets:', err.message);
+    }
+
     // Copy ReactFlow from node_modules
     try {
       const reactFlowPath = path.join(__dirname, '..', 'node_modules', 'reactflow', 'dist');
