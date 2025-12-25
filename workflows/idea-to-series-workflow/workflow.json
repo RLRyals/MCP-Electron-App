@@ -1,0 +1,283 @@
+{
+  "workflow_def_id": "idea-to-series",
+  "name": "Idea to Series",
+  "description": "Complete workflow from book idea to published 5-book series using AI agents",
+  "version": "2.0.0",
+  "tags": ["fiction", "series", "complete", "enhanced"],
+  "is_system": true,
+  "graph_json": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "user-input",
+        "name": "Capture Book/Series Idea",
+        "description": "Gather the author's initial concept for their book or series",
+        "position": { "x": 100, "y": 100 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "prompt": "What is your book or series idea? Include genre, themes, characters, or any inspiration you have.",
+        "inputType": "textarea",
+        "required": true,
+        "validation": {
+          "minLength": 10,
+          "maxLength": 5000
+        },
+        "defaultValue": ""
+      },
+      {
+        "id": "2",
+        "type": "planning",
+        "name": "Market Research",
+        "description": "Analyze market trends, comp titles, and commercial viability",
+        "position": { "x": 100, "y": 280 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "agent": "market-research-agent",
+        "skill": "",
+        "gate": false,
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Your Subscription)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "outputFormat": "json"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "type": "planning",
+        "name": "Series Architecture",
+        "description": "Design 5-book series structure with escalating stakes and character arcs",
+        "position": { "x": 100, "y": 460 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "agent": "series-architect-agent",
+        "skill": "",
+        "gate": false,
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Your Subscription)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "outputFormat": "json"
+          }
+        }
+      },
+      {
+        "id": "4",
+        "type": "gate",
+        "name": "Series Validation Gate",
+        "description": "Validate series structure meets commercial and quality standards (NPE score >= 80)",
+        "position": { "x": 100, "y": 640 },
+        "requiresApproval": true,
+        "contextConfig": { "mode": "simple" },
+        "agent": "npe-series-validator-agent",
+        "skill": "",
+        "gate": true,
+        "gateCondition": "$.npeScore >= 80",
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Your Subscription)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "outputFormat": "json"
+          }
+        }
+      },
+      {
+        "id": "5",
+        "type": "loop",
+        "name": "Book Loop",
+        "description": "Process each book in the series (5 iterations)",
+        "position": { "x": 100, "y": 820 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "loopType": "count",
+        "count": 5,
+        "iteratorVariable": "currentBook",
+        "indexVariable": "bookIndex",
+        "loopNodes": ["6", "7", "8", "9"],
+        "aggregateResults": true
+      },
+      {
+        "id": "6",
+        "type": "planning",
+        "name": "Book Planning",
+        "description": "Plan individual book structure, beats, and chapter outline",
+        "position": { "x": 350, "y": 700 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "agent": "series-architect-agent",
+        "skill": "",
+        "gate": false,
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Your Subscription)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "outputFormat": "json"
+          }
+        }
+      },
+      {
+        "id": "7",
+        "type": "loop",
+        "name": "Chapter Loop",
+        "description": "Write each chapter in the book",
+        "position": { "x": 350, "y": 880 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "loopType": "forEach",
+        "collection": "$.chapters",
+        "iteratorVariable": "currentChapter",
+        "indexVariable": "chapterIndex",
+        "loopNodes": ["8"],
+        "aggregateResults": true
+      },
+      {
+        "id": "8",
+        "type": "writing",
+        "name": "Write Chapter",
+        "description": "Write chapter prose with character voice and pacing",
+        "position": { "x": 600, "y": 880 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "agent": "bailey-first-drafter",
+        "skill": "",
+        "gate": false,
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Default)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "headless": true,
+            "outputFormat": "text"
+          }
+        }
+      },
+      {
+        "id": "9",
+        "type": "gate",
+        "name": "Book Quality Gate",
+        "description": "Validate completed book meets quality standards",
+        "position": { "x": 350, "y": 1060 },
+        "requiresApproval": true,
+        "contextConfig": { "mode": "simple" },
+        "agent": "commercial-validator-agent",
+        "skill": "",
+        "gate": true,
+        "gateCondition": "$.qualityScore >= 80",
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Your Subscription)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "outputFormat": "json"
+          }
+        }
+      },
+      {
+        "id": "10",
+        "type": "file",
+        "name": "Export Series",
+        "description": "Export all books to project folder",
+        "position": { "x": 100, "y": 1000 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "operation": "write",
+        "path": "{{projectFolder}}/series-complete.json",
+        "content": "{{seriesData}}",
+        "encoding": "utf8",
+        "createDirectories": true,
+        "overwrite": true,
+        "restrictToProjectFolder": true
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "type": "default"
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "type": "default"
+      },
+      {
+        "id": "e3-4",
+        "source": "3",
+        "target": "4",
+        "type": "default"
+      },
+      {
+        "id": "e4-5",
+        "source": "4",
+        "target": "5",
+        "type": "conditional",
+        "label": "Pass (NPE >= 80)",
+        "condition": "$.npeScore >= 80"
+      },
+      {
+        "id": "e4-3",
+        "source": "4",
+        "target": "3",
+        "type": "conditional",
+        "label": "Fail - Revise",
+        "condition": "$.npeScore < 80"
+      },
+      {
+        "id": "e5-6",
+        "source": "5",
+        "target": "6",
+        "type": "default",
+        "label": "For each book"
+      },
+      {
+        "id": "e6-7",
+        "source": "6",
+        "target": "7",
+        "type": "default"
+      },
+      {
+        "id": "e7-8",
+        "source": "7",
+        "target": "8",
+        "type": "default",
+        "label": "For each chapter"
+      },
+      {
+        "id": "e8-9",
+        "source": "8",
+        "target": "9",
+        "type": "default"
+      },
+      {
+        "id": "e9-5",
+        "source": "9",
+        "target": "5",
+        "type": "conditional",
+        "label": "Pass - Next book",
+        "condition": "$.qualityScore >= 80"
+      },
+      {
+        "id": "e9-6",
+        "source": "9",
+        "target": "6",
+        "type": "conditional",
+        "label": "Fail - Revise book",
+        "condition": "$.qualityScore < 80"
+      },
+      {
+        "id": "e5-10",
+        "source": "5",
+        "target": "10",
+        "type": "default",
+        "label": "All books complete"
+      }
+    ]
+  }
+}

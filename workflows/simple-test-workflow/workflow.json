@@ -1,0 +1,81 @@
+{
+  "workflow_def_id": "simple-test",
+  "name": "Simple Test Workflow",
+  "description": "A simple 3-node test workflow demonstrating user input, AI processing, and file output",
+  "version": "1.0.0",
+  "tags": ["test", "demo", "simple"],
+  "is_system": true,
+  "graph_json": {
+    "nodes": [
+      {
+        "id": "1",
+        "type": "user-input",
+        "name": "Get User Input",
+        "description": "Capture a simple text input from the user",
+        "position": { "x": 100, "y": 100 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "prompt": "Enter some text to process:",
+        "inputType": "text",
+        "required": true,
+        "validation": {
+          "minLength": 5,
+          "maxLength": 200
+        },
+        "defaultValue": "Hello, world!"
+      },
+      {
+        "id": "2",
+        "type": "planning",
+        "name": "Process with AI",
+        "description": "Have an AI agent analyze and enhance the input",
+        "position": { "x": 100, "y": 280 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "agent": "general-purpose",
+        "skill": "",
+        "gate": false,
+        "prompt": "Please analyze and enhance the following text:\n\n{{userInput}}\n\nProvide an improved version that is more clear, engaging, and polished.",
+        "provider": {
+          "type": "claude-code-cli",
+          "name": "Claude Code (Default)",
+          "config": {
+            "model": "claude-sonnet-4-5",
+            "headless": true,
+            "outputFormat": "text"
+          }
+        }
+      },
+      {
+        "id": "3",
+        "type": "file",
+        "name": "Save Output",
+        "description": "Save the processed result to a file",
+        "position": { "x": 100, "y": 460 },
+        "requiresApproval": false,
+        "contextConfig": { "mode": "simple" },
+        "operation": "write",
+        "path": "{{projectFolder}}/test-output.txt",
+        "content": "{{output}}",
+        "encoding": "utf8",
+        "createDirectories": true,
+        "overwrite": true,
+        "requireProjectFolder": true
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "type": "default"
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "type": "default"
+      }
+    ]
+  }
+}

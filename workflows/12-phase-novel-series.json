@@ -1,0 +1,571 @@
+{
+  "id": "12-phase-novel-series",
+  "name": "12-Phase Novel Series Writing Workflow",
+  "version": "1.0.0",
+  "description": "Complete workflow to write a 5-book urban fantasy series from initial idea to publication-ready manuscript. Includes market research, series planning, book planning, chapter writing loops, editing, and quality gates.",
+  "metadata": {
+    "author": "FictionLab",
+    "created": "2025-12-20T00:00:00.000Z",
+    "updated": "2025-12-20T00:00:00.000Z",
+    "tags": ["fiction", "urban-fantasy", "series", "novel-writing", "complete-workflow"]
+  },
+  "dependencies": {
+    "agents": [
+      "market-research-agent",
+      "series-architect-agent",
+      "book-planner-agent",
+      "npe-validator-agent",
+      "chapter-writer-agent",
+      "manuscript-assembler-agent",
+      "developmental-editor-agent",
+      "line-editor-agent",
+      "final-validator-agent",
+      "export-manager-agent",
+      "series-progression-agent",
+      "series-completion-agent"
+    ],
+    "skills": [
+      "urban-fantasy-market-analysis",
+      "five-book-series-planning",
+      "detailed-book-planning",
+      "validate-novel-structure",
+      "chapter-writing",
+      "manuscript-assembly",
+      "manuscript-dev-edit",
+      "manuscript-line-edit",
+      "manuscript-quality-check",
+      "export-preparation",
+      "series-progression-check",
+      "series-wrap-up"
+    ],
+    "mcpServers": [
+      "workflow-manager",
+      "file-system"
+    ]
+  },
+  "phases": [
+    {
+      "id": 0,
+      "name": "User Input: Book/Series Idea",
+      "fullName": "Capture Book or Series Idea from Author",
+      "type": "user",
+      "agent": "User",
+      "description": "Capture the author's initial book or series idea including genre, main character concept, setting, and key plot points.",
+      "process": [
+        "Present input form to author",
+        "Validate minimum input requirements",
+        "Store idea in workflow context"
+      ],
+      "output": "User's book/series idea captured with genre, characters, setting, and themes",
+      "mcp": "workflow-manager: Store user input in workflow context",
+      "gate": false,
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 50
+      }
+    },
+    {
+      "id": 1,
+      "name": "Market Research",
+      "fullName": "Phase 1: Market Research and Competitive Analysis",
+      "type": "planning",
+      "agent": "market-research-agent",
+      "skill": "urban-fantasy-market-analysis",
+      "description": "Research current urban fantasy market trends, identify comp titles, analyze reader expectations, and define target audience.",
+      "process": [
+        "Analyze current market trends in urban fantasy",
+        "Identify 5-10 comparable successful titles",
+        "Extract trending tropes and reader expectations",
+        "Define target audience demographics",
+        "Generate market positioning recommendations"
+      ],
+      "output": "Market analysis report with comp titles, trending tropes, target audience profile, and positioning strategy",
+      "mcp": "workflow-manager: Store market research results",
+      "gate": false,
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": 2,
+      "name": "Series Architecture",
+      "fullName": "Phase 2: Five-Book Series Architecture Planning",
+      "type": "planning",
+      "agent": "series-architect-agent",
+      "skill": "five-book-series-planning",
+      "description": "Plan the overall 5-book series structure including character arcs, world progression, and overarching plot threads.",
+      "process": [
+        "Design 5-book series arc structure",
+        "Plan protagonist character arc across all books",
+        "Develop supporting character arcs",
+        "Create world-building progression plan",
+        "Establish series-wide plot threads and resolutions",
+        "Generate one-paragraph summary for each book"
+      ],
+      "output": "Series bible with 5-book structure, character arc plans, world progression timeline, and book summaries",
+      "mcp": "workflow-manager: Store series architecture in series_bible table",
+      "gate": false,
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 350
+      }
+    },
+    {
+      "id": 3,
+      "name": "Book 1 Planning",
+      "fullName": "Phase 3: Detailed Planning for Book 1",
+      "type": "planning",
+      "agent": "book-planner-agent",
+      "skill": "detailed-book-planning",
+      "description": "Create detailed outline for Book 1 with chapter-by-chapter breakdown, scene structure, and character development beats.",
+      "process": [
+        "Create 3-act structure for Book 1",
+        "Break down into 25-30 chapters",
+        "Define key scenes and plot points for each chapter",
+        "Establish character development beats",
+        "Create detailed character profiles for main cast",
+        "Define subplots and their resolution",
+        "Generate chapter-by-chapter outline with scene cards"
+      ],
+      "output": "Detailed Book 1 outline with chapter breakdown, scene structure, character profiles, and subplot tracking",
+      "mcp": "workflow-manager: Store book outline and chapter breakdown",
+      "gate": false,
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 500
+      }
+    },
+    {
+      "id": 4,
+      "name": "NPE Validation",
+      "fullName": "Phase 4: No Pulp Errors (NPE) Quality Gate",
+      "type": "gate",
+      "agent": "npe-validator-agent",
+      "skill": "validate-novel-structure",
+      "description": "Validate planning quality using NPE checklist. Ensures solid structure before writing begins.",
+      "process": [
+        "Check for plot holes and inconsistencies",
+        "Validate character motivation clarity",
+        "Verify pacing and structure balance",
+        "Assess world-building coherence",
+        "Check for genre convention adherence",
+        "Generate validation score (0-100)",
+        "Provide detailed feedback on issues found"
+      ],
+      "output": "NPE validation report with score, issues found, and recommendations for improvement",
+      "mcp": "workflow-manager: Store validation results in quality_gates table",
+      "gate": true,
+      "gateCondition": "$.score >= 80",
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 650
+      }
+    },
+    {
+      "id": 5,
+      "name": "Chapter Writing Loop",
+      "fullName": "Phase 5: Write All Chapters for Book 1",
+      "type": "loop",
+      "agent": "chapter-writer-agent",
+      "skill": "chapter-writing",
+      "description": "Iteratively write each chapter of Book 1 based on the detailed outline. Loop through all 25-30 chapters.",
+      "process": [
+        "For each chapter in book outline:",
+        "  - Load chapter outline and scene cards",
+        "  - Load relevant character profiles",
+        "  - Load previous chapter for continuity",
+        "  - Generate chapter prose (3000-5000 words)",
+        "  - Validate chapter quality",
+        "  - Store completed chapter",
+        "Track progress and update workflow context"
+      ],
+      "output": "Array of 25-30 completed chapters, each 3000-5000 words, totaling ~90,000-word manuscript",
+      "mcp": "workflow-manager: Store each chapter in chapters table, track progress",
+      "gate": false,
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 800
+      }
+    },
+    {
+      "id": 6,
+      "name": "Manuscript Assembly",
+      "fullName": "Phase 6: Assemble Complete Book 1 Manuscript",
+      "type": "writing",
+      "agent": "manuscript-assembler-agent",
+      "skill": "manuscript-assembly",
+      "description": "Assemble all chapters into a complete manuscript file with proper formatting and metadata.",
+      "process": [
+        "Load all completed chapters in order",
+        "Add manuscript front matter (title page, copyright)",
+        "Format chapter headers and breaks",
+        "Add chapter numbers and titles",
+        "Generate table of contents",
+        "Write assembled manuscript to file",
+        "Generate manuscript statistics (word count, chapter count)"
+      ],
+      "output": "Complete Book 1 manuscript file (Book1_Manuscript.txt) and statistics report",
+      "mcp": "file-system: Write to {{projectFolder}}/Book1_Manuscript.txt",
+      "gate": false,
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 950
+      }
+    },
+    {
+      "id": 7,
+      "name": "Developmental Edit",
+      "fullName": "Phase 7: Developmental Editing Pass",
+      "type": "writing",
+      "agent": "developmental-editor-agent",
+      "skill": "manuscript-dev-edit",
+      "description": "High-level editing focused on story structure, pacing, plot coherence, and character arcs.",
+      "process": [
+        "Analyze overall story structure and pacing",
+        "Evaluate character development and arcs",
+        "Check plot consistency and logic",
+        "Assess scene flow and transitions",
+        "Identify weak or unnecessary scenes",
+        "Generate revision recommendations",
+        "Create developmental edit report"
+      ],
+      "output": "Developmental edit report with structural feedback and revision suggestions",
+      "mcp": "workflow-manager: Store edit report and revision notes",
+      "gate": false,
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 1100
+      }
+    },
+    {
+      "id": 8,
+      "name": "Line Edit",
+      "fullName": "Phase 8: Line Editing and Copy Editing Pass",
+      "type": "writing",
+      "agent": "line-editor-agent",
+      "skill": "manuscript-line-edit",
+      "description": "Sentence-level editing for style, clarity, flow, grammar, and word choice.",
+      "process": [
+        "Review each sentence for clarity and style",
+        "Fix grammar and punctuation errors",
+        "Improve word choice and eliminate clichés",
+        "Enhance dialogue tags and beats",
+        "Tighten prose and remove redundancies",
+        "Ensure consistent voice and tone",
+        "Generate edited manuscript with track changes"
+      ],
+      "output": "Line-edited manuscript with detailed change log and style improvements",
+      "mcp": "workflow-manager: Store edited version and change log",
+      "gate": false,
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 1250
+      }
+    },
+    {
+      "id": 9,
+      "name": "Final Quality Gate",
+      "fullName": "Phase 9: Final Manuscript Quality Check",
+      "type": "gate",
+      "agent": "final-validator-agent",
+      "skill": "manuscript-quality-check",
+      "description": "Final validation before publication. Checks readiness across all quality dimensions.",
+      "process": [
+        "Run comprehensive quality checklist",
+        "Verify plot consistency and resolution",
+        "Check character arc completion",
+        "Assess prose quality and readability",
+        "Validate genre expectations met",
+        "Check for typos and formatting issues",
+        "Generate readiness score (0-100)",
+        "Provide final recommendations"
+      ],
+      "output": "Final quality report with readiness score and publication recommendations",
+      "mcp": "workflow-manager: Store final validation in quality_gates table",
+      "gate": true,
+      "gateCondition": "$.readiness >= 90",
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 1400
+      }
+    },
+    {
+      "id": 10,
+      "name": "Export for Publication",
+      "fullName": "Phase 10: Export Final Manuscript for Publication",
+      "type": "writing",
+      "agent": "export-manager-agent",
+      "skill": "export-preparation",
+      "description": "Prepare and export the final manuscript in publication-ready format.",
+      "process": [
+        "Create export folder if not exists",
+        "Copy final manuscript to export location",
+        "Generate multiple formats (TXT, DOCX, PDF)",
+        "Create submission package with metadata",
+        "Generate cover letter template",
+        "Create backup copies",
+        "Generate export manifest"
+      ],
+      "output": "Publication-ready files in exports folder with manifest and submission materials",
+      "mcp": "file-system: Copy to {{projectFolder}}/exports/Book1_Final.txt",
+      "gate": false,
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 1550
+      }
+    },
+    {
+      "id": 11,
+      "name": "Series Progression Check",
+      "fullName": "Phase 11: Check if More Books Need to be Written",
+      "type": "planning",
+      "agent": "series-progression-agent",
+      "skill": "series-progression-check",
+      "description": "Determine if the series is complete or if more books need to be written (up to 5 total).",
+      "process": [
+        "Check current book number against series plan",
+        "Evaluate if all 5 books are complete",
+        "If incomplete, prepare for next book planning",
+        "Update series progress tracker",
+        "Generate next steps recommendation"
+      ],
+      "output": "Series progression status and next action (continue to next book or complete series)",
+      "mcp": "workflow-manager: Update series progress tracking",
+      "gate": false,
+      "gateCondition": "$.currentBookNumber < 5",
+      "requiresApproval": false,
+      "position": {
+        "x": 100,
+        "y": 1700
+      }
+    },
+    {
+      "id": 12,
+      "name": "Series Completion",
+      "fullName": "Phase 12: Series Completion and Final Report",
+      "type": "planning",
+      "agent": "series-completion-agent",
+      "skill": "series-wrap-up",
+      "description": "Generate final series completion report with statistics and next steps for publication.",
+      "process": [
+        "Compile statistics for all 5 books",
+        "Generate series completion report",
+        "Create series marketing materials",
+        "Compile character and world bible",
+        "Generate publication timeline",
+        "Create author notes and appendices",
+        "Package all deliverables"
+      ],
+      "output": "Series completion report with statistics, marketing materials, and publication roadmap",
+      "mcp": "workflow-manager: Mark series as complete, store final report",
+      "gate": false,
+      "requiresApproval": true,
+      "position": {
+        "x": 100,
+        "y": 1850
+      }
+    }
+  ],
+  "graph_json": {
+    "nodes": [
+      {
+        "id": "0",
+        "type": "user",
+        "data": {
+          "label": "User Input: Book/Series Idea",
+          "phase": {
+            "id": 0,
+            "name": "User Input: Book/Series Idea",
+            "type": "user"
+          }
+        },
+        "position": { "x": 100, "y": 50 }
+      },
+      {
+        "id": "1",
+        "type": "planning",
+        "data": {
+          "label": "Market Research",
+          "phase": {
+            "id": 1,
+            "name": "Market Research",
+            "type": "planning"
+          }
+        },
+        "position": { "x": 100, "y": 200 }
+      },
+      {
+        "id": "2",
+        "type": "planning",
+        "data": {
+          "label": "Series Architecture",
+          "phase": {
+            "id": 2,
+            "name": "Series Architecture",
+            "type": "planning"
+          }
+        },
+        "position": { "x": 100, "y": 350 }
+      },
+      {
+        "id": "3",
+        "type": "planning",
+        "data": {
+          "label": "Book 1 Planning",
+          "phase": {
+            "id": 3,
+            "name": "Book 1 Planning",
+            "type": "planning"
+          }
+        },
+        "position": { "x": 100, "y": 500 }
+      },
+      {
+        "id": "4",
+        "type": "gate",
+        "data": {
+          "label": "NPE Validation",
+          "phase": {
+            "id": 4,
+            "name": "NPE Validation",
+            "type": "gate"
+          }
+        },
+        "position": { "x": 100, "y": 650 }
+      },
+      {
+        "id": "5",
+        "type": "loop",
+        "data": {
+          "label": "Chapter Writing Loop",
+          "phase": {
+            "id": 5,
+            "name": "Chapter Writing Loop",
+            "type": "loop"
+          }
+        },
+        "position": { "x": 100, "y": 800 }
+      },
+      {
+        "id": "6",
+        "type": "writing",
+        "data": {
+          "label": "Manuscript Assembly",
+          "phase": {
+            "id": 6,
+            "name": "Manuscript Assembly",
+            "type": "writing"
+          }
+        },
+        "position": { "x": 100, "y": 950 }
+      },
+      {
+        "id": "7",
+        "type": "writing",
+        "data": {
+          "label": "Developmental Edit",
+          "phase": {
+            "id": 7,
+            "name": "Developmental Edit",
+            "type": "writing"
+          }
+        },
+        "position": { "x": 100, "y": 1100 }
+      },
+      {
+        "id": "8",
+        "type": "writing",
+        "data": {
+          "label": "Line Edit",
+          "phase": {
+            "id": 8,
+            "name": "Line Edit",
+            "type": "writing"
+          }
+        },
+        "position": { "x": 100, "y": 1250 }
+      },
+      {
+        "id": "9",
+        "type": "gate",
+        "data": {
+          "label": "Final Quality Gate",
+          "phase": {
+            "id": 9,
+            "name": "Final Quality Gate",
+            "type": "gate"
+          }
+        },
+        "position": { "x": 100, "y": 1400 }
+      },
+      {
+        "id": "10",
+        "type": "writing",
+        "data": {
+          "label": "Export for Publication",
+          "phase": {
+            "id": 10,
+            "name": "Export for Publication",
+            "type": "writing"
+          }
+        },
+        "position": { "x": 100, "y": 1550 }
+      },
+      {
+        "id": "11",
+        "type": "planning",
+        "data": {
+          "label": "Series Progression Check",
+          "phase": {
+            "id": 11,
+            "name": "Series Progression Check",
+            "type": "planning"
+          }
+        },
+        "position": { "x": 100, "y": 1700 }
+      },
+      {
+        "id": "12",
+        "type": "planning",
+        "data": {
+          "label": "Series Completion",
+          "phase": {
+            "id": 12,
+            "name": "Series Completion",
+            "type": "planning"
+          }
+        },
+        "position": { "x": 100, "y": 1850 }
+      }
+    ],
+    "edges": [
+      { "id": "e0-1", "source": "0", "target": "1", "type": "sequential" },
+      { "id": "e1-2", "source": "1", "target": "2", "type": "sequential" },
+      { "id": "e2-3", "source": "2", "target": "3", "type": "sequential" },
+      { "id": "e3-4", "source": "3", "target": "4", "type": "sequential" },
+      { "id": "e4-5", "source": "4", "target": "5", "type": "conditional", "label": "score >= 80" },
+      { "id": "e4-3", "source": "4", "target": "3", "type": "conditional", "label": "score < 80 (retry)" },
+      { "id": "e5-6", "source": "5", "target": "6", "type": "sequential" },
+      { "id": "e6-7", "source": "6", "target": "7", "type": "sequential" },
+      { "id": "e7-8", "source": "7", "target": "8", "type": "sequential" },
+      { "id": "e8-9", "source": "8", "target": "9", "type": "sequential" },
+      { "id": "e9-10", "source": "9", "target": "10", "type": "conditional", "label": "readiness >= 90" },
+      { "id": "e9-7", "source": "9", "target": "7", "type": "conditional", "label": "readiness < 90 (retry)" },
+      { "id": "e10-11", "source": "10", "target": "11", "type": "sequential" },
+      { "id": "e11-3", "source": "11", "target": "3", "type": "conditional", "label": "currentBookNumber < 5 (next book)" },
+      { "id": "e11-12", "source": "11", "target": "12", "type": "conditional", "label": "currentBookNumber >= 5 (complete)" }
+    ]
+  }
+}
