@@ -49,6 +49,29 @@ export class FolderImporter {
   }
 
   /**
+   * Preview workflow metadata without importing
+   * Returns the workflow ID, name, and version
+   */
+  async previewWorkflow(folderPath: string): Promise<{ id: string; name: string; version: string } | null> {
+    try {
+      const workflowFile = await this.findWorkflowFile(folderPath);
+      if (!workflowFile) {
+        return null;
+      }
+
+      const workflow = await this.parser.parseWorkflow(workflowFile);
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        version: workflow.version
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to preview workflow: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Import workflow from folder
    *
    * Expected structure:
@@ -59,8 +82,12 @@ export class FolderImporter {
    *   ├── skills/
    *   │   └── skill-name.md
    *   └── README.md
+   *
+   * @param folderPath Path to workflow folder
+   * @param customId Optional custom ID to use instead of the workflow's default ID
+   * @param customName Optional custom name to use instead of the workflow's default name
    */
-  async importFromFolder(folderPath: string): Promise<ImportResult> {
+  async importFromFolder(folderPath: string, customId?: string, customName?: string): Promise<ImportResult> {
     try {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Starting workflow import from: ${folderPath}`);
@@ -83,8 +110,24 @@ export class FolderImporter {
       // 3. Parse workflow definition (for internal processing)
       const workflow = await this.parser.parseWorkflow(workflowFile);
 
+      // Apply custom ID if provided
+      if (customId) {
+        workflow.id = customId;
+        rawWorkflowData.id = customId;
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Using custom workflow ID: ${customId}`);
+      }
+
+      // Apply custom name if provided
+      if (customName) {
+        workflow.name = customName;
+        rawWorkflowData.name = customName;
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Using custom workflow name: ${customName}`);
+      }
+
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Parsed workflow: ${workflow.name} v${workflow.version}`);
+        `Parsed workflow: ${workflow.name} (${workflow.id}) v${workflow.version}`);
 
       // 4. Check dependencies
       const depCheck = await this.depResolver.checkDependencies({

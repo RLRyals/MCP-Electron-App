@@ -2991,8 +2991,8 @@ function setupIPC(): void {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Deleted ${result.rowCount} version(s) of workflow: ${workflowDefId}`);
 
-      // Invalidate cache
-      workflowCache.invalidate(workflowDefId);
+      // Invalidate entire cache to refresh the workflow list
+      workflowCache.invalidateAll();
 
       return {
         success: true,
@@ -3005,13 +3005,61 @@ function setupIPC(): void {
     }
   });
 
-  // Import workflow from folder
-  ipcMain.handle('workflow:import-from-folder', async (_event, folderPath: string) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow from folder: ${folderPath}`);
+  // Preview workflow before import
+  ipcMain.handle('workflow:preview', async (_event, folderPath: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Previewing workflow from folder: ${folderPath}`);
     try {
       const { FolderImporter } = await import('./workflow/folder-importer');
       const importer = new FolderImporter();
-      const result = await importer.importFromFolder(folderPath);
+      const preview = await importer.previewWorkflow(folderPath);
+
+      if (!preview) return null;
+
+      // Check if this ID already exists and suggest an incremented version
+      const pool = getDatabasePool();
+      const existingResult = await pool.query(
+        'SELECT id FROM workflow_definitions WHERE id = $1 LIMIT 1',
+        [preview.id]
+      );
+
+      let suggestedId = preview.id;
+      let isDuplicate = (existingResult.rowCount ?? 0) > 0;
+
+      // If duplicate, find next available incremented ID
+      if (isDuplicate) {
+        let counter = 2;
+        while (true) {
+          const testId = `${preview.id}-${counter}`;
+          const testResult = await pool.query(
+            'SELECT id FROM workflow_definitions WHERE id = $1 LIMIT 1',
+            [testId]
+          );
+          if ((testResult.rowCount ?? 0) === 0) {
+            suggestedId = testId;
+            break;
+          }
+          counter++;
+        }
+      }
+
+      return {
+        ...preview,
+        suggestedId,
+        isDuplicate
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to preview workflow: ${error.message}`);
+      return null;
+    }
+  });
+
+  // Import workflow from folder
+  ipcMain.handle('workflow:import-from-folder', async (_event, folderPath: string, customId?: string, customName?: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow from folder: ${folderPath}${customId ? ` with custom ID: ${customId}` : ''}${customName ? ` with custom name: ${customName}` : ''}`);
+    try {
+      const { FolderImporter } = await import('./workflow/folder-importer');
+      const importer = new FolderImporter();
+      const result = await importer.importFromFolder(folderPath, customId, customName);
 
       // Invalidate cache after successful import
       workflowCache.invalidateAll();

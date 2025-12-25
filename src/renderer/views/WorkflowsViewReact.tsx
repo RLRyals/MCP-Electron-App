@@ -46,7 +46,7 @@ const WorkflowsApp: React.FC = () => {
   const [showTerminal, setShowTerminal] = useState(true);
 
   // Load workflows function (can be reused)
-  const loadWorkflows = useCallback(async () => {
+  const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
     try {
       const electronAPI = (window as any).electronAPI;
       if (!electronAPI || !electronAPI.invoke) {
@@ -54,7 +54,7 @@ const WorkflowsApp: React.FC = () => {
         return;
       }
 
-      const result = await electronAPI.invoke('workflow:get-definitions');
+      const result = await electronAPI.invoke('workflow:get-definitions', skipCache ? { skipCache: true } : undefined);
       console.log('[WorkflowsViewReact] Loaded workflows:', result);
 
       // Handle empty array (server not available) vs actual workflows
@@ -209,10 +209,10 @@ const WorkflowsApp: React.FC = () => {
     }
   };
 
-  const handleImport = async (folderPath: string): Promise<ImportResult> => {
+  const handleImport = async (folderPath: string, customId?: string, customName?: string): Promise<ImportResult> => {
     try {
       const electronAPI = (window as any).electronAPI;
-      const result = await electronAPI.invoke('workflow:import-from-folder', folderPath);
+      const result = await electronAPI.invoke('workflow:import-from-folder', folderPath, customId, customName);
 
       if (result.success) {
         // Reload workflows list, skipping cache to get fresh data
@@ -307,8 +307,8 @@ const WorkflowsApp: React.FC = () => {
 
       console.log('[WorkflowsViewReact] Deleted workflow:', workflowId);
 
-      // Reload workflows list
-      await loadWorkflows();
+      // Reload workflows list (skip cache to get fresh data)
+      await loadWorkflows(true);
 
       // Clear selection if we deleted the selected workflow
       if (selectedWorkflow?.id === workflowId) {
@@ -334,8 +334,8 @@ const WorkflowsApp: React.FC = () => {
 
       console.log('[WorkflowsViewReact] Reimported workflow:', workflowId);
 
-      // Reload workflows list
-      await loadWorkflows();
+      // Reload workflows list (skip cache to get fresh data)
+      await loadWorkflows(true);
 
       // Reload selected workflow if it was the reimported one
       if (selectedWorkflow?.id === workflowId) {
@@ -473,7 +473,7 @@ const WorkflowsApp: React.FC = () => {
         </button>
         <button
           style={buttonStyle('secondary')}
-          onClick={loadWorkflows}
+          onClick={() => loadWorkflows(true)}
         >
           🔄 Refresh
         </button>
