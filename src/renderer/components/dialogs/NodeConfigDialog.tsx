@@ -911,11 +911,15 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 }}
               >
                 <option value="text">Single Line Text</option>
-                <option value="textarea">Multi-line Text</option>
                 <option value="number">Number</option>
-                <option value="select">Dropdown Select</option>
-                <option value="checkbox">Checkbox</option>
+                {/* Disabled - GUI-only options (WorkflowExecutionPanel not integrated) */}
+                {/* <option value="textarea">Multi-line Text</option> */}
+                {/* <option value="select">Dropdown Select</option> */}
+                {/* <option value="checkbox">Checkbox</option> */}
               </select>
+              <div style={styles.helpText}>
+                Note: Only "Single Line Text" and "Number" work in Claude Code terminal execution.
+              </div>
             </div>
 
             <div style={styles.field}>

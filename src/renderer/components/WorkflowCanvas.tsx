@@ -80,6 +80,7 @@ export interface WorkflowCanvasProps {
         name: string;
         agent: string;
         skill?: string;
+        prompt?: string;              // CRITICAL: Prompt template for agent nodes
         subWorkflowId?: string;
         description: string;
         gate: boolean;
@@ -273,6 +274,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         ...(node.type === 'planning' || node.type === 'writing' || node.type === 'gate' ? {
           agent: node.agent,
           skill: node.skill,
+          prompt: node.prompt, // CRITICAL: Include prompt field
           gate: node.gate || false,
           gateCondition: node.gateCondition,
           provider: availableProviders[0] || {} as LLMProviderConfig,

@@ -36,6 +36,7 @@ export interface WorkflowPhase {
   type: 'planning' | 'gate' | 'writing' | 'loop' | 'user' | 'subworkflow';
   agent: string;
   skill?: string;
+  prompt?: string;                  // Prompt template for agent nodes (CRITICAL for execution)
   subWorkflowId?: string;
   description: string;
   gate: boolean;
