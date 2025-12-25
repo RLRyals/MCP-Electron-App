@@ -89,12 +89,13 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     const electronAPI = (window as any).electronAPI;
 
     term.writeln('\x1b[1;36m╔═══════════════════════════════════════════════════════════════╗\x1b[0m');
-    term.writeln('\x1b[1;36m║\x1b[0m              \x1b[1;33mFictionLab Terminal\x1b[0m                          \x1b[1;36m║\x1b[0m');
+    term.writeln('\x1b[1;36m║\x1b[0m                     \x1b[1;33mFictionLab Terminal\x1b[0m                       \x1b[1;36m║\x1b[0m');
     term.writeln('\x1b[1;36m╚═══════════════════════════════════════════════════════════════╝\x1b[0m');
     term.writeln('');
 
     // Check if terminal session already exists
-    electronAPI.invoke('terminal:list').then((terminals: string[]) => {
+    electronAPI.invoke('terminal:list').then((response: { terminals: string[] }) => {
+      const terminals = response.terminals || [];
       if (terminals.includes(TERMINAL_ID)) {
         console.log('[TerminalPanel] Reusing existing terminal session');
         term.writeln('\x1b[1;32m✓ Connected to existing Claude Code session\x1b[0m');

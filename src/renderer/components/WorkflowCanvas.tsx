@@ -290,6 +290,51 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           required: (node as any).required !== undefined ? (node as any).required : false,
           options: (node as any).options,
         } : {}),
+        ...(node.type === 'file' ? {
+          operation: (node as any).operation || 'read',
+          path: (node as any).path || '',
+          content: (node as any).content || '',
+          encoding: (node as any).encoding || 'utf8',
+          overwrite: (node as any).overwrite !== undefined ? (node as any).overwrite : true,
+          createDirectories: (node as any).createDirectories !== undefined ? (node as any).createDirectories : true,
+          requireProjectFolder: (node as any).requireProjectFolder !== undefined ? (node as any).requireProjectFolder : true,
+          restrictToProjectFolder: (node as any).restrictToProjectFolder !== undefined ? (node as any).restrictToProjectFolder : true,
+          targetPath: (node as any).targetPath || '',
+        } : {}),
+        ...(node.type === 'http' ? {
+          method: (node as any).method || 'GET',
+          url: (node as any).url || '',
+          headers: (node as any).headers || {},
+          body: (node as any).body || '',
+        } : {}),
+        ...(node.type === 'code' ? {
+          code: (node as any).code || '',
+        } : {}),
+        ...(node.type === 'conditional' || node.type === 'loop' ? {
+          condition: (node as any).condition || '',
+          loopType: (node as any).loopType,
+          iterationSource: (node as any).iterationSource,
+          maxIterations: (node as any).maxIterations,
+        } : {}),
+        // Output variable (applies to all node types)
+        ...(node as any).outputVariable ? {
+          outputVariable: (node as any).outputVariable,
+        } : {},
+        // Provider (applies to agent nodes)
+        ...(node as any).provider ? {
+          provider: (node as any).provider,
+        } : {},
+        // Context config (if exists in node)
+        ...(node as any).contextConfig ? {
+          contextConfig: (node as any).contextConfig,
+        } : {},
+        // Retry/timeout config (if exists)
+        ...(node as any).retryConfig ? {
+          retryConfig: (node as any).retryConfig,
+        } : {},
+        ...(node as any).timeoutMs ? {
+          timeoutMs: (node as any).timeoutMs,
+        } : {},
       } as WorkflowNode;
 
       setEditingNode(workflowNode);
@@ -338,6 +383,37 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
             defaultValue: (updatedNode as any).defaultValue,
             required: (updatedNode as any).required,
             options: (updatedNode as any).options,
+            // File operation specific fields
+            operation: (updatedNode as any).operation,
+            path: (updatedNode as any).path,
+            content: (updatedNode as any).content,
+            encoding: (updatedNode as any).encoding,
+            overwrite: (updatedNode as any).overwrite,
+            createDirectories: (updatedNode as any).createDirectories,
+            requireProjectFolder: (updatedNode as any).requireProjectFolder,
+            restrictToProjectFolder: (updatedNode as any).restrictToProjectFolder,
+            targetPath: (updatedNode as any).targetPath,
+            // HTTP operation specific fields
+            method: (updatedNode as any).method,
+            url: (updatedNode as any).url,
+            headers: (updatedNode as any).headers,
+            body: (updatedNode as any).body,
+            // Code execution specific fields
+            code: (updatedNode as any).code,
+            // Conditional/Loop specific fields
+            condition: (updatedNode as any).condition,
+            loopType: (updatedNode as any).loopType,
+            iterationSource: (updatedNode as any).iterationSource,
+            maxIterations: (updatedNode as any).maxIterations,
+            // Output variable (for all node types)
+            outputVariable: (updatedNode as any).outputVariable,
+            // Provider configuration
+            provider: (updatedNode as any).provider,
+            // Context configuration
+            contextConfig: updatedNode.contextConfig,
+            // Advanced configuration
+            retryConfig: updatedNode.retryConfig,
+            timeoutMs: updatedNode.timeoutMs,
             data: {
               // Add required data structure for WorkflowGraphNode
               phase: {
@@ -410,6 +486,37 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
                   defaultValue: (updatedNode as any).defaultValue,
                   required: (updatedNode as any).required,
                   options: (updatedNode as any).options,
+                  // File operation specific fields
+                  operation: (updatedNode as any).operation,
+                  path: (updatedNode as any).path,
+                  content: (updatedNode as any).content,
+                  encoding: (updatedNode as any).encoding,
+                  overwrite: (updatedNode as any).overwrite,
+                  createDirectories: (updatedNode as any).createDirectories,
+                  requireProjectFolder: (updatedNode as any).requireProjectFolder,
+                  restrictToProjectFolder: (updatedNode as any).restrictToProjectFolder,
+                  targetPath: (updatedNode as any).targetPath,
+                  // HTTP operation specific fields
+                  method: (updatedNode as any).method,
+                  url: (updatedNode as any).url,
+                  headers: (updatedNode as any).headers,
+                  body: (updatedNode as any).body,
+                  // Code execution specific fields
+                  code: (updatedNode as any).code,
+                  // Conditional/Loop specific fields
+                  condition: (updatedNode as any).condition,
+                  loopType: (updatedNode as any).loopType,
+                  iterationSource: (updatedNode as any).iterationSource,
+                  maxIterations: (updatedNode as any).maxIterations,
+                  // Output variable (for all node types)
+                  outputVariable: (updatedNode as any).outputVariable,
+                  // Provider configuration
+                  provider: (updatedNode as any).provider,
+                  // Context configuration
+                  contextConfig: updatedNode.contextConfig,
+                  // Advanced configuration
+                  retryConfig: updatedNode.retryConfig,
+                  timeoutMs: updatedNode.timeoutMs,
                 };
                 return updatedGraphNode;
               }

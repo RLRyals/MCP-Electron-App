@@ -52,13 +52,45 @@ export class PTYManager extends EventEmitter {
     }
 
     try {
-      const shell = pty.spawn(shellCommand, shellArgs, {
+      let spawnOptions: any = {
         name: 'xterm-color',
         cols,
         rows,
         cwd: cwd || process.cwd(),
         env: env || process.env,
-      });
+      };
+
+      // Platform-specific handling for commands that need PATH resolution
+      const needsShellWrapper = !shellCommand.includes('/') && !shellCommand.includes('\\') && !shellCommand.endsWith('.exe');
+
+      if (needsShellWrapper) {
+        if (os.platform() === 'win32') {
+          // Windows: Use cmd.exe to execute .cmd files and resolve PATH
+          const originalCommand = shellCommand;
+          const originalArgs = shellArgs;
+
+          // Build the full command string with proper escaping
+          // Quote arguments that contain spaces or special characters
+          const quotedArgs = originalArgs.map(arg => {
+            // If arg contains spaces, quotes, or special chars, wrap in quotes
+            if (arg.includes(' ') || arg.includes('"') || arg.includes('&') || arg.includes('|')) {
+              // Escape internal quotes and wrap in quotes
+              return `"${arg.replace(/"/g, '""')}"`;
+            }
+            return arg;
+          });
+
+          shellCommand = 'cmd.exe';
+          shellArgs = ['/c', originalCommand, ...quotedArgs];
+          console.log(`[PTYManager] Windows shell wrapper: ${shellCommand} /c ${originalCommand} ${quotedArgs.join(' ')}`);
+        } else {
+          // Unix/macOS: Commands in PATH work directly with node-pty
+          // No wrapper needed - node-pty uses the system's PATH
+          console.log(`[PTYManager] Unix/macOS: spawning ${shellCommand} directly`);
+        }
+      }
+
+      const shell = pty.spawn(shellCommand, shellArgs, spawnOptions);
 
       // Handle data from PTY
       shell.onData((data) => {
@@ -107,8 +139,9 @@ export class PTYManager extends EventEmitter {
           setTimeout(() => {
             this.emit('terminal:data', {
               id,
-              data: '\r\n\x1b[33mClaude Code not found. Running PowerShell instead.\x1b[0m\r\n' +
-                    '\x1b[90mInstall Claude Code with: npm install -g @anthropic-ai/claude-code\x1b[0m\r\n\r\n'
+              data: '\r\n\x1b[33mClaude Code execution failed.\x1b[0m\r\n' +
+                    '\x1b[90mFalling back to PowerShell. Make sure Claude CLI is properly installed:\x1b[0m\r\n' +
+                    '\x1b[90m  npm install -g @anthropic-ai/claude-code\x1b[0m\r\n\r\n'
             });
           }, 100);
 

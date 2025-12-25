@@ -77,7 +77,7 @@ export class WorkflowExecutor extends EventEmitter {
     super();
     // Use persistent client if provided, otherwise fallback to creating new client
     this.workflowClient = workflowClient || new MCPWorkflowClient();
-    this.claudeExecutor = new ClaudeCodeExecutor();
+    this.claudeExecutor = ClaudeCodeExecutor.getInstance();
     this.contextManager = new ContextManager();
     this.providerManager = getProviderManager();
 
@@ -828,14 +828,43 @@ export class WorkflowExecutor extends EventEmitter {
       logWithCategory('debug', LogCategory.WORKFLOW,
         `Global context now has variables: ${JSON.stringify(Object.keys(context.variables))}`);
 
+      // Log complete variable state for debugging
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `=== Variables After Node ${node.id} (${node.name}) ===`);
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `Available: ${JSON.stringify(Object.keys(context.variables))}`);
+
+      // Preview each variable
+      for (const [key, value] of Object.entries(context.variables)) {
+        const preview = String(value).substring(0, 100);
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `  ${key}: ${preview}${String(value).length > 100 ? '...' : ''}`);
+      }
+
       // 7. Emit node completed event
       this.emit('node-completed', {
         nodeId: node.id,
         nodeName: node.name,
         nodeType: node.type,
         status: result.status,
+        output: result.output,              // ADD: actual output content
+        variables: extracted.variables,      // ADD: extracted variables
         timestamp: new Date().toISOString(),
       });
+
+      // 8. Emit output to terminal if it's an agent node with text output
+      if (result.output && typeof result.output === 'string' && result.output.length > 0) {
+        this.emit('workflow:output', {
+          instanceId: context.instanceId,
+          nodeId: node.id,
+          nodeName: node.name,
+          output: result.output,
+          type: 'node-output',
+        });
+
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Node ${node.id} (${node.name}) output: ${result.output.substring(0, 200)}...`);
+      }
 
       return result;
 

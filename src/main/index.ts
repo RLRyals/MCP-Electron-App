@@ -32,6 +32,7 @@ import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import { WorkflowExecutor } from './workflow/workflow-executor';
+import { ClaudeCodeExecutor } from './workflow/claude-code-executor';
 import { PersistentMCPClient } from './workflow/persistent-mcp-client';
 import { workflowCache } from './workflow/workflow-cache';
 import { ContextManager } from './workflow/context-manager';
@@ -3959,6 +3960,10 @@ function setupIPC(): void {
   // ========================================
 
   const ptyManager = new PTYManager();
+
+  // Initialize ClaudeCodeExecutor singleton with PTY manager
+  // This ensures interactive mode can use PTY terminals
+  ClaudeCodeExecutor.getInstance(ptyManager);
 
   // Forward PTY output to renderer
   ptyManager.on('terminal:data', (data) => {

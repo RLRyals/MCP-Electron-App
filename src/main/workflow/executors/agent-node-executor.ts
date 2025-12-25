@@ -193,35 +193,41 @@ export class AgentNodeExecutor extends EventEmitter implements NodeExecutor {
    * Supports: {{varName}} for simple variables
    */
   private substituteVariables(template: string, context: any): string {
-    logWithCategory('debug', LogCategory.WORKFLOW,
-      `Substituting variables in template. Available in context.variables: ${JSON.stringify(Object.keys(context.variables || {}))}`);
+    // Log template info
+    const varRefs = template.match(/\{\{(.+?)\}\}/g) || [];
+    if (varRefs.length > 0) {
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `[VAR SUB] Template has ${varRefs.length} variables: ${varRefs.join(', ')}`);
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `[VAR SUB] Available: ${JSON.stringify(Object.keys(context.variables || {}))}`);
+    }
 
     return template.replace(/\{\{(.+?)\}\}/g, (match, varName) => {
       const trimmed = varName.trim();
 
-      logWithCategory('debug', LogCategory.WORKFLOW,
-        `Looking for variable: ${trimmed}`);
-
-      // Check in variables first
+      // Check context.variables first
       if (context.variables && trimmed in context.variables) {
         const value = context.variables[trimmed];
         logWithCategory('debug', LogCategory.WORKFLOW,
-          `Found in context.variables: ${trimmed} = ${String(value).substring(0, 100)}`);
+          `[VAR SUB] ✓ Found {{${trimmed}}} in context.variables`);
         return typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
       }
 
-      // Check in root context
+      // Check root context
       if (trimmed in context) {
         const value = context[trimmed];
         logWithCategory('debug', LogCategory.WORKFLOW,
-          `Found in root context: ${trimmed} = ${String(value).substring(0, 100)}`);
+          `[VAR SUB] ✓ Found {{${trimmed}}} in root context`);
         return typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
       }
 
-      // Variable not found - leave placeholder and log warning
-      logWithCategory('warn', LogCategory.WORKFLOW,
-        `Variable not found in prompt: ${trimmed}. Available: ${JSON.stringify(Object.keys(context.variables || {}))}`);
-      return match;
+      // NOT FOUND - log error
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `[VAR SUB] ✗ Variable not found: {{${trimmed}}}`);
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `[VAR SUB] Available were: ${JSON.stringify(Object.keys(context.variables || {}))}`);
+
+      return match; // Keep original {{variable}}
     });
   }
 
@@ -253,8 +259,42 @@ export class AgentNodeExecutor extends EventEmitter implements NodeExecutor {
 
     // In simple mode, store entire output
     if (node.contextConfig.mode === 'simple') {
-      variables.output = output;
-      variables[`${node.name}_output`] = output;
+      // Handle interactive session output (has transcript_file field)
+      if (typeof output === 'object' && output !== null && 'interactive' in output) {
+        // Interactive session - extract raw_output as main output
+        const textOutput = output.raw_output || output.message || 'Interactive session completed';
+
+        variables.output = textOutput;
+        variables[`${node.name}_output`] = textOutput;
+
+        // Store transcript file separately
+        if ('transcript_file' in output) {
+          variables.transcriptFile = output.transcript_file;
+          variables[`${node.name}_transcript`] = output.transcript_file;
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Interactive session transcript: ${output.transcript_file}`);
+        }
+
+        // Also store as outputVariable if specified
+        if ((node as any).outputVariable) {
+          const varName = (node as any).outputVariable;
+          variables[varName] = textOutput;
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Custom output variable: ${varName} = [${String(textOutput).substring(0, 50)}...]`);
+        }
+      } else {
+        // Normal output (string or other object)
+        variables.output = output;
+        variables[`${node.name}_output`] = output;
+
+        // Also store as outputVariable if specified
+        if ((node as any).outputVariable) {
+          const varName = (node as any).outputVariable;
+          variables[varName] = output;
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Custom output variable: ${varName} = [${String(output).substring(0, 50)}...]`);
+        }
+      }
 
       // Try to parse as JSON if it's a string
       if (typeof output === 'string') {

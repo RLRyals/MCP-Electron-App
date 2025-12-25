@@ -103,6 +103,11 @@ export class ContextManager {
       const outputs: Record<string, any> = {};
       const warnings: string[] = [];
 
+      // IMPORTANT: First merge in any variables the executor already created
+      if (result.variables) {
+        Object.assign(outputs, result.variables);
+      }
+
       if (node.contextConfig.mode === 'simple') {
         // Simple mode: entire output as single variable
         outputs.output = result.output;

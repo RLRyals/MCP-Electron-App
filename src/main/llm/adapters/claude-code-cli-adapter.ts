@@ -16,10 +16,12 @@ export class ClaudeCodeCLIAdapter implements LLMProviderAdapter {
   private executor: ClaudeCodeExecutor;
 
   constructor() {
-    this.executor = new ClaudeCodeExecutor();
+    // Use singleton instance - ensures shared state across all adapters
+    this.executor = ClaudeCodeExecutor.getInstance();
 
     // Forward claude-setup-required events from executor to provider manager
     // This allows the main process to catch and forward to renderer
+    // Note: Only attach listener once per adapter instance
     this.executor.on('claude-setup-required', (data) => {
       // Re-emit on global event bus
       const { getProviderManager } = require('../provider-manager');
@@ -39,14 +41,19 @@ export class ClaudeCodeCLIAdapter implements LLMProviderAdapter {
       const skill = request.context?.skill || null;
       const phaseNumber = request.context?.phaseNumber || 0;
 
+      // Get headless mode from provider config (default: true for backward compatibility)
+      const headless = provider.config?.headless !== false;
+
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Executing Claude Code CLI with skill: ${skill || 'none'}`);
+        `Executing Claude Code CLI with skill: ${skill || 'none'}, headless: ${headless}`);
 
       // Execute via existing ClaudeCodeExecutor
       const result = await this.executor.executeSkill(
         skill,
         phaseNumber,
-        request.prompt
+        request.prompt,
+        request.context, // Pass context including projectFolder
+        headless   // pass headless flag
       );
 
       if (!result.success) {

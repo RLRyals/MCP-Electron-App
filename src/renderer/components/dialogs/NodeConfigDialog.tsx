@@ -1715,6 +1715,41 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 <option value="text">Text</option>
               </select>
             </div>
+
+            {/* Execution Mode (Headless) */}
+            <div style={styles.field}>
+              <label htmlFor="config-headless" style={styles.label}>
+                Execution Mode
+              </label>
+              <select
+                id="config-headless"
+                style={styles.select}
+                value={provider.config?.headless === false ? 'interactive' : 'automatic'}
+                onChange={(e) => {
+                  const headless = e.target.value === 'automatic';
+                  setFormData({
+                    ...formData,
+                    provider: {
+                      ...provider,
+                      config: { ...provider.config, headless }
+                    }
+                  } as any);
+                  setIsDirty(true);
+                }}
+                aria-describedby="config-headless-help"
+              >
+                <option value="automatic">Automatic (headless)</option>
+                <option value="interactive">Interactive (pauses for conversation)</option>
+              </select>
+              <div id="config-headless-help" style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginTop: '4px'
+              }}>
+                <strong>Automatic:</strong> Agent processes input and moves to next node without waiting.<br/>
+                <strong>Interactive:</strong> Agent pauses to allow back-and-forth conversation.
+              </div>
+            </div>
           </>
         )}
 

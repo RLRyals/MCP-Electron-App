@@ -234,7 +234,24 @@ export class FileOperationExecutor implements NodeExecutor {
 
     if (node.content) {
       // Content specified directly in node
+
+      // Log template info
+      const varRefs = node.content.match(/\{\{(.+?)\}\}/g) || [];
+      if (varRefs.length > 0) {
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `[FILE WRITE] Template has ${varRefs.length} variables: ${varRefs.join(', ')}`);
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `[FILE WRITE] Available: ${JSON.stringify(Object.keys(context.variables || {}))}`);
+      }
+
       content = this.contextManager.substitute(node.content, context);
+
+      // Check if substitution failed
+      const remainingVars = String(content).match(/\{\{(.+?)\}\}/g);
+      if (remainingVars) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `[FILE WRITE] WARNING: Unsubstituted variables: ${remainingVars.join(', ')}`);
+      }
     } else {
       // Try to get content from context
       if (context.content !== undefined) {
@@ -244,27 +261,45 @@ export class FileOperationExecutor implements NodeExecutor {
       }
     }
 
-    // Check if file exists and overwrite setting
+    // Check if file exists and handle overwrite/auto-increment
+    let finalPath = paths.targetPath;
     const exists = await fs.pathExists(paths.targetPath);
+
     if (exists && node.overwrite === false) {
-      throw new Error(`File already exists and overwrite is disabled: ${paths.targetPath}`);
+      // Auto-increment filename: concept.md -> concept-1.md -> concept-2.md
+      const parsedPath = path.parse(paths.targetPath);
+      let counter = 1;
+      let newPath: string;
+
+      do {
+        newPath = path.join(
+          parsedPath.dir,
+          `${parsedPath.name}-${counter}${parsedPath.ext}`
+        );
+        counter++;
+      } while (await fs.pathExists(newPath));
+
+      finalPath = newPath;
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `[FILE WRITE] File exists, auto-incremented to: ${finalPath}`);
     }
 
     try {
       // Ensure parent directory exists
-      await fs.ensureDir(path.dirname(paths.targetPath));
+      await fs.ensureDir(path.dirname(finalPath));
 
       // Write file
       if (Buffer.isBuffer(content)) {
-        await fs.writeFile(paths.targetPath, content);
+        await fs.writeFile(finalPath, content);
       } else {
-        await fs.writeFile(paths.targetPath, content, 'utf8');
+        await fs.writeFile(finalPath, content, 'utf8');
       }
 
       return {
         success: true,
         operation: 'write',
-        path: paths.targetPath,
+        path: finalPath,
         bytesWritten: Buffer.byteLength(content),
         existed: exists,
       };

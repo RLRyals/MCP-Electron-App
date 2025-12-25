@@ -29,6 +29,7 @@ export interface ClaudeCodeCLIProvider extends BaseLLMProviderConfig {
   config: {
     model?: 'claude-sonnet-4-5' | 'claude-opus-4-5';
     outputFormat: 'json' | 'text';
+    headless?: boolean;  // true = automatic, false = interactive
   };
 }
 
