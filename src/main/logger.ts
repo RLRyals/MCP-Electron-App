@@ -205,5 +205,35 @@ export function clearLogs(): void {
   }
 }
 
+/**
+ * Set console log level for verbose debugging
+ * @param level The log level to set ('debug' for verbose, 'info' for normal)
+ */
+export function setConsoleLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): void {
+  log.transports.console.level = level;
+  log.info(`Console log level set to: ${level}`);
+}
+
+/**
+ * Get current console log level
+ */
+export function getConsoleLogLevel(): string {
+  return log.transports.console.level as string;
+}
+
+/**
+ * Enable verbose logging (sets console to debug level)
+ */
+export function enableVerboseLogging(): void {
+  setConsoleLogLevel('debug');
+}
+
+/**
+ * Disable verbose logging (sets console to info level)
+ */
+export function disableVerboseLogging(): void {
+  setConsoleLogLevel('info');
+}
+
 // Export the logger instance
 export default log;

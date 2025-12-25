@@ -822,6 +822,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Get current console log level
+     */
+    getLogLevel: (): Promise<string> => {
+      return ipcRenderer.invoke('logger:get-log-level');
+    },
+
+    /**
+     * Set console log level
+     */
+    setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error'): Promise<{ success: boolean; level: string }> => {
+      return ipcRenderer.invoke('logger:set-log-level', level);
+    },
+
+    /**
+     * Enable verbose logging (debug level + full env config logging)
+     */
+    enableVerbose: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('logger:enable-verbose');
+    },
+
+    /**
+     * Disable verbose logging (info level)
+     */
+    disableVerbose: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('logger:disable-verbose');
+    },
+
+    /**
      * Listen for system test results
      */
     onSystemTestResults: (callback: (results: SystemTestResult) => void): void => {

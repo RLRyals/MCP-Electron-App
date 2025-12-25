@@ -529,6 +529,32 @@ function setupIPC(): void {
     return getRecentLogs(lines);
   });
 
+  ipcMain.handle('logger:get-log-level', async () => {
+    const { getConsoleLogLevel } = await import('./logger.js');
+    return getConsoleLogLevel();
+  });
+
+  ipcMain.handle('logger:set-log-level', async (_, level: 'debug' | 'info' | 'warn' | 'error') => {
+    const { setConsoleLogLevel } = await import('./logger.js');
+    setConsoleLogLevel(level);
+    return { success: true, level };
+  });
+
+  ipcMain.handle('logger:enable-verbose', async () => {
+    const { enableVerboseLogging } = await import('./logger.js');
+    enableVerboseLogging();
+    // Also reset env config logging to show full details
+    const { resetConfigLogging } = await import('./env-config.js');
+    resetConfigLogging();
+    return { success: true };
+  });
+
+  ipcMain.handle('logger:disable-verbose', async () => {
+    const { disableVerboseLogging } = await import('./logger.js');
+    disableVerboseLogging();
+    return { success: true };
+  });
+
   ipcMain.handle('logger:generate-issue-template', async (_, title: string, message: string, stack?: string) => {
     return generateGitHubIssueTemplate(title, message, stack);
   });

@@ -36,7 +36,8 @@ export class LogsTab {
   private searchQuery: string = '';
   private logs: LogEntry[] = [];
   private isInitialized: boolean = false;
-  
+  private verboseLogging: boolean = false;
+
   // Database Connection & Activity
   private dbConnectionInterval: NodeJS.Timeout | null = null;
   private isDbConnected: boolean = false;
@@ -152,6 +153,11 @@ export class LogsTab {
           <button id="refresh-logs" class="logs-btn logs-btn-primary" title="Refresh logs">
             <span class="btn-icon">🔄</span>
             Refresh
+          </button>
+
+          <button id="toggle-verbose" class="logs-btn logs-btn-secondary" title="Enable verbose logging for troubleshooting">
+            <span class="btn-icon">🔬</span>
+            <span id="verbose-label">Enable Verbose</span>
           </button>
         </div>
 
@@ -444,6 +450,26 @@ export class LogsTab {
       .logs-btn-primary:hover:not(:disabled) {
         background: rgba(0, 212, 170, 0.5);
         border-color: rgba(0, 212, 170, 0.7);
+      }
+
+      .logs-btn-secondary {
+        background: rgba(100, 149, 237, 0.3);
+        border-color: rgba(100, 149, 237, 0.5);
+      }
+
+      .logs-btn-secondary:hover:not(:disabled) {
+        background: rgba(100, 149, 237, 0.5);
+        border-color: rgba(100, 149, 237, 0.7);
+      }
+
+      .logs-btn-warning {
+        background: rgba(255, 165, 0, 0.3);
+        border-color: rgba(255, 165, 0, 0.5);
+      }
+
+      .logs-btn-warning:hover:not(:disabled) {
+        background: rgba(255, 165, 0, 0.5);
+        border-color: rgba(255, 165, 0, 0.7);
       }
 
       .logs-icon-btn {
@@ -948,6 +974,14 @@ export class LogsTab {
       refreshBtn.addEventListener('click', () => this.loadLogs());
     }
 
+    // Toggle verbose logging
+    const toggleVerbose = document.getElementById('toggle-verbose');
+    if (toggleVerbose) {
+      toggleVerbose.addEventListener('click', async () => {
+        await this.toggleVerboseLogging();
+      });
+    }
+
     // Toggle auto-refresh
     const toggleAutoRefresh = document.getElementById('toggle-auto-refresh');
     if (toggleAutoRefresh) {
@@ -1306,6 +1340,51 @@ export class LogsTab {
       this.showNotification('Failed to export logs', 'error');
     } finally {
       const button = document.getElementById('export-logs') as HTMLButtonElement;
+      if (button) button.disabled = false;
+    }
+  }
+
+  /**
+   * Toggle verbose logging
+   */
+  private async toggleVerboseLogging(): Promise<void> {
+    try {
+      const button = document.getElementById('toggle-verbose') as HTMLButtonElement;
+      const label = document.getElementById('verbose-label');
+
+      if (button) button.disabled = true;
+
+      if (!this.verboseLogging) {
+        // Enable verbose
+        await (window as any).api.logger.enableVerbose();
+        this.verboseLogging = true;
+        if (label) label.textContent = 'Disable Verbose';
+        if (button) {
+          button.classList.remove('logs-btn-secondary');
+          button.classList.add('logs-btn-warning');
+          button.title = 'Disable verbose logging';
+        }
+        this.showNotification('Verbose logging enabled - all debug messages will be shown', 'success');
+      } else {
+        // Disable verbose
+        await (window as any).api.logger.disableVerbose();
+        this.verboseLogging = false;
+        if (label) label.textContent = 'Enable Verbose';
+        if (button) {
+          button.classList.remove('logs-btn-warning');
+          button.classList.add('logs-btn-secondary');
+          button.title = 'Enable verbose logging for troubleshooting';
+        }
+        this.showNotification('Verbose logging disabled', 'info');
+      }
+
+      // Refresh logs to show new level
+      await this.loadLogs();
+    } catch (error) {
+      console.error('Error toggling verbose logging:', error);
+      this.showNotification('Failed to toggle verbose logging', 'error');
+    } finally {
+      const button = document.getElementById('toggle-verbose') as HTMLButtonElement;
       if (button) button.disabled = false;
     }
   }

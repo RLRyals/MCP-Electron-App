@@ -12,6 +12,11 @@ import logger from './logger';
 import { sanitizeEnvFileContent } from './utils/sanitize';
 
 /**
+ * Track the last logged config to avoid duplicate logs
+ */
+let lastLoggedConfigHash: string | null = null;
+
+/**
  * Environment configuration interface
  */
 export interface EnvConfig {
@@ -526,6 +531,42 @@ export async function checkAllPortsAndSuggestAlternatives(
 }
 
 /**
+ * Compute a hash of the config for change detection
+ * @param content Sanitized env file content
+ */
+function computeConfigHash(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Log env config only if it has changed since last log
+ * @param content Raw env file content
+ * @param action Action being performed (e.g., "Loaded", "Saved")
+ * @param envPath Path to the env file
+ */
+function logEnvConfigIfChanged(content: string, action: string, envPath: string): void {
+  const sanitized = sanitizeEnvFileContent(content);
+  const currentHash = computeConfigHash(sanitized);
+
+  if (lastLoggedConfigHash !== currentHash) {
+    logger.info(`${action} .env configuration from: ${envPath}`);
+    logger.info('Sanitized .env content:\n' + sanitized);
+    lastLoggedConfigHash = currentHash;
+  } else {
+    logger.debug(`${action} .env configuration (unchanged, skipping detailed log)`);
+  }
+}
+
+/**
+ * Reset the logged config hash to force logging on next load/save
+ * Useful for debugging or when you explicitly want to see the config again
+ */
+export function resetConfigLogging(): void {
+  lastLoggedConfigHash = null;
+  logger.info('Config logging reset - next load/save will log full details');
+}
+
+/**
  * Parse .env file content
  * @param content File content to parse
  */
@@ -626,10 +667,8 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         logger.warn('POSTGRES_PASSWORD is empty in .env file - this will cause database connection errors');
       }
 
-      // Log with sanitized content
-      const sanitized = sanitizeEnvFileContent(content);
-      logger.info('Loaded .env configuration from:', envPath);
-      logger.info('Sanitized .env content:\n' + sanitized);
+      // Log with sanitized content only if changed
+      logEnvConfigIfChanged(content, 'Loaded', envPath);
 
       return config;
     } else {
@@ -711,10 +750,8 @@ export async function saveEnvConfig(config: EnvConfig): Promise<{ success: boole
     const content = formatEnvFile(config);
     fs.writeFileSync(envPath, content, 'utf-8');
 
-    // Log with sanitized content
-    const sanitized = sanitizeEnvFileContent(content);
-    logger.info('Saved .env configuration to:', envPath);
-    logger.info('Sanitized .env content:\n' + sanitized);
+    // Log with sanitized content only if changed
+    logEnvConfigIfChanged(content, 'Saved', envPath);
 
     return { success: true, path: envPath };
   } catch (error) {
