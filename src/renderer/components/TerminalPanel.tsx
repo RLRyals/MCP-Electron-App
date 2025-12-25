@@ -34,6 +34,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   const [panelHeight, setPanelHeight] = useState(height);
   const resizeStartY = useRef<number>(0);
   const resizeStartHeight = useRef<number>(0);
+  const [characterCounter, setCharacterCounter] = useState<string>('');
 
   // Initialize terminal
   useEffect(() => {
@@ -127,7 +128,47 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     });
 
     // Track current workflow input request
-    let currentInputRequest: { requestId: string; buffer: string; cursorPos: number } | null = null;
+    let currentInputRequest: {
+      requestId: string;
+      buffer: string;
+      cursorPos: number;
+      validation?: {
+        minLength?: number;
+        maxLength?: number;
+      };
+    } | null = null;
+
+    // Helper function to update character counter display
+    const updateCharacterCounter = () => {
+      if (!currentInputRequest || !currentInputRequest.validation) {
+        setCharacterCounter('');
+        return;
+      }
+
+      const { buffer, validation } = currentInputRequest;
+      const len = buffer.length;
+      const parts: string[] = [];
+
+      if (validation.maxLength !== undefined) {
+        const remaining = validation.maxLength - len;
+        if (remaining < 0) {
+          parts.push(`${len}/${validation.maxLength} chars (${Math.abs(remaining)} over limit!)`);
+        } else if (remaining < 50) {
+          parts.push(`${len}/${validation.maxLength} chars`);
+        } else {
+          parts.push(`${len}/${validation.maxLength} chars`);
+        }
+      } else {
+        parts.push(`${len} chars`);
+      }
+
+      if (validation.minLength !== undefined && len < validation.minLength) {
+        const needed = validation.minLength - len;
+        parts.push(`(need ${needed} more)`);
+      }
+
+      setCharacterCounter(parts.join(' '));
+    };
 
     // Handle paste events (Ctrl+V) - attach to both terminal element and xterm's textarea
     const handlePaste = (e: ClipboardEvent) => {
@@ -152,6 +193,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           if (backtrack > 0) {
             term.write('\x1b[' + backtrack + 'D');
           }
+          // Update character counter on separate line
+          updateCharacterCounter();
         } else {
           // Normal terminal mode - send paste to PTY
           electronAPI.invoke('terminal:input', TERMINAL_ID, text).catch((error: Error) => {
@@ -216,6 +259,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                 if (backtrack > 0) {
                   term.write('\x1b[' + backtrack + 'D');
                 }
+                // Update character counter on separate line
+                updateCharacterCounter();
               } else {
                 // Normal terminal mode - send to PTY
                 electronAPI.invoke('terminal:input', TERMINAL_ID, text).catch((error: Error) => {
@@ -246,6 +291,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
               term.write('\r\n\x1b[31m✗ Failed to submit input\x1b[0m\r\n');
             });
           currentInputRequest = null;
+          setCharacterCounter(''); // Clear counter
           term.write('\r\n'); // Move to next line
         } else if (data === '\x7f' || data === '\b') {
           // Backspace - delete character before cursor
@@ -262,6 +308,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             if (backtrack > 0) {
               term.write('\x1b[' + backtrack + 'D');
             }
+            // Update character counter on separate line
+            updateCharacterCounter();
           }
         } else if (data === '\x1b[C') {
           // Right arrow - move cursor right
@@ -303,6 +351,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             if (backtrack > 0) {
               term.write('\x1b[' + backtrack + 'D');
             }
+            // Update character counter on separate line
+            updateCharacterCounter();
           }
         } else if (data.charCodeAt(0) >= 32 && data.charCodeAt(0) < 127) {
           // Regular printable character - insert at cursor position
@@ -314,9 +364,12 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           // Write the new character and everything after it
           term.write(data + after);
           // Move cursor back to position (after the inserted char)
-          if (after.length > 0) {
-            term.write('\x1b[' + after.length + 'D');
+          const backtrack = after.length;
+          if (backtrack > 0) {
+            term.write('\x1b[' + backtrack + 'D');
           }
+          // Update character counter on separate line
+          updateCharacterCounter();
         }
       } else {
         // Normal terminal mode - send to PTY
@@ -376,11 +429,22 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     electronAPI.on('terminal:error', handleError);
 
     // Handle workflow user input prompts
-    const handleWritePrompt = (data: { requestId: string; prompt: string }) => {
+    const handleWritePrompt = (data: {
+      requestId: string;
+      prompt: string;
+      validation?: { minLength?: number; maxLength?: number };
+    }) => {
       console.log('[TerminalPanel] Writing workflow prompt to terminal:', data);
       if (xtermRef.current) {
         xtermRef.current.write(data.prompt);
-        currentInputRequest = { requestId: data.requestId, buffer: '', cursorPos: 0 };
+        currentInputRequest = {
+          requestId: data.requestId,
+          buffer: '',
+          cursorPos: 0,
+          validation: data.validation
+        };
+        // Show initial character counter
+        updateCharacterCounter();
       }
     };
 
@@ -552,7 +616,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       <div style={styles.header}>
         <span style={styles.title}>CLAUDE CODE TERMINAL</span>
         <span style={styles.hint}>
-          Interactive terminal powered by xterm.js
+          {characterCounter || 'Interactive terminal powered by xterm.js'}
         </span>
       </div>
       <div ref={terminalRef} style={styles.terminal} />

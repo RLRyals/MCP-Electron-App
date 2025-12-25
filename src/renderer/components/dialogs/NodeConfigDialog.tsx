@@ -954,80 +954,82 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
               </label>
             </div>
 
-            {/* Validation Rules */}
-            {((formData as any).inputType === 'text' || (formData as any).inputType === 'textarea') && (
-              <>
-                <div style={styles.fieldGroup}>
-                  <h4 style={styles.sectionHeader}>Validation Rules</h4>
+            {/* Validation Rules - Always show for text input */}
+            <div style={styles.fieldGroup}>
+              <h4 style={styles.sectionHeader}>Character Limits</h4>
 
-                  <div style={styles.fieldRow}>
-                    <div style={styles.field}>
-                      <label htmlFor="config-min-length" style={styles.label}>
-                        Minimum Length
-                      </label>
-                      <input
-                        id="config-min-length"
-                        type="number"
-                        min="0"
-                        style={styles.input}
-                        value={(formData as any).validation?.minLength || ''}
-                        onChange={(e) => {
-                          const minLength = e.target.value ? parseInt(e.target.value) : undefined;
-                          setFormData({
-                            ...formData,
-                            validation: { ...(formData as any).validation, minLength }
-                          } as any);
-                          setIsDirty(true);
-                        }}
-                        placeholder="e.g., 10"
-                      />
-                    </div>
-
-                    <div style={styles.field}>
-                      <label htmlFor="config-max-length" style={styles.label}>
-                        Maximum Length
-                      </label>
-                      <input
-                        id="config-max-length"
-                        type="number"
-                        min="0"
-                        style={styles.input}
-                        value={(formData as any).validation?.maxLength || ''}
-                        onChange={(e) => {
-                          const maxLength = e.target.value ? parseInt(e.target.value) : undefined;
-                          setFormData({
-                            ...formData,
-                            validation: { ...(formData as any).validation, maxLength }
-                          } as any);
-                          setIsDirty(true);
-                        }}
-                        placeholder="e.g., 5000"
-                      />
-                    </div>
-                  </div>
-
-                  <div style={styles.field}>
-                    <label htmlFor="config-pattern" style={styles.label}>
-                      Pattern (RegEx)
-                    </label>
-                    <input
-                      id="config-pattern"
-                      type="text"
-                      style={styles.input}
-                      value={(formData as any).validation?.pattern || ''}
-                      onChange={(e) => {
-                        const pattern = e.target.value || undefined;
-                        setFormData({
-                          ...formData,
-                          validation: { ...(formData as any).validation, pattern }
-                        } as any);
-                        setIsDirty(true);
-                      }}
-                      placeholder="e.g., ^[A-Za-z0-9]+$"
-                    />
-                  </div>
+              <div style={styles.fieldRow}>
+                <div style={styles.field}>
+                  <label htmlFor="config-min-length" style={styles.label}>
+                    Minimum Length
+                  </label>
+                  <input
+                    id="config-min-length"
+                    type="number"
+                    min="0"
+                    style={styles.input}
+                    value={(formData as any).validation?.minLength || ''}
+                    onChange={(e) => {
+                      const minLength = e.target.value ? parseInt(e.target.value) : undefined;
+                      setFormData({
+                        ...formData,
+                        validation: { ...(formData as any).validation, minLength }
+                      } as any);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g., 10"
+                  />
+                  <div style={styles.helpText}>Minimum characters required (optional)</div>
                 </div>
-              </>
+
+                <div style={styles.field}>
+                  <label htmlFor="config-max-length" style={styles.label}>
+                    Maximum Length
+                  </label>
+                  <input
+                    id="config-max-length"
+                    type="number"
+                    min="0"
+                    style={styles.input}
+                    value={(formData as any).validation?.maxLength || ''}
+                    onChange={(e) => {
+                      const maxLength = e.target.value ? parseInt(e.target.value) : undefined;
+                      setFormData({
+                        ...formData,
+                        validation: { ...(formData as any).validation, maxLength }
+                      } as any);
+                      setIsDirty(true);
+                    }}
+                    placeholder="e.g., 5000"
+                  />
+                  <div style={styles.helpText}>Maximum characters allowed (optional)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pattern validation - only for text/textarea */}
+            {((formData as any).inputType === 'text' || (formData as any).inputType === 'textarea') && (
+              <div style={styles.field}>
+                <label htmlFor="config-pattern" style={styles.label}>
+                  Pattern (RegEx)
+                </label>
+                <input
+                  id="config-pattern"
+                  type="text"
+                  style={styles.input}
+                  value={(formData as any).validation?.pattern || ''}
+                  onChange={(e) => {
+                    const pattern = e.target.value || undefined;
+                    setFormData({
+                      ...formData,
+                      validation: { ...(formData as any).validation, pattern }
+                    } as any);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g., ^[A-Za-z0-9]+$"
+                />
+                <div style={styles.helpText}>Optional regex pattern for validation</div>
+              </div>
             )}
 
             {(formData as any).inputType === 'number' && (

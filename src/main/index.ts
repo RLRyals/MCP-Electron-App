@@ -2420,14 +2420,28 @@ function setupIPC(): void {
 
       // Also send prompt to Claude Code terminal if it exists
       // Format the prompt for Claude Code to display
-      const promptText = `\r\n\x1b[1;33m[Workflow Input Required]\x1b[0m\r\n` +
+      let promptText = `\r\n\x1b[1;33m[Workflow Input Required]\x1b[0m\r\n` +
                         `\x1b[36m${data.prompt || 'Please provide input'}\x1b[0m\r\n` +
-                        `\x1b[90m(Node: ${data.nodeName})\x1b[0m\r\n` +
-                        `\x1b[32m>\x1b[0m `;
+                        `\x1b[90m(Node: ${data.nodeName})\x1b[0m\r\n`;
+
+      // Add character limit information if validation exists
+      if (data.validation && (data.validation.minLength || data.validation.maxLength)) {
+        const limits: string[] = [];
+        if (data.validation.minLength) {
+          limits.push(`Min: ${data.validation.minLength} chars`);
+        }
+        if (data.validation.maxLength) {
+          limits.push(`Max: ${data.validation.maxLength} chars`);
+        }
+        promptText += `\x1b[33mℹ️  ${limits.join(' • ')}\x1b[0m\r\n`;
+      }
+
+      promptText += `\x1b[32m>\x1b[0m `;
 
       mainWindow.webContents.send('terminal:write-prompt', {
         requestId: data.requestId,
-        prompt: promptText
+        prompt: promptText,
+        validation: data.validation
       });
     }
   });

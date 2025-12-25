@@ -537,12 +537,19 @@ export const WorkflowExecutionPanel: React.FC<WorkflowExecutionPanelProps> = ({
                       autoFocus
                     />
                     {/* Character counter for textarea */}
-                    {userInputRequest.validation?.minLength && (
+                    {(userInputRequest.validation?.minLength || userInputRequest.validation?.maxLength) && (
                       <div style={styles.characterCounter}>
-                        {userInputValue.length} / {userInputRequest.validation.minLength} characters
-                        {userInputValue.length < userInputRequest.validation.minLength && (
+                        {userInputValue.length}
+                        {userInputRequest.validation?.maxLength && ` / ${userInputRequest.validation.maxLength}`}
+                        {' characters'}
+                        {userInputRequest.validation?.minLength && userInputValue.length < userInputRequest.validation.minLength && (
                           <span style={styles.characterCounterWarning}>
                             {' '}(need {userInputRequest.validation.minLength - userInputValue.length} more)
+                          </span>
+                        )}
+                        {userInputRequest.validation?.maxLength && userInputValue.length > userInputRequest.validation.maxLength && (
+                          <span style={styles.characterCounterWarning}>
+                            {' '}({userInputValue.length - userInputRequest.validation.maxLength} over limit)
                           </span>
                         )}
                       </div>

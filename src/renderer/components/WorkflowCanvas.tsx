@@ -282,6 +282,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         ...(node.type === 'subworkflow' ? {
           subWorkflowId: node.subWorkflowId || '',
         } : {}),
+        ...(node.type === 'user-input' ? {
+          prompt: (node as any).prompt || '',
+          inputType: (node as any).inputType || 'text',
+          validation: (node as any).validation,
+          defaultValue: (node as any).defaultValue,
+          required: (node as any).required !== undefined ? (node as any).required : false,
+          options: (node as any).options,
+        } : {}),
       } as WorkflowNode;
 
       setEditingNode(workflowNode);
@@ -323,6 +331,13 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
             gateCondition: (updatedNode as any).gateCondition,
             requiresApproval: updatedNode.requiresApproval,
             position: updatedNode.position || { x: 100, y: 100 }, // Ensure position exists
+            // User-input specific fields
+            prompt: (updatedNode as any).prompt,
+            inputType: (updatedNode as any).inputType,
+            validation: (updatedNode as any).validation,
+            defaultValue: (updatedNode as any).defaultValue,
+            required: (updatedNode as any).required,
+            options: (updatedNode as any).options,
             data: {
               // Add required data structure for WorkflowGraphNode
               phase: {
@@ -388,6 +403,13 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
                   subWorkflowId: (updatedNode as any).subWorkflowId,
                   gate: (updatedNode as any).gate || false,
                   gateCondition: (updatedNode as any).gateCondition,
+                  // User-input specific fields
+                  prompt: (updatedNode as any).prompt,
+                  inputType: (updatedNode as any).inputType,
+                  validation: (updatedNode as any).validation,
+                  defaultValue: (updatedNode as any).defaultValue,
+                  required: (updatedNode as any).required,
+                  options: (updatedNode as any).options,
                 };
                 return updatedGraphNode;
               }
