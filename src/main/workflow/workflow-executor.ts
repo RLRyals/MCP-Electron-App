@@ -1,8 +1,9 @@
 /**
- * Workflow Executor
+ * Enhanced Workflow Executor
  *
  * Main workflow execution engine that orchestrates phase execution
- * Uses ClaudeCodeExecutor to run skills and MCPWorkflowClient to track progress
+ * Uses modular executor system for different node types
+ * Integrates with LLMProviderManager, ContextManager, and NodeExecutor interface
  * Emits events for real-time UI updates
  */
 
@@ -10,13 +11,28 @@ import { EventEmitter } from 'events';
 import { MCPWorkflowClient, WorkflowPhase, WorkflowDefinition } from './mcp-workflow-client';
 import { ClaudeCodeExecutor } from './claude-code-executor';
 import { logWithCategory, LogCategory } from '../logger';
+import { NodeExecutor } from './executors/base-executor';
+import { AgentNodeExecutor } from './executors/agent-node-executor';
+import { UserInputExecutor } from './executors/user-input-executor';
+import { CodeExecutionExecutor } from './executors/code-execution-executor';
+import { HttpRequestExecutor } from './executors/http-request-executor';
+import { FileOperationExecutor } from './executors/file-operation-executor';
+import { ConditionalExecutor } from './executors/conditional-executor';
+import { LoopExecutor } from './executors/loop-executor';
+import { SubWorkflowExecutor } from './executors/subworkflow-executor';
+import { ContextManager } from './context-manager';
+import { getProviderManager } from '../llm/provider-manager';
+import { WorkflowNode, NodeOutput } from '../../types/workflow-nodes';
+import { WorkflowExecutionContext } from '../../types/workflow-context';
+import { workflowCache } from './workflow-cache';
 
 export interface WorkflowExecutionOptions {
   workflowDefId: string;
   version?: string;
-  seriesId: number;
+  projectId: number;
   userId: number;
   startPhase?: number;
+  projectFolder: string;  // Required for file operations
 }
 
 export interface PhaseExecutionEvent {
@@ -38,6 +54,7 @@ export interface WorkflowExecutionState {
   startedAt: Date;
   completedAt?: Date;
   error?: string;
+  projectFolder?: string;
 }
 
 export class WorkflowExecutor extends EventEmitter {
@@ -45,32 +62,79 @@ export class WorkflowExecutor extends EventEmitter {
   private claudeExecutor: ClaudeCodeExecutor;
   private runningInstances: Map<number, WorkflowExecutionState> = new Map();
   private approvalQueue: Map<number, { phaseNumber: number; resolve: () => void; reject: (error: Error) => void }> = new Map();
+  private _userInputQueue: Map<string, {
+    nodeId: string;
+    resolve: (input: any) => void;
+    reject: (error: Error) => void;
+  }> = new Map();
 
-  constructor() {
+  // Enhanced execution system
+  private nodeExecutors: Map<string, NodeExecutor>;
+  private contextManager: ContextManager;
+  private providerManager: any; // LLMProviderManager
+
+  constructor(workflowClient?: any) {
     super();
-    this.workflowClient = new MCPWorkflowClient();
+    // Use persistent client if provided, otherwise fallback to creating new client
+    this.workflowClient = workflowClient || new MCPWorkflowClient();
     this.claudeExecutor = new ClaudeCodeExecutor();
+    this.contextManager = new ContextManager();
+    this.providerManager = getProviderManager();
+
+    // Forward Claude Code setup events
+    this.claudeExecutor.on('claude-setup-required', (data) => {
+      this.emit('claude-setup-required', data);
+    });
+
+    // Forward Claude Code output to terminal
+    this.claudeExecutor.on('claude-output', (data) => {
+      this.emit('claude-output', data);
+    });
+
+    // Register all node executors
+    this.nodeExecutors = new Map<string, NodeExecutor>();
+    this.nodeExecutors.set('planning', new AgentNodeExecutor());
+    this.nodeExecutors.set('writing', new AgentNodeExecutor());
+    this.nodeExecutors.set('gate', new AgentNodeExecutor());
+    this.nodeExecutors.set('user-input', new UserInputExecutor());
+    this.nodeExecutors.set('code', new CodeExecutionExecutor());
+    this.nodeExecutors.set('http', new HttpRequestExecutor());
+    this.nodeExecutors.set('file', new FileOperationExecutor());
+    this.nodeExecutors.set('conditional', new ConditionalExecutor());
+    this.nodeExecutors.set('loop', new LoopExecutor());
+    this.nodeExecutors.set('subworkflow', new SubWorkflowExecutor());
   }
 
   /**
    * Start workflow execution
    */
   async startWorkflow(options: WorkflowExecutionOptions): Promise<number> {
-    const { workflowDefId, version, seriesId, userId, startPhase = 0 } = options;
+    const { workflowDefId, version, projectId, userId, startPhase = 0, projectFolder } = options;
 
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Starting workflow: ${workflowDefId} for series ${seriesId}`);
+      `Starting workflow: ${workflowDefId} for project ${projectId}`);
 
     try {
-      // 1. Get workflow definition
-      const workflow = await this.workflowClient.getWorkflowDefinition(workflowDefId, version);
+      // 1. Get workflow definition (check cache first for speed)
+      let workflow = workflowCache.get(workflowDefId, version);
+
       if (!workflow) {
-        throw new Error(`Workflow definition not found: ${workflowDefId}`);
+        logWithCategory('debug', LogCategory.WORKFLOW, 'Cache miss, fetching workflow from MCP');
+        workflow = await this.workflowClient.getWorkflowDefinition(workflowDefId, version);
+
+        if (!workflow) {
+          throw new Error(`Workflow definition not found: ${workflowDefId}`);
+        }
+
+        // Cache for future use
+        workflowCache.set(workflowDefId, workflow.version, workflow);
+      } else {
+        logWithCategory('debug', LogCategory.WORKFLOW, 'Cache hit for workflow definition');
       }
 
       // 2. Create workflow instance using the MCP tool
       const instanceResult = await this.workflowClient.createWorkflowInstance(
-        seriesId,
+        projectId,
         userId,
         `Workflow execution: ${workflow.name}`
       );
@@ -94,7 +158,8 @@ export class WorkflowExecutor extends EventEmitter {
         version: workflow.version,
         currentPhase: startPhase,
         status: 'running',
-        startedAt: new Date()
+        startedAt: new Date(),
+        projectFolder
       };
 
       this.runningInstances.set(instanceId, state);
@@ -119,11 +184,11 @@ export class WorkflowExecutor extends EventEmitter {
   }
 
   /**
-   * Execute workflow phases sequentially
+   * Execute workflow - supports both node-based and phase-based (legacy)
    */
   private async executeWorkflow(
     instanceId: number,
-    workflow: WorkflowDefinition,
+    workflow: any,
     startPhase: number
   ): Promise<void> {
     const state = this.runningInstances.get(instanceId);
@@ -131,10 +196,53 @@ export class WorkflowExecutor extends EventEmitter {
       throw new Error(`Workflow instance ${instanceId} not found`);
     }
 
-    const phases: WorkflowPhase[] = workflow.phases_json;
+    // Parse graph_json to get nodes if it exists
+    let nodes: any[] | undefined;
+    if (workflow.graph_json) {
+      try {
+        const graphJson = typeof workflow.graph_json === 'string'
+          ? JSON.parse(workflow.graph_json)
+          : workflow.graph_json;
+        nodes = graphJson.nodes;
+
+        // Add nodes to workflow object for easier access
+        if (nodes && Array.isArray(nodes)) {
+          (workflow as any).nodes = nodes;
+          (workflow as any).edges = graphJson.edges;
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Failed to parse graph_json: ${error.message}`);
+      }
+    }
+
+    // Debug: log workflow structure
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Workflow structure - has nodes: ${!!nodes}, has phases_json: ${!!workflow.phases_json}, has phases: ${!!workflow.phases}`);
+
+    if (nodes) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Nodes type: ${typeof nodes}, is array: ${Array.isArray(nodes)}, length: ${nodes?.length}`);
+    }
+
+    // Check if this is a node-based workflow (new format)
+    // Priority: if nodes exist and are non-empty, use node-based execution
+    if (nodes && Array.isArray(nodes) && nodes.length > 0) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Executing node-based workflow ${instanceId}: ${nodes.length} nodes`);
+      await this.executeNodeBasedWorkflow(instanceId, workflow);
+      return;
+    }
+
+    // Legacy phase-based execution
+    const phases: WorkflowPhase[] = workflow.phases_json || workflow.phases;
+
+    if (!phases || phases.length === 0) {
+      throw new Error('Workflow has no phases or nodes to execute');
+    }
 
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Executing workflow ${instanceId}: ${phases.length} phases`);
+      `Executing phase-based workflow ${instanceId}: ${phases.length} phases`);
 
     try {
       for (let i = startPhase; i < phases.length; i++) {
@@ -513,6 +621,306 @@ export class WorkflowExecutor extends EventEmitter {
   }
 
   /**
+   * Get the user input queue for IPC handlers
+   */
+  get userInputQueue() {
+    return this._userInputQueue;
+  }
+
+  /**
+   * Execute node-based workflow (new format)
+   */
+  private async executeNodeBasedWorkflow(
+    instanceId: number,
+    workflow: any
+  ): Promise<void> {
+    const { projectFolder } = this.runningInstances.get(instanceId) || {};
+
+    // Create execution context
+    const context: WorkflowExecutionContext = {
+      instanceId: String(instanceId),
+      workflowId: workflow.id || workflow.name,
+      projectFolder: projectFolder || '',
+      variables: {},
+      nodeOutputs: new Map(),
+      mcpData: {},
+      currentNodeId: '',
+      completedNodes: [],
+      loopStack: [],
+      startedAt: new Date(),
+      userId: 0, // TODO: Get from workflow options
+      seriesId: 0, // TODO: Get from workflow options
+      eventEmitter: this, // Pass this WorkflowExecutor as event emitter
+      userInputQueue: this._userInputQueue // Pass the user input queue
+    } as any;
+
+    const nodes: WorkflowNode[] = workflow.nodes;
+    const edges = workflow.edges || [];
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Executing ${nodes.length} nodes in workflow ${instanceId}`);
+
+    // Emit log to terminal
+    this.emit('workflow:log', {
+      level: 'info',
+      category: 'WORKFLOW',
+      message: `Executing ${nodes.length} nodes in workflow ${instanceId}`
+    });
+
+    // Simple sequential execution for now (TODO: respect edges for conditional/parallel execution)
+    for (const node of nodes) {
+      context.currentNodeId = node.id;
+
+      try {
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Executing node: ${node.name} (${node.type})`);
+
+        this.emit('workflow:log', {
+          level: 'info',
+          category: 'WORKFLOW',
+          message: `Executing node: ${node.name} (${node.type})`
+        });
+
+        const result = await this.executeNodeEnhanced(node, context);
+
+        if (result.status === 'failed') {
+          // Check if node has continueOnError flag
+          const continueOnError = (node as any).continueOnError || false;
+
+          if (!continueOnError) {
+            throw new Error(result.error || 'Node execution failed');
+          }
+
+          // Log warning but continue execution
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Node failed but continuing due to continueOnError flag: ${node.name} - ${result.error}`);
+
+          this.emit('workflow:log', {
+            level: 'warn',
+            category: 'WORKFLOW',
+            message: `⚠ Node failed but continuing: ${node.name} - ${result.error}`
+          });
+
+          // Still add to completed nodes to track that it was executed
+          context.completedNodes.push(node.id);
+          continue;
+        }
+
+        context.completedNodes.push(node.id);
+
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Node completed: ${node.name}`);
+
+        this.emit('workflow:log', {
+          level: 'info',
+          category: 'WORKFLOW',
+          message: `✓ Node completed: ${node.name}`
+        });
+
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.WORKFLOW,
+          `Node execution failed: ${node.name} - ${error.message}`);
+
+        this.emit('workflow:log', {
+          level: 'error',
+          category: 'WORKFLOW',
+          message: `✗ Node failed: ${node.name} - ${error.message}`
+        });
+
+        // Check if we should stop the entire workflow or continue
+        const continueOnError = (node as any).continueOnError || false;
+        if (!continueOnError) {
+          throw error;
+        }
+
+        // Log and continue to next node
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Continuing workflow despite node failure due to continueOnError flag`);
+      }
+    }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Workflow ${instanceId} completed successfully`);
+
+    this.emit('workflow:log', {
+      level: 'info',
+      category: 'WORKFLOW',
+      message: `✓ Workflow ${instanceId} completed successfully`
+    });
+  }
+
+  /**
+   * Enhanced node execution with new executor system
+   * Uses NodeExecutor interface, ContextManager, and retry logic
+   */
+  private async executeNodeEnhanced(
+    node: WorkflowNode,
+    context: WorkflowExecutionContext
+  ): Promise<NodeOutput> {
+    try {
+      // 1. Check skip condition (if present)
+      if (node.skipCondition) {
+        const shouldSkip = this.contextManager.evaluateCondition(node.skipCondition, context);
+        if (shouldSkip) {
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Skipping node ${node.id} due to skip condition: ${node.skipCondition}`);
+
+          return {
+            nodeId: node.id,
+            nodeName: node.name,
+            timestamp: new Date(),
+            status: 'success',
+            output: { skipped: true, reason: 'Skip condition met' },
+            variables: { skipped: true },
+          };
+        }
+      }
+
+      // 2. Build node-specific context (input mapping)
+      const nodeContextResult = await this.contextManager.buildNodeContext(node, context);
+      if (!nodeContextResult.success) {
+        const errorMsg = nodeContextResult.error || 'Failed to build node context';
+        logWithCategory('error', LogCategory.WORKFLOW,
+          `Node context build failed for ${node.id}: ${errorMsg}`);
+
+        return {
+          nodeId: node.id,
+          nodeName: node.name,
+          timestamp: new Date(),
+          status: 'failed',
+          output: null,
+          variables: {},
+          error: errorMsg,
+        };
+      }
+
+      // 3. Get executor for node type
+      const executor = this.nodeExecutors.get(node.type);
+      if (!executor) {
+        throw new Error(`No executor found for node type: ${node.type}`);
+      }
+
+      // Emit node started event
+      this.emit('node-started', {
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: node.type,
+        timestamp: new Date().toISOString(),
+      });
+
+      // 4. Execute with retry logic and timeout
+      const result = await this.executeWithRetry(
+        () => executor.execute(node, nodeContextResult.context),
+        node.retryConfig,
+        node.timeoutMs
+      );
+
+      // 5. Extract output variables (output mapping)
+      const extracted = await this.contextManager.extractOutputs(node, result, context);
+
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `Node ${node.id} extracted variables: ${JSON.stringify(Object.keys(extracted.variables))}`);
+
+      // 6. Update global context
+      context.nodeOutputs.set(node.id, result);
+      Object.assign(context.variables, extracted.variables);
+
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `Global context now has variables: ${JSON.stringify(Object.keys(context.variables))}`);
+
+      // 7. Emit node completed event
+      this.emit('node-completed', {
+        nodeId: node.id,
+        nodeName: node.name,
+        nodeType: node.type,
+        status: result.status,
+        timestamp: new Date().toISOString(),
+      });
+
+      return result;
+
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Enhanced node execution failed for ${node.id}: ${error.message}`);
+
+      // Emit node failed event
+      this.emit('node-failed', {
+        nodeId: node.id,
+        nodeName: node.name,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+
+      return {
+        nodeId: node.id,
+        nodeName: node.name,
+        timestamp: new Date(),
+        status: 'failed',
+        output: null,
+        variables: {},
+        error: error.message,
+        errorStack: error.stack,
+      };
+    }
+  }
+
+  /**
+   * Execute function with retry logic
+   */
+  private async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    retryConfig?: { maxRetries: number; retryDelayMs: number; backoffMultiplier: number },
+    timeoutMs?: number
+  ): Promise<T> {
+    const maxRetries = retryConfig?.maxRetries || 0;
+    const retryDelay = retryConfig?.retryDelayMs || 1000;
+    const backoff = retryConfig?.backoffMultiplier || 2;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (timeoutMs) {
+          return await this.executeWithTimeout(fn, timeoutMs);
+        } else {
+          return await fn();
+        }
+      } catch (error: any) {
+        if (attempt < maxRetries) {
+          const delay = retryDelay * Math.pow(backoff, attempt);
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Execution failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms: ${error.message}`);
+          await this.sleep(delay);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error('executeWithRetry: unreachable code');
+  }
+
+  /**
+   * Execute function with timeout
+   */
+  private async executeWithTimeout<T>(
+    fn: () => Promise<T>,
+    timeoutMs: number
+  ): Promise<T> {
+    return Promise.race([
+      fn(),
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`Execution timeout after ${timeoutMs}ms`)), timeoutMs)
+      )
+    ]);
+  }
+
+  /**
+   * Sleep utility for retry delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * Build prompt for a phase
    */
   private buildPhasePrompt(phase: WorkflowPhase): string {
@@ -527,8 +935,15 @@ export class WorkflowExecutor extends EventEmitter {
 
   /**
    * Emit phase event to renderer
+   * NOTE: Phase-based system is legacy and being phased out
    */
   private emitPhaseEvent(event: PhaseExecutionEvent): void {
+    // Validate event before emitting to prevent undefined errors
+    if (!event || typeof event !== 'object') {
+      console.warn('[WorkflowExecutor] Attempted to emit invalid phase event:', event);
+      return;
+    }
+
     this.emit('phase-event', event);
 
     // Also emit specific event types
