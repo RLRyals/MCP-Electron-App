@@ -20,7 +20,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
-import { SeriesCreationDialog } from '../components/SeriesCreationDialog.js';
+import { TerminalPanel } from '../components/TerminalPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
 import type { Project } from '../../types/project.js';
 
@@ -41,7 +41,9 @@ const WorkflowsApp: React.FC = () => {
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [showSeriesDialog, setShowSeriesDialog] = useState(false);
   const [seriesDialogContext, setSeriesDialogContext] = useState<{ projectId: number; projectName: string } | null>(null);
-  const [executionStatus, setExecutionStatus] = useState<Map<number, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
+  const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
+  const [terminalHeight, setTerminalHeight] = useState(300);
+  const [showTerminal, setShowTerminal] = useState(true);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async () => {
@@ -130,55 +132,65 @@ const WorkflowsApp: React.FC = () => {
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI || !electronAPI.on || !electronAPI.off) return;
 
-    const handlePhaseStarted = (data: any) => {
-      console.log('[WorkflowsViewReact] Phase started:', data);
+    // Node-based workflow handlers (phase-based system removed)
+    const handleNodeStarted = (data: any) => {
+      console.log('[WorkflowsViewReact] Node started:', data);
+      if (!data || !data.nodeId) {
+        console.warn('[WorkflowsViewReact] Invalid node-started data:', data);
+        return;
+      }
       setExecutionStatus(prev => {
-        // Only create new Map if value actually changed
-        const existing = prev.get(data.phaseNumber);
+        const existing = prev.get(data.nodeId);
         if (existing === 'in_progress') return prev;
 
         const newMap = new Map(prev);
-        newMap.set(data.phaseNumber, 'in_progress');
+        newMap.set(data.nodeId, 'in_progress');
         return newMap;
       });
     };
 
-    const handlePhaseCompleted = (data: any) => {
-      console.log('[WorkflowsViewReact] Phase completed:', data);
+    const handleNodeCompleted = (data: any) => {
+      console.log('[WorkflowsViewReact] Node completed:', data);
+      if (!data || !data.nodeId) {
+        console.warn('[WorkflowsViewReact] Invalid node-completed data:', data);
+        return;
+      }
       setExecutionStatus(prev => {
-        // Only create new Map if value actually changed
-        const existing = prev.get(data.phaseNumber);
+        const existing = prev.get(data.nodeId);
         if (existing === 'completed') return prev;
 
         const newMap = new Map(prev);
-        newMap.set(data.phaseNumber, 'completed');
+        newMap.set(data.nodeId, 'completed');
         return newMap;
       });
     };
 
-    const handlePhaseFailed = (data: any) => {
-      console.log('[WorkflowsViewReact] Phase failed:', data);
+    const handleNodeFailed = (data: any) => {
+      console.log('[WorkflowsViewReact] Node failed:', data);
+      if (!data || !data.nodeId) {
+        console.warn('[WorkflowsViewReact] Invalid node-failed data:', data);
+        return;
+      }
       setExecutionStatus(prev => {
-        // Only create new Map if value actually changed
-        const existing = prev.get(data.phaseNumber);
+        const existing = prev.get(data.nodeId);
         if (existing === 'failed') return prev;
 
         const newMap = new Map(prev);
-        newMap.set(data.phaseNumber, 'failed');
+        newMap.set(data.nodeId, 'failed');
         return newMap;
       });
     };
 
-    // Register listeners
-    electronAPI.on('workflow:phase-started', handlePhaseStarted);
-    electronAPI.on('workflow:phase-completed', handlePhaseCompleted);
-    electronAPI.on('workflow:phase-failed', handlePhaseFailed);
+    // Register node-based workflow listeners only
+    electronAPI.on('workflow:node-started', handleNodeStarted);
+    electronAPI.on('workflow:node-completed', handleNodeCompleted);
+    electronAPI.on('workflow:node-failed', handleNodeFailed);
 
     // Cleanup on unmount
     return () => {
-      electronAPI.off('workflow:phase-started', handlePhaseStarted);
-      electronAPI.off('workflow:phase-completed', handlePhaseCompleted);
-      electronAPI.off('workflow:phase-failed', handlePhaseFailed);
+      electronAPI.off('workflow:node-started', handleNodeStarted);
+      electronAPI.off('workflow:node-completed', handleNodeCompleted);
+      electronAPI.off('workflow:node-failed', handleNodeFailed);
     };
   }, []);
 
@@ -203,8 +215,11 @@ const WorkflowsApp: React.FC = () => {
       const result = await electronAPI.invoke('workflow:import-from-folder', folderPath);
 
       if (result.success) {
-        // Reload workflows list
-        await loadWorkflows();
+        // Reload workflows list, skipping cache to get fresh data
+        const freshWorkflows = await electronAPI.invoke('workflow:get-definitions', { skipCache: true });
+        if (Array.isArray(freshWorkflows)) {
+          setWorkflows(freshWorkflows);
+        }
       }
 
       return result;
@@ -236,10 +251,38 @@ const WorkflowsApp: React.FC = () => {
         return;
       }
 
+      // Get full project object to access folder_path
+      const activeProject = appState.getActiveProject();
+      console.log('[WorkflowsViewReact] Active project for workflow start:', activeProject);
+
+      if (!activeProject) {
+        if (typeof (window as any).showNotification === 'function') {
+          (window as any).showNotification('No active project found. Please select a project from the top bar.', 'error');
+        } else {
+          alert('No active project found. Please select a project from the top bar.');
+        }
+        return;
+      }
+
+      // Handle both folder_path and folder_location for backward compatibility
+      const projectFolder = (activeProject as any).folder_path || (activeProject as any).folder_location;
+
+      if (!projectFolder) {
+        if (typeof (window as any).showNotification === 'function') {
+          (window as any).showNotification('Selected project does not have a folder path configured', 'error');
+        } else {
+          alert('Selected project does not have a folder path configured');
+        }
+        return;
+      }
+
+      console.log('[WorkflowsViewReact] Starting workflow with project folder:', projectFolder);
+
       const instanceId = await electronAPI.invoke('workflow:start', {
         workflowDefId: selectedWorkflow.id,
-        projectId: activeProjectId,
+        seriesId: activeProjectId, // Using projectId as seriesId for now
         userId: 1, // TODO: Get from user session
+        projectFolder: projectFolder, // Add project folder for file operations
       });
 
       console.log('[WorkflowsViewReact] Started workflow instance:', instanceId);
@@ -252,6 +295,60 @@ const WorkflowsApp: React.FC = () => {
       console.error('[WorkflowsViewReact] Failed to start workflow:', error);
       if (typeof (window as any).showNotification === 'function') {
         (window as any).showNotification(`Failed to start workflow: ${error.message}`, 'error');
+      }
+    }
+  };
+
+  const handleDeleteWorkflow = async (workflowId: string) => {
+    try {
+      const electronAPI = (window as any).electronAPI;
+
+      await electronAPI.invoke('workflow:delete', workflowId);
+
+      console.log('[WorkflowsViewReact] Deleted workflow:', workflowId);
+
+      // Reload workflows list
+      await loadWorkflows();
+
+      // Clear selection if we deleted the selected workflow
+      if (selectedWorkflow?.id === workflowId) {
+        setSelectedWorkflow(null);
+      }
+
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification('Workflow deleted successfully', 'success');
+      }
+    } catch (error: any) {
+      console.error('[WorkflowsViewReact] Failed to delete workflow:', error);
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(`Failed to delete workflow: ${error.message}`, 'error');
+      }
+    }
+  };
+
+  const handleReimportWorkflow = async (workflowId: string) => {
+    try {
+      const electronAPI = (window as any).electronAPI;
+
+      await electronAPI.invoke('workflow:reimport', workflowId);
+
+      console.log('[WorkflowsViewReact] Reimported workflow:', workflowId);
+
+      // Reload workflows list
+      await loadWorkflows();
+
+      // Reload selected workflow if it was the reimported one
+      if (selectedWorkflow?.id === workflowId) {
+        handleSelectWorkflow(workflowId);
+      }
+
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification('Workflow refreshed from source', 'success');
+      }
+    } catch (error: any) {
+      console.error('[WorkflowsViewReact] Failed to reimport workflow:', error);
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(`Failed to refresh workflow: ${error.message}`, 'error');
       }
     }
   };
@@ -327,6 +424,13 @@ const WorkflowsApp: React.FC = () => {
 
   const contentStyle: React.CSSProperties = {
     display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    overflow: 'hidden',
+  };
+
+  const mainContentStyle: React.CSSProperties = {
+    display: 'flex',
     flex: 1,
     overflow: 'hidden',
   };
@@ -377,17 +481,20 @@ const WorkflowsApp: React.FC = () => {
 
       {/* Main Content */}
       <div style={contentStyle}>
-        {/* Sidebar with workflow list */}
-        <div style={sidebarStyle}>
-          <WorkflowList
-            workflows={workflows}
-            selectedId={selectedWorkflow?.id}
-            onSelect={handleSelectWorkflow}
-          />
-        </div>
+        <div style={mainContentStyle}>
+          {/* Sidebar with workflow list */}
+          <div style={sidebarStyle}>
+            <WorkflowList
+              workflows={workflows}
+              selectedId={selectedWorkflow?.id}
+              onSelect={handleSelectWorkflow}
+              onDelete={handleDeleteWorkflow}
+              onReimport={handleReimportWorkflow}
+            />
+          </div>
 
-        {/* Canvas area */}
-        <div style={canvasContainerStyle}>
+          {/* Canvas area */}
+          <div style={canvasContainerStyle}>
           {selectedWorkflow ? (
             <>
               <div style={{
@@ -416,11 +523,22 @@ const WorkflowsApp: React.FC = () => {
                         id: selectedWorkflow.id,
                         name: String(selectedWorkflow.name),
                         version: String(selectedWorkflow.version),
+                        graph_json: selectedWorkflow.graph_json,
                         phases_json: selectedWorkflow.phases_json || []
                       }}
                       executionStatus={executionStatus}
                       onNodeClick={(nodeId: string, phase: any) => {
                         console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
+                      }}
+                      onWorkflowChange={(updatedWorkflow: any) => {
+                        console.log('[WorkflowsViewReact] Workflow changed:', updatedWorkflow);
+                        // Update the selected workflow with the new data
+                        setSelectedWorkflow({
+                          ...selectedWorkflow,
+                          ...updatedWorkflow,
+                        });
+                        // Reload workflows list to ensure it's in sync
+                        loadWorkflows();
                       }}
                     />
                   );
@@ -442,7 +560,16 @@ const WorkflowsApp: React.FC = () => {
               Select a workflow from the sidebar to visualize
             </div>
           )}
+          </div>
         </div>
+
+        {/* Terminal Panel */}
+        {showTerminal && (
+          <TerminalPanel
+            height={terminalHeight}
+            onResize={setTerminalHeight}
+          />
+        )}
       </div>
 
       {/* Import Dialog */}
@@ -469,20 +596,6 @@ const WorkflowsApp: React.FC = () => {
         onClose={() => setShowProjectDialog(false)}
         onProjectCreated={handleProjectCreated}
       />
-
-      {/* Series Creation Dialog */}
-      {seriesDialogContext && (
-        <SeriesCreationDialog
-          projectId={seriesDialogContext.projectId}
-          projectName={seriesDialogContext.projectName}
-          isOpen={showSeriesDialog}
-          onClose={() => {
-            setShowSeriesDialog(false);
-            setSeriesDialogContext(null);
-          }}
-          onSeriesCreated={handleSeriesCreated}
-        />
-      )}
     </div>
   );
 };

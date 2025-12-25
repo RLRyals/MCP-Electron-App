@@ -351,3 +351,56 @@
 .workflow-card:nth-child(3) { animation-delay: 0.1s; }
 .workflow-card:nth-child(4) { animation-delay: 0.15s; }
 .workflow-card:nth-child(5) { animation-delay: 0.2s; }
+
+/* ========================================
+   Workflow List Item Styles
+   ======================================== */
+
+.workflow-list-item {
+  /* Hover transitions are handled via CSS for performance */
+  /* Prevents layout thrashing from JS-based style updates */
+}
+
+.workflow-list-item:not(.selected):hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ========================================
+   React Flow Edge Enhancements
+   ======================================== */
+
+/* Make edges more grabbable with a larger invisible hitbox */
+.react-flow__edge-path {
+  cursor: pointer;
+  stroke-width: 2px;
+  transition: stroke-width 0.2s ease;
+}
+
+/* Add a wider invisible hitbox for easier selection */
+.react-flow__edge.selectable:hover .react-flow__edge-path {
+  stroke-width: 3px;
+}
+
+/* Selected edge styling */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
+}
+
+/* Edge interaction area - invisible but clickable */
+.react-flow__edge-interaction {
+  stroke-width: 20px !important;
+  cursor: grab;
+}
+
+/* Edge label styling */
+.react-flow__edge-text {
+  fill: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.react-flow__edge.selected .react-flow__edge-text {
+  fill: #3b82f6;
+  font-weight: 600;
+}

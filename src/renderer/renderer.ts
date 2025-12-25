@@ -789,6 +789,116 @@ function migrateOldTabState(): void {
 }
 
 /**
+ * Show Claude Code CLI installation dialog
+ */
+function showClaudeCodeInstallDialog(reason: string): void {
+  const dialog = document.createElement('div');
+  dialog.className = 'error-dialog';
+  dialog.innerHTML = `
+    <div class="error-dialog-backdrop"></div>
+    <div class="error-dialog-content" style="max-width: 600px;">
+      <h3>Claude Code CLI ${reason === 'not_installed' ? 'Not Installed' : 'Setup Required'}</h3>
+      <p>${reason === 'not_installed'
+        ? 'Claude Code CLI is not installed. You need to install it to run workflows that use your Claude subscription.'
+        : 'You are not logged in to Claude. Please log in to continue.'
+      }</p>
+
+      <div id="installation-status" style="background: rgba(0, 150, 255, 0.1); border: 1px solid rgba(0, 150, 255, 0.3); border-radius: 8px; padding: 15px; margin: 15px 0;">
+        <p style="margin: 0;">Click the button below to automatically install and set up Claude Code.</p>
+      </div>
+
+      <div class="error-dialog-buttons">
+        <button id="auto-install-claude" class="button primary">Install Claude Code Automatically</button>
+        <button id="close-claude-dialog" class="button">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Auto-install Claude Code
+  const autoInstallBtn = document.getElementById('auto-install-claude') as HTMLButtonElement;
+  const statusDiv = document.getElementById('installation-status');
+
+  if (autoInstallBtn && statusDiv) {
+    autoInstallBtn.addEventListener('click', async () => {
+      try {
+        autoInstallBtn.disabled = true;
+        autoInstallBtn.textContent = 'Installing...';
+        statusDiv.innerHTML = '<p style="margin: 0;">Installing Claude Code CLI... This may take a minute.</p>';
+
+        // Call backend to install Claude Code
+        const result = await (window as any).electronAPI.invoke('claude:install-cli');
+
+        if (result.success) {
+          statusDiv.innerHTML = `
+            <p style="margin: 0; color: #4ade80;">✓ Claude Code CLI installed successfully!</p>
+            <p style="margin: 10px 0 0 0; font-size: 0.9em;">Opening browser for authentication...</p>
+          `;
+          autoInstallBtn.textContent = 'Authenticating...';
+
+          // Now authenticate
+          const authResult = await (window as any).electronAPI.invoke('claude:authenticate');
+
+          if (authResult.success) {
+            statusDiv.innerHTML = `
+              <p style="margin: 0; color: #4ade80;">✓ Successfully authenticated!</p>
+              <p style="margin: 10px 0 0 0;">Claude Code is now ready. Click below to retry your workflow.</p>
+            `;
+            autoInstallBtn.textContent = 'Retry Workflow';
+            autoInstallBtn.disabled = false;
+            showNotification('Claude Code setup complete!', 'success');
+
+            // Change button to retry workflow
+            const retryHandler = async () => {
+              autoInstallBtn.removeEventListener('click', retryHandler);
+              document.body.removeChild(dialog);
+
+              // Reload the page to reset the workflow state
+              showNotification('Restarting application to apply changes...', 'info');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            };
+
+            autoInstallBtn.addEventListener('click', retryHandler);
+          } else {
+            throw new Error(authResult.error || 'Authentication failed');
+          }
+        } else {
+          throw new Error(result.error || 'Installation failed');
+        }
+      } catch (error: any) {
+        console.error('Auto-install failed:', error);
+        statusDiv.innerHTML = `
+          <p style="margin: 0; color: #f87171;">✗ Installation failed: ${error.message}</p>
+          <p style="margin: 10px 0 0 0; font-size: 0.9em;">Please make sure you have npm installed and an internet connection.</p>
+        `;
+        autoInstallBtn.disabled = false;
+        autoInstallBtn.textContent = 'Retry Installation';
+        showNotification('Installation failed. Please try again.', 'error');
+      }
+    });
+  }
+
+  // Close button
+  const closeButton = document.getElementById('close-claude-dialog');
+  if (closeButton) {
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  }
+
+  // Close on backdrop click
+  const backdrop = dialog.querySelector('.error-dialog-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  }
+}
+
+/**
  * Initialize the renderer process
  */
 async function init(): Promise<void> {
@@ -931,6 +1041,56 @@ async function init(): Promise<void> {
         break;
       case 'view-reload':
         window.location.reload();
+        break;
+
+      // Plugins menu
+      case 'plugins-manage':
+        viewRouter.navigateTo('plugins');
+        break;
+
+      // Plugin actions - Claude Code
+      case 'plugin-claude-code-subscription-install-cli':
+        if ((window as any).electronAPI?.plugins?.call) {
+          (window as any).electronAPI.plugins.call('claude-code-subscription', 'install-cli')
+            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
+            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
+        }
+        break;
+
+      case 'plugin-claude-code-subscription-login':
+        if ((window as any).electronAPI?.plugins?.call) {
+          (window as any).electronAPI.plugins.call('claude-code-subscription', 'login')
+            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
+            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
+        }
+        break;
+
+      case 'plugin-claude-code-subscription-check-auth':
+        if ((window as any).electronAPI?.plugins?.call) {
+          (window as any).electronAPI.plugins.call('claude-code-subscription', 'check-auth')
+            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
+            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
+        }
+        break;
+
+      case 'plugin-claude-code-subscription-run-task':
+        if ((window as any).electronAPI?.plugins?.call) {
+          // TODO: Show form dialog to collect task data
+          console.log('[Renderer] Run task - form UI not implemented yet');
+          (window as any).electronAPI.plugins.call('claude-code-subscription', 'run-task', {
+            prompt: 'Test task',
+            context: '',
+            workingDirectory: '',
+            timeout: 300
+          })
+            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
+            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
+        }
+        break;
+
+      case 'plugin-claude-code-subscription-show-settings':
+        // TODO: Show settings dialog
+        console.log('[Renderer] Plugin settings - not implemented yet');
         break;
 
       default:
@@ -1108,6 +1268,14 @@ async function init(): Promise<void> {
       }
     });
   }
+
+  // Listen for Claude Code setup required events
+  (window as any).electronAPI.on('claude-setup-required', (data: any) => {
+    console.log('[Renderer] Claude setup required:', data);
+
+    // Show Claude Code CLI installation dialog
+    showClaudeCodeInstallDialog(data.reason);
+  });
 
   // Automatically check prerequisites on load
   checkPrerequisites();

@@ -19,19 +19,55 @@ export interface WorkflowListItem {
   tags?: string[];
   is_system?: boolean;
   phases_json: any[];
+  graph_json?: any; // Graph-based workflow representation
 }
 
 export interface WorkflowListProps {
   workflows: WorkflowListItem[];
   selectedId?: string;
   onSelect: (workflowId: string) => void;
+  onDelete?: (workflowId: string) => void;
+  onReimport?: (workflowId: string) => void;
 }
 
 export const WorkflowList: React.FC<WorkflowListProps> = ({
   workflows,
   selectedId,
   onSelect,
+  onDelete,
+  onReimport,
 }) => {
+  const [filterTags, setFilterTags] = React.useState<string[]>([]);
+  const [availableTags, setAvailableTags] = React.useState<string[]>([]);
+
+  // Extract all unique tags from workflows
+  React.useEffect(() => {
+    const tags = new Set<string>();
+    workflows.forEach(w => {
+      if (w.tags && Array.isArray(w.tags)) {
+        w.tags.forEach(tag => tags.add(String(tag)));
+      }
+    });
+    setAvailableTags(Array.from(tags).sort());
+  }, [workflows]);
+
+  // Filter workflows by selected tags
+  const filteredWorkflows = React.useMemo(() => {
+    if (filterTags.length === 0) return workflows;
+    return workflows.filter(w => {
+      if (!w.tags || !Array.isArray(w.tags)) return false;
+      return filterTags.some(filterTag => w.tags!.includes(filterTag));
+    });
+  }, [workflows, filterTags]);
+
+  const toggleFilterTag = (tag: string) => {
+    setFilterTags(prev =>
+      prev.includes(tag)
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
   const containerStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -60,7 +96,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     background: isSelected ? '#3b82f6' : 'white',
     border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
     color: isSelected ? 'white' : '#1f2937',
-    transition: 'all 0.2s ease',
+    transition: 'box-shadow 0.2s ease',
     boxShadow: isSelected ? '0 2px 8px rgba(59, 130, 246, 0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
   });
 
@@ -109,9 +145,54 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     color: '#9ca3af',
   };
 
-  // Separate system and user workflows
-  const systemWorkflows = workflows.filter(w => w.is_system);
-  const userWorkflows = workflows.filter(w => !w.is_system);
+  const actionButtonStyle: React.CSSProperties = {
+    padding: '4px 8px',
+    fontSize: '11px',
+    fontWeight: 600,
+    borderRadius: '4px',
+    border: '1px solid #d1d5db',
+    background: 'white',
+    color: '#6b7280',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  };
+
+  const deleteButtonStyle: React.CSSProperties = {
+    ...actionButtonStyle,
+    borderColor: '#f87171',
+    color: '#dc2626',
+  };
+
+  const filterContainerStyle: React.CSSProperties = {
+    padding: '12px',
+    borderBottom: '1px solid #e5e7eb',
+    background: 'white',
+  };
+
+  const filterTagStyle = (isActive: boolean): React.CSSProperties => ({
+    display: 'inline-block',
+    padding: '4px 12px',
+    margin: '4px 4px 4px 0',
+    fontSize: '11px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    background: isActive ? '#3b82f6' : '#f3f4f6',
+    color: isActive ? 'white' : '#6b7280',
+    border: isActive ? '1px solid #3b82f6' : '1px solid #e5e7eb',
+    transition: 'all 0.2s ease',
+  });
+
+  const workflowActionsStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '6px',
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid rgba(0,0,0,0.1)',
+  };
+
+  // Separate system and user workflows from filtered set
+  const systemWorkflows = filteredWorkflows.filter(w => w.is_system);
+  const userWorkflows = filteredWorkflows.filter(w => !w.is_system);
 
   if (workflows.length === 0) {
     return (
@@ -131,6 +212,34 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
 
   return (
     <div style={containerStyle}>
+      {/* Tag Filter */}
+      {availableTags.length > 0 && (
+        <div style={filterContainerStyle}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: '#6b7280' }}>
+            FILTER BY TAG
+          </div>
+          <div>
+            {availableTags.map(tag => (
+              <span
+                key={tag}
+                style={filterTagStyle(filterTags.includes(tag))}
+                onClick={() => toggleFilterTag(tag)}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          {filterTags.length > 0 && (
+            <button
+              style={{ ...actionButtonStyle, marginTop: '8px' }}
+              onClick={() => setFilterTags([])}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+
       {systemWorkflows.length > 0 && (
         <>
           <div style={sectionHeaderStyle}>System Workflows</div>
@@ -139,18 +248,9 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
             return (
               <div
                 key={workflow.id}
+                className={`workflow-list-item ${isSelected ? 'selected' : ''}`}
                 style={workflowItemStyle(isSelected, true)}
                 onClick={() => onSelect(workflow.id)}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-                  }
-                }}
               >
                 <div style={workflowNameStyle(isSelected)}>
                   {String(workflow.name || 'Unnamed')}
@@ -176,6 +276,33 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                         {String(tag)}
                       </span>
                     ))}
+                  </div>
+                )}
+                {/* Action Buttons */}
+                {(onDelete || onReimport) && (
+                  <div style={workflowActionsStyle} onClick={(e) => e.stopPropagation()}>
+                    {onReimport && (
+                      <button
+                        style={actionButtonStyle}
+                        onClick={() => onReimport(workflow.id)}
+                        title="Reload from source folder"
+                      >
+                        🔄 Refresh
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        style={deleteButtonStyle}
+                        onClick={() => {
+                          if (confirm(`Delete workflow "${workflow.name}"?`)) {
+                            onDelete(workflow.id);
+                          }
+                        }}
+                        title="Delete this workflow"
+                      >
+                        🗑️ Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -192,18 +319,9 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
             return (
               <div
                 key={workflow.id}
+                className={`workflow-list-item ${isSelected ? 'selected' : ''}`}
                 style={workflowItemStyle(isSelected, false)}
                 onClick={() => onSelect(workflow.id)}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-                  }
-                }}
               >
                 <div style={workflowNameStyle(isSelected)}>
                   {String(workflow.name || 'Unnamed')}
@@ -229,6 +347,33 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                         {String(tag)}
                       </span>
                     ))}
+                  </div>
+                )}
+                {/* Action Buttons */}
+                {(onDelete || onReimport) && (
+                  <div style={workflowActionsStyle} onClick={(e) => e.stopPropagation()}>
+                    {onReimport && (
+                      <button
+                        style={actionButtonStyle}
+                        onClick={() => onReimport(workflow.id)}
+                        title="Reload from source folder"
+                      >
+                        🔄 Refresh
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        style={deleteButtonStyle}
+                        onClick={() => {
+                          if (confirm(`Delete workflow "${workflow.name}"?`)) {
+                            onDelete(workflow.id);
+                          }
+                        }}
+                        title="Delete this workflow"
+                      >
+                        🗑️ Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

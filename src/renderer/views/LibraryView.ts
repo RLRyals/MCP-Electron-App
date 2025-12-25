@@ -109,12 +109,14 @@ export class LibraryView implements View {
       if (this.selectedType === 'all' || this.selectedType === 'books') {
         await this.loadTable('books', 'book');
       }
-      if (this.selectedType === 'all' || this.selectedType === 'outlines') {
-        await this.loadTable('outlines', 'outline');
-      }
-      if (this.selectedType === 'all' || this.selectedType === 'drafts') {
-        await this.loadTable('drafts', 'draft');
-      }
+      // TODO: Add outlines and drafts tables to database schema
+      // These tables don't exist yet in the MCP database
+      // if (this.selectedType === 'all' || this.selectedType === 'outlines') {
+      //   await this.loadTable('outlines', 'outline');
+      // }
+      // if (this.selectedType === 'all' || this.selectedType === 'drafts') {
+      //   await this.loadTable('drafts', 'draft');
+      // }
 
       console.log(`[LibraryView] Loaded ${this.items.length} items`);
     } catch (error) {

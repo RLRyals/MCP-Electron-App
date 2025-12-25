@@ -5,7 +5,8 @@
  */
 
 import type { View } from '../components/ViewRouter.js';
-import type { TopBarConfig } from '../components/TopBar.js';
+import type { TopBarConfig} from '../components/TopBar.js';
+import { PluginInstallWizard } from '../components/PluginInstallWizard.js';
 
 export class PluginsLauncher implements View {
   private container: HTMLElement | null = null;
@@ -96,6 +97,7 @@ export class PluginsLauncher implements View {
   private renderPluginCard(plugin: any): string {
     const isPinned = this.isPluginPinned(plugin.id);
     const isActive = plugin.status === 'active';
+    const isUtility = plugin.pluginType === 'utility';
 
     return `
       <div class="plugin-card ${isActive ? 'active' : 'inactive'}" data-plugin-id="${plugin.id}">
@@ -106,13 +108,19 @@ export class PluginsLauncher implements View {
           <div class="plugin-meta">
             <span class="plugin-version">v${plugin.version || '1.0.0'}</span>
             <span class="plugin-status ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+            ${isUtility ? '<span class="plugin-type">Utility</span>' : ''}
           </div>
         </div>
         <div class="plugin-actions">
-          ${isActive ? `
+          ${isActive && !isUtility ? `
             <button class="plugin-action-btn primary" data-action="launch" title="Launch Plugin">
               Launch
             </button>
+          ` : ''}
+          ${isUtility && isActive ? `
+            <span class="plugin-utility-note" style="font-size: 0.85em; color: #888; margin-right: 8px;">
+              Menu: Plugins → ${this.escapeHtml(plugin.name || plugin.id)}
+            </span>
           ` : ''}
           <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
                   data-action="pin"
@@ -306,31 +314,64 @@ export class PluginsLauncher implements View {
         });
         break;
       case 'import':
-        try {
-          const electronAPI = (window as any).electronAPI;
-          const result = await electronAPI.dialog.showOpenDialog({
-            title: 'Import Plugin',
-            properties: ['openDirectory'],
-            buttonLabel: 'Import Plugin',
-          });
-          
-          if (!result.canceled && result.filePaths.length > 0) {
-            const path = result.filePaths[0];
-            await electronAPI.import.plugin(path);
-            // Refresh list
-            await this.loadPlugins();
-            this.render();
-            this.attachEventListeners();
-            alert('Plugin imported successfully!');
+        console.log('[PluginsLauncher] Import action triggered');
+        // Show the plugin install wizard
+        console.log('[PluginsLauncher] Creating PluginInstallWizard...');
+        const wizard = new PluginInstallWizard({
+          onComplete: async (success, pluginId) => {
+            if (success) {
+              // Refresh plugin list
+              await this.loadPlugins();
+              this.render();
+              this.attachEventListeners();
+
+              // Show success notification
+              if ((window as any).showNotification) {
+                (window as any).showNotification(
+                  `Plugin ${pluginId || ''} installed successfully! Reloading...`,
+                  'success'
+                );
+              }
+
+              // Reload app to activate plugin
+              setTimeout(() => {
+                const electronAPI = (window as any).electronAPI;
+                if (electronAPI && electronAPI.app && electronAPI.app.relaunch) {
+                  electronAPI.app.relaunch();
+                }
+              }, 1500);
+            }
+          },
+          onCancel: () => {
+            console.log('[PluginsLauncher] Install wizard cancelled');
           }
-        } catch (error: any) {
-          console.error('[PluginsLauncher] Import failed:', error);
-          alert(`Import failed: ${error.message}`);
-        }
+        });
+        console.log('[PluginsLauncher] Wizard created, calling show()...');
+        wizard.show();
+        console.log('[PluginsLauncher] Wizard.show() called');
         break;
       case 'manage':
-        // TODO: Open plugin management dialog
-        console.log('[PluginsLauncher] Manage plugins');
+        // Show plugin management info (TODO: create full management view)
+        const manageInfo = `
+Plugin Management
+
+Installed Plugins: ${this.plugins.length}
+Active Plugins: ${this.plugins.filter(p => p.status === 'active').length}
+
+Plugin Location:
+Windows: %APPDATA%\\fictionlab\\plugins\\
+Mac/Linux: ~/.fictionlab/plugins/
+
+To manage plugins:
+1. Install new plugins using "Import Plugin"
+2. View plugin details by clicking on them
+3. Enable/disable plugins by editing plugin.json
+4. Remove plugins by deleting their folder
+
+Full management UI coming soon!
+        `.trim();
+
+        alert(manageInfo);
         break;
       default:
         console.warn('[PluginsLauncher] Unknown action:', actionId);

@@ -8,22 +8,43 @@
  * - Handles for connections
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+
+// Add hover styles for edit button
+if (typeof document !== 'undefined' && !document.getElementById('phase-node-styles')) {
+  const style = document.createElement('style');
+  style.id = 'phase-node-styles';
+  style.textContent = `
+    .phase-node-container:hover .phase-edit-button {
+      opacity: 1 !important;
+    }
+    .phase-edit-button:hover {
+      background: #f3f4f6 !important;
+    }
+    .sub-workflow-link:hover {
+      color: #2563eb !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export interface PhaseNodeData {
   label: string;
   phase: {
     id: number;
     name: string;
-    type: 'planning' | 'gate' | 'writing' | 'loop' | 'user' | 'subworkflow';
+    type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow';
     agent: string;
     skill?: string;
+    subWorkflowId?: string;
     description: string;
     gate: boolean;
     requiresApproval: boolean;
   };
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  onEdit?: () => void;
+  onOpenSubWorkflow?: () => void;
 }
 
 export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
@@ -44,16 +65,25 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
     switch (data.phase.type) {
       case 'planning':
         return '📋';
-      case 'gate':
-        return '🚪';
       case 'writing':
         return '✍️';
-      case 'loop':
-        return '🔄';
+      case 'gate':
+        return '🚪';
+      case 'user-input':
       case 'user':
         return '👤';
+      case 'code':
+        return '⚙️';
+      case 'http':
+        return '🌐';
+      case 'file':
+        return '📁';
+      case 'conditional':
+        return '🔀';
+      case 'loop':
+        return '🔄';
       case 'subworkflow':
-        return '🔗';
+        return '📦';
       default:
         return '•';
     }
@@ -67,6 +97,8 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
     minWidth: '180px',
     boxShadow: data.status === 'in_progress' ? '0 4px 12px rgba(96, 165, 250, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    position: 'relative',
   };
 
   const headerStyle: React.CSSProperties = {
@@ -107,8 +139,22 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
     borderTop: '1px solid #e5e7eb',
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data.onEdit) {
+      data.onEdit();
+    }
+  };
+
+  const handleSubWorkflowClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data.onOpenSubWorkflow) {
+      data.onOpenSubWorkflow();
+    }
+  };
+
   return (
-    <div style={nodeStyle}>
+    <div className="phase-node-container" style={nodeStyle} onDoubleClick={handleDoubleClick}>
       <Handle
         type="target"
         position={Position.Left}
@@ -120,15 +166,43 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
         }}
       />
 
+      {/* Edit button - appears on hover */}
+      <button
+        className="phase-edit-button"
+        style={editButtonStyle}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (data.onEdit) data.onEdit();
+        }}
+        title="Edit phase (double-click)"
+      >
+        ✏️
+      </button>
+
       <div style={headerStyle}>
         <span style={{ fontSize: '16px' }}>{getTypeIcon()}</span>
         <div style={labelStyle}>{String(data.label || 'Unnamed Phase')}</div>
       </div>
 
-      <div style={agentStyle}>Agent: {String(data.phase.agent || 'Unknown')}</div>
+      {/* Only show agent for nodes that actually use agents */}
+      {data.phase.agent && !['user-input', 'user', 'file', 'http'].includes(data.phase.type) && (
+        <div style={agentStyle}>Agent: {String(data.phase.agent)}</div>
+      )}
 
       {data.phase.skill && (
         <div style={skillStyle}>Skill: {String(data.phase.skill)}</div>
+      )}
+
+      {/* Sub-workflow indicator with click-to-open */}
+      {data.phase.type === 'subworkflow' && data.phase.subWorkflowId && (
+        <div
+          className="sub-workflow-link"
+          style={subWorkflowLinkStyle}
+          onClick={handleSubWorkflowClick}
+          title="Click to open sub-workflow"
+        >
+          🔗 {data.phase.subWorkflowId}
+        </div>
       )}
 
       {data.phase.gate && (
@@ -157,4 +231,27 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
       />
     </div>
   );
+};
+
+const editButtonStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '4px',
+  right: '4px',
+  padding: '4px 6px',
+  background: 'white',
+  border: '1px solid #d1d5db',
+  borderRadius: '4px',
+  fontSize: '12px',
+  cursor: 'pointer',
+  opacity: 0,
+  transition: 'opacity 0.2s',
+};
+
+const subWorkflowLinkStyle: React.CSSProperties = {
+  fontSize: '11px',
+  color: '#3b82f6',
+  marginBottom: '4px',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+  transition: 'color 0.2s',
 };

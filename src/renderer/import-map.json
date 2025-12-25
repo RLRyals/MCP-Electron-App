@@ -3,6 +3,9 @@
         "react": "./vendor/react.js",
         "react-dom/client": "./vendor/react-dom-client.js",
         "react/jsx-runtime": "./vendor/react-jsx-runtime.js",
-        "reactflow": "./vendor/reactflow.js"
+        "reactflow": "./vendor/reactflow.js",
+        "@xterm/xterm": "./vendor/xterm.js",
+        "@xterm/addon-fit": "./vendor/addon-fit.js",
+        "@xterm/addon-web-links": "./vendor/addon-web-links.js"
     }
 }
