@@ -1297,6 +1297,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Claude Code CLI API
+   */
+  claudeCode: {
+    /**
+     * Get Claude Code CLI installation and authentication status
+     */
+    getStatus: (): Promise<{
+      installed: boolean;
+      version?: string;
+      loggedIn: boolean;
+      userName?: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('claude-code:get-status');
+    },
+
+    /**
+     * Open Claude Code installation page in browser
+     */
+    openInstallPage: (): Promise<void> => {
+      return ipcRenderer.invoke('claude-code:open-install-page');
+    },
+  },
+
+  /**
    * Docker Images API
    */
   dockerImages: {
@@ -1472,6 +1497,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     showOpenDialog: (options: any): Promise<any> => {
       return ipcRenderer.invoke('dialog:show-open-dialog', options);
+    },
+  },
+
+  /**
+   * Bundled Plugins API
+   */
+  bundledPlugins: {
+    /**
+     * List all bundled example plugins
+     * Returns array of plugin info including installation status
+     */
+    list: (): Promise<any[]> => {
+      return ipcRenderer.invoke('bundled-plugins:list');
+    },
+
+    /**
+     * Install a bundled example plugin by ID
+     * Returns the plugin ID
+     */
+    install: (pluginId: string): Promise<string> => {
+      return ipcRenderer.invoke('bundled-plugins:install', pluginId);
+    },
+
+    /**
+     * Get the path to bundled plugins (for debugging)
+     */
+    getPath: (): Promise<string> => {
+      return ipcRenderer.invoke('bundled-plugins:get-path');
     },
   },
 
@@ -2165,9 +2218,84 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Document API (Agents and Skills)
+   */
+  document: {
+    /**
+     * Read an agent file
+     */
+    readAgent: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-agent', name);
+    },
+
+    /**
+     * Write an agent file
+     */
+    writeAgent: (name: string, content: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-agent', name, content);
+    },
+
+    /**
+     * Read a skill file
+     */
+    readSkill: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-skill', name);
+    },
+
+    /**
+     * Write a skill file
+     */
+    writeSkill: (name: string, content: string, filePath?: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-skill', name, content, filePath);
+    },
+
+    /**
+     * Import agent from single file
+     */
+    importAgentFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-agent-file');
+    },
+
+    /**
+     * Import agents from folder
+     */
+    importAgentFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-agent-folder');
+    },
+
+    /**
+     * Import skill from single file
+     */
+    importSkillFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-skill-file');
+    },
+
+    /**
+     * Import skills from folder
+     */
+    importSkillFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-skill-folder');
+    },
+  },
+
+  /**
    * Workflows API
    */
   workflows: {
+    /**
+     * Get list of installed agents
+     */
+    getInstalledAgents: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-agents');
+    },
+
+    /**
+     * Get list of installed skills
+     */
+    getInstalledSkills: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-skills');
+    },
+
     /**
      * List all workflows
      */
