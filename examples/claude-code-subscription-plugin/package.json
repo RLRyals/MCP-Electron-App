@@ -1,0 +1,25 @@
+{
+  "name": "claude-code-subscription-plugin",
+  "version": "1.0.0",
+  "description": "Claude Code CLI with subscription authentication for FictionLab",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc && copyfiles -f dist/examples/claude-code-subscription-plugin/src/*.* dist && rimraf dist/examples dist/src",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "fictionlab",
+    "plugin",
+    "claude-code",
+    "ai",
+    "headless"
+  ],
+  "author": "FictionLab Team",
+  "license": "MIT",
+  "devDependencies": {
+    "copyfiles": "^2.4.1",
+    "rimraf": "^6.1.2",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "id": "claude-code-subscription",
+  "name": "Claude Code (Subscription)",
+  "version": "1.0.0",
+  "description": "Install Claude Code CLI and authenticate with your Anthropic subscription for headless workflow execution",
+  "author": "FictionLab Team",
+  "icon": "🤖",
+  "fictionLabVersion": ">=0.1.0",
+  "pluginType": "utility",
+
+  "entry": {
+    "main": "dist/index.js"
+  },
+
+  "permissions": {
+    "childProcesses": true,
+    "fileSystem": true,
+    "database": false,
+    "mcp": [],
+    "network": true,
+    "docker": false,
+    "clipboard": true,
+    "dialogs": true
+  },
+
+  "ui": {
+    "menuItems": [
+      {
+        "label": "Claude Code",
+        "submenu": [
+          {
+            "label": "Install CLI",
+            "action": "install-cli"
+          },
+          {
+            "label": "Login to Anthropic",
+            "action": "login"
+          },
+          {
+            "label": "Check Authentication Status",
+            "action": "check-auth"
+          },
+          {
+            "label": "Run Headless Task",
+            "action": "run-task"
+          },
+          {
+            "label": "Settings",
+            "action": "show-settings"
+          }
+        ]
+      }
+    ],
+    "views": [
+      {
+        "id": "claude-task-runner",
+        "name": "Claude Task Runner",
+        "icon": "🤖",
+        "component": "ClaudeTaskRunner"
+      }
+    ]
+  },
+
+  "configSchema": {
+    "claudeCodePath": {
+      "type": "string",
+      "default": "",
+      "description": "Custom path to Claude Code CLI (leave empty for auto-detection)",
+      "required": false
+    },
+    "authenticated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether user is authenticated with Anthropic",
+      "required": false
+    },
+    "autoUpdate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically check for Claude Code updates",
+      "required": false
+    },
+    "headlessMode": {
+      "type": "boolean",
+      "default": true,
+      "description": "Run Claude Code in headless mode by default",
+      "required": false
+    }
+  }
+}

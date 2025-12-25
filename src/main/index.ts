@@ -1,5 +1,4 @@
-import * as electron from 'electron';
-const { app, BrowserWindow, ipcMain, Menu, shell } = electron;
+import { app, BrowserWindow, ipcMain, Menu, shell, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as prerequisites from './prerequisites';
@@ -33,8 +32,11 @@ import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import { WorkflowExecutor } from './workflow/workflow-executor';
-import { MCPWorkflowClient } from './workflow/mcp-workflow-client';
+import { PersistentMCPClient } from './workflow/persistent-mcp-client';
 import { workflowCache } from './workflow/workflow-cache';
+import { ContextManager } from './workflow/context-manager';
+import { getProviderManager } from './llm/provider-manager';
+import type { LLMProviderConfig } from '../types/llm-providers';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -65,6 +67,9 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
+
+// Singleton persistent MCP client for workflow operations
+let persistentMCPClient: PersistentMCPClient | null = null;
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -407,6 +412,7 @@ function openTypingMindInBrowser(url: string): void {
 }
 
 import { registerImportHandlers } from './handlers/import-handlers';
+import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handlers';
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -414,6 +420,9 @@ import { registerImportHandlers } from './handlers/import-handlers';
 function setupIPC(): void {
   // Register import handlers
   registerImportHandlers();
+
+  // Register bundled plugins handlers
+  registerBundledPluginsHandlers();
 
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {
@@ -2388,18 +2397,37 @@ function setupIPC(): void {
   // ========================================
 
   const workflowExecutor = new WorkflowExecutor();
-  const workflowClient = new MCPWorkflowClient();
+
+  // Forward workflow events to renderer
+  workflowExecutor.on('workflow:user-input-required', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('workflow:user-input-required', data);
+    }
+  });
+
+  workflowExecutor.on('workflow:log', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('workflow:log', data);
+    }
+  });
+
+  // Use the singleton persistent MCP client
+  if (!persistentMCPClient) {
+    throw new Error('Persistent MCP client not initialized. This should not happen.');
+  }
+  const workflowClient = persistentMCPClient;
 
   // Start workflow execution
   ipcMain.handle('workflow:start', async (_event, options: {
     workflowDefId: string;
     version?: string;
-    seriesId: number;
+    projectId: number;
     userId: number;
     startPhase?: number;
+    projectFolder: string;
   }) => {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `IPC: Starting workflow execution: ${options.workflowDefId}`);
+      `IPC: Starting workflow execution: ${options.workflowDefId} with project folder: ${options.projectFolder}`);
     try {
       const instanceId = await workflowExecutor.startWorkflow(options);
       return { success: true, instanceId };
@@ -2448,6 +2476,27 @@ function setupIPC(): void {
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW,
         `Failed to reject phase: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Handle user input submission
+  ipcMain.handle('workflow:send-user-input', async (_event, requestId: string, userInput: any) => {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `IPC: User input received for request ${requestId}`);
+    try {
+      const pending = workflowExecutor.userInputQueue.get(requestId);
+
+      if (pending) {
+        pending.resolve(userInput);
+        workflowExecutor.userInputQueue.delete(requestId);
+        return { success: true };
+      } else {
+        throw new Error(`No pending input request found: ${requestId}`);
+      }
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to handle user input: ${error.message}`);
       throw error;
     }
   });
@@ -2561,6 +2610,306 @@ function setupIPC(): void {
     }
   });
 
+  // Update individual workflow phase
+  ipcMain.handle('workflow:update-phase', async (_event, data: {
+    workflowId: string;
+    phaseId: number;
+    updates: any;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Updating phase ${data.phaseId} in workflow: ${data.workflowId}`);
+    try {
+      const updatedPhase = await workflowClient.updateWorkflowPhase(
+        data.workflowId,
+        data.phaseId,
+        data.updates
+      );
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully updated phase ${data.phaseId} in workflow ${data.workflowId}`);
+
+      return { success: true, phase: updatedPhase };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to update phase: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Add new phase to workflow
+  ipcMain.handle('workflow:add-phase', async (_event, data: {
+    workflowId: string;
+    newPhase: any;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Adding new phase to workflow: ${data.workflowId}`);
+    try {
+      // Get current workflow
+      const workflow = await workflowClient.getWorkflowDefinition(data.workflowId);
+
+      if (!workflow || !workflow.phases_json) {
+        throw new Error('Workflow not found or has no phases');
+      }
+
+      // Find the next available phase ID
+      const maxId = workflow.phases_json.reduce((max, phase) =>
+        Math.max(max, phase.id), -1);
+      const newPhaseId = maxId + 1;
+
+      // Create the new phase with ID
+      const newPhaseWithId = {
+        ...data.newPhase,
+        id: newPhaseId,
+      };
+
+      // Add to phases array
+      const updatedPhasesJson = [...workflow.phases_json, newPhaseWithId];
+
+      // Update workflow in database using import (which updates existing workflow)
+      await workflowClient.importWorkflowDefinition({
+        ...workflow,
+        phases_json: updatedPhasesJson,
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      // Get fresh workflow data
+      const updatedWorkflow = await workflowClient.getWorkflowDefinition(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully added phase ${newPhaseId} to workflow ${data.workflowId}`);
+
+      return { success: true, workflow: updatedWorkflow };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to add phase: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // =============================================
+  // GRAPH-BASED WORKFLOW OPERATIONS (N8N-style)
+  // =============================================
+
+  // Add node to workflow graph
+  ipcMain.handle('workflow:add-node', async (_event, data: {
+    workflowId: string;
+    newNode: any; // Accept full WorkflowNode object with all properties
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Adding node to workflow: ${data.workflowId}`);
+    try {
+      const { randomUUID } = await import('crypto');
+      const nodeId = data.newNode.id || randomUUID();
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Adding node ${nodeId} (${data.newNode.type}) to workflow ${data.workflowId}`);
+
+      // Store the complete node data including all enhanced fields
+      const nodeData = { ...data.newNode };
+      delete nodeData.id; // Remove id as it's stored separately
+
+      // Call MCP add_node tool
+      await workflowClient.callTool('add_node', {
+        workflow_def_id: data.workflowId,
+        node_id: nodeId,
+        node_type: data.newNode.type,
+        node_data: nodeData // Store complete node configuration
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully added node ${nodeId} to workflow ${data.workflowId}`);
+
+      return { success: true, nodeId };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to add node: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Delete node from workflow graph
+  ipcMain.handle('workflow:delete-node', async (_event, data: {
+    workflowId: string;
+    nodeId: string;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Deleting node ${data.nodeId} from workflow: ${data.workflowId}`);
+    try {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Deleting node ${data.nodeId} from workflow ${data.workflowId}`);
+
+      // Call MCP delete_node tool (also removes connected edges)
+      await workflowClient.callTool('delete_node', {
+        workflow_def_id: data.workflowId,
+        node_id: data.nodeId
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully deleted node ${data.nodeId} from workflow ${data.workflowId}`);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to delete node: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Add edge to workflow graph
+  ipcMain.handle('workflow:add-edge', async (_event, data: {
+    workflowId: string;
+    source: string;
+    target: string;
+    type?: string;
+    label?: string;
+    condition?: string;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Adding edge to workflow: ${data.workflowId}`);
+    try {
+      const { randomUUID } = await import('crypto');
+      const edgeId = randomUUID();
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Adding edge ${edgeId} (${data.source} -> ${data.target}) to workflow ${data.workflowId}`);
+
+      // Call MCP create_edge tool
+      await workflowClient.callTool('create_edge', {
+        workflow_def_id: data.workflowId,
+        edge_id: edgeId,
+        source_node_id: data.source,
+        target_node_id: data.target,
+        edge_type: data.type,
+        label: data.label,
+        condition: data.condition
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully added edge ${edgeId} to workflow ${data.workflowId}`);
+
+      return { success: true, edgeId };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to add edge: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Update edge in workflow graph
+  ipcMain.handle('workflow:update-edge', async (_event, data: {
+    workflowId: string;
+    edgeId: string;
+    updates: {
+      label?: string;
+      condition?: string;
+      type?: string;
+    };
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Updating edge ${data.edgeId} in workflow: ${data.workflowId}`);
+    try {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Updating edge ${data.edgeId} in workflow ${data.workflowId}`);
+
+      // Call MCP update_edge tool
+      await workflowClient.callTool('update_edge', {
+        workflow_def_id: data.workflowId,
+        edge_id: data.edgeId,
+        updates: data.updates
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully updated edge ${data.edgeId} in workflow ${data.workflowId}`);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to update edge: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Delete edge from workflow graph
+  ipcMain.handle('workflow:delete-edge', async (_event, data: {
+    workflowId: string;
+    edgeId: string;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Deleting edge ${data.edgeId} from workflow: ${data.workflowId}`);
+    try {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Deleting edge ${data.edgeId} from workflow ${data.workflowId}`);
+
+      // Call MCP delete_edge tool
+      await workflowClient.callTool('delete_edge', {
+        workflow_def_id: data.workflowId,
+        edge_id: data.edgeId
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully deleted edge ${data.edgeId} from workflow ${data.workflowId}`);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to delete edge: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Update node properties in workflow graph
+  ipcMain.handle('workflow:update-node', async (_event, data: {
+    workflowId: string;
+    nodeId: string;
+    updates: any;
+  }) => {
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `IPC: Updating node ${data.nodeId} in workflow: ${data.workflowId}`);
+    try {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Updating node ${data.nodeId} in workflow ${data.workflowId}`);
+
+      // Call MCP update_node_data tool
+      await workflowClient.callTool('update_node_data', {
+        workflow_def_id: data.workflowId,
+        node_id: data.nodeId,
+        updates: data.updates
+      });
+
+      // Invalidate cache for this workflow
+      workflowCache.invalidate(data.workflowId);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Successfully updated node ${data.nodeId} in workflow ${data.workflowId}`);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Failed to update node: ${error.message}`);
+      throw error;
+    }
+  });
+
   // Import workflow from folder
   ipcMain.handle('workflow:import-from-folder', async (_event, folderPath: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Importing workflow from folder: ${folderPath}`);
@@ -2630,6 +2979,118 @@ function setupIPC(): void {
       return await resolver.getInstalledSkills();
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to get installed skills: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Read agent file
+  ipcMain.handle('document:read-agent', async (_event, agentName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Reading agent file: ${agentName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+      const agentPath = path.join(homeDir, '.claude', 'agents', `${agentName}.md`);
+
+      const content = await fs.readFile(agentPath, 'utf-8');
+      return {
+        content,
+        filePath: agentPath,
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to read agent: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Write agent file
+  ipcMain.handle('document:write-agent', async (_event, agentName: string, content: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Writing agent file: ${agentName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+      const agentsDir = path.join(homeDir, '.claude', 'agents');
+      const agentPath = path.join(agentsDir, `${agentName}.md`);
+
+      // Ensure directory exists
+      await fs.mkdir(agentsDir, { recursive: true });
+
+      await fs.writeFile(agentPath, content, 'utf-8');
+      logWithCategory('info', LogCategory.WORKFLOW, `Agent file saved: ${agentPath}`);
+
+      return { success: true, filePath: agentPath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to write agent: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Read skill file
+  ipcMain.handle('document:read-skill', async (_event, skillName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Reading skill file: ${skillName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+
+      // Try both single file and directory formats
+      const singleFilePath = path.join(homeDir, '.claude', 'skills', `${skillName}.md`);
+      const dirFilePath = path.join(homeDir, '.claude', 'skills', skillName, 'SKILL.md');
+
+      let content: string;
+      let filePath: string;
+
+      try {
+        content = await fs.readFile(singleFilePath, 'utf-8');
+        filePath = singleFilePath;
+      } catch {
+        content = await fs.readFile(dirFilePath, 'utf-8');
+        filePath = dirFilePath;
+      }
+
+      return { content, filePath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to read skill: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Write skill file
+  ipcMain.handle('document:write-skill', async (_event, skillName: string, content: string, filePath?: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Writing skill file: ${skillName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+
+      // Use provided path or determine from skill name
+      let targetPath = filePath;
+      if (!targetPath) {
+        const singleFilePath = path.join(homeDir, '.claude', 'skills', `${skillName}.md`);
+        const dirFilePath = path.join(homeDir, '.claude', 'skills', skillName, 'SKILL.md');
+
+        // Check which format exists
+        try {
+          await fs.access(singleFilePath);
+          targetPath = singleFilePath;
+        } catch {
+          try {
+            await fs.access(dirFilePath);
+            targetPath = dirFilePath;
+          } catch {
+            // Default to single file format
+            targetPath = singleFilePath;
+          }
+        }
+      }
+
+      await fs.writeFile(targetPath, content, 'utf-8');
+      logWithCategory('info', LogCategory.WORKFLOW, `Skill file saved: ${targetPath}`);
+
+      return { success: true, filePath: targetPath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to write skill: ${error.message}`);
       throw error;
     }
   });
@@ -2741,6 +3202,187 @@ function setupIPC(): void {
     }
   });
 
+  // ========================================
+  // Provider Management Handlers
+  // ========================================
+
+  // List all saved providers
+  ipcMain.handle('provider:list', async () => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const providers = await providerManager.listSavedProviders();
+      return providers;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to list providers: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
+  // Add new provider
+  ipcMain.handle('provider:add', async (_event, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const id = await providerManager.saveProvider(provider);
+      return { success: true, id };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to add provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Update existing provider
+  ipcMain.handle('provider:update', async (_event, id: string, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const updatedProvider = { ...provider, id };
+      await providerManager.saveProvider(updatedProvider);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to update provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Delete provider
+  ipcMain.handle('provider:delete', async (_event, id: string) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      await providerManager.deleteProvider(id);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to delete provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Test provider credentials
+  ipcMain.handle('provider:test', async (_event, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const result = await providerManager.validateProvider(provider);
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Provider test failed: ${error.message}`);
+      return { valid: false, error: error.message };
+    }
+  });
+
+  // Get all available LLM providers (for workflow node configuration)
+  ipcMain.handle('llm-providers:get-all', async () => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+
+      // Get saved providers from credential store
+      const savedProviders = await providerManager.listSavedProviders();
+
+      // If no saved providers, return a default Claude Code CLI provider
+      if (!savedProviders || savedProviders.length === 0) {
+        logWithCategory('info', LogCategory.WORKFLOW, 'No saved providers, returning default Claude Code CLI');
+        return [{
+          id: 'default-claude-code-cli',
+          type: 'claude-code-cli',
+          name: 'Claude Code (Default)',
+          enabled: true,
+          config: {
+            model: 'claude-sonnet-4-5',
+            headless: true,
+            outputFormat: 'text'
+          }
+        }];
+      }
+
+      return savedProviders;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to get LLM providers: ${error.message}`);
+      // Return default provider even on error
+      return [{
+        id: 'default-claude-code-cli',
+        type: 'claude-code-cli',
+        name: 'Claude Code (Default)',
+        enabled: true,
+        config: {
+          model: 'claude-sonnet-4-5',
+          headless: true,
+          outputFormat: 'text'
+        }
+      }];
+    }
+  });
+
+  // ========================================
+  // Context & Variable Handlers
+  // ========================================
+
+  // Evaluate JSONPath expression (for testing in UI)
+  ipcMain.handle('workflow:evaluate-jsonpath', async (_event, expression: string, context: any) => {
+    try {
+      const contextManager = new ContextManager();
+      const result = contextManager.evaluateJSONPath(expression, context);
+      return { success: true, result };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Test condition expression (for conditional nodes)
+  ipcMain.handle('workflow:test-condition', async (_event, condition: string, context: any) => {
+    try {
+      const contextManager = new ContextManager();
+      const result = contextManager.evaluateCondition(condition, context);
+      return { success: true, result };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ========================================
+  // File Browser Handlers
+  // ========================================
+
+  // Open file picker dialog
+  ipcMain.handle('dialog:open-file', async (_event, options?: { defaultPath?: string }) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        defaultPath: options?.defaultPath,
+      });
+
+      if (result.canceled) {
+        return { canceled: true };
+      }
+
+      return { canceled: false, filePath: result.filePaths[0] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `File dialog error: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
+  // Open folder picker dialog
+  ipcMain.handle('dialog:open-folder', async (_event, options?: { defaultPath?: string }) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        defaultPath: options?.defaultPath,
+      });
+
+      if (result.canceled) {
+        return { canceled: true };
+      }
+
+      return { canceled: false, folderPath: result.filePaths[0] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Folder dialog error: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
   // Shell operations
   ipcMain.handle('shell:open-path', async (_event, path: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening path: ${path}`);
@@ -2801,6 +3443,26 @@ app.whenReady().then(async () => {
   // Set Windows App User Model ID for proper taskbar behavior
   if (process.platform === 'win32') {
     app.setAppUserModelId('net.fictionlab.studio');
+  }
+
+  // Initialize database pool and persistent MCP client BEFORE setupIPC
+  // (IPC handlers need the client to be ready)
+  try {
+    logWithCategory('info', LogCategory.SYSTEM, 'Initializing database pool...');
+    await initializeDatabasePool();
+    logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized');
+
+    logWithCategory('info', LogCategory.SYSTEM, 'Initializing persistent MCP client...');
+    persistentMCPClient = new PersistentMCPClient();
+    await persistentMCPClient.start();
+    logWithCategory('info', LogCategory.SYSTEM, 'Persistent MCP client initialized successfully');
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error initializing database/MCP client:', error);
+    // Fatal error - show error dialog and quit
+    dialog.showErrorBox('Initialization Error',
+      `Failed to initialize database or MCP client: ${error}\n\nThe application will now exit.`);
+    app.quit();
+    return;
   }
 
   setupIPC();
@@ -2867,11 +3529,9 @@ app.whenReady().then(async () => {
     createWindow();
 
     // Initialize plugin system after main window is created
+    // (Database and MCP client are already initialized before setupIPC)
     try {
       logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin system...');
-
-      // Initialize database pool first
-      await initializeDatabasePool();
 
       // Initialize plugin manager
       await pluginManager.initialize();
@@ -2935,6 +3595,16 @@ app.on('window-all-closed', () => {
 // Handle app before quit
 app.on('before-quit', async () => {
   logger.info('App is quitting...');
+
+  // Shut down persistent MCP client
+  try {
+    if (persistentMCPClient) {
+      logWithCategory('info', LogCategory.SYSTEM, 'Shutting down persistent MCP client...');
+      await persistentMCPClient.shutdown();
+    }
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error shutting down persistent MCP client:', error);
+  }
 
   // Clean up plugin system
   try {
