@@ -289,16 +289,21 @@ class PluginManager {
 
     logWithCategory('info', LogCategory.SYSTEM, `Handling plugin action: ${pluginId} -> ${action}`);
 
-    // Call the plugin's IPC handler directly
+    // Send message to renderer to invoke the plugin's IPC handler
+    // The renderer will call electronAPI.invoke(channelName)
     const channelName = `plugin:${pluginId}:${action}`;
 
     try {
-      // Invoke the IPC handler (this simulates what the renderer would do)
-      const result = await this.mainWindow?.webContents.executeJavaScript(
-        `require('electron').ipcRenderer.invoke('${channelName}')`
-      );
+      if (this.mainWindow) {
+        // Send event to renderer to invoke the handler
+        this.mainWindow.webContents.send('plugin-action', {
+          pluginId,
+          action,
+          channelName
+        });
 
-      logWithCategory('debug', LogCategory.SYSTEM, `Plugin action ${channelName} completed:`, result);
+        logWithCategory('debug', LogCategory.SYSTEM, `Sent plugin action to renderer: ${channelName}`);
+      }
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, `Plugin action ${channelName} failed:`, error);
 

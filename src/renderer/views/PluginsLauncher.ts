@@ -117,10 +117,10 @@ export class PluginsLauncher implements View {
               Launch
             </button>
           ` : ''}
-          ${isUtility && isActive ? `
-            <span class="plugin-utility-note" style="font-size: 0.85em; color: #888; margin-right: 8px;">
-              Menu: Plugins → ${this.escapeHtml(plugin.name || plugin.id)}
-            </span>
+          ${isUtility && isActive && plugin.id === 'claude-code-subscription' ? `
+            <button class="plugin-action-btn primary" data-action="settings" title="Configure Workspace">
+              ⚙️ Settings
+            </button>
           ` : ''}
           <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
                   data-action="pin"
@@ -256,6 +256,22 @@ export class PluginsLauncher implements View {
         launchBtn.addEventListener('click', () => this.launchPlugin(pluginId));
       }
 
+      // Settings button (for Claude Code plugin)
+      const settingsBtn = card.querySelector('[data-action="settings"]');
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const result = await (window as any).electronAPI.invoke('plugin:claude-code-subscription:show-settings');
+            if (result && result.success) {
+              console.log('[PluginsLauncher] Workspace configured:', result.workspace);
+            }
+          } catch (error) {
+            console.error('[PluginsLauncher] Failed to show settings:', error);
+          }
+        });
+      }
+
       // Pin button
       const pinBtn = card.querySelector('[data-action="pin"]');
       if (pinBtn) {
@@ -265,9 +281,9 @@ export class PluginsLauncher implements View {
         });
       }
 
-      // Card click to launch (if active)
+      // Card click to launch (if active and not a utility plugin)
       const plugin = this.plugins.find(p => p.id === pluginId);
-      if (plugin && plugin.status === 'active') {
+      if (plugin && plugin.status === 'active' && plugin.pluginType !== 'utility') {
         card.addEventListener('click', (e) => {
           // Don't trigger if clicking on action buttons
           if ((e.target as HTMLElement).closest('.plugin-action-btn')) return;

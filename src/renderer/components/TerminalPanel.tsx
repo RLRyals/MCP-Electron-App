@@ -17,6 +17,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 export interface TerminalPanelProps {
   height?: number;
   onResize?: (height: number) => void;
+  title?: string; // Optional custom title for the terminal
+  workspaceLabel?: string; // Optional label showing the workspace (e.g., project name)
 }
 
 // Singleton terminal ID - shared across all TerminalPanel instances
@@ -24,7 +26,9 @@ const TERMINAL_ID = 'claude-code-terminal';
 
 export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   height = 300,
-  onResize
+  onResize,
+  title = 'CLAUDE CODE TERMINAL',
+  workspaceLabel
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -104,12 +108,15 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         term.writeln('\x1b[1;32mStarting Claude Code...\x1b[0m');
         term.writeln('');
 
+        // Use configured workspace (or Documents folder) as default for general terminal
+        // This is separate from workflow-specific terminals which use projectFolder
         electronAPI.invoke('terminal:create', {
           id: TERMINAL_ID,
           command: 'claude',  // Assumes claude is in PATH
           args: [],
           cols: term.cols,
           rows: term.rows,
+          useHomeDirectory: true, // Signal to use configured workspace instead of app dir
         }).then(() => {
           console.log('[TerminalPanel] Claude Code session started');
         }).catch((error: Error) => {
@@ -615,7 +622,14 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         onMouseDown={handleResizeStart}
       />
       <div style={styles.header}>
-        <span style={styles.title}>CLAUDE CODE TERMINAL</span>
+        <span style={styles.title}>
+          {title}
+          {workspaceLabel && (
+            <span style={{ color: '#4ec9b0', marginLeft: '8px', fontWeight: 'normal' }}>
+              [{workspaceLabel}]
+            </span>
+          )}
+        </span>
         <span style={styles.hint}>
           {characterCounter || 'Interactive terminal powered by xterm.js'}
         </span>

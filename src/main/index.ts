@@ -2183,6 +2183,61 @@ function setupIPC(): void {
     }
   });
 
+  // Claude Code Plugin Settings Handler
+  ipcMain.handle('plugin:claude-code-subscription:show-settings', async (_event) => {
+    try {
+      const plugin = pluginManager.getPlugin('claude-code-subscription');
+      if (!plugin) {
+        throw new Error('Claude Code plugin not found');
+      }
+
+      // Get current workspace setting
+      const currentWorkspace = plugin.context.config.get<string>('defaultWorkspace') || '';
+
+      // Show folder picker dialog
+      const result = await dialog.showOpenDialog(mainWindow!, {
+        title: 'Select Claude Code Workspace Folder',
+        message: 'Choose a safe folder for Claude Code to use as its workspace',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: currentWorkspace || app.getPath('documents')
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { success: false, message: 'Selection cancelled' };
+      }
+
+      const selectedPath = result.filePaths[0];
+
+      // Save to plugin config
+      await plugin.context.config.set('defaultWorkspace', selectedPath);
+
+      logWithCategory('info', LogCategory.SYSTEM,
+        `Claude Code workspace updated: ${selectedPath}`);
+
+      // Show success notification
+      if (mainWindow) {
+        mainWindow.webContents.send('show-notification', {
+          type: 'success',
+          message: `Workspace set to: ${selectedPath}`
+        });
+      }
+
+      return {
+        success: true,
+        workspace: selectedPath,
+        message: 'Workspace configured successfully'
+      };
+
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM,
+        `Failed to configure workspace: ${error.message}`);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
   // Plugin View IPC handlers
   // NEW: Get plugin view URL for embedding in main window
   ipcMain.handle('plugin:get-view-url', async (_event, pluginId: string, viewName: string) => {
@@ -3994,11 +4049,39 @@ function setupIPC(): void {
     env?: NodeJS.ProcessEnv;
     cols?: number;
     rows?: number;
+    useHomeDirectory?: boolean; // Use user's home directory as workspace
   }) => {
     logWithCategory('info', LogCategory.SYSTEM,
       `IPC: Creating terminal ${options.id}: ${options.command} ${options.args.join(' ')}`);
     try {
-      ptyManager.createTerminal(options);
+      // If useHomeDirectory is true, get workspace from plugin config or fall back to safe default
+      const finalOptions = { ...options };
+      if (options.useHomeDirectory && !options.cwd) {
+        // Try to get configured workspace from Claude Code plugin
+        let workspace: string | undefined;
+        try {
+          const plugin = pluginManager.getPlugin('claude-code-subscription');
+          if (plugin && plugin.context) {
+            workspace = plugin.context.config.get<string>('defaultWorkspace');
+          }
+        } catch (error) {
+          // Plugin not available or not configured
+        }
+
+        // Fall back to Documents folder (safer than home directory)
+        if (!workspace) {
+          workspace = app.getPath('documents');
+          logWithCategory('info', LogCategory.SYSTEM,
+            `No workspace configured, using Documents folder: ${workspace}`);
+        } else {
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Using configured workspace: ${workspace}`);
+        }
+
+        finalOptions.cwd = workspace;
+      }
+
+      ptyManager.createTerminal(finalOptions);
       return { success: true };
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM,

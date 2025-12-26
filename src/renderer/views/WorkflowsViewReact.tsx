@@ -44,6 +44,7 @@ const WorkflowsApp: React.FC = () => {
   const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
   const [terminalHeight, setTerminalHeight] = useState(300);
   const [showTerminal, setShowTerminal] = useState(true);
+  const [activeProjectName, setActiveProjectName] = useState<string>('');
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -73,8 +74,14 @@ const WorkflowsApp: React.FC = () => {
   useEffect(() => {
     loadWorkflows();
 
-    // Load app state
-    appState.refresh().catch(error => {
+    // Load app state and set initial project name
+    appState.refresh().then(() => {
+      const activeProject = appState.getActiveProject();
+      if (activeProject) {
+        const projectName = (activeProject as any).project_name || (activeProject as any).name || '';
+        setActiveProjectName(projectName);
+      }
+    }).catch(error => {
       console.error('[WorkflowsViewReact] Failed to load app state:', error);
     });
 
@@ -88,6 +95,9 @@ const WorkflowsApp: React.FC = () => {
 
       topBar.on('project-selected', async (data: { projectId: number; projectName: string }) => {
         console.log('[WorkflowsViewReact] Project selected event:', data);
+
+        // Update active project name for terminal label
+        setActiveProjectName(data.projectName);
 
         // Refresh app state to ensure projects are loaded
         console.log('[WorkflowsViewReact] Calling appState.refresh()...');
@@ -568,6 +578,8 @@ const WorkflowsApp: React.FC = () => {
           <TerminalPanel
             height={terminalHeight}
             onResize={setTerminalHeight}
+            title="CLAUDE CODE TERMINAL"
+            workspaceLabel={activeProjectName || 'General Workspace'}
           />
         )}
       </div>
