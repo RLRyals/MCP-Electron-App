@@ -91,6 +91,18 @@ export class WorkflowExecutor extends EventEmitter {
       this.emit('claude-output', data);
     });
 
+    // Forward interactive session events
+    this.claudeExecutor.on('workflow-prompt-ready', (data) => {
+      this.emit('workflow-prompt-ready', data);
+
+      // Also emit a log message to show in workflow UI
+      this.emit('workflow:log', {
+        level: 'info',
+        category: 'WORKFLOW',
+        message: `🎯 Interactive Claude Code session started (Terminal ID: ${data.ptyId})`
+      });
+    });
+
     // Register all node executors
     this.nodeExecutors = new Map<string, NodeExecutor>();
     this.nodeExecutors.set('planning', new AgentNodeExecutor());

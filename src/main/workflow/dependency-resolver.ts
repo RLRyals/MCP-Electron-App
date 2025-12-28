@@ -201,4 +201,22 @@ export class DependencyResolver {
       .filter(file => file.endsWith('.md'))
       .map(file => path.basename(file, '.md'));
   }
+
+  /**
+   * Get installed output-styles list from ~/.claude/output-styles/
+   * Output styles are used for interactive nodes to control presentation format
+   */
+  async getInstalledOutputStyles(): Promise<string[]> {
+    const homeDir = require('os').homedir();
+    const outputStylesDir = path.join(homeDir, '.claude', 'output-styles');
+
+    if (!await fs.pathExists(outputStylesDir)) {
+      return [];
+    }
+
+    const files = await fs.readdir(outputStylesDir);
+    return files
+      .filter(file => file.endsWith('.md'))
+      .map(file => path.basename(file, '.md'));
+  }
 }

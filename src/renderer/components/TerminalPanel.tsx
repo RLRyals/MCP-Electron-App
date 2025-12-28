@@ -39,6 +39,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   const resizeStartY = useRef<number>(0);
   const resizeStartHeight = useRef<number>(0);
   const [characterCounter, setCharacterCounter] = useState<string>('');
+  const activeTerminalIdRef = useRef<string>(TERMINAL_ID);  // Track which terminal is active
 
   // Initialize terminal
   useEffect(() => {
@@ -204,8 +205,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           // Update character counter on separate line
           updateCharacterCounter();
         } else {
-          // Normal terminal mode - send paste to PTY
-          electronAPI.invoke('terminal:input', TERMINAL_ID, text).catch((error: Error) => {
+          // Normal terminal mode - send paste to active PTY
+          electronAPI.invoke('terminal:input', activeTerminalIdRef.current, text).catch((error: Error) => {
             console.error('[TerminalPanel] Failed to send paste:', error);
           });
         }
@@ -270,8 +271,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                 // Update character counter on separate line
                 updateCharacterCounter();
               } else {
-                // Normal terminal mode - send to PTY
-                electronAPI.invoke('terminal:input', TERMINAL_ID, text).catch((error: Error) => {
+                // Normal terminal mode - send to active PTY
+                electronAPI.invoke('terminal:input', activeTerminalIdRef.current, text).catch((error: Error) => {
                   console.error('[TerminalPanel] Failed to send paste:', error);
                 });
               }
@@ -380,8 +381,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           updateCharacterCounter();
         }
       } else {
-        // Normal terminal mode - send to PTY
-        electronAPI.invoke('terminal:input', TERMINAL_ID, data).catch((error: Error) => {
+        // Normal terminal mode - send to active PTY (could be UI terminal or workflow terminal)
+        electronAPI.invoke('terminal:input', activeTerminalIdRef.current, data).catch((error: Error) => {
           console.error('[TerminalPanel] Failed to send input:', error);
         });
       }
@@ -396,16 +397,34 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     // Handle terminal output from PTY
     // Note: preload's on() wrapper strips the event, so first arg is the payload
     const handleData = (payload: { id: string; data: string }) => {
+      // Accept both UI terminal and workflow terminals
+      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
+
       console.log('[TerminalPanel] Received terminal:data event:', {
         payloadId: payload?.id,
         expectedId: TERMINAL_ID,
         dataLength: payload?.data?.length,
         hasXterm: !!xtermRef.current,
-        match: payload?.id === TERMINAL_ID
+        match: isOurTerminal
       });
-      if (payload && payload.id === TERMINAL_ID && xtermRef.current) {
+      if (payload && isOurTerminal && xtermRef.current) {
         console.log('[TerminalPanel] Writing data to xterm:', payload.data.substring(0, 50));
+
+        // If this is a workflow terminal, update the active terminal ID
+        if (payload.id.startsWith('workflow-claude-')) {
+          activeTerminalIdRef.current = payload.id;
+          console.log('[TerminalPanel] Active terminal switched to workflow:', payload.id);
+        }
+
         xtermRef.current.write(payload.data);
+
+        // Force terminal refresh - xterm.js doesn't always update without window focus
+        // Call refresh() to ensure the terminal repaints immediately
+        requestAnimationFrame(() => {
+          if (xtermRef.current) {
+            xtermRef.current.refresh(0, xtermRef.current.rows - 1);
+          }
+        });
       } else {
         console.warn('[TerminalPanel] Skipping data - ID mismatch or no xterm', {
           hasPayload: !!payload,
@@ -417,15 +436,23 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     };
 
     const handleExit = (payload: { id: string; exitCode: number }) => {
-      if (payload && payload.id === TERMINAL_ID && xtermRef.current) {
+      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
+      if (payload && isOurTerminal && xtermRef.current) {
         xtermRef.current.writeln('');
         xtermRef.current.writeln(`\x1b[33m✗ Terminal session ended (exit code: ${payload.exitCode})\x1b[0m`);
         xtermRef.current.writeln('');
+
+        // If a workflow terminal exited, switch back to UI terminal
+        if (payload.id.startsWith('workflow-claude-')) {
+          activeTerminalIdRef.current = TERMINAL_ID;
+          console.log('[TerminalPanel] Workflow terminal exited, switched back to UI terminal');
+        }
       }
     };
 
     const handleError = (payload: { id: string; error: string }) => {
-      if (payload && payload.id === TERMINAL_ID && xtermRef.current) {
+      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
+      if (payload && isOurTerminal && xtermRef.current) {
         xtermRef.current.writeln('');
         xtermRef.current.writeln(`\x1b[31m✗ Terminal error: ${payload.error}\x1b[0m`);
         xtermRef.current.writeln('');
@@ -500,9 +527,27 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       xtermRef.current.write(`${colorCode}${data.data}\x1b[0m`);
     };
 
+    // Handle interactive workflow session start
+    const handleWorkflowPromptReady = (data: { sessionId: string; ptyId: string; prompt: string; message: string }) => {
+      if (!xtermRef.current) return;
+
+      console.log('[TerminalPanel] Interactive Claude session started:', data);
+
+      // Switch active terminal to the workflow terminal
+      activeTerminalIdRef.current = data.ptyId;
+
+      // DON'T write decorative messages - let Claude Code's output be the only thing shown
+      // The overlapping text was caused by the app injecting status messages
+      // while Claude Code was also writing to the terminal
+
+      // Focus the terminal for immediate interaction
+      xtermRef.current.focus();
+    };
+
     electronAPI.on('terminal:write-prompt', handleWritePrompt);
     electronAPI.on('workflow:log', handleWorkflowLog);
     electronAPI.on('claude-code:stream', handleClaudeCodeStream);
+    electronAPI.on('workflow:prompt-ready', handleWorkflowPromptReady);
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
@@ -529,6 +574,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       electronAPI.off('terminal:write-prompt', handleWritePrompt);
       electronAPI.off('workflow:log', handleWorkflowLog);
       electronAPI.off('claude-code:stream', handleClaudeCodeStream);
+      electronAPI.off('workflow:prompt-ready', handleWorkflowPromptReady);
 
       // Remove paste event listeners
       if (terminalContainer) {

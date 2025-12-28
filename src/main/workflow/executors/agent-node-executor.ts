@@ -157,11 +157,18 @@ export class AgentNodeExecutor extends EventEmitter implements NodeExecutor {
     logWithCategory('debug', LogCategory.WORKFLOW,
       `Prompt: ${prompt.substring(0, 200)}...`);
 
+    // Add skill to context if specified (needed for Claude Code CLI execution)
+    const executionContext = {
+      ...context,
+      skill: node.skill || null,
+      agent: node.agent,
+    };
+
     // Execute prompt via provider manager
     const response = await providerManager.executePrompt(
       node.provider,
       prompt,
-      context,
+      executionContext,
       systemPrompt
     );
 

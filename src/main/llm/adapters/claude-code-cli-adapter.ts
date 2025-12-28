@@ -37,19 +37,19 @@ export class ClaudeCodeCLIAdapter implements LLMProviderAdapter {
     const provider = request.provider as ClaudeCodeCLIProvider;
 
     try {
-      // Extract skill from context if available
-      const skill = request.context?.skill || null;
+      // Extract agent from context (Claude CLI uses --agent, not --skill)
+      const agent = request.context?.agent || null;
       const phaseNumber = request.context?.phaseNumber || 0;
 
       // Get headless mode from provider config (default: true for backward compatibility)
       const headless = provider.config?.headless !== false;
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Executing Claude Code CLI with skill: ${skill || 'none'}, headless: ${headless}`);
+        `Executing Claude Code CLI with agent: ${agent || 'none'}, headless: ${headless}`);
 
       // Execute via existing ClaudeCodeExecutor
       const result = await this.executor.executeSkill(
-        skill,
+        agent,
         phaseNumber,
         request.prompt,
         request.context, // Pass context including projectFolder

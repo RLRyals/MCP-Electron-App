@@ -92,13 +92,16 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   const [isDirty, setIsDirty] = useState(false);
   const [contextMode, setContextMode] = useState<'simple' | 'advanced'>('simple');
 
-  // Agent/Skill management state
+  // Agent/Skill/Output-Style management state
   const [installedAgents, setInstalledAgents] = useState<string[]>([]);
   const [installedSkills, setInstalledSkills] = useState<string[]>([]);
+  const [installedOutputStyles, setInstalledOutputStyles] = useState<string[]>([]);
   const [editingAgent, setEditingAgent] = useState<{ name: string; content: string; filePath: string } | null>(null);
   const [editingSkill, setEditingSkill] = useState<{ name: string; content: string; filePath: string } | null>(null);
+  const [editingOutputStyle, setEditingOutputStyle] = useState<{ name: string; content: string; filePath: string } | null>(null);
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [creatingSkill, setCreatingSkill] = useState(false);
+  const [creatingOutputStyle, setCreatingOutputStyle] = useState(false);
 
   // ============================================================================
   // Refs for Focus Management
@@ -162,16 +165,18 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
     }
   }, [node]);
 
-  // Load installed agents and skills
+  // Load installed agents, skills, and output-styles
   useEffect(() => {
     const loadInstalled = async () => {
       try {
         const agents = await (window as any).electronAPI.workflows.getInstalledAgents();
         const skills = await (window as any).electronAPI.workflows.getInstalledSkills();
+        const outputStyles = await (window as any).electronAPI.workflows.getInstalledOutputStyles();
         setInstalledAgents(agents || []);
         setInstalledSkills(skills || []);
+        setInstalledOutputStyles(outputStyles || []);
       } catch (error) {
-        console.error('Failed to load installed agents/skills:', error);
+        console.error('Failed to load installed agents/skills/output-styles:', error);
       }
     };
 
@@ -530,6 +535,105 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   };
 
   // ============================================================================
+  // Output-Style Handlers
+  // ============================================================================
+
+  const handleEditOutputStyle = async (outputStyleName: string) => {
+    if (!outputStyleName) {
+      alert('Please select an output-style first');
+      return;
+    }
+
+    if (!installedOutputStyles.includes(outputStyleName)) {
+      alert('Output-style not found on disk. Create it first.');
+      return;
+    }
+
+    try {
+      const { content, filePath } = await (window as any).electronAPI.document.readOutputStyle(outputStyleName);
+      setEditingOutputStyle({ name: outputStyleName, content, filePath });
+    } catch (error: any) {
+      alert(`Failed to load output-style: ${error.message}`);
+    }
+  };
+
+  const handleSaveOutputStyle = async (content: string) => {
+    if (!editingOutputStyle) return;
+
+    try {
+      await (window as any).electronAPI.document.writeOutputStyle(editingOutputStyle.name, content);
+      setEditingOutputStyle(null);
+
+      // Refresh installed output-styles list
+      const outputStyles = await (window as any).electronAPI.workflows.getInstalledOutputStyles();
+      setInstalledOutputStyles(outputStyles || []);
+    } catch (error: any) {
+      alert(`Failed to save output-style: ${error.message}`);
+    }
+  };
+
+  const handleImportOutputStyleFile = async () => {
+    try {
+      const result = await (window as any).electronAPI.document.importOutputStyleFile();
+      if (result.canceled) return;
+
+      // Sanitize filename to valid output-style name (lowercase, numbers, dashes only)
+      const outputStyleName = result.fileName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+      // Confirm overwrite if exists
+      if (installedOutputStyles.includes(outputStyleName)) {
+        const confirmed = confirm(`Output-style '${outputStyleName}' already exists. Overwrite?`);
+        if (!confirmed) return;
+      }
+
+      await (window as any).electronAPI.document.writeOutputStyle(outputStyleName, result.content);
+
+      // Refresh and auto-select
+      const outputStyles = await (window as any).electronAPI.workflows.getInstalledOutputStyles();
+      setInstalledOutputStyles(outputStyles || []);
+      setFormData({ ...formData, agent: outputStyleName } as any);
+      setIsDirty(true);
+
+      alert(`Output-style imported successfully as: ${outputStyleName}`);
+    } catch (error: any) {
+      alert(`Failed to import output-style: ${error.message}`);
+    }
+  };
+
+  const handleImportOutputStyleFolder = async () => {
+    try {
+      const result = await (window as any).electronAPI.document.importOutputStyleFolder();
+      if (result.canceled) return;
+
+      // Process each output-style from folder
+      let imported = 0;
+      let skipped = 0;
+
+      for (const outputStyle of result.outputStyles) {
+        // Check if exists
+        if (installedOutputStyles.includes(outputStyle.fileName)) {
+          const confirmed = confirm(`Output-style '${outputStyle.fileName}' already exists. Overwrite?`);
+          if (!confirmed) {
+            skipped++;
+            continue;
+          }
+        }
+
+        await (window as any).electronAPI.document.writeOutputStyle(outputStyle.fileName, outputStyle.content);
+        imported++;
+      }
+
+      // Refresh
+      const outputStyles = await (window as any).electronAPI.workflows.getInstalledOutputStyles();
+      setInstalledOutputStyles(outputStyles || []);
+
+      alert(`Imported ${imported} output-style(s). Skipped ${skipped}.`);
+    } catch (error: any) {
+      alert(`Failed to import output-styles: ${error.message}`);
+    }
+  };
+
+  // ============================================================================
   // Validation
   // ============================================================================
 
@@ -739,79 +843,140 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
     return (
       <div role="tabpanel" id="panel-config" aria-labelledby="tab-config">
         {/* Planning, Writing, Gate Nodes */}
-        {isAgentNode(formData) && (
-          <>
-            <div style={styles.field}>
-              <label htmlFor="config-agent" style={styles.label}>
-                Agent <span style={styles.required}>*</span>
-              </label>
+        {isAgentNode(formData) && (() => {
+          const agentNode = formData as any;
+          const provider = agentNode.provider || {
+            type: 'claude-code-cli',
+            config: { headless: true }
+          };
+          const isInteractive = provider.config?.headless === false;
 
-              <AgentSkillSelector
-                type="agent"
-                value={(formData as any).agent || ''}
-                onChange={(value: string) => {
-                  setFormData({ ...formData, agent: value } as any);
-                  setIsDirty(true);
-                  setErrors(errors.filter(err => err.field !== 'agent'));
-                }}
-                installedOptions={installedAgents}
-                error={agentError?.message}
-                required={true}
-              />
+          return (
+            <>
+              {isInteractive ? (
+                // Interactive mode: show output-style selector
+                <div style={styles.field}>
+                  <label htmlFor="config-agent" style={styles.label}>
+                    Output Style <span style={styles.required}>*</span>
+                  </label>
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#6b7280',
+                    marginBottom: '8px'
+                  }}>
+                    Output styles control presentation format. Skills are auto-selected from ~/.claude/skills/ based on conversation context.
+                  </div>
 
-              <AgentSkillActionButtons
-                type="agent"
-                selectedName={(formData as any).agent || ''}
-                installedOptions={installedAgents}
-                onEdit={() => handleEditAgent((formData as any).agent)}
-                onCreate={() => setCreatingAgent(true)}
-                onImportFile={() => handleImportAgentFile()}
-                onImportFolder={() => handleImportAgentFolder()}
-              />
+                  <AgentSkillSelector
+                    type="agent"
+                    value={(formData as any).agent || ''}
+                    onChange={(value: string) => {
+                      setFormData({ ...formData, agent: value } as any);
+                      setIsDirty(true);
+                      setErrors(errors.filter(err => err.field !== 'agent'));
+                    }}
+                    installedOptions={installedOutputStyles}
+                    error={agentError?.message}
+                    required={true}
+                  />
 
-              {agentError && (
-                <div
-                  id="config-agent-error"
-                  style={styles.errorText}
-                  role="alert"
-                  aria-live="polite"
-                >
-                  {agentError.message}
+                  <AgentSkillActionButtons
+                    type="agent"
+                    selectedName={(formData as any).agent || ''}
+                    installedOptions={installedOutputStyles}
+                    onEdit={() => handleEditOutputStyle((formData as any).agent)}
+                    onCreate={() => setCreatingOutputStyle(true)}
+                    onImportFile={() => handleImportOutputStyleFile()}
+                    onImportFolder={() => handleImportOutputStyleFolder()}
+                  />
+
+                  {agentError && (
+                    <div
+                      id="config-agent-error"
+                      style={styles.errorText}
+                      role="alert"
+                      aria-live="polite"
+                    >
+                      {agentError.message}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Non-interactive mode: show agent selector
+                <div style={styles.field}>
+                  <label htmlFor="config-agent" style={styles.label}>
+                    Agent <span style={styles.required}>*</span>
+                  </label>
+
+                  <AgentSkillSelector
+                    type="agent"
+                    value={(formData as any).agent || ''}
+                    onChange={(value: string) => {
+                      setFormData({ ...formData, agent: value } as any);
+                      setIsDirty(true);
+                      setErrors(errors.filter(err => err.field !== 'agent'));
+                    }}
+                    installedOptions={installedAgents}
+                    error={agentError?.message}
+                    required={true}
+                  />
+
+                  <AgentSkillActionButtons
+                    type="agent"
+                    selectedName={(formData as any).agent || ''}
+                    installedOptions={installedAgents}
+                    onEdit={() => handleEditAgent((formData as any).agent)}
+                    onCreate={() => setCreatingAgent(true)}
+                    onImportFile={() => handleImportAgentFile()}
+                    onImportFolder={() => handleImportAgentFolder()}
+                  />
+
+                  {agentError && (
+                    <div
+                      id="config-agent-error"
+                      style={styles.errorText}
+                      role="alert"
+                      aria-live="polite"
+                    >
+                      {agentError.message}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
 
-            <div style={styles.field}>
-              <label htmlFor="config-skill" style={styles.label}>
-                Skill (Optional)
-              </label>
-
-              <AgentSkillSelector
-                type="skill"
-                value={(formData as any).skill || ''}
-                onChange={(value: string) => {
-                  setFormData({ ...formData, skill: value || undefined } as any);
-                  setIsDirty(true);
-                }}
-                installedOptions={installedSkills}
-                required={false}
-              />
-
-              <AgentSkillActionButtons
-                type="skill"
-                selectedName={(formData as any).skill || ''}
-                installedOptions={installedSkills}
-                onEdit={() => handleEditSkill((formData as any).skill)}
-                onCreate={() => setCreatingSkill(true)}
-                onImportFile={() => handleImportSkillFile()}
-                onImportFolder={() => handleImportSkillFolder()}
-              />
-            </div>
-
-            {formData.type === 'gate' && (
+              {/* Skill field (shown for all modes) */}
               <div style={styles.field}>
-                <label htmlFor="config-condition" style={styles.label}>
-                  Gate Condition
+                <label htmlFor="config-skill" style={styles.label}>
+                  Skill (Optional)
+                </label>
+
+                <AgentSkillSelector
+                  type="skill"
+                  value={(formData as any).skill || ''}
+                  onChange={(value: string) => {
+                    setFormData({ ...formData, skill: value || undefined } as any);
+                    setIsDirty(true);
+                  }}
+                  installedOptions={installedSkills}
+                  required={false}
+                />
+
+                <AgentSkillActionButtons
+                  type="skill"
+                  selectedName={(formData as any).skill || ''}
+                  installedOptions={installedSkills}
+                  onEdit={() => handleEditSkill((formData as any).skill)}
+                  onCreate={() => setCreatingSkill(true)}
+                  onImportFile={() => handleImportSkillFile()}
+                  onImportFolder={() => handleImportSkillFolder()}
+                />
+              </div>
+
+              {/* Gate condition field */}
+              {formData.type === 'gate' && (
+                <div style={styles.field}>
+                  <label htmlFor="config-condition" style={styles.label}>
+                    Gate Condition
                 </label>
                 <textarea
                   id="config-condition"
@@ -824,57 +989,60 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                   placeholder="JSONPath or JavaScript expression"
                 />
               </div>
-            )}
-
-            <div style={styles.field}>
-              <label htmlFor="config-prompt" style={styles.label}>
-                Prompt Template <span style={styles.required}>*</span>
-              </label>
-              <div style={{ marginBottom: '8px', fontSize: '13px', color: '#666' }}>
-                This is the exact prompt that will be sent to the AI. Use {'{{variableName}}'} to insert context variables.
-              </div>
-              <textarea
-                id="config-prompt"
-                style={{ ...styles.input, minHeight: '200px', fontFamily: 'monospace', fontSize: '13px' }}
-                value={(formData as any).prompt || ''}
-                onChange={(e) => {
-                  setFormData({ ...formData, prompt: e.target.value } as any);
-                  setIsDirty(true);
-                  setErrors(errors.filter(err => err.field !== 'prompt'));
-                }}
-                placeholder="Example: Analyze the following text:\n\n{{userInput}}\n\nProvide detailed feedback and suggestions."
-                aria-required="true"
-              />
-              {getFieldError('prompt') && (
-                <div
-                  id="config-prompt-error"
-                  style={styles.errorText}
-                  role="alert"
-                  aria-live="polite"
-                >
-                  {getFieldError('prompt')?.message}
-                </div>
               )}
-            </div>
 
-            <div style={styles.field}>
-              <label htmlFor="config-output-var" style={styles.label}>
-                Output Variable Name
-              </label>
-              <input
-                id="config-output-var"
-                type="text"
-                style={styles.input}
-                value={(formData as any).outputVariable || ''}
-                onChange={(e) => {
-                  setFormData({ ...formData, outputVariable: e.target.value } as any);
-                  setIsDirty(true);
-                }}
-                placeholder="e.g., characterAnalysis, worldBuildingNotes"
-              />
-            </div>
-          </>
-        )}
+              {/* Prompt Template field */}
+              <div style={styles.field}>
+                <label htmlFor="config-prompt" style={styles.label}>
+                  Prompt Template <span style={styles.required}>*</span>
+                </label>
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#666' }}>
+                  This is the exact prompt that will be sent to the AI. Use {'{{variableName}}'} to insert context variables.
+                </div>
+                <textarea
+                  id="config-prompt"
+                  style={{ ...styles.input, minHeight: '200px', fontFamily: 'monospace', fontSize: '13px' }}
+                  value={(formData as any).prompt || ''}
+                  onChange={(e) => {
+                    setFormData({ ...formData, prompt: e.target.value } as any);
+                    setIsDirty(true);
+                    setErrors(errors.filter(err => err.field !== 'prompt'));
+                  }}
+                  placeholder="Example: Analyze the following text:\n\n{{userInput}}\n\nProvide detailed feedback and suggestions."
+                  aria-required="true"
+                />
+                {getFieldError('prompt') && (
+                  <div
+                    id="config-prompt-error"
+                    style={styles.errorText}
+                    role="alert"
+                    aria-live="polite"
+                  >
+                    {getFieldError('prompt')?.message}
+                  </div>
+                )}
+              </div>
+
+              {/* Output Variable Name field */}
+              <div style={styles.field}>
+                <label htmlFor="config-output-var" style={styles.label}>
+                  Output Variable Name
+                </label>
+                <input
+                  id="config-output-var"
+                  type="text"
+                  style={styles.input}
+                  value={(formData as any).outputVariable || ''}
+                  onChange={(e) => {
+                    setFormData({ ...formData, outputVariable: e.target.value } as any);
+                    setIsDirty(true);
+                  }}
+                  placeholder="e.g., characterAnalysis, worldBuildingNotes"
+                />
+              </div>
+            </>
+          );
+        })()}
 
         {/* User Input Node */}
         {formData.type === 'user-input' && (
@@ -2259,6 +2427,34 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
             setCreatingSkill(false);
           }}
           onCancel={() => setCreatingSkill(false)}
+        />
+      )}
+
+      {/* Output-Style Edit Dialog */}
+      {editingOutputStyle && (
+        <DocumentEditDialog
+          type="agent"
+          name={editingOutputStyle.name}
+          content={editingOutputStyle.content}
+          filePath={editingOutputStyle.filePath}
+          onSave={handleSaveOutputStyle}
+          onCancel={() => setEditingOutputStyle(null)}
+        />
+      )}
+
+      {/* Create Output-Style Dialog */}
+      {creatingOutputStyle && (
+        <CreateAgentDialog
+          installedAgents={installedOutputStyles}
+          onSave={async (name, content) => {
+            await (window as any).electronAPI.document.writeOutputStyle(name, content);
+            const outputStyles = await (window as any).electronAPI.workflows.getInstalledOutputStyles();
+            setInstalledOutputStyles(outputStyles || []);
+            setFormData({ ...formData, agent: name } as any);
+            setIsDirty(true);
+            setCreatingOutputStyle(false);
+          }}
+          onCancel={() => setCreatingOutputStyle(false)}
         />
       )}
     </div>

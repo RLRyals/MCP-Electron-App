@@ -97,16 +97,23 @@ export class PluginsLauncher implements View {
   private renderPluginCard(plugin: any): string {
     const isPinned = this.isPluginPinned(plugin.id);
     const isActive = plugin.status === 'active';
-    const isUtility = plugin.pluginType === 'utility';
+
+    // Plugin data structure: { id, manifest: { pluginType, name, version, icon, description }, status }
+    const manifest = plugin.manifest || {};
+    const isUtility = manifest.pluginType === 'utility';
+    const name = manifest.name || plugin.id;
+    const description = manifest.description || 'No description';
+    const version = manifest.version || '1.0.0';
+    const icon = manifest.icon || '🔌';
 
     return `
       <div class="plugin-card ${isActive ? 'active' : 'inactive'}" data-plugin-id="${plugin.id}">
-        <div class="plugin-icon">${plugin.icon || '🔌'}</div>
+        <div class="plugin-icon">${icon}</div>
         <div class="plugin-info">
-          <h3 class="plugin-name">${this.escapeHtml(plugin.name || plugin.id)}</h3>
-          <p class="plugin-description">${this.escapeHtml(plugin.description || 'No description')}</p>
+          <h3 class="plugin-name">${this.escapeHtml(name)}</h3>
+          <p class="plugin-description">${this.escapeHtml(description)}</p>
           <div class="plugin-meta">
-            <span class="plugin-version">v${plugin.version || '1.0.0'}</span>
+            <span class="plugin-version">v${version}</span>
             <span class="plugin-status ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
             ${isUtility ? '<span class="plugin-type">Utility</span>' : ''}
           </div>
@@ -117,8 +124,8 @@ export class PluginsLauncher implements View {
               Launch
             </button>
           ` : ''}
-          ${isUtility && isActive && plugin.id === 'claude-code-subscription' ? `
-            <button class="plugin-action-btn primary" data-action="settings" title="Configure Workspace">
+          ${isUtility && isActive ? `
+            <button class="plugin-action-btn primary" data-action="settings" title="Plugin Settings">
               ⚙️ Settings
             </button>
           ` : ''}
@@ -256,18 +263,35 @@ export class PluginsLauncher implements View {
         launchBtn.addEventListener('click', () => this.launchPlugin(pluginId));
       }
 
-      // Settings button (for Claude Code plugin)
+      // Settings button (for utility plugins)
       const settingsBtn = card.querySelector('[data-action="settings"]');
       if (settingsBtn) {
         settingsBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const result = await (window as any).electronAPI.invoke('plugin:claude-code-subscription:show-settings');
+            // Build the IPC channel name based on plugin ID
+            const channelName = `plugin:${pluginId}:show-settings`;
+            console.log('[PluginsLauncher] Invoking settings handler:', channelName);
+
+            const result = await (window as any).electronAPI.invoke(channelName);
             if (result && result.success) {
-              console.log('[PluginsLauncher] Workspace configured:', result.workspace);
+              console.log('[PluginsLauncher] Settings configured:', result);
+
+              // Show success notification
+              if ((window as any).showNotification) {
+                (window as any).showNotification(result.message || 'Settings saved successfully', 'success');
+              }
             }
           } catch (error) {
             console.error('[PluginsLauncher] Failed to show settings:', error);
+
+            // Show error notification
+            if ((window as any).showNotification) {
+              (window as any).showNotification(
+                `Failed to open settings: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                'error'
+              );
+            }
           }
         });
       }
@@ -283,7 +307,8 @@ export class PluginsLauncher implements View {
 
       // Card click to launch (if active and not a utility plugin)
       const plugin = this.plugins.find(p => p.id === pluginId);
-      if (plugin && plugin.status === 'active' && plugin.pluginType !== 'utility') {
+      const pluginType = plugin?.manifest?.pluginType;
+      if (plugin && plugin.status === 'active' && pluginType !== 'utility') {
         card.addEventListener('click', (e) => {
           // Don't trigger if clicking on action buttons
           if ((e.target as HTMLElement).closest('.plugin-action-btn')) return;

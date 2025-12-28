@@ -3299,6 +3299,163 @@ function setupIPC(): void {
     }
   });
 
+  // Get installed output-styles
+  ipcMain.handle('workflow:get-installed-output-styles', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Getting installed output-styles');
+    try {
+      const { DependencyResolver } = await import('./workflow/dependency-resolver');
+      const resolver = new DependencyResolver();
+      return await resolver.getInstalledOutputStyles();
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to get installed output-styles: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Read output-style file
+  ipcMain.handle('document:read-output-style', async (_event, outputStyleName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Reading output-style file: ${outputStyleName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+      const outputStylePath = path.join(homeDir, '.claude', 'output-styles', `${outputStyleName}.md`);
+
+      const content = await fs.readFile(outputStylePath, 'utf-8');
+      return {
+        content,
+        filePath: outputStylePath,
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to read output-style: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Write output-style file
+  ipcMain.handle('document:write-output-style', async (_event, outputStyleName: string, content: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Writing output-style file: ${outputStyleName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+      const outputStylesDir = path.join(homeDir, '.claude', 'output-styles');
+      const outputStylePath = path.join(outputStylesDir, `${outputStyleName}.md`);
+
+      // Ensure directory exists
+      await fs.mkdir(outputStylesDir, { recursive: true });
+
+      await fs.writeFile(outputStylePath, content, 'utf-8');
+      logWithCategory('info', LogCategory.WORKFLOW, `Output-style file saved: ${outputStylePath}`);
+
+      return { success: true, filePath: outputStylePath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to write output-style: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Delete output-style file
+  ipcMain.handle('document:delete-output-style', async (_event, outputStyleName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Deleting output-style file: ${outputStyleName}`);
+    try {
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const homeDir = os.homedir();
+      const outputStylePath = path.join(homeDir, '.claude', 'output-styles', `${outputStyleName}.md`);
+
+      await fs.unlink(outputStylePath);
+      logWithCategory('info', LogCategory.WORKFLOW, `Output-style file deleted: ${outputStylePath}`);
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to delete output-style: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import output-style from single file
+  ipcMain.handle('document:import-output-style-file', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing output-style from file');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Output-Style File',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown Files', extensions: ['md'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        buttonLabel: 'Import Output-Style'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const sourcePath = result.filePaths[0];
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      const fileName = path.basename(sourcePath, '.md');
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Output-style imported from: ${sourcePath}`);
+
+      return {
+        canceled: false,
+        fileName,
+        content,
+        sourcePath
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import output-style file: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Import output-styles from folder
+  ipcMain.handle('document:import-output-style-folder', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Importing output-styles from folder');
+    try {
+      const { dialog } = await import('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Import Output-Styles Folder',
+        properties: ['openDirectory'],
+        buttonLabel: 'Import Output-Styles'
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const fs = await import('fs/promises');
+      const folderPath = result.filePaths[0];
+      const files = await fs.readdir(folderPath);
+
+      // Filter .md files
+      const mdFiles = files.filter(file => file.endsWith('.md'));
+
+      const outputStyles = [];
+      for (const file of mdFiles) {
+        const filePath = path.join(folderPath, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const fileName = path.basename(file, '.md');
+
+        outputStyles.push({ fileName, content, sourcePath: filePath });
+      }
+
+      logWithCategory('info', LogCategory.WORKFLOW, `Imported ${outputStyles.length} output-styles from: ${folderPath}`);
+
+      return {
+        canceled: false,
+        outputStyles,
+        folderPath
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to import output-styles folder: ${error.message}`);
+      throw error;
+    }
+  });
+
   // Read agent file
   ipcMain.handle('document:read-agent', async (_event, agentName: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Reading agent file: ${agentName}`);
@@ -3999,6 +4156,14 @@ function setupIPC(): void {
     }
   });
 
+  // Handle workflow prompt ready (for interactive sessions)
+  workflowExecutor.on('workflow-prompt-ready', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Show prompt in a notification/modal for easy copying
+      mainWindow.webContents.send('workflow:prompt-ready', data);
+    }
+  });
+
   // Also listen to provider manager events for claude-setup-required
   // (from ClaudeCodeCLIAdapter which creates its own executor instance)
   const providerManager = getProviderManager();
@@ -4135,7 +4300,56 @@ app.whenReady().then(async () => {
     app.setAppUserModelId('net.fictionlab.studio');
   }
 
-  // Initialize database pool and persistent MCP client BEFORE setupIPC
+  // CRITICAL: Check Docker before initializing database and MCP client
+  // Docker is a core dependency - MCP servers run in Docker containers
+  try {
+    logWithCategory('info', LogCategory.SYSTEM, 'Checking Docker status...');
+    const dockerStatus = await docker.checkDockerHealth();
+
+    if (!dockerStatus.running || !dockerStatus.healthy) {
+      logWithCategory('warn', LogCategory.DOCKER,
+        `Docker is not running: ${dockerStatus.message}`);
+
+      // Attempt to start Docker Desktop
+      logWithCategory('info', LogCategory.DOCKER, 'Attempting to start Docker Desktop...');
+      const startResult = await docker.startAndWaitForDocker((progress) => {
+        logWithCategory('debug', LogCategory.DOCKER,
+          `Docker startup progress: ${progress.message} (${progress.percent}%)`);
+      });
+
+      if (!startResult.success) {
+        // Failed to start Docker - show error and quit
+        const errorMessage =
+          `Docker Desktop is required to run this application but failed to start.\n\n` +
+          `Error: ${startResult.error || startResult.message}\n\n` +
+          `Please start Docker Desktop manually and try again.\n\n` +
+          `The application will now exit.`;
+
+        logWithCategory('error', LogCategory.DOCKER, errorMessage);
+        dialog.showErrorBox('Docker Required', errorMessage);
+        app.quit();
+        return;
+      }
+
+      logWithCategory('info', LogCategory.DOCKER, 'Docker Desktop started successfully');
+    } else {
+      logWithCategory('info', LogCategory.DOCKER, 'Docker is already running and healthy');
+    }
+  } catch (error: any) {
+    const errorMessage =
+      `Failed to check or start Docker Desktop.\n\n` +
+      `Error: ${error.message}\n\n` +
+      `Docker Desktop is required to run this application.\n` +
+      `Please ensure Docker Desktop is installed and start it manually.\n\n` +
+      `The application will now exit.`;
+
+    logWithCategory('error', LogCategory.DOCKER, errorMessage);
+    dialog.showErrorBox('Docker Required', errorMessage);
+    app.quit();
+    return;
+  }
+
+  // Initialize database pool and persistent MCP client AFTER Docker is ready
   // (IPC handlers need the client to be ready)
   try {
     logWithCategory('info', LogCategory.SYSTEM, 'Initializing database pool...');

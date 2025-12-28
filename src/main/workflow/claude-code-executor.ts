@@ -55,10 +55,10 @@ export class ClaudeCodeExecutor extends EventEmitter {
   }
 
   /**
-   * Execute a skill with Claude Code
+   * Execute Claude Code with optional agent
    */
   async executeSkill(
-    skillName: string,
+    agentName: string | null,
     phaseNumber: number,
     prompt: string,
     context?: object,
@@ -69,7 +69,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
     const session: ClaudeCodeSession = {
       id: sessionId,
       phaseNumber,
-      skillName,
+      skillName: agentName || '',  // Keep for backward compatibility
       output: [],
       status: 'running'
     };
@@ -77,11 +77,11 @@ export class ClaudeCodeExecutor extends EventEmitter {
     this.sessions.set(sessionId, session);
 
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Starting Claude Code session: ${sessionId} for skill: ${skillName}`);
+      `Starting Claude Code session: ${sessionId}${agentName ? ` with agent: ${agentName}` : ''}`);
 
     try {
-      // Execute Claude Code with skill
-      const result = await this.runClaudeCode(prompt, skillName, session, context, headless);
+      // Execute Claude Code with optional agent
+      const result = await this.runClaudeCode(prompt, agentName, session, context, headless);
 
       session.status = 'completed';
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -113,7 +113,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
    */
   private async runClaudeCode(
     prompt: string,
-    skillName: string,
+    agentName: string | null,
     session: ClaudeCodeSession,
     context?: object,
     headless: boolean = true
@@ -161,20 +161,29 @@ export class ClaudeCodeExecutor extends EventEmitter {
       // Construct Claude Code command
       const args = [];
 
-      if (skillName) {
-        args.push('--skill', skillName);
-      }
-
-      // Headless mode: add --print for non-interactive JSON output
-      // Interactive mode: pass prompt as argument for conversation
       if (headless) {
+        // NON-INTERACTIVE MODE (Background Subagent)
+        // - Uses --agent flag to spawn a subagent with declared skills
+        // - Agent file in ~/.claude/agents/ lists available skills
+        // - Runs headless, returns JSON output
         args.push('--print');
         args.push('--output-format', 'json');
+
+        if (agentName) {
+          args.push('--agent', agentName);
+        }
+      } else {
+        // INTERACTIVE MODE (Terminal Conversation)
+        // - NO --agent flag needed! Output styles are set via /output-style command
+        // - Output style file from ~/.claude/output-styles/ controls response format
+        // - Skills are AUTO-SELECTED from ~/.claude/skills/ based on conversation
+        // - User can interact directly with Claude in terminal
+        // Note: We'll send /output-style command after Claude starts
       }
 
       // CRITICAL: Interactive mode needs 'inherit' stdio to allow user interaction
       // Headless mode uses 'pipe' to capture JSON output
-      let claudeProcess: ChildProcess;
+      let claudeProcess: ChildProcess | undefined;
       let stdout = '';
       let stderr = '';
 
@@ -246,15 +255,14 @@ export class ClaudeCodeExecutor extends EventEmitter {
           return;
         }
 
-        // Add prompt as final argument
-        args.push(prompt);
-
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
-        // Use the standard terminal ID that the UI expects
-        const ptyId = 'claude-code-terminal';
+        // Use a unique terminal ID for this workflow session (don't conflict with UI terminal)
+        const ptyId = `workflow-claude-${session.id}`;
 
         logWithCategory('info', LogCategory.WORKFLOW,
-          `Starting Claude Code in INTERACTIVE mode via PTY: claude ${args.slice(0, -1).join(' ')} "<prompt>" (length: ${prompt.length} chars)`);
+          `Starting Claude Code in INTERACTIVE mode via PTY: claude ${args.join(' ')}`);
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Initial prompt will be sent to terminal (length: ${prompt.length} chars)`);
         logWithCategory('info', LogCategory.WORKFLOW,
           'Interactive mode: User will see prompt and can have conversation');
         logWithCategory('info', LogCategory.WORKFLOW,
@@ -278,9 +286,45 @@ export class ClaudeCodeExecutor extends EventEmitter {
           this.ptyManager.createTerminal({
             id: ptyId,
             command: 'claude',
-            args: args,
+            args: args,  // Don't include prompt in args - we'll send it via PTY input
             cwd: workingDir
           });
+
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Interactive Claude session created in PTY: ${ptyId}`);
+
+          // Wait for Claude to start and emit ready event immediately
+          setTimeout(() => {
+            // Emit event to notify UI that interactive session is ready (switch terminal view)
+            this.emit('workflow-prompt-ready', {
+              sessionId: session.id,
+              ptyId: ptyId,
+              prompt: prompt,
+              message: `Interactive Claude Code session started${agentName ? ` with output style: ${agentName}` : ''}.`
+            });
+
+            // Wait a bit more for terminal to be ready and visible, then send commands
+            setTimeout(() => {
+              // If output style is specified, set it first via /output-style command
+              if (agentName) {
+                logWithCategory('info', LogCategory.WORKFLOW,
+                  `Setting output style: ${agentName}`);
+                this.ptyManager!.writeToTerminal(ptyId, `/output-style ${agentName}\n`);
+
+                // Wait for output style to be set
+                setTimeout(() => {
+                  logWithCategory('info', LogCategory.WORKFLOW,
+                    `Sending initial prompt to Claude (${prompt.length} chars)`);
+                  this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+                }, 1500);  // Longer delay for output style processing
+              } else {
+                // No output style, send prompt immediately
+                logWithCategory('info', LogCategory.WORKFLOW,
+                  `Sending initial prompt to Claude (${prompt.length} chars)`);
+                this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+              }
+            }, 500);  // Wait for terminal UI to switch
+          }, 1000);  // Initial delay to allow Claude to start
 
           // Listen for PTY exit
           const exitHandler = (data: { id: string; exitCode: number }) => {
@@ -297,7 +341,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
                 resolve({
                   interactive: true,
                   message: 'Interactive conversation completed. Transcript saved.',
-                  skill: skillName,
+                  agent: agentName,
                   session_id: session.id,
                   transcript_file: `transcript_${timestamp}.md`,
                   raw_output: `Interactive session completed.\nTranscript saved as: transcript_${timestamp}.md`
@@ -311,10 +355,10 @@ export class ClaudeCodeExecutor extends EventEmitter {
           this.ptyManager.on('terminal:exit', exitHandler);
 
           logWithCategory('info', LogCategory.WORKFLOW,
-            `Interactive PTY terminal created: ${ptyId}`);
+            `Interactive PTY terminal created: ${ptyId} - waiting for session to complete`);
 
-          // Don't wait for close event - PTY exit handler will resolve/reject
-          return;
+          // FIXED: Wait for the PTY exit handler to resolve/reject the promise
+          // The promise will be resolved/rejected by the exitHandler when Claude exits
 
         } catch (error: any) {
           logWithCategory('error', LogCategory.WORKFLOW,
@@ -326,7 +370,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
 
       // Only headless mode uses claudeProcess close/error handlers
       // Interactive mode uses PTY exit handler (registered above)
-      if (headless) {
+      if (headless && claudeProcess) {
         claudeProcess.on('close', (code: number) => {
           if (code === 0) {
             // Headless mode: parse JSON output
@@ -343,7 +387,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
                 // If no JSON found, return raw output wrapped in object
                 resolve({
                   raw_output: stdout.trim(),
-                  skill: skillName,
+                  agent: agentName,
                   session_id: session.id
                 });
               }
@@ -354,7 +398,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
               // Return raw output if JSON parsing fails
               resolve({
                 raw_output: stdout.trim(),
-                skill: skillName,
+                agent: agentName,
                 session_id: session.id,
                 parse_error: String(error)
               });

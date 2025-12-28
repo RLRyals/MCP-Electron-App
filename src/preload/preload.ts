@@ -2278,6 +2278,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Read an output-style file
+     */
+    readOutputStyle: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-output-style', name);
+    },
+
+    /**
+     * Write an output-style file
+     */
+    writeOutputStyle: (name: string, content: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-output-style', name, content);
+    },
+
+    /**
+     * Delete an output-style file
+     */
+    deleteOutputStyle: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:delete-output-style', name);
+    },
+
+    /**
+     * Import output-style from single file
+     */
+    importOutputStyleFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-output-style-file');
+    },
+
+    /**
+     * Import output-styles from folder
+     */
+    importOutputStyleFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-output-style-folder');
+    },
+
+    /**
      * Import agent from single file
      */
     importAgentFile: (): Promise<any> => {
@@ -2322,6 +2357,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getInstalledSkills: (): Promise<string[]> => {
       return ipcRenderer.invoke('workflow:get-installed-skills');
+    },
+
+    /**
+     * Get list of installed output-styles
+     */
+    getInstalledOutputStyles: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-output-styles');
     },
 
     /**

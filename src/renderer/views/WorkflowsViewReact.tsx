@@ -45,6 +45,7 @@ const WorkflowsApp: React.FC = () => {
   const [terminalHeight, setTerminalHeight] = useState(300);
   const [showTerminal, setShowTerminal] = useState(true);
   const [activeProjectName, setActiveProjectName] = useState<string>('');
+  const [interactiveSession, setInteractiveSession] = useState<{ sessionId: string; ptyId: string; nodeId?: string } | null>(null);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -165,6 +166,10 @@ const WorkflowsApp: React.FC = () => {
         console.warn('[WorkflowsViewReact] Invalid node-completed data:', data);
         return;
       }
+
+      // Clear interactive session when node completes
+      setInteractiveSession(null);
+
       setExecutionStatus(prev => {
         const existing = prev.get(data.nodeId);
         if (existing === 'completed') return prev;
@@ -191,16 +196,44 @@ const WorkflowsApp: React.FC = () => {
       });
     };
 
+    // Handle workflow prompt ready (for interactive Claude sessions)
+    const handlePromptReady = (data: any) => {
+      console.log('[WorkflowsViewReact] Workflow prompt ready:', data);
+
+      // Track the active interactive session
+      setInteractiveSession({
+        sessionId: data.sessionId,
+        ptyId: data.ptyId
+      });
+
+      // Show notification with the prompt
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(
+          `🎯 ${data.message || 'Interactive brainstorming session started'}`,
+          'info'
+        );
+      }
+
+      // Log it to console for debugging
+      console.log('[WorkflowsViewReact] 📋 Interactive session started:', {
+        sessionId: data.sessionId,
+        ptyId: data.ptyId,
+        promptLength: data.prompt?.length
+      });
+    };
+
     // Register node-based workflow listeners only
     electronAPI.on('workflow:node-started', handleNodeStarted);
     electronAPI.on('workflow:node-completed', handleNodeCompleted);
     electronAPI.on('workflow:node-failed', handleNodeFailed);
+    electronAPI.on('workflow:prompt-ready', handlePromptReady);
 
     // Cleanup on unmount
     return () => {
       electronAPI.off('workflow:node-started', handleNodeStarted);
       electronAPI.off('workflow:node-completed', handleNodeCompleted);
       electronAPI.off('workflow:node-failed', handleNodeFailed);
+      electronAPI.off('workflow:prompt-ready', handlePromptReady);
     };
   }, []);
 
@@ -239,6 +272,38 @@ const WorkflowsApp: React.FC = () => {
         success: false,
         message: error.message || 'Unknown error occurred',
       };
+    }
+  };
+
+  const handleContinueWorkflow = async () => {
+    if (!interactiveSession) return;
+
+    try {
+      const electronAPI = (window as any).electronAPI;
+
+      console.log('[WorkflowsViewReact] Terminating interactive session:', interactiveSession.ptyId);
+
+      // Close the terminal to trigger workflow continuation
+      await electronAPI.invoke('terminal:close', interactiveSession.ptyId);
+
+      // Show notification
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(
+          '✅ Interactive session ended. Workflow continuing...',
+          'success'
+        );
+      }
+
+      // Clear the session state
+      setInteractiveSession(null);
+    } catch (error: any) {
+      console.error('[WorkflowsViewReact] Failed to continue workflow:', error);
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(
+          `❌ Failed to continue workflow: ${error.message}`,
+          'error'
+        );
+      }
     }
   };
 
@@ -419,15 +484,15 @@ const WorkflowsApp: React.FC = () => {
     background: '#f9fafb',
   };
 
-  const buttonStyle = (variant: 'primary' | 'secondary' = 'secondary', disabled = false): React.CSSProperties => ({
+  const buttonStyle = (variant: 'primary' | 'secondary' | 'success' = 'secondary', disabled = false): React.CSSProperties => ({
     padding: '10px 20px',
     borderRadius: '6px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    background: variant === 'primary' ? '#3b82f6' : '#ffffff',
-    color: variant === 'primary' ? '#ffffff' : '#374151',
-    border: variant === 'primary' ? 'none' : '1px solid #d1d5db',
+    background: variant === 'primary' ? '#3b82f6' : variant === 'success' ? '#10b981' : '#ffffff',
+    color: variant === 'primary' || variant === 'success' ? '#ffffff' : '#374151',
+    border: variant === 'primary' || variant === 'success' ? 'none' : '1px solid #d1d5db',
     opacity: disabled ? 0.5 : 1,
     transition: 'all 0.2s ease',
   });
@@ -481,6 +546,18 @@ const WorkflowsApp: React.FC = () => {
         >
           ▶️ Start Workflow
         </button>
+        {interactiveSession && (
+          <button
+            style={{
+              ...buttonStyle('success'),
+              animation: 'pulse 2s ease-in-out infinite',
+            }}
+            onClick={handleContinueWorkflow}
+            title="End the interactive brainstorming session and continue to the next workflow step"
+          >
+            ✅ Continue Workflow
+          </button>
+        )}
         <button
           style={buttonStyle('secondary')}
           onClick={() => loadWorkflows(true)}

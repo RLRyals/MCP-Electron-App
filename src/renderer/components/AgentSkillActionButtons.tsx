@@ -6,8 +6,8 @@ interface AgentSkillActionButtonsProps {
   installedOptions: string[];
   onEdit: () => void;
   onCreate: () => void;
-  onImportFile: () => void;
-  onImportFolder: () => void;
+  onImportFile?: () => void;
+  onImportFolder?: () => void;
 }
 
 export const AgentSkillActionButtons: React.FC<AgentSkillActionButtonsProps> = ({
@@ -148,72 +148,74 @@ export const AgentSkillActionButtons: React.FC<AgentSkillActionButtonsProps> = (
         ➕ Create
       </button>
 
-      {/* Import Button with Menu */}
-      <div style={styles.importButtonContainer} ref={menuRef}>
-        <button
-          type="button"
-          style={importHover ? { ...styles.button, ...styles.buttonHover } : styles.button}
-          onClick={() => setShowImportMenu(!showImportMenu)}
-          title={`Import ${label}(s)`}
-          onMouseEnter={() => setImportHover(true)}
-          onMouseLeave={() => setImportHover(false)}
-          aria-label={`Import ${label}`}
-          aria-expanded={showImportMenu}
-          aria-haspopup="menu"
-        >
-          📥 Import ▼
-        </button>
+      {/* Import Button with Menu - only shown if import handlers are provided */}
+      {(onImportFile || onImportFolder) && (
+        <div style={styles.importButtonContainer} ref={menuRef}>
+          <button
+            type="button"
+            style={importHover ? { ...styles.button, ...styles.buttonHover } : styles.button}
+            onClick={() => setShowImportMenu(!showImportMenu)}
+            title={`Import ${label}(s)`}
+            onMouseEnter={() => setImportHover(true)}
+            onMouseLeave={() => setImportHover(false)}
+            aria-label={`Import ${label}`}
+            aria-expanded={showImportMenu}
+            aria-haspopup="menu"
+          >
+            📥 Import ▼
+          </button>
 
-        {showImportMenu && (
-          <div style={styles.importMenu} role="menu">
-            <div
-              style={{
-                ...styles.menuItem,
-                ...(fileMenuHover ? styles.menuItemHover : {})
-              }}
-              onClick={() => {
-                onImportFile();
-                setShowImportMenu(false);
-              }}
-              onMouseEnter={() => setFileMenuHover(true)}
-              onMouseLeave={() => setFileMenuHover(false)}
-              role="menuitem"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  onImportFile();
+          {showImportMenu && (
+            <div style={styles.importMenu} role="menu">
+              <div
+                style={{
+                  ...styles.menuItem,
+                  ...(fileMenuHover ? styles.menuItemHover : {})
+                }}
+                onClick={() => {
+                  onImportFile?.();
                   setShowImportMenu(false);
-                }
-              }}
-            >
-              📄 Import File...
-            </div>
-            <div
-              style={{
-                ...styles.menuItem,
-                ...styles.menuItemLast,
-                ...(folderMenuHover ? styles.menuItemHover : {})
-              }}
-              onClick={() => {
-                onImportFolder();
-                setShowImportMenu(false);
-              }}
-              onMouseEnter={() => setFolderMenuHover(true)}
-              onMouseLeave={() => setFolderMenuHover(false)}
-              role="menuitem"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  onImportFolder();
+                }}
+                onMouseEnter={() => setFileMenuHover(true)}
+                onMouseLeave={() => setFileMenuHover(false)}
+                role="menuitem"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onImportFile?.();
+                    setShowImportMenu(false);
+                  }
+                }}
+              >
+                📄 Import File...
+              </div>
+              <div
+                style={{
+                  ...styles.menuItem,
+                  ...styles.menuItemLast,
+                  ...(folderMenuHover ? styles.menuItemHover : {})
+                }}
+                onClick={() => {
+                  onImportFolder?.();
                   setShowImportMenu(false);
-                }
-              }}
-            >
-              📁 Import Folder...
+                }}
+                onMouseEnter={() => setFolderMenuHover(true)}
+                onMouseLeave={() => setFolderMenuHover(false)}
+                role="menuitem"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onImportFolder?.();
+                    setShowImportMenu(false);
+                  }
+                }}
+              >
+                📁 Import Folder...
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
