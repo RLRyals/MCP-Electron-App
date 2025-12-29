@@ -4148,13 +4148,9 @@ function setupIPC(): void {
     }
   });
 
-  // Forward Claude Code output to terminal in real-time
-  workflowExecutor.on('claude-output', (data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      // Stream output to terminal via terminal:data event
-      mainWindow.webContents.send('claude-code:stream', data);
-    }
-  });
+  // NOTE: Removed 'claude-output' forwarding - it caused duplicate output
+  // Interactive mode uses PTY which already emits terminal:data events
+  // Headless mode captures output internally without real-time streaming
 
   // Handle workflow prompt ready (for interactive sessions)
   workflowExecutor.on('workflow-prompt-ready', (data) => {

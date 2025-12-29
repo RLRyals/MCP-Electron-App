@@ -119,6 +119,8 @@ export class ClaudeCodeExecutor extends EventEmitter {
     headless: boolean = true
   ): Promise<object> {
     // 1. Check if Claude CLI is available
+    // Note: We only check if it's installed, not authentication status
+    // The CLI will prompt for auth if needed during actual execution
     const status = await this.detector.getStatus();
 
     if (!status.installed) {
@@ -137,24 +139,8 @@ export class ClaudeCodeExecutor extends EventEmitter {
       );
     }
 
-    if (!status.loggedIn) {
-      logWithCategory('warn', LogCategory.WORKFLOW,
-        'User is not logged in to Claude');
-
-      // Emit event to trigger login prompt
-      this.emit('claude-setup-required', {
-        reason: 'not_logged_in',
-        status
-      });
-
-      throw new Error(
-        'You are not logged in to Claude.\n\n' +
-        'Please log in through the setup wizard.'
-      );
-    }
-
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Claude Code ready - version ${status.version}, user: ${status.userName}`);
+      `Claude Code ready - version ${status.version}`);
 
     // 2. All checks passed - execute command
     return new Promise((resolve, reject) => {
@@ -217,7 +203,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
           return;
         }
 
-        // Capture output
+        // Capture output (but don't emit it - that causes duplicate output)
         claudeProcess.stdout?.on('data', (data: Buffer) => {
           const output = data.toString();
           stdout += output;
@@ -226,12 +212,9 @@ export class ClaudeCodeExecutor extends EventEmitter {
           logWithCategory('debug', LogCategory.WORKFLOW,
             `Claude Code stdout: ${output.substring(0, 200)}...`);
 
-          // Stream output to terminal in real-time
-          this.emit('claude-output', {
-            sessionId: session.id,
-            data: output,
-            stream: 'stdout'
-          });
+          // NOTE: Don't emit 'claude-output' here - it causes duplicate output
+          // The output is already being captured for JSON parsing
+          // If we need real-time streaming in headless mode, we should use a different event
         });
 
         claudeProcess.stderr?.on('data', (data: Buffer) => {
@@ -241,12 +224,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
           logWithCategory('debug', LogCategory.WORKFLOW,
             `Claude Code stderr: ${error}`);
 
-          // Stream stderr to terminal in real-time
-          this.emit('claude-output', {
-            sessionId: session.id,
-            data: error,
-            stream: 'stderr'
-          });
+          // NOTE: Don't emit stderr either - just capture for error reporting
         });
       } else {
         // Interactive mode: use PTY for terminal interaction
@@ -293,38 +271,103 @@ export class ClaudeCodeExecutor extends EventEmitter {
           logWithCategory('info', LogCategory.WORKFLOW,
             `Interactive Claude session created in PTY: ${ptyId}`);
 
-          // Wait for Claude to start and emit ready event immediately
-          setTimeout(() => {
-            // Emit event to notify UI that interactive session is ready (switch terminal view)
-            this.emit('workflow-prompt-ready', {
-              sessionId: session.id,
-              ptyId: ptyId,
-              prompt: prompt,
-              message: `Interactive Claude Code session started${agentName ? ` with output style: ${agentName}` : ''}.`
-            });
+          // Emit event to notify UI that interactive session is ready (switch terminal view)
+          // Do this immediately so user can see Claude Code starting up
+          this.emit('workflow-prompt-ready', {
+            sessionId: session.id,
+            ptyId: ptyId,
+            prompt: prompt,
+            message: `Interactive Claude Code session started${agentName ? ` with output style: ${agentName}` : ''}.`
+          });
 
-            // Wait a bit more for terminal to be ready and visible, then send commands
-            setTimeout(() => {
-              // If output style is specified, set it first via /output-style command
-              if (agentName) {
+          // Wait for Claude Code to be ready by listening for PTY output
+          // Claude Code outputs a prompt when ready (e.g., "> " or similar)
+          let claudeReady = false;
+          let outputStyleSet = false;
+          let initialOutputBuffer = '';
+
+          const readyHandler = (data: { id: string; data: string }) => {
+            if (data.id !== ptyId) {
+              logWithCategory('debug', LogCategory.WORKFLOW,
+                `Ignoring PTY data from different terminal: ${data.id} (expected: ${ptyId})`);
+              return;
+            }
+
+            initialOutputBuffer += data.data;
+
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `PTY data received (${data.data.length} chars), buffer size: ${initialOutputBuffer.length}`);
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Latest data: ${data.data.substring(0, 100).replace(/\n/g, '\\n')}`);
+
+            // Strip ANSI escape codes to detect prompt
+            // ANSI codes like \x1b[0m, \x1b[38;2;215;119;87m surround the prompt
+            const strippedBuffer = initialOutputBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+
+            // Look for Claude Code's ready prompt (appears after banner)
+            // Common patterns: "> ", "? ", or end of banner text
+            const hasPrompt = /[>?]\s*$/.test(strippedBuffer) ||
+                             strippedBuffer.includes('How can I help you');
+
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Prompt detected: ${hasPrompt}, claudeReady: ${claudeReady}, outputStyleSet: ${outputStyleSet}` +
+              ` (stripped: ${strippedBuffer.substring(Math.max(0, strippedBuffer.length - 50))})`);
+
+            if (hasPrompt && !claudeReady) {
+              claudeReady = true;
+              logWithCategory('info', LogCategory.WORKFLOW,
+                'Claude Code is ready - detected prompt pattern');
+
+              // If output style is specified, set it first
+              if (agentName && !outputStyleSet) {
+                outputStyleSet = true;
                 logWithCategory('info', LogCategory.WORKFLOW,
                   `Setting output style: ${agentName}`);
-                this.ptyManager!.writeToTerminal(ptyId, `/output-style ${agentName}\n`);
+                logWithCategory('warn', LogCategory.WORKFLOW,
+                  'Output styles are currently disabled due to validation issues - sending prompt directly');
 
-                // Wait for output style to be set
-                setTimeout(() => {
-                  logWithCategory('info', LogCategory.WORKFLOW,
-                    `Sending initial prompt to Claude (${prompt.length} chars)`);
-                  this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
-                }, 1500);  // Longer delay for output style processing
-              } else {
+                // TEMPORARILY SKIP OUTPUT STYLE - it's causing "Invalid output style" errors
+                // Just send the prompt directly
+                this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+                this.ptyManager!.off('terminal:data', readyHandler);
+              } else if (!agentName) {
                 // No output style, send prompt immediately
                 logWithCategory('info', LogCategory.WORKFLOW,
                   `Sending initial prompt to Claude (${prompt.length} chars)`);
                 this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+
+                // Stop listening - we're done with initialization
+                this.ptyManager!.off('terminal:data', readyHandler);
               }
-            }, 500);  // Wait for terminal UI to switch
-          }, 1000);  // Initial delay to allow Claude to start
+            } else if (hasPrompt && claudeReady && outputStyleSet) {
+              // Output style has been set, now send the actual prompt
+              logWithCategory('info', LogCategory.WORKFLOW,
+                `Sending initial prompt to Claude (${prompt.length} chars)`);
+              this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+
+              // Stop listening - we're done with initialization
+              this.ptyManager!.off('terminal:data', readyHandler);
+            }
+          };
+
+          // Listen for PTY data to detect when Claude is ready
+          this.ptyManager.on('terminal:data', readyHandler);
+
+          // Fallback timeout in case we never detect the prompt
+          setTimeout(() => {
+            if (!claudeReady || (agentName && !outputStyleSet)) {
+              logWithCategory('warn', LogCategory.WORKFLOW,
+                'Claude Code ready detection timed out - proceeding anyway');
+
+              // Remove listener
+              this.ptyManager!.off('terminal:data', readyHandler);
+
+              // Send commands anyway (skip output style due to validation issues)
+              logWithCategory('warn', LogCategory.WORKFLOW,
+                'Skipping output style in fallback - sending prompt directly');
+              this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
+            }
+          }, 10000);  // 10 second fallback timeout
 
           // Listen for PTY exit
           const exitHandler = (data: { id: string; exitCode: number }) => {

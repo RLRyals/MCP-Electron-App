@@ -17,6 +17,10 @@ export interface ClaudeCodeStatus {
 }
 
 export class ClaudeCodeDetector {
+  private cachedStatus: ClaudeCodeStatus | null = null;
+  private lastCheckTime: number = 0;
+  private readonly CACHE_DURATION = 30000; // 30 seconds
+
   /**
    * Check if `claude` command exists and get version
    */
@@ -147,42 +151,67 @@ export class ClaudeCodeDetector {
   }
 
   /**
-   * Get full Claude Code status
+   * Get full Claude Code status (fast - only checks if installed)
+   *
+   * NOTE: We don't check authentication status anymore because:
+   * 1. There's no `claude auth whoami` command - that was creating fake "auth" conversations
+   * 2. The old check took 98 seconds and created empty chats in history
+   * 3. If Claude isn't authenticated, it will prompt the user when actually run
    */
   async getStatus(): Promise<ClaudeCodeStatus> {
+    // Return cached status if recent (within 30 seconds)
+    const now = Date.now();
+    if (this.cachedStatus && (now - this.lastCheckTime) < this.CACHE_DURATION) {
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        'Using cached Claude Code status (age: ' + Math.round((now - this.lastCheckTime) / 1000) + 's)');
+      return this.cachedStatus;
+    }
+
     try {
-      // Check installation
+      // Check installation only
       const version = await this.getVersion();
       const installed = version !== null;
 
       if (!installed) {
-        return {
+        const status: ClaudeCodeStatus = {
           installed: false,
           loggedIn: false,
           error: 'Claude Code CLI is not installed or not in PATH'
         };
+        this.cachedStatus = status;
+        this.lastCheckTime = now;
+        return status;
       }
 
-      // Check authentication
-      const userInfo = await this.getUserInfo();
-      const loggedIn = userInfo !== null;
-
-      return {
+      // Assume logged in if installed (Claude CLI will handle auth if needed)
+      const status: ClaudeCodeStatus = {
         installed: true,
         version,
-        loggedIn,
-        userName: userInfo?.userName
+        loggedIn: true,  // Assume true - CLI will prompt if not
+        userName: 'Claude User'
       };
+
+      // Cache the result
+      this.cachedStatus = status;
+      this.lastCheckTime = now;
+
+      return status;
 
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW,
         `Failed to get Claude Code status: ${error.message}`);
 
-      return {
+      const errorStatus: ClaudeCodeStatus = {
         installed: false,
         loggedIn: false,
         error: error.message
       };
+
+      // Cache error status briefly (don't retry immediately)
+      this.cachedStatus = errorStatus;
+      this.lastCheckTime = now;
+
+      return errorStatus;
     }
   }
 }

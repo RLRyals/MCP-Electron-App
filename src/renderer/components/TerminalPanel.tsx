@@ -245,6 +245,13 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     term.onData((data) => {
       console.log('[TerminalPanel] User input:', data, data.split('').map(c => c.charCodeAt(0)));
 
+      // Filter out focus events - these are ANSI sequences that shouldn't be sent to PTY
+      // [I = focus in, [O = focus out
+      if (data === '\x1b[I' || data === '\x1b[O') {
+        console.log('[TerminalPanel] Ignoring focus event:', data);
+        return;
+      }
+
       // Check for Ctrl+V (ASCII 22)
       if (data === '\x16') {
         console.log('[TerminalPanel] Ctrl+V detected, attempting clipboard read');
@@ -397,29 +404,22 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     // Handle terminal output from PTY
     // Note: preload's on() wrapper strips the event, so first arg is the payload
     const handleData = (payload: { id: string; data: string }) => {
-      // Accept both UI terminal and workflow terminals
-      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
-
       console.log('[TerminalPanel] Received terminal:data event:', {
         payloadId: payload?.id,
-        expectedId: TERMINAL_ID,
+        activeTerminalId: activeTerminalIdRef.current,
         dataLength: payload?.data?.length,
-        hasXterm: !!xtermRef.current,
-        match: isOurTerminal
+        hasXterm: !!xtermRef.current
       });
-      if (payload && isOurTerminal && xtermRef.current) {
-        console.log('[TerminalPanel] Writing data to xterm:', payload.data.substring(0, 50));
 
-        // If this is a workflow terminal, update the active terminal ID
-        if (payload.id.startsWith('workflow-claude-')) {
-          activeTerminalIdRef.current = payload.id;
-          console.log('[TerminalPanel] Active terminal switched to workflow:', payload.id);
-        }
+      // ONLY accept data from the currently active terminal
+      // This prevents old terminals from interfering after workflow starts
+      if (payload && payload.id === activeTerminalIdRef.current && xtermRef.current) {
+        console.log('[TerminalPanel] Writing data to xterm:', payload.data.substring(0, 50));
 
         xtermRef.current.write(payload.data);
 
-        // Force terminal refresh - xterm.js doesn't always update without window focus
-        // Call refresh() to ensure the terminal repaints immediately
+        // Single refresh on next animation frame is sufficient
+        // Multiple refreshes cause flickering and duplicate rendering
         requestAnimationFrame(() => {
           if (xtermRef.current) {
             xtermRef.current.refresh(0, xtermRef.current.rows - 1);
@@ -436,23 +436,45 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     };
 
     const handleExit = (payload: { id: string; exitCode: number }) => {
-      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
-      if (payload && isOurTerminal && xtermRef.current) {
+      // Only handle exit for the currently active terminal
+      if (payload && payload.id === activeTerminalIdRef.current && xtermRef.current) {
+        console.log('[TerminalPanel] Active terminal exited:', payload);
         xtermRef.current.writeln('');
         xtermRef.current.writeln(`\x1b[33m✗ Terminal session ended (exit code: ${payload.exitCode})\x1b[0m`);
         xtermRef.current.writeln('');
 
-        // If a workflow terminal exited, switch back to UI terminal
+        // If a workflow terminal exited, try to restart the UI terminal
         if (payload.id.startsWith('workflow-claude-')) {
+          console.log('[TerminalPanel] Workflow terminal exited, restarting UI terminal');
+
+          // Switch back to UI terminal ID
           activeTerminalIdRef.current = TERMINAL_ID;
-          console.log('[TerminalPanel] Workflow terminal exited, switched back to UI terminal');
+
+          // Restart the UI terminal
+          electronAPI.invoke('terminal:create', {
+            id: TERMINAL_ID,
+            command: 'claude',
+            args: [],
+            cols: xtermRef.current.cols,
+            rows: xtermRef.current.rows,
+            useHomeDirectory: true,
+          }).then(() => {
+            console.log('[TerminalPanel] UI terminal restarted after workflow completion');
+            if (xtermRef.current) {
+              xtermRef.current.writeln('\x1b[1;32m✓ Reconnected to Claude Code\x1b[0m');
+              xtermRef.current.writeln('');
+            }
+          }).catch((error: Error) => {
+            console.error('[TerminalPanel] Failed to restart UI terminal:', error);
+          });
         }
       }
     };
 
     const handleError = (payload: { id: string; error: string }) => {
-      const isOurTerminal = payload?.id === TERMINAL_ID || payload?.id?.startsWith('workflow-claude-');
-      if (payload && isOurTerminal && xtermRef.current) {
+      // Only handle errors for the currently active terminal
+      if (payload && payload.id === activeTerminalIdRef.current && xtermRef.current) {
+        console.log('[TerminalPanel] Active terminal error:', payload);
         xtermRef.current.writeln('');
         xtermRef.current.writeln(`\x1b[31m✗ Terminal error: ${payload.error}\x1b[0m`);
         xtermRef.current.writeln('');
@@ -512,20 +534,9 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       xtermRef.current.write(`\r\n${colorCode}[${timestamp}] ${prefix}${data.message}\x1b[0m`);
     };
 
-    // Handle Claude Code output streaming from workflows
-    const handleClaudeCodeStream = (data: { sessionId: string; data: string; stream: 'stdout' | 'stderr' }) => {
-      if (!xtermRef.current) return;
-
-      console.log('[TerminalPanel] Received claude-code:stream event:', {
-        sessionId: data.sessionId,
-        dataLength: data.data?.length,
-        stream: data.stream
-      });
-
-      // Color stderr differently (yellow for warnings/errors)
-      const colorCode = data.stream === 'stderr' ? '\x1b[33m' : '\x1b[0m';
-      xtermRef.current.write(`${colorCode}${data.data}\x1b[0m`);
-    };
+    // NOTE: Removed handleClaudeCodeStream - it caused duplicate output
+    // Interactive mode uses PTY which already emits terminal:data events
+    // Headless mode captures output internally without emitting to terminal
 
     // Handle interactive workflow session start
     const handleWorkflowPromptReady = (data: { sessionId: string; ptyId: string; prompt: string; message: string }) => {
@@ -533,8 +544,19 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
 
       console.log('[TerminalPanel] Interactive Claude session started:', data);
 
+      // IMPORTANT: Close the UI terminal to prevent conflicts
+      // The workflow will create its own terminal and we don't want both running
+      electronAPI.invoke('terminal:close', TERMINAL_ID).then(() => {
+        console.log('[TerminalPanel] Closed UI terminal to avoid conflict with workflow terminal');
+      }).catch((error: Error) => {
+        console.warn('[TerminalPanel] Failed to close UI terminal:', error);
+      });
+
       // Switch active terminal to the workflow terminal
       activeTerminalIdRef.current = data.ptyId;
+
+      // Clear the terminal to remove the old UI terminal content
+      xtermRef.current.clear();
 
       // DON'T write decorative messages - let Claude Code's output be the only thing shown
       // The overlapping text was caused by the app injecting status messages
@@ -546,7 +568,6 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
 
     electronAPI.on('terminal:write-prompt', handleWritePrompt);
     electronAPI.on('workflow:log', handleWorkflowLog);
-    electronAPI.on('claude-code:stream', handleClaudeCodeStream);
     electronAPI.on('workflow:prompt-ready', handleWorkflowPromptReady);
 
     // Handle resize
@@ -554,7 +575,13 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       fitAddon.fit();
       const dims = fitAddon.proposeDimensions();
       if (dims) {
-        electronAPI.invoke('terminal:resize', TERMINAL_ID, dims.cols, dims.rows);
+        // Resize whichever terminal is currently active (UI or workflow)
+        const terminalToResize = activeTerminalIdRef.current;
+        electronAPI.invoke('terminal:resize', terminalToResize, dims.cols, dims.rows)
+          .catch((error: Error) => {
+            // Ignore errors if terminal doesn't exist (it may have been closed)
+            console.debug('[TerminalPanel] Terminal resize failed (terminal may be closed):', error);
+          });
       }
     });
 
@@ -573,7 +600,6 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       electronAPI.off('terminal:error', handleError);
       electronAPI.off('terminal:write-prompt', handleWritePrompt);
       electronAPI.off('workflow:log', handleWorkflowLog);
-      electronAPI.off('claude-code:stream', handleClaudeCodeStream);
       electronAPI.off('workflow:prompt-ready', handleWorkflowPromptReady);
 
       // Remove paste event listeners
