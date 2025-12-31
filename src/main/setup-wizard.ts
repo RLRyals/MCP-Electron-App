@@ -206,7 +206,7 @@ export async function markWizardComplete(): Promise<{ success: boolean; error?: 
       WizardStep.WELCOME,
       WizardStep.PREREQUISITES,
       WizardStep.ENVIRONMENT,
-      WizardStep.CLIENT_SELECTION,
+      WizardStep.PLUGINS,
       WizardStep.DOWNLOAD_SETUP,
       WizardStep.SYSTEM_STARTUP,
       WizardStep.COMPLETE
@@ -284,7 +284,7 @@ export function getStepName(step: WizardStep): string {
     [WizardStep.WELCOME]: 'Welcome',
     [WizardStep.PREREQUISITES]: 'Prerequisites Check',
     [WizardStep.ENVIRONMENT]: 'Environment Configuration',
-    [WizardStep.CLIENT_SELECTION]: 'Client Selection',
+    [WizardStep.PLUGINS]: 'Plugin Selection',
     [WizardStep.DOWNLOAD_SETUP]: 'Download & Setup',
     [WizardStep.SYSTEM_STARTUP]: 'System Startup',
     [WizardStep.COMPLETE]: 'Setup Complete'
@@ -301,7 +301,7 @@ export function getStepDescription(step: WizardStep): string {
     [WizardStep.WELCOME]: 'Welcome to MCP Writing System setup',
     [WizardStep.PREREQUISITES]: 'Checking system requirements',
     [WizardStep.ENVIRONMENT]: 'Configuring database and services',
-    [WizardStep.CLIENT_SELECTION]: 'Choose your MCP clients',
+    [WizardStep.PLUGINS]: 'Choose optional plugins',
     [WizardStep.DOWNLOAD_SETUP]: 'Downloading and preparing components',
     [WizardStep.SYSTEM_STARTUP]: 'Starting MCP services',
     [WizardStep.COMPLETE]: 'Setup complete!'
@@ -344,14 +344,13 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
       }
       return { canProceed: true };
 
-    case WizardStep.CLIENT_SELECTION:
-      // At least one client should be selected (or can skip)
+    case WizardStep.PLUGINS:
+      // Plugins are optional, can always proceed
       return { canProceed: true };
 
     case WizardStep.DOWNLOAD_SETUP:
       // Check that build pipeline and downloads are complete
-      const needsTypingMind = state.data.clients?.includes('typingmind');
-      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: clients=${JSON.stringify(state.data.clients)}, needsTypingMind=${needsTypingMind}, buildPipeline=${JSON.stringify(state.data.buildPipeline)}, downloads=${JSON.stringify(state.data.downloads)}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: plugins=${JSON.stringify(state.data.plugins)}, buildPipeline=${JSON.stringify(state.data.buildPipeline)}, downloads=${JSON.stringify(state.data.downloads)}`);
 
       // If build pipeline is marked as completed, allow proceeding
       // This is the primary indicator that the build has finished successfully
@@ -367,15 +366,6 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
         return {
           canProceed: false,
           reason: 'Build pipeline has not completed. Please wait for the build to finish.'
-        };
-      }
-
-      // Only check for Typing Mind if it was selected
-      if (needsTypingMind && !state.data.downloads.typingMindCompleted) {
-        logWithCategory('debug', LogCategory.SYSTEM, `Blocked: Typing mind needed but not completed`);
-        return {
-          canProceed: false,
-          reason: 'Typing Mind download is still in progress. Please wait for it to complete.'
         };
       }
 

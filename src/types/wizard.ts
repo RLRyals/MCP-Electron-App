@@ -10,7 +10,7 @@ export enum WizardStep {
   WELCOME = 1,
   PREREQUISITES = 2,
   ENVIRONMENT = 3,
-  CLIENT_SELECTION = 4,
+  PLUGINS = 4,
   DOWNLOAD_SETUP = 5,
   SYSTEM_STARTUP = 6,
   COMPLETE = 7
@@ -33,8 +33,10 @@ export interface WizardStepData {
     configPath?: string;
   };
 
-  // Step 4: Client selection
-  clients?: string[];
+  // Step 4: Plugins
+  plugins?: {
+    workflow: boolean;
+  };
 
   // Step 5: Download & setup
   buildPipeline?: {

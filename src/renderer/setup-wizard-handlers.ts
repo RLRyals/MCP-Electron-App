@@ -108,7 +108,7 @@ function initializeSidebarSteps() {
         { number: 1, name: 'Welcome', description: 'Getting started' },
         { number: 2, name: 'Prerequisites', description: 'System requirements' },
         { number: 3, name: 'Environment', description: 'Configuration' },
-        { number: 4, name: 'Client Selection', description: 'Choose clients' },
+        { number: 4, name: 'Plugin Selection', description: 'Choose plugins' },
         { number: 5, name: 'Download & Setup', description: 'Preparing components' },
         { number: 6, name: 'System Startup', description: 'Starting services' },
         { number: 7, name: 'Complete', description: 'All done!' }
@@ -256,7 +256,7 @@ async function initializeCurrentStep() {
             await initializeEnvironmentStep();
             break;
         case 4:
-            await initializeClientSelectionStep();
+            await initializePluginSelectionStep();
             break;
         case 5:
             await initializeDownloadStep();
@@ -761,107 +761,153 @@ async function saveEnvironmentConfig(): Promise<boolean> {
 }
 
 /**
- * Step 4: Initialize Client Selection
+ * Step 4: Initialize Plugin Selection
  */
-/**
- * Step 4: Initialize Client Selection
- */
-async function initializeClientSelectionStep() {
-    const container = document.getElementById('client-selection-container');
+async function initializePluginSelectionStep() {
+    const container = document.getElementById('plugin-selection-container');
     if (!container) return;
 
     try {
-        // Load available clients
-        const clients = await (window as any).electronAPI.clientSelection.getOptions();
-        console.log('Available clients:', clients);
+        // Get current plugin selection from wizard state
+        const state = wizardState.data.plugins || { workflow: false };
 
-        // Get current selection
-        const selection = await (window as any).electronAPI.clientSelection.getSelection();
-        const selectedClients = selection?.clients || [];
+        // Create plugin selection UI
+        container.innerHTML = `
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 15px;">
+                <div style="margin-bottom: 20px;">
+                    <p style="font-size: 1.1rem; opacity: 0.9;">
+                        Choose optional plugins to enhance your MCP Writing System:
+                    </p>
+                </div>
 
-        // Create client cards using shared UI
-        container.innerHTML = (window as any).ClientManagementUI.createClientSelectionCards(clients, selectedClients);
+                <div class="plugin-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <!-- Workflow Plugin Card -->
+                    <div class="plugin-card" style="background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 20px; transition: all 0.3s;">
+                        <div style="display: flex; align-items: start; gap: 15px;">
+                            <input type="checkbox" id="plugin-workflow" class="plugin-checkbox" ${state.workflow ? 'checked' : ''}
+                                   style="width: 20px; height: 20px; margin-top: 5px; cursor: pointer;">
+                            <div style="flex: 1;">
+                                <label for="plugin-workflow" style="font-size: 1.2rem; font-weight: 600; cursor: pointer; display: block; margin-bottom: 8px;">
+                                    Workflow Plugin
+                                </label>
+                                <p style="font-size: 0.95rem; opacity: 0.8; margin: 0; line-height: 1.5;">
+                                    Advanced workflow automation and task management for complex writing projects. Includes visual workflow designer and execution tracking.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
-        // Add event listeners using shared UI
-        // Pass initializeClientSelectionStep as onRefresh callback
-        // Pass saveClientSelection as onSaveSelection callback
-        (window as any).ClientManagementUI.setupClientSelectionListeners(
-            async () => { await initializeClientSelectionStep(); },
-            async () => { await saveClientSelection(); }
-        );
+                    <!-- Future plugins can be added here -->
+                    <div class="plugin-card" style="background: rgba(255, 255, 255, 0.03); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 20px; opacity: 0.6;">
+                        <div style="display: flex; align-items: start; gap: 15px;">
+                            <div style="width: 20px; height: 20px; margin-top: 5px;"></div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 8px;">
+                                    More Plugins Coming Soon
+                                </div>
+                                <p style="font-size: 0.95rem; opacity: 0.8; margin: 0; line-height: 1.5;">
+                                    Additional plugins for grammar checking, style analysis, and more will be available in future updates.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; justify-content: flex-end; margin-top: 30px;">
+                    <button class="wizard-btn primary" id="save-plugin-selection-btn">Save Selection</button>
+                </div>
+
+                <div id="plugin-selection-status" style="margin-top: 20px;"></div>
+            </div>
+        `;
+
+        // Add event listener for save button
+        const saveBtn = document.getElementById('save-plugin-selection-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', savePluginSelection);
+        }
+
+        // Add visual feedback for checkbox changes
+        const checkboxes = document.querySelectorAll('.plugin-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const card = checkbox.closest('.plugin-card') as HTMLElement;
+                if (card && (checkbox as HTMLInputElement).checked) {
+                    card.style.borderColor = 'rgba(76, 175, 80, 0.6)';
+                    card.style.background = 'rgba(76, 175, 80, 0.1)';
+                } else if (card) {
+                    card.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    card.style.background = 'rgba(255, 255, 255, 0.05)';
+                }
+            });
+
+            // Apply initial styles
+            const card = checkbox.closest('.plugin-card') as HTMLElement;
+            if (card && (checkbox as HTMLInputElement).checked) {
+                card.style.borderColor = 'rgba(76, 175, 80, 0.6)';
+                card.style.background = 'rgba(76, 175, 80, 0.1)';
+            }
+        });
 
     } catch (error) {
-        console.error('Error loading client selection:', error);
+        console.error('Error loading plugin selection:', error);
         container.innerHTML = `
             <div class="alert error">
                 <span style="font-size: 1.5rem;">⚠️</span>
                 <div>
-                    <strong>Error Loading Clients</strong><br>
+                    <strong>Error Loading Plugins</strong><br>
                     ${error instanceof Error ? error.message : String(error)}
                 </div>
             </div>
         `;
     }
 }
-/**
- * Create client selection cards HTML
- */
-/**
- * Create client selection cards HTML
- */
-
 
 /**
- * Save client selection
+ * Save plugin selection
  */
-async function saveClientSelection(): Promise<boolean> {
-    const statusEl = document.getElementById('client-selection-status');
+async function savePluginSelection(): Promise<boolean> {
+    const statusEl = document.getElementById('plugin-selection-status');
 
     try {
-        // Get selected clients
-        const selectedClients: string[] = [];
-        document.querySelectorAll('.client-checkbox:checked').forEach((checkbox: any) => {
-            selectedClients.push(checkbox.value);
-        });
+        // Get selected plugins
+        const workflowCheckbox = document.getElementById('plugin-workflow') as HTMLInputElement;
+        const pluginSelection = {
+            workflow: workflowCheckbox?.checked || false
+        };
 
-        console.log('Selected clients:', selectedClients);
+        console.log('Selected plugins:', pluginSelection);
 
         if (statusEl) {
             statusEl.innerHTML = '<div class="spinner" style="display: inline-block;"></div> Saving selection...';
         }
 
-        // Save selection
-        const result = await (window as any).electronAPI.clientSelection.saveSelection(selectedClients);
+        // Save wizard state
+        const saveStateResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.PLUGINS, {
+            plugins: pluginSelection
+        });
 
-        if (result.success) {
-            // Save wizard state
-            const saveStateResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.CLIENT_SELECTION, {
-                clients: selectedClients
-            });
-
-            if (!saveStateResult.success) {
-                throw new Error(`Failed to save wizard state: ${saveStateResult.error}`);
-            }
-
-            if (statusEl) {
-                statusEl.innerHTML = `
-                    <div class="alert success">
-                        <span style="font-size: 1.5rem;">✓</span>
-                        <div>
-                            <strong>Selection Saved</strong><br>
-                            ${selectedClients.length} client(s) selected: ${selectedClients.join(', ')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            return true;
-        } else {
-            throw new Error(result.error || 'Failed to save selection');
+        if (!saveStateResult.success) {
+            throw new Error(`Failed to save wizard state: ${saveStateResult.error}`);
         }
 
+        if (statusEl) {
+            const selectedCount = Object.values(pluginSelection).filter(Boolean).length;
+            statusEl.innerHTML = `
+                <div class="alert success">
+                    <span style="font-size: 1.5rem;">✓</span>
+                    <div>
+                        <strong>Selection Saved</strong><br>
+                        ${selectedCount} plugin(s) selected
+                    </div>
+                </div>
+            `;
+        }
+
+        return true;
+
     } catch (error) {
-        console.error('Error saving client selection:', error);
+        console.error('Error saving plugin selection:', error);
         if (statusEl) {
             statusEl.innerHTML = `
                 <div class="alert error">
@@ -1104,13 +1150,13 @@ async function initializeDownloadStep() {
         }
 
         // Docker is now running, proceed with the build pipeline
-        // Get selected clients to determine which components to build
-        const selection = await (window as any).electronAPI.clientSelection.getSelection();
+        // Get selected plugins to determine which components to build
+        const state = await (window as any).electronAPI.setupWizard.getState();
         const selectedComponents = ['core-system']; // Always include core system
 
-        // Add optional components based on client selection
-        if (selection?.clients?.includes('typingmind')) {
-            selectedComponents.push('typing-mind-component');
+        // Add optional components based on plugin selection
+        if (state.data.plugins?.workflow) {
+            selectedComponents.push('workflow-plugin');
         }
 
         console.log('Starting build pipeline with components:', selectedComponents);
@@ -1614,9 +1660,15 @@ async function initializeCompleteStep() {
             summary.push('Environment configuration saved');
         }
 
-        const clients = wizardState.data.clients || [];
-        if (clients.length > 0) {
-            summary.push(`${clients.length} client(s) selected: ${clients.join(', ')}`);
+        // Show selected plugins
+        const plugins = wizardState.data.plugins;
+        if (plugins) {
+            const selectedPlugins = Object.entries(plugins)
+                .filter(([_, enabled]) => enabled)
+                .map(([name, _]) => name);
+            if (selectedPlugins.length > 0) {
+                summary.push(`${selectedPlugins.length} plugin(s) selected: ${selectedPlugins.join(', ')}`);
+            }
         }
 
         if (wizardState.data.downloads?.dockerImagesCompleted) {
@@ -1742,9 +1794,9 @@ async function nextStep() {
         return;
     }
 
-    // For CLIENT_SELECTION step, automatically save selection before proceeding
-    if (currentStep === WizardStep.CLIENT_SELECTION) {
-        const saved = await saveClientSelection();
+    // For PLUGINS step, automatically save selection before proceeding
+    if (currentStep === WizardStep.PLUGINS) {
+        const saved = await savePluginSelection();
         if (!saved) {
             // Save failed, don't proceed
             return;

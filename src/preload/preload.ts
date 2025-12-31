@@ -516,7 +516,7 @@ enum WizardStep {
   WELCOME = 1,
   PREREQUISITES = 2,
   ENVIRONMENT = 3,
-  CLIENT_SELECTION = 4,
+  PLUGINS = 4,
   DOWNLOAD_SETUP = 5,
   SYSTEM_STARTUP = 6,
   COMPLETE = 7
@@ -535,7 +535,9 @@ interface WizardStepData {
     saved: boolean;
     configPath?: string;
   };
-  clients?: string[];
+  plugins?: {
+    workflow: boolean;
+  };
   downloads?: {
     typingMindCompleted: boolean;
     dockerImagesCompleted: boolean;
@@ -2076,7 +2078,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       WELCOME: 1,
       PREREQUISITES: 2,
       ENVIRONMENT: 3,
-      CLIENT_SELECTION: 4,
+      PLUGINS: 4,
       DOWNLOAD_SETUP: 5,
       SYSTEM_STARTUP: 6,
       COMPLETE: 7
