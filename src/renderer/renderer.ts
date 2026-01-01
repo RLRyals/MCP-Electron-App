@@ -970,17 +970,27 @@ async function init(): Promise<void> {
   // Listen for plugin state changes and update navigation
   const electronAPI = (window as any).electronAPI;
   if (electronAPI?.on) {
-    electronAPI.on('plugin-state-changed', async () => {
-      console.log('[Renderer] Plugin state changed, updating navigation...');
+    electronAPI.on('plugin-state-changed', async (data: { pluginId: string; state: string }) => {
+      console.log('[Renderer] Plugin state changed:', data);
 
       // Reload sidebar navigation
       await sidebar.updateNavigation();
 
       // Re-register plugin-dependent views
       if (sidebar.isPluginInstalled('fictionlab-workflow')) {
-        if (!viewRouter['viewClasses'].has('workflows')) {
+        const wasRegistered = viewRouter['viewClasses'].has('workflows');
+        if (!wasRegistered) {
           viewRouter.registerView('workflows', WorkflowsViewReact);
           console.log('[Renderer] WorkflowsViewReact registered after plugin install');
+        }
+
+        // If we're currently trying to view workflows but it was showing "Plugin Required",
+        // re-navigate to actually load the view now that the plugin is ready
+        const currentViewId = viewRouter['currentViewId'];
+        const savedView = localStorage.getItem('fictionlab-active-view');
+        if (savedView === 'workflows' && (!currentViewId || currentViewId !== 'workflows' || !wasRegistered)) {
+          console.log('[Renderer] Re-navigating to workflows view after plugin activation');
+          await viewRouter.navigateTo('workflows');
         }
       } else {
         // Remove workflows view if plugin was uninstalled
@@ -1079,51 +1089,6 @@ async function init(): Promise<void> {
       // Plugins menu
       case 'plugins-manage':
         viewRouter.navigateTo('plugins');
-        break;
-
-      // Plugin actions - Claude Code
-      case 'plugin-claude-code-subscription-install-cli':
-        if ((window as any).electronAPI?.plugins?.call) {
-          (window as any).electronAPI.plugins.call('claude-code-subscription', 'install-cli')
-            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
-            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
-        }
-        break;
-
-      case 'plugin-claude-code-subscription-login':
-        if ((window as any).electronAPI?.plugins?.call) {
-          (window as any).electronAPI.plugins.call('claude-code-subscription', 'login')
-            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
-            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
-        }
-        break;
-
-      case 'plugin-claude-code-subscription-check-auth':
-        if ((window as any).electronAPI?.plugins?.call) {
-          (window as any).electronAPI.plugins.call('claude-code-subscription', 'check-auth')
-            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
-            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
-        }
-        break;
-
-      case 'plugin-claude-code-subscription-run-task':
-        if ((window as any).electronAPI?.plugins?.call) {
-          // TODO: Show form dialog to collect task data
-          console.log('[Renderer] Run task - form UI not implemented yet');
-          (window as any).electronAPI.plugins.call('claude-code-subscription', 'run-task', {
-            prompt: 'Test task',
-            context: '',
-            workingDirectory: '',
-            timeout: 300
-          })
-            .then((result: any) => console.log('[Renderer] Plugin action result:', result))
-            .catch((error: any) => console.error('[Renderer] Plugin action error:', error));
-        }
-        break;
-
-      case 'plugin-claude-code-subscription-show-settings':
-        // TODO: Show settings dialog
-        console.log('[Renderer] Plugin settings - not implemented yet');
         break;
 
       default:

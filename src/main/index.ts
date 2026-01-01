@@ -33,7 +33,6 @@ import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import { getProviderManager } from './llm/provider-manager';
 import type { LLMProviderConfig } from '../types/llm-providers';
-import { PTYManager } from './pty-manager';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -64,7 +63,6 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
-let ptyManager: PTYManager | null = null;
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -2176,61 +2174,6 @@ function setupIPC(): void {
     }
   });
 
-  // Claude Code Plugin Settings Handler
-  ipcMain.handle('plugin:claude-code-subscription:show-settings', async (_event) => {
-    try {
-      const plugin = pluginManager.getPlugin('claude-code-subscription');
-      if (!plugin) {
-        throw new Error('Claude Code plugin not found');
-      }
-
-      // Get current workspace setting
-      const currentWorkspace = plugin.context.config.get<string>('defaultWorkspace') || '';
-
-      // Show folder picker dialog
-      const result = await dialog.showOpenDialog(mainWindow!, {
-        title: 'Select Claude Code Workspace Folder',
-        message: 'Choose a safe folder for Claude Code to use as its workspace',
-        properties: ['openDirectory', 'createDirectory'],
-        defaultPath: currentWorkspace || app.getPath('documents')
-      });
-
-      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
-        return { success: false, message: 'Selection cancelled' };
-      }
-
-      const selectedPath = result.filePaths[0];
-
-      // Save to plugin config
-      await plugin.context.config.set('defaultWorkspace', selectedPath);
-
-      logWithCategory('info', LogCategory.SYSTEM,
-        `Claude Code workspace updated: ${selectedPath}`);
-
-      // Show success notification
-      if (mainWindow) {
-        mainWindow.webContents.send('show-notification', {
-          type: 'success',
-          message: `Workspace set to: ${selectedPath}`
-        });
-      }
-
-      return {
-        success: true,
-        workspace: selectedPath,
-        message: 'Workspace configured successfully'
-      };
-
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM,
-        `Failed to configure workspace: ${error.message}`);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  });
-
   // Plugin View IPC handlers
   // NEW: Get plugin view URL for embedding in main window
   ipcMain.handle('plugin:get-view-url', async (_event, pluginId: string, viewName: string) => {
@@ -2649,124 +2592,6 @@ function setupIPC(): void {
     }
   });
 
-  // ========================================
-  // PTY (Terminal) IPC Handlers
-  // ========================================
-
-  ptyManager = new PTYManager();
-
-  // Forward PTY output to renderer
-  ptyManager.on('terminal:data', (data) => {
-    logger.debug(`[IPC] Forwarding terminal data to renderer:`, data.data?.substring(0, 50));
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('terminal:data', data);
-    }
-  });
-
-  ptyManager.on('terminal:exit', (data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('terminal:exit', data);
-    }
-  });
-
-  ptyManager.on('terminal:error', (data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('terminal:error', data);
-    }
-  });
-
-  // Create terminal session
-  ipcMain.handle('terminal:create', async (_event, options: {
-    id: string;
-    command: string;
-    args: string[];
-    cwd?: string;
-    env?: NodeJS.ProcessEnv;
-    cols?: number;
-    rows?: number;
-    useHomeDirectory?: boolean; // Use user's home directory as workspace
-  }) => {
-    logWithCategory('info', LogCategory.SYSTEM,
-      `IPC: Creating terminal ${options.id}: ${options.command} ${options.args.join(' ')}`);
-    try {
-      // If useHomeDirectory is true, get workspace from plugin config or fall back to safe default
-      const finalOptions = { ...options };
-      if (options.useHomeDirectory && !options.cwd) {
-        // Try to get configured workspace from Claude Code plugin
-        let workspace: string | undefined;
-        try {
-          const plugin = pluginManager.getPlugin('claude-code-subscription');
-          if (plugin && plugin.context) {
-            workspace = plugin.context.config.get<string>('defaultWorkspace');
-          }
-        } catch (error) {
-          // Plugin not available or not configured
-        }
-
-        // Fall back to Documents folder (safer than home directory)
-        if (!workspace) {
-          workspace = app.getPath('documents');
-          logWithCategory('info', LogCategory.SYSTEM,
-            `No workspace configured, using Documents folder: ${workspace}`);
-        } else {
-          logWithCategory('info', LogCategory.SYSTEM,
-            `Using configured workspace: ${workspace}`);
-        }
-
-        finalOptions.cwd = workspace;
-      }
-
-      if (!ptyManager) {
-        throw new Error('PTY Manager not initialized');
-      }
-      ptyManager.createTerminal(finalOptions);
-      return { success: true };
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM,
-        `Failed to create terminal: ${error.message}`);
-      throw error;
-    }
-  });
-
-  // Send input to terminal
-  ipcMain.handle('terminal:input', async (_event, id: string, data: string) => {
-    if (!ptyManager) {
-      throw new Error('PTY Manager not initialized');
-    }
-    logger.debug(`[IPC] terminal:input received for ${id}:`, data);
-    ptyManager.writeToTerminal(id, data);
-    return { success: true };
-  });
-
-  // Resize terminal
-  ipcMain.handle('terminal:resize', async (_event, id: string, cols: number, rows: number) => {
-    if (!ptyManager) {
-      throw new Error('PTY Manager not initialized');
-    }
-    ptyManager.resizeTerminal(id, cols, rows);
-    return { success: true };
-  });
-
-  // Close terminal
-  ipcMain.handle('terminal:close', async (_event, id: string) => {
-    if (!ptyManager) {
-      throw new Error('PTY Manager not initialized');
-    }
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing terminal ${id}`);
-    ptyManager.closeTerminal(id);
-    return { success: true };
-  });
-
-  // Get active terminals
-  ipcMain.handle('terminal:list', async () => {
-    if (!ptyManager) {
-      return { terminals: [] };
-    }
-    return { terminals: ptyManager.getActiveTerminals() };
-  });
-
-  // Note: PTY cleanup is handled in the consolidated before-quit handler below
-
   logger.info('IPC handlers registered');
 }
 
@@ -2985,16 +2810,6 @@ app.on('before-quit', async (event) => {
   isQuitting = true;
 
   logger.info('App is quitting...');
-
-  // Close all terminal sessions
-  try {
-    if (ptyManager) {
-      logWithCategory('info', LogCategory.SYSTEM, 'Closing all terminal sessions');
-      ptyManager.closeAll();
-    }
-  } catch (error) {
-    logWithCategory('error', LogCategory.SYSTEM, 'Error closing terminal sessions:', error);
-  }
 
   // Clean up plugin system
   try {

@@ -9,14 +9,12 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { logWithCategory, LogCategory } from '../logger';
 import { ClaudeCodeDetector } from '../claude-code-detector';
-import type { PTYManager } from '../pty-manager';
 
 export interface ClaudeCodeSession {
   id: string;
   phaseNumber: number;
   skillName: string;
   process?: ChildProcess;
-  ptyId?: string;  // For interactive sessions using PTY
   output: string[];
   status: 'running' | 'completed' | 'failed';
 }
@@ -32,44 +30,38 @@ export class ClaudeCodeExecutor extends EventEmitter {
   private static instance?: ClaudeCodeExecutor;
   private sessions: Map<string, ClaudeCodeSession> = new Map();
   private detector: ClaudeCodeDetector;
-  private ptyManager?: PTYManager;
 
-  constructor(ptyManager?: PTYManager) {
+  constructor() {
     super();
     this.detector = new ClaudeCodeDetector();
-    this.ptyManager = ptyManager;
   }
 
   /**
    * Get or create singleton instance
    * This ensures all parts of the app use the same executor
    */
-  static getInstance(ptyManager?: PTYManager): ClaudeCodeExecutor {
+  static getInstance(): ClaudeCodeExecutor {
     if (!ClaudeCodeExecutor.instance) {
-      ClaudeCodeExecutor.instance = new ClaudeCodeExecutor(ptyManager);
-    } else if (ptyManager && !ClaudeCodeExecutor.instance.ptyManager) {
-      // If PTY manager is provided later, update the instance
-      ClaudeCodeExecutor.instance.ptyManager = ptyManager;
+      ClaudeCodeExecutor.instance = new ClaudeCodeExecutor();
     }
     return ClaudeCodeExecutor.instance;
   }
 
   /**
-   * Execute Claude Code with optional agent
+   * Execute Claude Code with optional agent (headless only)
    */
   async executeSkill(
     agentName: string | null,
     phaseNumber: number,
     prompt: string,
-    context?: object,
-    headless: boolean = true
+    context?: object
   ): Promise<ClaudeCodeResult> {
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const session: ClaudeCodeSession = {
       id: sessionId,
       phaseNumber,
-      skillName: agentName || '',  // Keep for backward compatibility
+      skillName: agentName || '',
       output: [],
       status: 'running'
     };
@@ -81,7 +73,7 @@ export class ClaudeCodeExecutor extends EventEmitter {
 
     try {
       // Execute Claude Code with optional agent
-      const result = await this.runClaudeCode(prompt, agentName, session, context, headless);
+      const result = await this.runClaudeCode(prompt, agentName, session, context);
 
       session.status = 'completed';
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -108,19 +100,16 @@ export class ClaudeCodeExecutor extends EventEmitter {
   }
 
   /**
-   * Run Claude Code CLI
-   * Checks if Claude is installed and user is logged in before executing
+   * Run Claude Code CLI in headless mode
+   * Checks if Claude is installed before executing
    */
   private async runClaudeCode(
     prompt: string,
     agentName: string | null,
     session: ClaudeCodeSession,
-    context?: object,
-    headless: boolean = true
+    context?: object
   ): Promise<object> {
     // 1. Check if Claude CLI is available
-    // Note: We only check if it's installed, not authentication status
-    // The CLI will prompt for auth if needed during actual execution
     const status = await this.detector.getStatus();
 
     if (!status.installed) {
@@ -144,317 +133,99 @@ export class ClaudeCodeExecutor extends EventEmitter {
 
     // 2. All checks passed - execute command
     return new Promise((resolve, reject) => {
-      // Construct Claude Code command
-      const args = [];
+      // Construct Claude Code command for headless mode
+      const args = ['--print', '--output-format', 'json'];
 
-      if (headless) {
-        // NON-INTERACTIVE MODE (Background Subagent)
-        // - Uses --agent flag to spawn a subagent with declared skills
-        // - Agent file in ~/.claude/agents/ lists available skills
-        // - Runs headless, returns JSON output
-        args.push('--print');
-        args.push('--output-format', 'json');
-
-        if (agentName) {
-          args.push('--agent', agentName);
-        }
-      } else {
-        // INTERACTIVE MODE (Terminal Conversation)
-        // - NO --agent flag needed! Output styles are set via /output-style command
-        // - Output style file from ~/.claude/output-styles/ controls response format
-        // - Skills are AUTO-SELECTED from ~/.claude/skills/ based on conversation
-        // - User can interact directly with Claude in terminal
-        // Note: We'll send /output-style command after Claude starts
+      if (agentName) {
+        args.push('--agent', agentName);
       }
 
-      // CRITICAL: Interactive mode needs 'inherit' stdio to allow user interaction
-      // Headless mode uses 'pipe' to capture JSON output
-      let claudeProcess: ChildProcess | undefined;
+      // Extract project folder from context for workspace setup
+      const projectFolder = (context as any)?.projectFolder;
+      const workingDir = projectFolder || process.cwd();
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Spawning Claude Code in HEADLESS mode: claude ${args.join(' ')} (prompt via stdin, length: ${prompt.length} chars)`);
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Claude Code workspace: ${workingDir}${projectFolder ? ' (from workflow)' : ' (default)'}`);
+
+      const claudeProcess = spawn('claude', args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+        cwd: workingDir
+      });
+
+      session.process = claudeProcess;
+
       let stdout = '';
       let stderr = '';
 
-      if (headless) {
-        // Extract project folder from context for workspace setup
-        const projectFolder = (context as any)?.projectFolder;
-        const workingDir = projectFolder || process.cwd();
-
-        // Headless mode: pipe stdio to capture output, prompt via stdin
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Spawning Claude Code in HEADLESS mode: claude ${args.join(' ')} (prompt via stdin, length: ${prompt.length} chars)`);
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Claude Code workspace: ${workingDir}${projectFolder ? ' (from workflow)' : ' (default)'}`);
-
-        claudeProcess = spawn('claude', args, {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          shell: true,
-          cwd: workingDir
-        });
-
-        session.process = claudeProcess;
-
-        // Write prompt to stdin
-        try {
-          claudeProcess.stdin?.write(prompt);
-          claudeProcess.stdin?.end();
-        } catch (error: any) {
-          logWithCategory('error', LogCategory.WORKFLOW,
-            `Failed to write prompt to stdin: ${error.message}`);
-          reject(new Error(`Failed to write prompt to stdin: ${error.message}`));
-          return;
-        }
-
-        // Capture output (but don't emit it - that causes duplicate output)
-        claudeProcess.stdout?.on('data', (data: Buffer) => {
-          const output = data.toString();
-          stdout += output;
-          session.output.push(output);
-
-          logWithCategory('debug', LogCategory.WORKFLOW,
-            `Claude Code stdout: ${output.substring(0, 200)}...`);
-
-          // NOTE: Don't emit 'claude-output' here - it causes duplicate output
-          // The output is already being captured for JSON parsing
-          // If we need real-time streaming in headless mode, we should use a different event
-        });
-
-        claudeProcess.stderr?.on('data', (data: Buffer) => {
-          const error = data.toString();
-          stderr += error;
-
-          logWithCategory('debug', LogCategory.WORKFLOW,
-            `Claude Code stderr: ${error}`);
-
-          // NOTE: Don't emit stderr either - just capture for error reporting
-        });
-      } else {
-        // Interactive mode: use PTY for terminal interaction
-        if (!this.ptyManager) {
-          reject(new Error('Interactive mode requires PTY manager, but none was provided'));
-          return;
-        }
-
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
-        // Use a unique terminal ID for this workflow session (don't conflict with UI terminal)
-        const ptyId = `workflow-claude-${session.id}`;
-
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Starting Claude Code in INTERACTIVE mode via PTY: claude ${args.join(' ')}`);
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Initial prompt will be sent to terminal (length: ${prompt.length} chars)`);
-        logWithCategory('info', LogCategory.WORKFLOW,
-          'Interactive mode: User will see prompt and can have conversation');
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Transcript will be saved as: transcript_${timestamp}.md`);
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `PTY terminal ID: ${ptyId}`);
-
-        // Store PTY ID and timestamp in session
-        session.ptyId = ptyId;
-        (session as any).transcriptTimestamp = timestamp;
-
-        // Extract project folder from context for workspace setup
-        const projectFolder = (context as any)?.projectFolder;
-        const workingDir = projectFolder || process.cwd();
-
-        logWithCategory('info', LogCategory.WORKFLOW,
-          `Claude Code workspace: ${workingDir}${projectFolder ? ' (from workflow)' : ' (default)'}`);
-
-        // Create PTY terminal for interactive Claude session
-        try {
-          this.ptyManager.createTerminal({
-            id: ptyId,
-            command: 'claude',
-            args: args,  // Don't include prompt in args - we'll send it via PTY input
-            cwd: workingDir
-          });
-
-          logWithCategory('info', LogCategory.WORKFLOW,
-            `Interactive Claude session created in PTY: ${ptyId}`);
-
-          // Emit event to notify UI that interactive session is ready (switch terminal view)
-          // Do this immediately so user can see Claude Code starting up
-          this.emit('workflow-prompt-ready', {
-            sessionId: session.id,
-            ptyId: ptyId,
-            prompt: prompt,
-            message: `Interactive Claude Code session started${agentName ? ` with output style: ${agentName}` : ''}.`
-          });
-
-          // Wait for Claude Code to be ready by listening for PTY output
-          // Claude Code outputs a prompt when ready (e.g., "> " or similar)
-          let claudeReady = false;
-          let outputStyleSet = false;
-          let initialOutputBuffer = '';
-
-          const readyHandler = (data: { id: string; data: string }) => {
-            if (data.id !== ptyId) {
-              logWithCategory('debug', LogCategory.WORKFLOW,
-                `Ignoring PTY data from different terminal: ${data.id} (expected: ${ptyId})`);
-              return;
-            }
-
-            initialOutputBuffer += data.data;
-
-            logWithCategory('debug', LogCategory.WORKFLOW,
-              `PTY data received (${data.data.length} chars), buffer size: ${initialOutputBuffer.length}`);
-            logWithCategory('debug', LogCategory.WORKFLOW,
-              `Latest data: ${data.data.substring(0, 100).replace(/\n/g, '\\n')}`);
-
-            // Strip ANSI escape codes to detect prompt
-            // ANSI codes like \x1b[0m, \x1b[38;2;215;119;87m surround the prompt
-            const strippedBuffer = initialOutputBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-
-            // Look for Claude Code's ready prompt (appears after banner)
-            // Common patterns: "> ", "? ", or end of banner text
-            const hasPrompt = /[>?]\s*$/.test(strippedBuffer) ||
-                             strippedBuffer.includes('How can I help you');
-
-            logWithCategory('debug', LogCategory.WORKFLOW,
-              `Prompt detected: ${hasPrompt}, claudeReady: ${claudeReady}, outputStyleSet: ${outputStyleSet}` +
-              ` (stripped: ${strippedBuffer.substring(Math.max(0, strippedBuffer.length - 50))})`);
-
-            if (hasPrompt && !claudeReady) {
-              claudeReady = true;
-              logWithCategory('info', LogCategory.WORKFLOW,
-                'Claude Code is ready - detected prompt pattern');
-
-              // If output style is specified, set it first
-              if (agentName && !outputStyleSet) {
-                outputStyleSet = true;
-                logWithCategory('info', LogCategory.WORKFLOW,
-                  `Setting output style: ${agentName}`);
-                logWithCategory('warn', LogCategory.WORKFLOW,
-                  'Output styles are currently disabled due to validation issues - sending prompt directly');
-
-                // TEMPORARILY SKIP OUTPUT STYLE - it's causing "Invalid output style" errors
-                // Just send the prompt directly
-                this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
-                this.ptyManager!.off('terminal:data', readyHandler);
-              } else if (!agentName) {
-                // No output style, send prompt immediately
-                logWithCategory('info', LogCategory.WORKFLOW,
-                  `Sending initial prompt to Claude (${prompt.length} chars)`);
-                this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
-
-                // Stop listening - we're done with initialization
-                this.ptyManager!.off('terminal:data', readyHandler);
-              }
-            } else if (hasPrompt && claudeReady && outputStyleSet) {
-              // Output style has been set, now send the actual prompt
-              logWithCategory('info', LogCategory.WORKFLOW,
-                `Sending initial prompt to Claude (${prompt.length} chars)`);
-              this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
-
-              // Stop listening - we're done with initialization
-              this.ptyManager!.off('terminal:data', readyHandler);
-            }
-          };
-
-          // Listen for PTY data to detect when Claude is ready
-          this.ptyManager.on('terminal:data', readyHandler);
-
-          // Fallback timeout in case we never detect the prompt
-          setTimeout(() => {
-            if (!claudeReady || (agentName && !outputStyleSet)) {
-              logWithCategory('warn', LogCategory.WORKFLOW,
-                'Claude Code ready detection timed out - proceeding anyway');
-
-              // Remove listener
-              this.ptyManager!.off('terminal:data', readyHandler);
-
-              // Send commands anyway (skip output style due to validation issues)
-              logWithCategory('warn', LogCategory.WORKFLOW,
-                'Skipping output style in fallback - sending prompt directly');
-              this.ptyManager!.writeToTerminal(ptyId, prompt + '\n');
-            }
-          }, 10000);  // 10 second fallback timeout
-
-          // Listen for PTY exit
-          const exitHandler = (data: { id: string; exitCode: number }) => {
-            if (data.id === ptyId) {
-              logWithCategory('info', LogCategory.WORKFLOW,
-                `Interactive Claude session exited with code ${data.exitCode}`);
-
-              session.status = data.exitCode === 0 ? 'completed' : 'failed';
-
-              // Remove listener
-              this.ptyManager?.off('terminal:exit', exitHandler);
-
-              if (data.exitCode === 0) {
-                resolve({
-                  interactive: true,
-                  message: 'Interactive conversation completed. Transcript saved.',
-                  agent: agentName,
-                  session_id: session.id,
-                  transcript_file: `transcript_${timestamp}.md`,
-                  raw_output: `Interactive session completed.\nTranscript saved as: transcript_${timestamp}.md`
-                });
-              } else {
-                reject(new Error(`Claude Code exited with code ${data.exitCode}`));
-              }
-            }
-          };
-
-          this.ptyManager.on('terminal:exit', exitHandler);
-
-          logWithCategory('info', LogCategory.WORKFLOW,
-            `Interactive PTY terminal created: ${ptyId} - waiting for session to complete`);
-
-          // FIXED: Wait for the PTY exit handler to resolve/reject the promise
-          // The promise will be resolved/rejected by the exitHandler when Claude exits
-
-        } catch (error: any) {
-          logWithCategory('error', LogCategory.WORKFLOW,
-            `Failed to create PTY terminal: ${error.message}`);
-          reject(new Error(`Failed to start interactive session: ${error.message}`));
-          return;
-        }
+      // Write prompt to stdin
+      try {
+        claudeProcess.stdin?.write(prompt);
+        claudeProcess.stdin?.end();
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.WORKFLOW,
+          `Failed to write prompt to stdin: ${error.message}`);
+        reject(new Error(`Failed to write prompt to stdin: ${error.message}`));
+        return;
       }
 
-      // Only headless mode uses claudeProcess close/error handlers
-      // Interactive mode uses PTY exit handler (registered above)
-      if (headless && claudeProcess) {
-        claudeProcess.on('close', (code: number) => {
-          if (code === 0) {
-            // Headless mode: parse JSON output
-            try {
-              // Parse JSON output
-              // Claude Code may output multiple JSON objects or mixed output
-              // Try to extract JSON from the output
-              const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+      // Capture output
+      claudeProcess.stdout?.on('data', (data: Buffer) => {
+        const output = data.toString();
+        stdout += output;
+        session.output.push(output);
 
-              if (jsonMatch) {
-                const result = JSON.parse(jsonMatch[0]);
-                resolve(result);
-              } else {
-                // If no JSON found, return raw output wrapped in object
-                resolve({
-                  raw_output: stdout.trim(),
-                  agent: agentName,
-                  session_id: session.id
-                });
-              }
-            } catch (error) {
-              logWithCategory('warn', LogCategory.WORKFLOW,
-                `Failed to parse Claude Code JSON output, returning raw: ${error}`);
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `Claude Code stdout: ${output.substring(0, 200)}...`);
+      });
 
-              // Return raw output if JSON parsing fails
+      claudeProcess.stderr?.on('data', (data: Buffer) => {
+        const error = data.toString();
+        stderr += error;
+
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `Claude Code stderr: ${error}`);
+      });
+
+      claudeProcess.on('close', (code: number) => {
+        if (code === 0) {
+          try {
+            // Parse JSON output
+            const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+
+            if (jsonMatch) {
+              const result = JSON.parse(jsonMatch[0]);
+              resolve(result);
+            } else {
+              // If no JSON found, return raw output wrapped in object
               resolve({
                 raw_output: stdout.trim(),
                 agent: agentName,
-                session_id: session.id,
-                parse_error: String(error)
+                session_id: session.id
               });
             }
-          } else {
-            reject(new Error(`Claude Code exited with code ${code}: ${stderr || 'No error output'}`));
-          }
-        });
+          } catch (error) {
+            logWithCategory('warn', LogCategory.WORKFLOW,
+              `Failed to parse Claude Code JSON output, returning raw: ${error}`);
 
-        claudeProcess.on('error', (error: Error) => {
-          reject(new Error(`Failed to start Claude Code: ${error.message}`));
-        });
-      }
+            // Return raw output if JSON parsing fails
+            resolve({
+              raw_output: stdout.trim(),
+              agent: agentName,
+              session_id: session.id,
+              parse_error: String(error)
+            });
+          }
+        } else {
+          reject(new Error(`Claude Code exited with code ${code}: ${stderr || 'No error output'}`));
+        }
+      });
+
+      claudeProcess.on('error', (error: Error) => {
+        reject(new Error(`Failed to start Claude Code: ${error.message}`));
+      });
     });
   }
 

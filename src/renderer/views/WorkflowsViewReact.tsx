@@ -20,7 +20,6 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
-import { TerminalPanel } from '../components/TerminalPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
 import type { Project } from '../../types/project.js';
 
@@ -42,10 +41,6 @@ const WorkflowsApp: React.FC = () => {
   const [showSeriesDialog, setShowSeriesDialog] = useState(false);
   const [seriesDialogContext, setSeriesDialogContext] = useState<{ projectId: number; projectName: string } | null>(null);
   const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
-  const [terminalHeight, setTerminalHeight] = useState(300);
-  const [showTerminal, setShowTerminal] = useState(true);
-  const [activeProjectName, setActiveProjectName] = useState<string>('');
-  const [interactiveSession, setInteractiveSession] = useState<{ sessionId: string; ptyId: string; nodeId?: string } | null>(null);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -75,14 +70,8 @@ const WorkflowsApp: React.FC = () => {
   useEffect(() => {
     loadWorkflows();
 
-    // Load app state and set initial project name
-    appState.refresh().then(() => {
-      const activeProject = appState.getActiveProject();
-      if (activeProject) {
-        const projectName = (activeProject as any).project_name || (activeProject as any).name || '';
-        setActiveProjectName(projectName);
-      }
-    }).catch(error => {
+    // Load app state
+    appState.refresh().catch(error => {
       console.error('[WorkflowsViewReact] Failed to load app state:', error);
     });
 
@@ -96,9 +85,6 @@ const WorkflowsApp: React.FC = () => {
 
       topBar.on('project-selected', async (data: { projectId: number; projectName: string }) => {
         console.log('[WorkflowsViewReact] Project selected event:', data);
-
-        // Update active project name for terminal label
-        setActiveProjectName(data.projectName);
 
         // Refresh app state to ensure projects are loaded
         console.log('[WorkflowsViewReact] Calling appState.refresh()...');
@@ -167,9 +153,6 @@ const WorkflowsApp: React.FC = () => {
         return;
       }
 
-      // Clear interactive session when node completes
-      setInteractiveSession(null);
-
       setExecutionStatus(prev => {
         const existing = prev.get(data.nodeId);
         if (existing === 'completed') return prev;
@@ -196,44 +179,16 @@ const WorkflowsApp: React.FC = () => {
       });
     };
 
-    // Handle workflow prompt ready (for interactive Claude sessions)
-    const handlePromptReady = (data: any) => {
-      console.log('[WorkflowsViewReact] Workflow prompt ready:', data);
-
-      // Track the active interactive session
-      setInteractiveSession({
-        sessionId: data.sessionId,
-        ptyId: data.ptyId
-      });
-
-      // Show notification with the prompt
-      if (typeof (window as any).showNotification === 'function') {
-        (window as any).showNotification(
-          `🎯 ${data.message || 'Interactive brainstorming session started'}`,
-          'info'
-        );
-      }
-
-      // Log it to console for debugging
-      console.log('[WorkflowsViewReact] 📋 Interactive session started:', {
-        sessionId: data.sessionId,
-        ptyId: data.ptyId,
-        promptLength: data.prompt?.length
-      });
-    };
-
     // Register node-based workflow listeners only
     electronAPI.on('workflow:node-started', handleNodeStarted);
     electronAPI.on('workflow:node-completed', handleNodeCompleted);
     electronAPI.on('workflow:node-failed', handleNodeFailed);
-    electronAPI.on('workflow:prompt-ready', handlePromptReady);
 
     // Cleanup on unmount
     return () => {
       electronAPI.off('workflow:node-started', handleNodeStarted);
       electronAPI.off('workflow:node-completed', handleNodeCompleted);
       electronAPI.off('workflow:node-failed', handleNodeFailed);
-      electronAPI.off('workflow:prompt-ready', handlePromptReady);
     };
   }, []);
 
@@ -272,38 +227,6 @@ const WorkflowsApp: React.FC = () => {
         success: false,
         message: error.message || 'Unknown error occurred',
       };
-    }
-  };
-
-  const handleContinueWorkflow = async () => {
-    if (!interactiveSession) return;
-
-    try {
-      const electronAPI = (window as any).electronAPI;
-
-      console.log('[WorkflowsViewReact] Terminating interactive session:', interactiveSession.ptyId);
-
-      // Close the terminal to trigger workflow continuation
-      await electronAPI.invoke('terminal:close', interactiveSession.ptyId);
-
-      // Show notification
-      if (typeof (window as any).showNotification === 'function') {
-        (window as any).showNotification(
-          '✅ Interactive session ended. Workflow continuing...',
-          'success'
-        );
-      }
-
-      // Clear the session state
-      setInteractiveSession(null);
-    } catch (error: any) {
-      console.error('[WorkflowsViewReact] Failed to continue workflow:', error);
-      if (typeof (window as any).showNotification === 'function') {
-        (window as any).showNotification(
-          `❌ Failed to continue workflow: ${error.message}`,
-          'error'
-        );
-      }
     }
   };
 
@@ -546,18 +469,6 @@ const WorkflowsApp: React.FC = () => {
         >
           ▶️ Start Workflow
         </button>
-        {interactiveSession && (
-          <button
-            style={{
-              ...buttonStyle('success'),
-              animation: 'pulse 2s ease-in-out infinite',
-            }}
-            onClick={handleContinueWorkflow}
-            title="End the interactive brainstorming session and continue to the next workflow step"
-          >
-            ✅ Continue Workflow
-          </button>
-        )}
         <button
           style={buttonStyle('secondary')}
           onClick={() => loadWorkflows(true)}
@@ -649,16 +560,6 @@ const WorkflowsApp: React.FC = () => {
           )}
           </div>
         </div>
-
-        {/* Terminal Panel */}
-        {showTerminal && (
-          <TerminalPanel
-            height={terminalHeight}
-            onResize={setTerminalHeight}
-            title="CLAUDE CODE TERMINAL"
-            workspaceLabel={activeProjectName || 'General Workspace'}
-          />
-        )}
       </div>
 
       {/* Import Dialog */}

@@ -138,18 +138,15 @@ export class ViewRouter {
       return;
     }
 
-    // Check if this view requires a plugin to be installed
-    if (this.pluginRequiredViews.has(viewId)) {
-      const requiredPlugin = this.pluginRequiredViews.get(viewId)!;
-      if (!this.sidebar.isPluginInstalled(requiredPlugin)) {
+    // Check if view is registered
+    if (!this.viewClasses.has(viewId)) {
+      // View not registered - check if it requires a plugin
+      if (this.pluginRequiredViews.has(viewId)) {
+        const requiredPlugin = this.pluginRequiredViews.get(viewId)!;
         console.warn('[ViewRouter] View requires plugin:', viewId, requiredPlugin);
         this.showPluginRequiredView(viewId, requiredPlugin);
         return;
       }
-    }
-
-    // Check if view is registered
-    if (!this.viewClasses.has(viewId)) {
       console.error('[ViewRouter] View not registered:', viewId);
       this.showErrorView(`View "${viewId}" not found`);
       return;

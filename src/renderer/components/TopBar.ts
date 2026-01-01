@@ -640,12 +640,6 @@ export class TopBar {
       case 'plugins':
         return [
           { label: 'Manage Plugins', action: 'plugins-manage' },
-          { separator: true } as any,
-          { label: 'Claude Code: Install CLI', action: 'plugin-claude-code-subscription-install-cli' },
-          { label: 'Claude Code: Login to Anthropic', action: 'plugin-claude-code-subscription-login' },
-          { label: 'Claude Code: Check Auth Status', action: 'plugin-claude-code-subscription-check-auth' },
-          { label: 'Claude Code: Run Headless Task', action: 'plugin-claude-code-subscription-run-task' },
-          { label: 'Claude Code: Settings', action: 'plugin-claude-code-subscription-show-settings' },
         ];
 
       default:
