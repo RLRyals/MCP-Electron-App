@@ -2,7 +2,7 @@
   "id": "fictionlab-workflow",
   "name": "Workflow System",
   "version": "1.0.0",
-  "description": "Execute multi-step AI workflows for fiction writing",
+  "description": "Backend service for workflow execution. Use the Workflows tab to create and run workflows.",
   "author": "FictionLab",
   "icon": "🔧",
   "fictionLabVersion": ">=0.1.0",
@@ -35,14 +35,5 @@
       "reason": "Make HTTP requests in workflow nodes"
     }
   },
-  "dependencies": [],
-  "ui": {
-    "menuItems": [
-      {
-        "id": "open-workflow-manager",
-        "label": "Workflow Manager",
-        "location": "main-menu"
-      }
-    ]
-  }
+  "dependencies": []
 }
