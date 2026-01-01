@@ -124,11 +124,6 @@ export class PluginsLauncher implements View {
               Launch
             </button>
           ` : ''}
-          ${isUtility && isActive ? `
-            <button class="plugin-action-btn primary" data-action="settings" title="Plugin Settings">
-              ⚙️ Settings
-            </button>
-          ` : ''}
           <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
                   data-action="pin"
                   title="${isPinned ? 'Unpin' : 'Pin'}">

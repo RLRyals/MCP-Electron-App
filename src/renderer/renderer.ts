@@ -963,6 +963,28 @@ async function init(): Promise<void> {
     console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
   }
 
+  // Listen for plugin state changes and update navigation
+  const electronAPI = (window as any).electronAPI;
+  if (electronAPI?.on) {
+    electronAPI.on('plugin-state-changed', async () => {
+      console.log('[Renderer] Plugin state changed, updating navigation...');
+
+      // Reload sidebar navigation
+      await sidebar.updateNavigation();
+
+      // Re-register plugin-dependent views
+      if (sidebar.isPluginInstalled('fictionlab-workflow')) {
+        if (!viewRouter['viewClasses'].has('workflows')) {
+          viewRouter.registerView('workflows', WorkflowsViewReact);
+          console.log('[Renderer] WorkflowsViewReact registered after plugin install');
+        }
+      } else {
+        // Remove workflows view if plugin was uninstalled
+        viewRouter.clearCache('workflows');
+      }
+    });
+  }
+
   isViewRouterReady = true;
 
   // Get initial view and navigate to it

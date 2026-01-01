@@ -100,6 +100,11 @@ class PluginManager {
 
       // Update plugin menu
       this.updatePluginMenu();
+
+      // Notify renderer of plugin state change
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('plugin-state-changed', { pluginId, state: 'activated' });
+      }
     });
 
     this.registry.on('plugin-deactivated', (pluginId: string) => {
@@ -107,6 +112,11 @@ class PluginManager {
 
       // Update plugin menu
       this.updatePluginMenu();
+
+      // Notify renderer of plugin state change
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('plugin-state-changed', { pluginId, state: 'deactivated' });
+      }
     });
 
     this.registry.on('plugin-error', (pluginId: string, error: Error) => {
