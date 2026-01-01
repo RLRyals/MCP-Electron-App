@@ -450,13 +450,18 @@ class PluginManager {
       logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
       await fs.copy(sourcePath, destPath, { overwrite: true });
       
-      // 4. Reload plugins
+      // 4. Load the new plugin
       if (this.registry) {
-        // If plugin was already loaded, we might need to unload it first?
-        // simple approach: discover and load all (which updates existing)
-        await this.registry.discoverAndLoadAll();
+        // Only load this specific plugin instead of re-discovering all plugins
+        // This avoids "already loaded" errors for existing plugins
+        await this.registry.loadPlugin(destPath, { force: false });
+
+        // Activate the plugin if auto-activate is enabled
+        if (this.registry['options']?.autoActivate) {
+          await this.registry.activatePlugin(manifest.id);
+        }
       }
-      
+
       return manifest.id;
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, 'Failed to import plugin:', error);
