@@ -450,9 +450,12 @@ class PluginManager {
       logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
       await fs.copy(sourcePath, destPath, { overwrite: true });
 
-      // 3.5. Install dependencies if package.json exists
+      // 3.5. Install dependencies if needed
+      const nodeModulesPath = path.join(destPath, 'node_modules');
       const packageJsonPath = path.join(destPath, 'package.json');
-      if (await fs.pathExists(packageJsonPath)) {
+
+      // Only install if package.json exists AND node_modules doesn't exist (bundled plugins have node_modules)
+      if (await fs.pathExists(packageJsonPath) && !await fs.pathExists(nodeModulesPath)) {
         logWithCategory('info', LogCategory.SYSTEM, `Installing plugin dependencies...`);
         try {
           const { exec } = require('child_process');
@@ -460,7 +463,7 @@ class PluginManager {
           const execAsync = promisify(exec);
 
           // Run npm install in the plugin directory
-          await execAsync('npm install --production', {
+          await execAsync('npm install --omit=dev', {
             cwd: destPath,
             timeout: 120000 // 2 minute timeout
           });
@@ -470,6 +473,8 @@ class PluginManager {
           logWithCategory('error', LogCategory.SYSTEM, `Failed to install plugin dependencies:`, error);
           // Don't throw - try to load anyway in case dependencies are optional
         }
+      } else if (await fs.pathExists(nodeModulesPath)) {
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies already present (bundled)`);
       }
 
       // 4. Load the new plugin

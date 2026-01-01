@@ -1,5 +1,5 @@
 import * as net from 'net';
-import { WorkflowRunner } from '@fictionlab/workflow-runner';
+import { WorkflowRunner } from '../bundled/workflow-runner/dist';
 
 /**
  * IDE IPC Server

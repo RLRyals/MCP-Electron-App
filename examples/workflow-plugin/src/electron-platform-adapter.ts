@@ -1,4 +1,4 @@
-import { PlatformAdapter } from '@fictionlab/workflow-runner';
+import { PlatformAdapter } from '../bundled/workflow-runner/dist';
 import { PluginContext } from './types/plugin-api';
 import { BrowserWindow } from 'electron';
 

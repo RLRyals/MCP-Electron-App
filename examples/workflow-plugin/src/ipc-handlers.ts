@@ -1,5 +1,5 @@
 import { PluginContext } from './types/plugin-api';
-import { WorkflowRunner, WorkflowClient } from '@fictionlab/workflow-runner';
+import { WorkflowRunner, WorkflowClient } from '../bundled/workflow-runner/dist';
 
 export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunner) {
   // List workflows

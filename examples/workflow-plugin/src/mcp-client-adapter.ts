@@ -1,4 +1,4 @@
-import { IMCPClient } from '@fictionlab/workflow-runner';
+import { IMCPClient } from '../bundled/workflow-runner/dist';
 import { PluginContext } from './types/plugin-api';
 
 /**

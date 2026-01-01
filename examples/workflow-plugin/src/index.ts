@@ -1,5 +1,6 @@
 import { FictionLabPlugin, PluginContext } from './types/plugin-api';
-import { WorkflowRunner } from '@fictionlab/workflow-runner';
+// Import from bundled workflow-runner (copied during build)
+import { WorkflowRunner } from '../bundled/workflow-runner/dist';
 import { MCPClientAdapter } from './mcp-client-adapter';
 import { ElectronPlatformAdapter } from './electron-platform-adapter';
 import { registerIPCHandlers } from './ipc-handlers';
