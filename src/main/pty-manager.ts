@@ -194,15 +194,21 @@ export class PTYManager extends EventEmitter {
     const terminal = this.terminals.get(id);
     if (terminal) {
       try {
-        terminal.kill();
-        logger.debug(`[PTYManager] Terminal ${id} closed`);
+        // Check if the terminal process is still alive before killing
+        if (typeof (terminal as any).pid !== 'undefined') {
+          terminal.kill();
+          logger.debug(`[PTYManager] Terminal ${id} closed`);
+        } else {
+          logger.debug(`[PTYManager] Terminal ${id} already exited`);
+        }
       } catch (error: any) {
-        logger.error(`[PTYManager] Error closing terminal ${id}:`, error);
+        // Suppress errors during shutdown - terminal may already be closed
+        logger.debug(`[PTYManager] Error closing terminal ${id} (likely already closed):`, error.message);
       } finally {
         this.terminals.delete(id);
       }
     } else {
-      logger.warn(`[PTYManager] Terminal ${id} not found, cannot close`);
+      logger.debug(`[PTYManager] Terminal ${id} not found, already closed`);
     }
   }
 
@@ -212,7 +218,11 @@ export class PTYManager extends EventEmitter {
   closeAll(): void {
     logger.debug(`[PTYManager] Closing all ${this.terminals.size} terminals`);
     for (const [id] of this.terminals) {
-      this.closeTerminal(id);
+      try {
+        this.closeTerminal(id);
+      } catch (error: any) {
+        logger.error(`[PTYManager] Error closing terminal ${id} during cleanup:`, error);
+      }
     }
   }
 
