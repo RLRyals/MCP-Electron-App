@@ -449,7 +449,29 @@ class PluginManager {
       // 3. Copy plugin
       logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
       await fs.copy(sourcePath, destPath, { overwrite: true });
-      
+
+      // 3.5. Install dependencies if package.json exists
+      const packageJsonPath = path.join(destPath, 'package.json');
+      if (await fs.pathExists(packageJsonPath)) {
+        logWithCategory('info', LogCategory.SYSTEM, `Installing plugin dependencies...`);
+        try {
+          const { exec } = require('child_process');
+          const { promisify } = require('util');
+          const execAsync = promisify(exec);
+
+          // Run npm install in the plugin directory
+          await execAsync('npm install --production', {
+            cwd: destPath,
+            timeout: 120000 // 2 minute timeout
+          });
+
+          logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies installed successfully`);
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM, `Failed to install plugin dependencies:`, error);
+          // Don't throw - try to load anyway in case dependencies are optional
+        }
+      }
+
       // 4. Load the new plugin
       if (this.registry) {
         // Only load this specific plugin instead of re-discovering all plugins
