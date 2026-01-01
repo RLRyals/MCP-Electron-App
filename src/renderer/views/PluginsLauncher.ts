@@ -123,12 +123,15 @@ export class PluginsLauncher implements View {
             <button class="plugin-action-btn primary" data-action="launch" title="Launch Plugin">
               Launch
             </button>
+            <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
+                    data-action="pin"
+                    title="${isPinned ? 'Unpin' : 'Pin'}">
+              ${isPinned ? '📌' : '📍'}
+            </button>
           ` : ''}
-          <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
-                  data-action="pin"
-                  title="${isPinned ? 'Unpin' : 'Pin'}">
-            ${isPinned ? '📌' : '📍'}
-          </button>
+          ${isUtility ? `
+            <span class="plugin-utility-label">Backend Service</span>
+          ` : ''}
         </div>
       </div>
     `;
