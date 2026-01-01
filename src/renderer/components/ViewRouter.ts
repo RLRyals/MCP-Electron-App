@@ -46,6 +46,11 @@ export class ViewRouter {
   private maxHistorySize: number = 20;
   private initPromise: Promise<void> | null = null;
 
+  // Plugin-dependent views
+  private pluginRequiredViews: Map<string, string> = new Map([
+    ['workflows', 'fictionlab.workflow']
+  ]);
+
   constructor(options: ViewRouterOptions) {
     this.container = options.container;
     this.sidebar = options.sidebar;
@@ -131,6 +136,16 @@ export class ViewRouter {
     if (viewId.startsWith('plugin-') || (viewId === 'plugin' && params?.pluginId)) {
       await this.navigateToPlugin(params?.pluginId || viewId.replace('plugin-', ''), params?.viewName || 'default');
       return;
+    }
+
+    // Check if this view requires a plugin to be installed
+    if (this.pluginRequiredViews.has(viewId)) {
+      const requiredPlugin = this.pluginRequiredViews.get(viewId)!;
+      if (!this.sidebar.isPluginInstalled(requiredPlugin)) {
+        console.warn('[ViewRouter] View requires plugin:', viewId, requiredPlugin);
+        this.showPluginRequiredView(viewId, requiredPlugin);
+        return;
+      }
     }
 
     // Check if view is registered
@@ -369,6 +384,32 @@ export class ViewRouter {
         <button class="top-bar-action" onclick="window.location.reload()">
           Reload Application
         </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Show a plugin required view
+   */
+  private showPluginRequiredView(viewId: string, pluginId: string): void {
+    const viewNames: Record<string, string> = {
+      'workflows': 'Workflows'
+    };
+    const viewName = viewNames[viewId] || viewId;
+
+    this.container.innerHTML = `
+      <div class="error-message">
+        <h2>Plugin Required</h2>
+        <p>The <strong>${viewName}</strong> view requires the <strong>${pluginId}</strong> plugin to be installed.</p>
+        <p>Please install the plugin from the Plugins page to use this feature.</p>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+          <button class="top-bar-action" onclick="(window.__viewRouter__ || window).navigateTo ? (window.__viewRouter__ || window).navigateTo('plugins') : window.location.href='#plugins'">
+            Go to Plugins
+          </button>
+          <button class="top-bar-action" onclick="(window.__viewRouter__ || window).navigateTo ? (window.__viewRouter__ || window).navigateTo('dashboard') : window.location.href='#dashboard'">
+            Go to Dashboard
+          </button>
+        </div>
       </div>
     `;
   }

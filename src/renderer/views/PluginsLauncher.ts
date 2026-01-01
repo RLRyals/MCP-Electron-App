@@ -366,6 +366,9 @@ export class PluginsLauncher implements View {
               this.render();
               this.attachEventListeners();
 
+              // Notify that a plugin was installed (for sidebar/router updates)
+              window.dispatchEvent(new CustomEvent('plugin-installed', { detail: { pluginId } }));
+
               // Show success notification
               if ((window as any).showNotification) {
                 (window as any).showNotification(

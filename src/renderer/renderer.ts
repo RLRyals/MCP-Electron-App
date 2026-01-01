@@ -948,13 +948,20 @@ async function init(): Promise<void> {
     }
   });
 
-  sidebar.initialize();
+  // Initialize sidebar (async - loads installed plugins)
+  await sidebar.initialize();
 
   // Initialize ViewRouter (async - registers all views)
   await viewRouter.initialize();
 
-  // Register React-based views manually (import map only works in static imports)
-  viewRouter.registerView('workflows', WorkflowsViewReact);
+  // Register React-based views manually only if their plugins are installed
+  // WorkflowsViewReact requires fictionlab.workflow plugin
+  if (sidebar.isPluginInstalled('fictionlab.workflow')) {
+    viewRouter.registerView('workflows', WorkflowsViewReact);
+    console.log('[Renderer] WorkflowsViewReact registered (plugin installed)');
+  } else {
+    console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
+  }
 
   isViewRouterReady = true;
 
@@ -1100,6 +1107,37 @@ async function init(): Promise<void> {
 
   // Store viewRouter globally for plugin handlers
   (window as any).__viewRouter__ = viewRouter;
+
+  // Listen for plugin installation events to update the UI
+  window.addEventListener('plugin-installed', async (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const { pluginId } = customEvent.detail || {};
+    console.log('[Renderer] Plugin installed:', pluginId);
+
+    // Update sidebar navigation
+    await sidebar.updateNavigation();
+
+    // Register workflow view if the workflow plugin was installed
+    if (pluginId === 'fictionlab.workflow' && sidebar.isPluginInstalled('fictionlab.workflow')) {
+      viewRouter.registerView('workflows', WorkflowsViewReact);
+      console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
+    }
+  });
+
+  // Listen for plugin uninstallation events to update the UI
+  window.addEventListener('plugin-uninstalled', async (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const { pluginId } = customEvent.detail || {};
+    console.log('[Renderer] Plugin uninstalled:', pluginId);
+
+    // Update sidebar navigation
+    await sidebar.updateNavigation();
+
+    // If workflow plugin was uninstalled and user is on workflows view, navigate away
+    if (pluginId === 'fictionlab.workflow' && viewRouter.getCurrentViewId() === 'workflows') {
+      await viewRouter.navigateTo('dashboard');
+    }
+  });
 
   console.log('[Renderer] Dashboard components initialized successfully');
 

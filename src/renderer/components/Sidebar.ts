@@ -34,6 +34,7 @@ export class Sidebar {
   private navigationTree: SidebarItem[];
   private listeners: Map<string, Set<Function>> = new Map();
   private pinnedPlugins: string[] = [];
+  private installedPlugins: Set<string> = new Set();
 
   // Storage keys
   private readonly STORAGE_ACTIVE_VIEW = 'fictionlab-active-view';
@@ -50,7 +51,13 @@ export class Sidebar {
   /**
    * Initialize the sidebar
    */
-  public initialize(): void {
+  public async initialize(): Promise<void> {
+    // Load installed plugins first
+    await this.loadInstalledPlugins();
+
+    // Rebuild navigation tree based on installed plugins
+    this.navigationTree = this.createNavigationTree();
+
     this.render();
     this.attachEventListeners();
 
@@ -66,10 +73,17 @@ export class Sidebar {
    * Create the navigation tree structure
    */
   private createNavigationTree(): SidebarItem[] {
-    return [
+    const items: SidebarItem[] = [
       // Primary Navigation
       { id: 'dashboard', label: 'Dashboard', icon: '📊', section: 'primary' },
-      { id: 'workflows', label: 'Workflows', icon: '🔧', section: 'primary' },
+    ];
+
+    // Only include workflows if the workflow plugin is installed
+    if (this.installedPlugins.has('fictionlab.workflow')) {
+      items.push({ id: 'workflows', label: 'Workflows', icon: '🔧', section: 'primary' });
+    }
+
+    items.push(
       { id: 'library', label: 'Library', icon: '📚', section: 'primary' },
       { id: 'plugins', label: 'Plugins', icon: '🔌', section: 'primary' },
       {
@@ -89,8 +103,10 @@ export class Sidebar {
 
       // Secondary Navigation
       { id: 'help', label: 'Help', icon: '❓', section: 'secondary' },
-      { id: 'about', label: 'About', icon: 'ℹ️', section: 'secondary' },
-    ];
+      { id: 'about', label: 'About', icon: 'ℹ️', section: 'secondary' }
+    );
+
+    return items;
   }
 
   /**
@@ -493,6 +509,58 @@ export class Sidebar {
         }
       });
     }
+  }
+
+  /**
+   * Load installed plugins from the plugin API
+   */
+  private async loadInstalledPlugins(): Promise<void> {
+    try {
+      const plugins = await (window as any).electron.ipcRenderer.invoke('plugin:list');
+      this.installedPlugins.clear();
+
+      // Add all installed plugin IDs to the set
+      if (Array.isArray(plugins)) {
+        plugins.forEach((plugin: any) => {
+          if (plugin.id && plugin.status === 'active') {
+            this.installedPlugins.add(plugin.id);
+          }
+        });
+      }
+
+      console.log('[Sidebar] Loaded installed plugins:', Array.from(this.installedPlugins));
+    } catch (error) {
+      console.error('[Sidebar] Failed to load installed plugins:', error);
+    }
+  }
+
+  /**
+   * Update the navigation tree based on current installed plugins
+   */
+  public async updateNavigation(): Promise<void> {
+    // Reload installed plugins
+    await this.loadInstalledPlugins();
+
+    // Rebuild navigation tree
+    this.navigationTree = this.createNavigationTree();
+
+    // Re-render the sidebar
+    this.render();
+    this.attachEventListeners();
+
+    // Restore active view
+    if (this.activeViewId) {
+      this.setActiveView(this.activeViewId);
+    }
+
+    console.log('[Sidebar] Navigation updated');
+  }
+
+  /**
+   * Check if a plugin is installed
+   */
+  public isPluginInstalled(pluginId: string): boolean {
+    return this.installedPlugins.has(pluginId);
   }
 
   /**
