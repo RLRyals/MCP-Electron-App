@@ -516,7 +516,13 @@ export class Sidebar {
    */
   private async loadInstalledPlugins(): Promise<void> {
     try {
-      const plugins = await (window as any).electron.ipcRenderer.invoke('plugin:list');
+      const electronAPI = (window as any).electronAPI;
+      if (!electronAPI || !electronAPI.plugins || !electronAPI.plugins.list) {
+        console.warn('[Sidebar] Plugin API not available');
+        return;
+      }
+
+      const plugins = await electronAPI.plugins.list();
       this.installedPlugins.clear();
 
       // Add all installed plugin IDs to the set
