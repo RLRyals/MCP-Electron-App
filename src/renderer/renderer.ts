@@ -272,6 +272,10 @@ interface ElectronAPI {
     getRecentLogs: (lines?: number) => Promise<string[]>;
     generateIssueTemplate: (title: string, message: string, stack?: string) => Promise<string>;
     openGitHubIssue: (title: string, message: string, stack?: string) => Promise<void>;
+    getLogLevel: () => Promise<string>;
+    setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<{ success: boolean; level: string }>;
+    enableVerbose: () => Promise<{ success: boolean }>;
+    disableVerbose: () => Promise<{ success: boolean }>;
     onSystemTestResults: (callback: (results: SystemTestResult) => void) => void;
   };
   envConfig: {

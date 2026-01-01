@@ -36,7 +36,7 @@ export class LogsTab {
   private searchQuery: string = '';
   private logs: LogEntry[] = [];
   private isInitialized: boolean = false;
-  private verboseLogging: boolean = false;
+  private currentLogLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
 
   // Database Connection & Activity
   private dbConnectionInterval: NodeJS.Timeout | null = null;
@@ -62,6 +62,7 @@ export class LogsTab {
 
     try {
       this.render();
+      await this.loadCurrentLogLevel();
       this.attachEventListeners();
       await this.loadLogs();
 
@@ -150,14 +151,22 @@ export class LogsTab {
             </button>
           </div>
 
+          <div class="logs-control-group">
+            <label for="console-log-level">
+              <span class="control-icon">🎛️</span>
+              Console Level:
+            </label>
+            <select id="console-log-level" class="logs-select" title="Set console output verbosity (affects terminal logs)">
+              <option value="error">Error Only</option>
+              <option value="warn">Warnings & Errors</option>
+              <option value="info" selected>Info (Normal)</option>
+              <option value="debug">Debug (Verbose)</option>
+            </select>
+          </div>
+
           <button id="refresh-logs" class="logs-btn logs-btn-primary" title="Refresh logs">
             <span class="btn-icon">🔄</span>
             Refresh
-          </button>
-
-          <button id="toggle-verbose" class="logs-btn logs-btn-secondary" title="Enable verbose logging for troubleshooting">
-            <span class="btn-icon">🔬</span>
-            <span id="verbose-label">Enable Verbose</span>
           </button>
         </div>
 
@@ -974,11 +983,11 @@ export class LogsTab {
       refreshBtn.addEventListener('click', () => this.loadLogs());
     }
 
-    // Toggle verbose logging
-    const toggleVerbose = document.getElementById('toggle-verbose');
-    if (toggleVerbose) {
-      toggleVerbose.addEventListener('click', async () => {
-        await this.toggleVerboseLogging();
+    // Console log level selector
+    const consoleLogLevel = document.getElementById('console-log-level') as HTMLSelectElement;
+    if (consoleLogLevel) {
+      consoleLogLevel.addEventListener('change', async () => {
+        await this.setConsoleLogLevel(consoleLogLevel.value as 'debug' | 'info' | 'warn' | 'error');
       });
     }
 
@@ -1345,47 +1354,57 @@ export class LogsTab {
   }
 
   /**
-   * Toggle verbose logging
+   * Load current console log level from backend
    */
-  private async toggleVerboseLogging(): Promise<void> {
+  private async loadCurrentLogLevel(): Promise<void> {
     try {
-      const button = document.getElementById('toggle-verbose') as HTMLButtonElement;
-      const label = document.getElementById('verbose-label');
+      const level = await window.electronAPI.logger.getLogLevel();
+      this.currentLogLevel = level as 'debug' | 'info' | 'warn' | 'error';
 
-      if (button) button.disabled = true;
-
-      if (!this.verboseLogging) {
-        // Enable verbose
-        await (window as any).api.logger.enableVerbose();
-        this.verboseLogging = true;
-        if (label) label.textContent = 'Disable Verbose';
-        if (button) {
-          button.classList.remove('logs-btn-secondary');
-          button.classList.add('logs-btn-warning');
-          button.title = 'Disable verbose logging';
-        }
-        this.showNotification('Verbose logging enabled - all debug messages will be shown', 'success');
-      } else {
-        // Disable verbose
-        await (window as any).api.logger.disableVerbose();
-        this.verboseLogging = false;
-        if (label) label.textContent = 'Enable Verbose';
-        if (button) {
-          button.classList.remove('logs-btn-warning');
-          button.classList.add('logs-btn-secondary');
-          button.title = 'Enable verbose logging for troubleshooting';
-        }
-        this.showNotification('Verbose logging disabled', 'info');
+      // Update the UI dropdown to reflect current level
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) {
+        selector.value = this.currentLogLevel;
       }
-
-      // Refresh logs to show new level
-      await this.loadLogs();
     } catch (error) {
-      console.error('Error toggling verbose logging:', error);
-      this.showNotification('Failed to toggle verbose logging', 'error');
+      console.error('Error loading log level:', error);
+      this.currentLogLevel = 'info'; // Default fallback
+    }
+  }
+
+  /**
+   * Set console log level
+   */
+  private async setConsoleLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): Promise<void> {
+    try {
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) selector.disabled = true;
+
+      await window.electronAPI.logger.setLogLevel(level);
+      this.currentLogLevel = level;
+
+      const levelNames = {
+        error: 'Error Only',
+        warn: 'Warnings & Errors',
+        info: 'Info (Normal)',
+        debug: 'Debug (Verbose)'
+      };
+
+      this.showNotification(
+        `Console log level set to: ${levelNames[level]}. Terminal will now show ${level} and above.`,
+        'success'
+      );
+
+      // Optionally refresh logs if viewing application logs
+      if (this.currentService === 'application') {
+        await this.loadLogs();
+      }
+    } catch (error) {
+      console.error('Error setting log level:', error);
+      this.showNotification('Failed to set log level', 'error');
     } finally {
-      const button = document.getElementById('toggle-verbose') as HTMLButtonElement;
-      if (button) button.disabled = false;
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) selector.disabled = false;
     }
   }
 
