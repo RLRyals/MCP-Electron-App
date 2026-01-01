@@ -200,19 +200,33 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       }
     }
 
-    // No result content - this shouldn't happen for successful queries
-    logWithCategory('warn', LogCategory.SYSTEM, '[DATABASE-ADMIN] No content array found in response!', {
-      hasResult: !!mcpResponse.result,
-      hasResultContent: !!mcpResponse.result?.content,
-      hasDirectContent: !!mcpResponse.content,
+    // No result content in standard locations - try alternative parsing
+    logWithCategory('debug', LogCategory.SYSTEM, '[DATABASE-ADMIN] No standard content array, checking alternatives...');
+
+    // Check if mcpResponse itself has the content structure (alternative format)
+    if (mcpResponse && typeof mcpResponse === 'object') {
+      const rawResponse = mcpResponse as any;
+      if (rawResponse.content && Array.isArray(rawResponse.content) && rawResponse.content[0]?.text) {
+        try {
+          const textContent = rawResponse.content[0].text;
+          const jsonStartIndex = textContent.search(/[\{\[]/);
+          const jsonText = jsonStartIndex >= 0 ? textContent.substring(jsonStartIndex) : textContent;
+          const resultData = JSON.parse(jsonText);
+          logWithCategory('debug', LogCategory.SYSTEM, '[DATABASE-ADMIN] Successfully parsed from alternative content location');
+          return {
+            success: true,
+            data: resultData,
+          };
+        } catch (parseError: any) {
+          logWithCategory('warn', LogCategory.SYSTEM, `[DATABASE-ADMIN] Failed to parse alternative content: ${parseError.message}`);
+        }
+      }
+    }
+
+    // Return raw response as last resort
+    logWithCategory('warn', LogCategory.SYSTEM, '[DATABASE-ADMIN] Returning raw MCP response - no parseable content found', {
       responseKeys: Object.keys(mcpResponse)
     });
-    
-    logWithCategory('warn', LogCategory.SYSTEM, 'MCP response has no content array', {
-      responseStructure: JSON.stringify(mcpResponse).substring(0, 200)
-    });
-    
-    // Return the raw response as a last resort so we can see what's happening
     return {
       success: true,
       data: mcpResponse,

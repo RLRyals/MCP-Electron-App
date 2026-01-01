@@ -216,15 +216,16 @@ export class ProjectManager {
       logWithCategory('debug', LogCategory.SYSTEM, `[ProjectManager] Full result.data: ${JSON.stringify(data).substring(0, 500)}`);
 
       // Handle case where database-admin returned unparsed response with content array
+      // (Fallback parsing - database-admin should normally parse this)
       if (data && data.content && Array.isArray(data.content) && data.content[0]?.text) {
-        logWithCategory('warn', LogCategory.SYSTEM, `[ProjectManager] Received unparsed MCP response, parsing manually...`);
+        logWithCategory('debug', LogCategory.SYSTEM, `[ProjectManager] Parsing MCP response content array...`);
         try {
           const textContent = data.content[0].text;
           // Extract JSON from formatted text
           const jsonStartIndex = textContent.search(/[\{\[]/);
           const jsonText = jsonStartIndex >= 0 ? textContent.substring(jsonStartIndex) : textContent;
           data = JSON.parse(jsonText);
-          logWithCategory('info', LogCategory.SYSTEM, `[ProjectManager] Successfully parsed MCP response manually`);
+          logWithCategory('debug', LogCategory.SYSTEM, `[ProjectManager] Successfully parsed MCP response`);
         } catch (parseError: any) {
           logWithCategory('error', LogCategory.SYSTEM, `[ProjectManager] Failed to parse MCP content: ${parseError.message}`);
         }

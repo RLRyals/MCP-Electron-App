@@ -23,6 +23,9 @@ import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
 import type { Project } from '../../types/project.js';
 
+// Plugin IPC channel prefix for workflow plugin
+const WORKFLOW_PLUGIN = 'plugin:fictionlab-workflow:';
+
 // Temporary stub - series management is now in MCP-Writing-Servers
 interface Series {
   id: number;
@@ -51,7 +54,7 @@ const WorkflowsApp: React.FC = () => {
         return;
       }
 
-      const result = await electronAPI.invoke('workflow:get-definitions', skipCache ? { skipCache: true } : undefined);
+      const result = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:list`, skipCache ? { skipCache: true } : undefined);
       console.log('[WorkflowsViewReact] Loaded workflows:', result);
 
       // Handle empty array (server not available) vs actual workflows
@@ -194,10 +197,11 @@ const WorkflowsApp: React.FC = () => {
 
   const handleSelectWorkflow = async (workflowId: string) => {
     try {
+      console.log('[WorkflowsViewReact] Fetching workflow with id:', workflowId);
       const electronAPI = (window as any).electronAPI;
-      const workflow = await electronAPI.invoke('workflow:get-definition', workflowId);
+      const workflow = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:get`, { id: workflowId });
 
-      console.log('[WorkflowsViewReact] Selected workflow:', workflow.name);
+      console.log('[WorkflowsViewReact] Selected workflow result:', workflow);
 
       setSelectedWorkflow(workflow);
       // Reset execution status when switching workflows
@@ -210,11 +214,11 @@ const WorkflowsApp: React.FC = () => {
   const handleImport = async (folderPath: string, customId?: string, customName?: string): Promise<ImportResult> => {
     try {
       const electronAPI = (window as any).electronAPI;
-      const result = await electronAPI.invoke('workflow:import-from-folder', folderPath, customId, customName);
+      const result = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:import-from-folder`, folderPath, customId, customName);
 
       if (result.success) {
         // Reload workflows list, skipping cache to get fresh data
-        const freshWorkflows = await electronAPI.invoke('workflow:get-definitions', { skipCache: true });
+        const freshWorkflows = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:list`, { skipCache: true });
         if (Array.isArray(freshWorkflows)) {
           setWorkflows(freshWorkflows);
         }
@@ -276,11 +280,13 @@ const WorkflowsApp: React.FC = () => {
 
       console.log('[WorkflowsViewReact] Starting workflow with project folder:', projectFolder);
 
-      const instanceId = await electronAPI.invoke('workflow:start', {
-        workflowDefId: selectedWorkflow.id,
-        seriesId: activeProjectId, // Using projectId as seriesId for now
-        userId: 1, // TODO: Get from user session
-        projectFolder: projectFolder, // Add project folder for file operations
+      const instanceId = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:execute`, {
+        workflowId: selectedWorkflow.id,
+        options: {
+          seriesId: activeProjectId, // Using projectId as seriesId for now
+          userId: 1, // TODO: Get from user session
+          projectFolder: projectFolder, // Add project folder for file operations
+        }
       });
 
       console.log('[WorkflowsViewReact] Started workflow instance:', instanceId);
@@ -301,7 +307,7 @@ const WorkflowsApp: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
 
-      await electronAPI.invoke('workflow:delete', workflowId);
+      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:delete`, workflowId);
 
       console.log('[WorkflowsViewReact] Deleted workflow:', workflowId);
 
@@ -328,7 +334,7 @@ const WorkflowsApp: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
 
-      await electronAPI.invoke('workflow:reimport', workflowId);
+      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:reimport`, workflowId);
 
       console.log('[WorkflowsViewReact] Reimported workflow:', workflowId);
 

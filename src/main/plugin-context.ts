@@ -10,6 +10,42 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 import { Pool, PoolClient } from 'pg';
 import axios from 'axios';
+import { PersistentMCPClient } from './workflow/persistent-mcp-client';
+
+// Singleton instance of PersistentMCPClient for workflow-manager stdio communication
+let workflowMCPClient: PersistentMCPClient | null = null;
+let workflowMCPClientStartPromise: Promise<void> | null = null;
+
+/**
+ * Get or create the singleton PersistentMCPClient for workflow-manager
+ * Uses stdio for low-latency communication per architecture spec
+ */
+async function getWorkflowMCPClient(): Promise<PersistentMCPClient> {
+  if (workflowMCPClient && workflowMCPClient.isReady()) {
+    return workflowMCPClient;
+  }
+
+  if (workflowMCPClientStartPromise) {
+    await workflowMCPClientStartPromise;
+    if (workflowMCPClient) {
+      return workflowMCPClient;
+    }
+  }
+
+  workflowMCPClient = new PersistentMCPClient();
+  workflowMCPClientStartPromise = workflowMCPClient.start();
+
+  try {
+    await workflowMCPClientStartPromise;
+    logWithCategory('info', LogCategory.SYSTEM, 'PersistentMCPClient started for workflow-manager stdio communication');
+    return workflowMCPClient;
+  } catch (error: any) {
+    workflowMCPClient = null;
+    workflowMCPClientStartPromise = null;
+    throw error;
+  }
+}
+
 import {
   PluginContext,
   PluginServices,
@@ -181,7 +217,17 @@ function createMCPConnectionManager(
   pluginId: string,
   permissions: PluginPermissions
 ): MCPConnectionManager {
-  const allowedServers = permissions.mcp || [];
+  // Handle both array format (mcp: ["server1", "server2"])
+  // and object format (mcp: { enabled: true, servers: ["server1"] })
+  let allowedServers: string[] = [];
+  if (Array.isArray(permissions.mcp)) {
+    allowedServers = permissions.mcp;
+  } else if (permissions.mcp && typeof permissions.mcp === 'object') {
+    const mcpConfig = permissions.mcp as any;
+    if (mcpConfig.enabled && Array.isArray(mcpConfig.servers)) {
+      allowedServers = mcpConfig.servers;
+    }
+  }
 
   return {
     getEndpoint(serverId: string): string | null {
@@ -220,6 +266,46 @@ function createMCPConnectionManager(
       toolName: string,
       args: Record<string, any>
     ): Promise<T> {
+      // Check permission first
+      if (!allowedServers.includes(serverId)) {
+        throw new PluginError(
+          PluginErrorType.PERMISSION_DENIED,
+          pluginId,
+          `MCP server '${serverId}' not permitted. Allowed servers: ${allowedServers.join(', ')}`
+        );
+      }
+
+      // Use stdio (PersistentMCPClient) for workflow-manager - per architecture spec
+      if (serverId === 'workflow-manager') {
+        try {
+          // Fix for MCP server bug: when version is 'latest', omit it entirely
+          // The server incorrectly concatenates "id vlatest" instead of treating them separately
+          let fixedArgs = args;
+          if (toolName === 'get_workflow_definition' && args.version === 'latest') {
+            fixedArgs = { ...args };
+            delete fixedArgs.version;
+            logWithCategory('debug', LogCategory.SYSTEM,
+              `Removed 'latest' version from get_workflow_definition call to avoid MCP server bug`);
+          }
+
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} calling workflow-manager tool via stdio: ${toolName}`, fixedArgs);
+
+          const client = await getWorkflowMCPClient();
+          const result = await client.callTool(toolName, fixedArgs);
+
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} workflow-manager result for ${toolName}:`, result);
+
+          return result as T;
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM,
+            `Plugin ${pluginId} workflow-manager stdio error:`, error);
+          throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
+        }
+      }
+
+      // Use HTTP for all other MCP servers
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         throw new PluginError(
@@ -276,6 +362,17 @@ function createMCPConnectionManager(
     },
 
     async isServerRunning(serverId: string): Promise<boolean> {
+      // For workflow-manager, check if the PersistentMCPClient is ready
+      if (serverId === 'workflow-manager') {
+        try {
+          const client = await getWorkflowMCPClient();
+          return client.isReady();
+        } catch {
+          return false;
+        }
+      }
+
+      // For other servers, use HTTP health check
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         return false;
@@ -294,6 +391,29 @@ function createMCPConnectionManager(
     },
 
     async getServerInfo(serverId: string): Promise<MCPServerInfo | null> {
+      // For workflow-manager, use stdio client
+      if (serverId === 'workflow-manager') {
+        try {
+          const client = await getWorkflowMCPClient();
+          const running = client.isReady();
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: running ? 'running' : 'stopped',
+            tools: [], // Tools list not available via stdio without additional protocol
+          };
+        } catch (error) {
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: 'error',
+          };
+        }
+      }
+
+      // For other servers, use HTTP
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         return null;
