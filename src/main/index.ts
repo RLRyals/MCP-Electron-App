@@ -64,6 +64,7 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
+let ptyManager: PTYManager | null = null;
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -2652,7 +2653,7 @@ function setupIPC(): void {
   // PTY (Terminal) IPC Handlers
   // ========================================
 
-  const ptyManager = new PTYManager();
+  ptyManager = new PTYManager();
 
   // Forward PTY output to renderer
   ptyManager.on('terminal:data', (data) => {
@@ -2715,6 +2716,9 @@ function setupIPC(): void {
         finalOptions.cwd = workspace;
       }
 
+      if (!ptyManager) {
+        throw new Error('PTY Manager not initialized');
+      }
       ptyManager.createTerminal(finalOptions);
       return { success: true };
     } catch (error: any) {
@@ -2726,6 +2730,9 @@ function setupIPC(): void {
 
   // Send input to terminal
   ipcMain.handle('terminal:input', async (_event, id: string, data: string) => {
+    if (!ptyManager) {
+      throw new Error('PTY Manager not initialized');
+    }
     logger.debug(`[IPC] terminal:input received for ${id}:`, data);
     ptyManager.writeToTerminal(id, data);
     return { success: true };
@@ -2733,12 +2740,18 @@ function setupIPC(): void {
 
   // Resize terminal
   ipcMain.handle('terminal:resize', async (_event, id: string, cols: number, rows: number) => {
+    if (!ptyManager) {
+      throw new Error('PTY Manager not initialized');
+    }
     ptyManager.resizeTerminal(id, cols, rows);
     return { success: true };
   });
 
   // Close terminal
   ipcMain.handle('terminal:close', async (_event, id: string) => {
+    if (!ptyManager) {
+      throw new Error('PTY Manager not initialized');
+    }
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing terminal ${id}`);
     ptyManager.closeTerminal(id);
     return { success: true };
@@ -2746,14 +2759,13 @@ function setupIPC(): void {
 
   // Get active terminals
   ipcMain.handle('terminal:list', async () => {
+    if (!ptyManager) {
+      return { terminals: [] };
+    }
     return { terminals: ptyManager.getActiveTerminals() };
   });
 
-  // Cleanup PTY sessions on app quit
-  app.on('before-quit', () => {
-    logWithCategory('info', LogCategory.SYSTEM, 'Closing all terminal sessions');
-    ptyManager.closeAll();
-  });
+  // Note: PTY cleanup is handled in the consolidated before-quit handler below
 
   logger.info('IPC handlers registered');
 }
@@ -2900,13 +2912,14 @@ app.whenReady().then(async () => {
     try {
       logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin system...');
 
-      // Initialize plugin manager
-      await pluginManager.initialize();
-
-      // Set main window reference for plugin UI interactions
+      // Set main window reference BEFORE initializing plugins
+      // so that plugin-state-changed events can be sent during activation
       if (mainWindow) {
         pluginManager.setMainWindow(mainWindow);
       }
+
+      // Initialize plugin manager (discovers and activates plugins)
+      await pluginManager.initialize();
 
       logWithCategory('info', LogCategory.SYSTEM, 'Plugin system initialized successfully');
     } catch (error) {
@@ -2959,9 +2972,29 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle app before quit
-app.on('before-quit', async () => {
+// Handle app before quit with proper async cleanup
+let isQuitting = false;
+app.on('before-quit', async (event) => {
+  if (isQuitting) {
+    // Already cleaning up, allow quit to proceed
+    return;
+  }
+
+  // Prevent default quit to allow async cleanup
+  event.preventDefault();
+  isQuitting = true;
+
   logger.info('App is quitting...');
+
+  // Close all terminal sessions
+  try {
+    if (ptyManager) {
+      logWithCategory('info', LogCategory.SYSTEM, 'Closing all terminal sessions');
+      ptyManager.closeAll();
+    }
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error closing terminal sessions:', error);
+  }
 
   // Clean up plugin system
   try {
@@ -2977,13 +3010,21 @@ app.on('before-quit', async () => {
   } catch (error) {
     logWithCategory('error', LogCategory.SYSTEM, 'Error closing database pool:', error);
   }
+
+  // Now actually quit
+  logWithCategory('info', LogCategory.SYSTEM, 'Cleanup complete, quitting app');
+  app.quit();
 });
 
-// Log any unhandled errors
+// Log any unhandled errors and prevent default error dialog
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
+  console.error('UNCAUGHT EXCEPTION:', error);
+  // Prevent the error dialog sound
+  return true;
 });
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection:', reason);
+  console.error('UNHANDLED REJECTION:', reason);
 });
