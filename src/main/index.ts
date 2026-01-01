@@ -2656,7 +2656,7 @@ function setupIPC(): void {
 
   // Forward PTY output to renderer
   ptyManager.on('terminal:data', (data) => {
-    console.log(`[IPC] Forwarding terminal data to renderer:`, data.data?.substring(0, 50));
+    logger.debug(`[IPC] Forwarding terminal data to renderer:`, data.data?.substring(0, 50));
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('terminal:data', data);
     }
@@ -2726,7 +2726,7 @@ function setupIPC(): void {
 
   // Send input to terminal
   ipcMain.handle('terminal:input', async (_event, id: string, data: string) => {
-    console.log(`[IPC] terminal:input received for ${id}:`, data);
+    logger.debug(`[IPC] terminal:input received for ${id}:`, data);
     ptyManager.writeToTerminal(id, data);
     return { success: true };
   });

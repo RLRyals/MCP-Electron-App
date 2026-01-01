@@ -9,6 +9,7 @@
 import * as pty from 'node-pty';
 import { EventEmitter } from 'events';
 import * as os from 'os';
+import logger from './logger';
 
 export interface TerminalOptions {
   id: string;
@@ -31,11 +32,11 @@ export class PTYManager extends EventEmitter {
 
     // Check if terminal already exists
     if (this.terminals.has(id)) {
-      console.warn(`[PTYManager] Terminal ${id} already exists, closing existing session`);
+      logger.warn(`[PTYManager] Terminal ${id} already exists, closing existing session`);
       this.closeTerminal(id);
     }
 
-    console.log(`[PTYManager] Creating terminal ${id}: ${command} ${args.join(' ')}`);
+    logger.debug(`[PTYManager] Creating terminal ${id}: ${command} ${args.join(' ')}`);
 
     // Determine shell based on platform if command is 'shell'
     let shellCommand = command;
@@ -82,11 +83,11 @@ export class PTYManager extends EventEmitter {
 
           shellCommand = 'cmd.exe';
           shellArgs = ['/c', originalCommand, ...quotedArgs];
-          console.log(`[PTYManager] Windows shell wrapper: ${shellCommand} /c ${originalCommand} ${quotedArgs.join(' ')}`);
+          logger.debug(`[PTYManager] Windows shell wrapper: ${shellCommand} /c ${originalCommand} ${quotedArgs.join(' ')}`);
         } else {
           // Unix/macOS: Commands in PATH work directly with node-pty
           // No wrapper needed - node-pty uses the system's PATH
-          console.log(`[PTYManager] Unix/macOS: spawning ${shellCommand} directly`);
+          logger.debug(`[PTYManager] Unix/macOS: spawning ${shellCommand} directly`);
         }
       }
 
@@ -94,25 +95,25 @@ export class PTYManager extends EventEmitter {
 
       // Handle data from PTY
       shell.onData((data) => {
-        console.log(`[PTYManager] Received data from terminal ${id}:`, data.substring(0, 100));
+        logger.debug(`[PTYManager] Received data from terminal ${id}:`, data.substring(0, 100));
         this.emit('terminal:data', { id, data });
       });
 
       // Handle PTY exit
       shell.onExit((exitInfo) => {
-        console.log(`[PTYManager] Terminal ${id} exited with code ${exitInfo.exitCode}`);
+        logger.debug(`[PTYManager] Terminal ${id} exited with code ${exitInfo.exitCode}`);
         this.emit('terminal:exit', { id, exitCode: exitInfo.exitCode });
         this.terminals.delete(id);
       });
 
       this.terminals.set(id, shell);
-      console.log(`[PTYManager] Terminal ${id} created successfully`);
+      logger.debug(`[PTYManager] Terminal ${id} created successfully`);
     } catch (error: any) {
-      console.error(`[PTYManager] Failed to create terminal ${id}:`, error);
+      logger.error(`[PTYManager] Failed to create terminal ${id}:`, error);
 
       // If claude command fails, try falling back to PowerShell on Windows
       if (command === 'claude' && os.platform() === 'win32') {
-        console.log(`[PTYManager] Claude not found, falling back to PowerShell for terminal ${id}`);
+        logger.debug(`[PTYManager] Claude not found, falling back to PowerShell for terminal ${id}`);
         try {
           const fallbackShell = pty.spawn('powershell.exe', [], {
             name: 'xterm-color',
@@ -123,12 +124,12 @@ export class PTYManager extends EventEmitter {
           });
 
           fallbackShell.onData((data) => {
-            console.log(`[PTYManager] Received data from fallback terminal ${id}:`, data.substring(0, 100));
+            logger.debug(`[PTYManager] Received data from fallback terminal ${id}:`, data.substring(0, 100));
             this.emit('terminal:data', { id, data });
           });
 
           fallbackShell.onExit((exitInfo) => {
-            console.log(`[PTYManager] Terminal ${id} exited with code ${exitInfo.exitCode}`);
+            logger.debug(`[PTYManager] Terminal ${id} exited with code ${exitInfo.exitCode}`);
             this.emit('terminal:exit', { id, exitCode: exitInfo.exitCode });
             this.terminals.delete(id);
           });
@@ -145,10 +146,10 @@ export class PTYManager extends EventEmitter {
             });
           }, 100);
 
-          console.log(`[PTYManager] Fallback terminal ${id} created successfully`);
+          logger.debug(`[PTYManager] Fallback terminal ${id} created successfully`);
           return; // Success with fallback
         } catch (fallbackError: any) {
-          console.error(`[PTYManager] Fallback also failed for terminal ${id}:`, fallbackError);
+          logger.error(`[PTYManager] Fallback also failed for terminal ${id}:`, fallbackError);
           this.emit('terminal:error', { id, error: `Failed to start terminal: ${fallbackError.message}` });
           throw fallbackError;
         }
@@ -165,11 +166,11 @@ export class PTYManager extends EventEmitter {
   writeToTerminal(id: string, data: string): void {
     const terminal = this.terminals.get(id);
     if (terminal) {
-      console.log(`[PTYManager] Writing to terminal ${id}:`, data);
+      logger.debug(`[PTYManager] Writing to terminal ${id}:`, data);
       terminal.write(data);
     } else {
-      console.warn(`[PTYManager] Terminal ${id} not found, cannot write data`);
-      console.warn(`[PTYManager] Active terminals:`, Array.from(this.terminals.keys()));
+      logger.warn(`[PTYManager] Terminal ${id} not found, cannot write data`);
+      logger.warn(`[PTYManager] Active terminals:`, Array.from(this.terminals.keys()));
     }
   }
 
@@ -180,9 +181,9 @@ export class PTYManager extends EventEmitter {
     const terminal = this.terminals.get(id);
     if (terminal) {
       terminal.resize(cols, rows);
-      console.log(`[PTYManager] Terminal ${id} resized to ${cols}x${rows}`);
+      logger.debug(`[PTYManager] Terminal ${id} resized to ${cols}x${rows}`);
     } else {
-      console.warn(`[PTYManager] Terminal ${id} not found, cannot resize`);
+      logger.warn(`[PTYManager] Terminal ${id} not found, cannot resize`);
     }
   }
 
@@ -194,14 +195,14 @@ export class PTYManager extends EventEmitter {
     if (terminal) {
       try {
         terminal.kill();
-        console.log(`[PTYManager] Terminal ${id} closed`);
+        logger.debug(`[PTYManager] Terminal ${id} closed`);
       } catch (error: any) {
-        console.error(`[PTYManager] Error closing terminal ${id}:`, error);
+        logger.error(`[PTYManager] Error closing terminal ${id}:`, error);
       } finally {
         this.terminals.delete(id);
       }
     } else {
-      console.warn(`[PTYManager] Terminal ${id} not found, cannot close`);
+      logger.warn(`[PTYManager] Terminal ${id} not found, cannot close`);
     }
   }
 
@@ -209,7 +210,7 @@ export class PTYManager extends EventEmitter {
    * Close all PTY sessions
    */
   closeAll(): void {
-    console.log(`[PTYManager] Closing all ${this.terminals.size} terminals`);
+    logger.debug(`[PTYManager] Closing all ${this.terminals.size} terminals`);
     for (const [id] of this.terminals) {
       this.closeTerminal(id);
     }

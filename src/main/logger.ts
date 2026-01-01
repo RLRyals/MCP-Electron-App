@@ -45,7 +45,7 @@ export function initializeLogger(): void {
   log.transports.file.resolvePathFn = () => path.join(logsPath, 'main.log');
 
   // Configure console transport
-  log.transports.console.level = 'info';
+  log.transports.console.level = 'warn';
   log.transports.console.format = '[{y}-{m}-{d} {h}:{i}:{s}] [{level}] {text}';
 
   // Default log level is already set via transports

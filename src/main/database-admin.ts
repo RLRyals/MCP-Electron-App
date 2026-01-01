@@ -75,8 +75,6 @@ async function getMCPServerUrl(): Promise<string> {
  * Call an MCP tool using JSON-RPC 2.0 protocol
  */
 async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperationResult> {
-  // VERSION MARKER - If you see this, the new code IS running!
-  console.error(`[DATABASE-ADMIN-V2] *** CALLING MCP TOOL: ${toolName} ***`);
   logWithCategory('info', LogCategory.SYSTEM, `Calling MCP tool: ${toolName}`);
 
   const baseUrl = await getMCPServerUrl();
@@ -184,7 +182,6 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
 
         // LOG WHAT WE'RE ABOUT TO RETURN
         logWithCategory('info', LogCategory.SYSTEM, `[RETURNING] success: true, data type: ${typeof resultData}, data keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
-        console.error(`[DATABASE-ADMIN] *** NEW CODE IS RUNNING *** Returning parsed data with keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
 
         return {
           success: true,
@@ -204,7 +201,7 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
     }
 
     // No result content - this shouldn't happen for successful queries
-    console.error('[DATABASE-ADMIN] No content array found in response!', {
+    logWithCategory('warn', LogCategory.SYSTEM, '[DATABASE-ADMIN] No content array found in response!', {
       hasResult: !!mcpResponse.result,
       hasResultContent: !!mcpResponse.result?.content,
       hasDirectContent: !!mcpResponse.content,

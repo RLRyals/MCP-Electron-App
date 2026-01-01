@@ -10,6 +10,7 @@ import { app } from 'electron';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
 import type { RepositoryProgress } from '../types/repository';
+import logger from './logger';
 
 /**
  * Repository configuration from setup-config.json
@@ -162,7 +163,7 @@ export class BuildPipelineOrchestrator {
    */
   async loadConfig(configPath: string): Promise<void> {
     try {
-      console.log(`Loading configuration from: ${configPath}`);
+      logger.debug(`Loading configuration from: ${configPath}`);
 
       // Check if file exists
       if (!await fs.pathExists(configPath)) {
@@ -171,10 +172,10 @@ export class BuildPipelineOrchestrator {
 
       const configData = await fs.readFile(configPath, 'utf-8');
       this.config = JSON.parse(configData);
-      console.log('Configuration loaded successfully');
+      logger.debug('Configuration loaded successfully');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`Failed to load configuration: ${message}`);
+      logger.error(`Failed to load configuration: ${message}`);
       throw new Error(`Failed to load configuration from ${configPath}: ${message}`);
     }
   }
@@ -272,7 +273,7 @@ export class BuildPipelineOrchestrator {
       const repoPath = path.join(baseClonePath, repo.clonePath);
 
       if (!options.force && await fs.pathExists(repoPath)) {
-        console.log(`Repository ${repo.name} already exists, skipping`);
+        logger.info(`Repository ${repo.name} already exists, skipping`);
         clonedRepos.push(repo.id);
 
         if (onProgress) {
@@ -312,7 +313,7 @@ export class BuildPipelineOrchestrator {
       } catch (error) {
         // If optional, log and continue; otherwise re-throw
         if (repo.optional) {
-          console.warn(`Failed to clone optional repository ${repo.name}:`, error);
+          logger.warn(`Failed to clone optional repository ${repo.name}:`, error);
         } else {
           throw new Error(`Failed to clone required repository ${repo.name}: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -392,10 +393,10 @@ export class BuildPipelineOrchestrator {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         if (!step.continueOnError) {
-          console.error(`Build step failed and continueOnError is false: ${step.name}`, errorMsg);
+          logger.error(`Build step failed and continueOnError is false: ${step.name}`, errorMsg);
           throw error;
         } else {
-          console.warn(`Build step failed but continueOnError is true, continuing: ${step.name}`, errorMsg);
+          logger.warn(`Build step failed but continueOnError is true, continuing: ${step.name}`, errorMsg);
           // Log the warning for the user to see
           if (onProgress) {
             onProgress({
@@ -445,7 +446,7 @@ export class BuildPipelineOrchestrator {
       const imageName = `${imageConfig.repository}:${imageConfig.tag}`;
 
       if (!await fs.pathExists(dockerfilePath)) {
-        console.log(`Dockerfile not found, skipping Docker build for ${imageName}`);
+        logger.info(`Dockerfile not found, skipping Docker build for ${imageName}`);
         continue;
       }
 
@@ -472,7 +473,7 @@ export class BuildPipelineOrchestrator {
 
         dockerImages.push(imageName);
       } catch (error) {
-        console.warn(`Docker build failed for ${imageName}, continuing`);
+        logger.warn(`Docker build failed for ${imageName}, continuing`);
       }
     }
 
