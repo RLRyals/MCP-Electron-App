@@ -48,7 +48,7 @@ export class ViewRouter {
 
   // Plugin-dependent views
   private pluginRequiredViews: Map<string, string> = new Map([
-    ['workflows', 'fictionlab.workflow']
+    ['workflows', 'fictionlab-workflow']
   ]);
 
   constructor(options: ViewRouterOptions) {

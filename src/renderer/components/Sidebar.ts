@@ -79,7 +79,7 @@ export class Sidebar {
     ];
 
     // Only include workflows if the workflow plugin is installed
-    if (this.installedPlugins.has('fictionlab.workflow')) {
+    if (this.installedPlugins.has('fictionlab-workflow')) {
       items.push({ id: 'workflows', label: 'Workflows', icon: '🔧', section: 'primary' });
     }
 

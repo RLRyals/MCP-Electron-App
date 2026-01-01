@@ -1,10 +1,17 @@
 {
-  "id": "fictionlab.workflow",
+  "id": "fictionlab-workflow",
   "name": "Workflow System",
   "version": "1.0.0",
   "description": "Execute multi-step AI workflows for fiction writing",
   "author": "FictionLab",
-  "main": "dist/index.js",
+  "icon": "🔧",
+  "fictionLabVersion": ">=0.1.0",
+  "pluginType": "utility",
+
+  "entry": {
+    "main": "dist/index.js"
+  },
+
   "permissions": {
     "database": {
       "enabled": true,

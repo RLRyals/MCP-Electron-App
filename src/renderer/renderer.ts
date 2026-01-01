@@ -955,8 +955,8 @@ async function init(): Promise<void> {
   await viewRouter.initialize();
 
   // Register React-based views manually only if their plugins are installed
-  // WorkflowsViewReact requires fictionlab.workflow plugin
-  if (sidebar.isPluginInstalled('fictionlab.workflow')) {
+  // WorkflowsViewReact requires fictionlab-workflow plugin
+  if (sidebar.isPluginInstalled('fictionlab-workflow')) {
     viewRouter.registerView('workflows', WorkflowsViewReact);
     console.log('[Renderer] WorkflowsViewReact registered (plugin installed)');
   } else {
@@ -1118,7 +1118,7 @@ async function init(): Promise<void> {
     await sidebar.updateNavigation();
 
     // Register workflow view if the workflow plugin was installed
-    if (pluginId === 'fictionlab.workflow' && sidebar.isPluginInstalled('fictionlab.workflow')) {
+    if (pluginId === 'fictionlab-workflow' && sidebar.isPluginInstalled('fictionlab-workflow')) {
       viewRouter.registerView('workflows', WorkflowsViewReact);
       console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
     }
@@ -1134,7 +1134,7 @@ async function init(): Promise<void> {
     await sidebar.updateNavigation();
 
     // If workflow plugin was uninstalled and user is on workflows view, navigate away
-    if (pluginId === 'fictionlab.workflow' && viewRouter.getCurrentViewId() === 'workflows') {
+    if (pluginId === 'fictionlab-workflow' && viewRouter.getCurrentViewId() === 'workflows') {
       await viewRouter.navigateTo('dashboard');
     }
   });

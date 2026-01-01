@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 export default class WorkflowPlugin implements FictionLabPlugin {
-  readonly id = 'fictionlab.workflow';
+  readonly id = 'fictionlab-workflow';
   readonly name = 'Workflow System';
   readonly version = '1.0.0';
 
