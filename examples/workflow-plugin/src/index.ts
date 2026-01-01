@@ -1,4 +1,4 @@
-import { FictionLabPlugin, PluginContext } from '../../../src/types/plugin-api';
+import { FictionLabPlugin, PluginContext } from './types/plugin-api';
 import { WorkflowRunner } from '@fictionlab/workflow-runner';
 import { MCPClientAdapter } from './mcp-client-adapter';
 import { ElectronPlatformAdapter } from './electron-platform-adapter';

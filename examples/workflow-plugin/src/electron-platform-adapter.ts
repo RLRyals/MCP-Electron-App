@@ -1,5 +1,5 @@
 import { PlatformAdapter } from '@fictionlab/workflow-runner';
-import { PluginContext } from '../../../src/types/plugin-api';
+import { PluginContext } from './types/plugin-api';
 import { BrowserWindow } from 'electron';
 
 /**

@@ -1,4 +1,4 @@
-import { PluginContext } from '../../../src/types/plugin-api';
+import { PluginContext } from './types/plugin-api';
 import { WorkflowRunner, WorkflowClient } from '@fictionlab/workflow-runner';
 
 export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunner) {
