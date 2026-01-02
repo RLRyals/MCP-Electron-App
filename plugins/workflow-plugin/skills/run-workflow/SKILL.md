@@ -1,43 +1,70 @@
-# run-workflow
+---
+name: run-workflow
+description: Execute FictionLab workflows from your IDE. Use this to run multi-phase writing workflows like series planning, book structuring, chapter writing, and quality gates. Requires FictionLab app to be running.
+allowed-tools: Bash(node:*)
+---
 
-Execute FictionLab workflows from any IDE with Claude Code.
+# FictionLab Workflow Runner
 
-## Requirements
+Execute FictionLab workflows from Claude Code. Requires FictionLab app to be running with Docker containers up.
 
-- FictionLab must be running (provides MCP servers and database)
-- Workflow plugin installed in FictionLab
+## Prerequisites
 
-## Usage
+1. **FictionLab must be running** (check Services tab - all green)
+2. **workflow-runner package built**: Run once in terminal:
+   ```bash
+   cd c:/github/workflow-runner && npm run build
+   ```
+
+## Commands
+
+### List Available Workflows
 
 ```bash
-/run-workflow <workflow-id> [--version=<version>]
+node c:/github/workflow-runner/dist/index.js list
 ```
 
-## Examples
+### Execute a Workflow
 
 ```bash
-# Run latest version of a workflow
-/run-workflow 12-phase-novel-pipeline
-
-# Run specific version
-/run-workflow 12-phase-novel-pipeline --version=1.2.0
+node c:/github/workflow-runner/dist/index.js execute <workflow-id>
 ```
 
-## How it works
+**Example:**
+```bash
+node c:/github/workflow-runner/dist/index.js execute idea-to-series-2
+```
 
-1. Skill connects to FictionLab via Named Pipe (Windows) or Unix Socket (Mac/Linux)
-2. FictionLab's main process receives request via IPC socket
-3. Main process uses PersistentMCPClient to execute workflow (stdio/JSON-RPC)
-4. Results are returned through IPC socket to IDE
-5. Workflow outputs are displayed in console
+### Execute with Options
 
-**Socket Path:**
-- Windows: `\\\\.\\pipe\\fictionlab-workflow-runner`
-- Mac/Linux: `~/.fictionlab/workflow-runner.sock`
+```bash
+node c:/github/workflow-runner/dist/index.js execute <workflow-id> \
+  --workspace "c:/path/to/project" \
+  --variables '{"genre":"Urban Fantasy","targetWordCount":80000}'
+```
 
-## Workflow Outputs
+## Available Workflows
 
-Workflows can produce variables and artifacts that are saved to your workspace:
-- Generated files (outlines, chapters, etc.)
-- Workflow variables (character names, plot points, etc.)
-- Execution logs and history
+Check FictionLab's Workflows tab or run `list` command to see available workflows.
+
+Common workflows:
+- `idea-to-series-2` - Full series planning workflow
+- `simple-test-2` - Simple test workflow
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "MCP connection failed" | Ensure FictionLab is running + Docker containers up |
+| "Workflow not found" | Import workflow via FictionLab Workflows tab first |
+| "ECONNREFUSED" | Check that workflow-manager MCP server is running |
+
+## How it Works
+
+```
+Claude Code → workflow-runner → IPC Socket → FictionLab → MCP Server → PostgreSQL
+```
+
+The workflow-runner connects to FictionLab's IPC server via:
+- Windows: `\\.\pipe\fictionlab-workflow-runner`
+- Mac/Linux: `/tmp/fictionlab-workflow-runner.sock`
