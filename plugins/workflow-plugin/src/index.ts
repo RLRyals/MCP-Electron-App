@@ -1,4 +1,7 @@
 import { FictionLabPlugin, PluginContext } from '../../../src/types/plugin-api';
+// Import from bundled workflow-runner (copied during plugin deployment)
+// In dev: resolves via package.json "file:" reference
+// In production: resolves from bundled/workflow-runner/dist
 import { WorkflowRunner } from '@fictionlab/workflow-runner';
 import { MCPClientAdapter } from './mcp-client-adapter';
 import { ElectronPlatformAdapter } from './electron-platform-adapter';
