@@ -16,51 +16,81 @@ export default class WorkflowPlugin implements FictionLabPlugin {
 
   private runner: WorkflowRunner | null = null;
   private ipcServer: IDEIPCServer | null = null;
+  private context: PluginContext | null = null;
+
+  private log(level: 'info' | 'warn' | 'error' | 'debug', message: string, ...args: any[]): void {
+    if (this.context?.logger) {
+      this.context.logger[level](message, ...args);
+    } else {
+      console[level === 'warn' ? 'warn' : level === 'error' ? 'error' : 'log'](`[Workflow Plugin] ${message}`, ...args);
+    }
+  }
 
   async onActivate(context: PluginContext): Promise<void> {
-    console.log('[Workflow Plugin] Activating...');
+    this.context = context;
+    this.log('info', 'Activating workflow plugin...');
 
-    // 1. Install global Claude Code skill
-    await this.installGlobalSkill();
+    try {
+      // 1. Install global Claude Code skill
+      await this.installGlobalSkill();
 
-    // 2. Create MCP client adapter (wraps FictionLab's PersistentMCPClient)
-    const mcpClient = new MCPClientAdapter(context);
+      // 2. Create MCP client adapter (wraps FictionLab's PersistentMCPClient)
+      this.log('debug', 'Creating MCP client adapter...');
+      const mcpClient = new MCPClientAdapter(context);
 
-    // 3. Create Electron platform adapter
-    const mainWindow = BrowserWindow.getAllWindows()[0];
-    const platformAdapter = new ElectronPlatformAdapter(context, mainWindow);
+      // 3. Create Electron platform adapter
+      this.log('debug', 'Creating Electron platform adapter...');
+      const mainWindow = BrowserWindow.getAllWindows()[0];
+      const platformAdapter = new ElectronPlatformAdapter(context, mainWindow);
 
-    // 4. Initialize workflow runner with injected dependencies
-    this.runner = new WorkflowRunner({
-      mcpClient,
-      platformAdapter
-    });
+      // 4. Initialize workflow runner with injected dependencies
+      this.log('debug', 'Initializing WorkflowRunner...');
+      this.runner = new WorkflowRunner({
+        mcpClient,
+        platformAdapter
+      });
 
-    // 5. Register IPC handlers for renderer communication
-    registerIPCHandlers(context, this.runner);
+      // 5. Register IPC handlers for renderer communication
+      this.log('debug', 'Registering IPC handlers...');
+      registerIPCHandlers(context, this.runner);
 
-    // 6. Start IDE IPC server for Claude Code skill
-    await this.startIDEIPCServer();
+      // 6. Start IDE IPC server for Claude Code skill
+      this.log('info', 'Starting IDE IPC server...');
+      await this.startIDEIPCServer();
 
-    console.log('[Workflow Plugin] Activated successfully');
+      this.log('info', 'Workflow plugin activated successfully');
+    } catch (error: any) {
+      this.log('error', 'Failed to activate workflow plugin:', error.message, error.stack);
+      throw error;
+    }
   }
 
   async onDeactivate(): Promise<void> {
-    console.log('[Workflow Plugin] Deactivating...');
+    this.log('info', 'Deactivating workflow plugin...');
 
     // Shutdown IPC server
     if (this.ipcServer) {
-      await this.ipcServer.shutdown();
+      try {
+        await this.ipcServer.shutdown();
+        this.log('info', 'IDE IPC server shutdown complete');
+      } catch (error: any) {
+        this.log('error', 'Error shutting down IDE IPC server:', error.message);
+      }
       this.ipcServer = null;
     }
 
     // Shutdown workflow runner
     if (this.runner) {
-      await this.runner.shutdown();
+      try {
+        await this.runner.shutdown();
+        this.log('info', 'Workflow runner shutdown complete');
+      } catch (error: any) {
+        this.log('error', 'Error shutting down workflow runner:', error.message);
+      }
       this.runner = null;
     }
 
-    console.log('[Workflow Plugin] Deactivated');
+    this.log('info', 'Workflow plugin deactivated');
   }
 
   /**
@@ -72,9 +102,7 @@ export default class WorkflowPlugin implements FictionLabPlugin {
       const globalSkillDir = path.join(homeDir, '.claude', 'skills', 'run-workflow');
       const localSkillDir = path.join(__dirname, '../skills/run-workflow');
 
-      console.log('[Workflow Plugin] Installing global skill...');
-      console.log(`  Source: ${localSkillDir}`);
-      console.log(`  Target: ${globalSkillDir}`);
+      this.log('info', `Installing global skill from ${localSkillDir} to ${globalSkillDir}`);
 
       // Ensure target directory exists
       await fs.ensureDir(path.dirname(globalSkillDir));
@@ -82,9 +110,9 @@ export default class WorkflowPlugin implements FictionLabPlugin {
       // Copy skill files to global location
       await fs.copy(localSkillDir, globalSkillDir, { overwrite: true });
 
-      console.log('[Workflow Plugin] Global skill installed successfully');
-    } catch (error) {
-      console.error('[Workflow Plugin] Failed to install global skill:', error);
+      this.log('info', 'Global skill installed successfully');
+    } catch (error: any) {
+      this.log('error', 'Failed to install global skill:', error.message);
       // Don't throw - skill installation is optional
     }
   }
@@ -98,12 +126,19 @@ export default class WorkflowPlugin implements FictionLabPlugin {
         throw new Error('Workflow runner not initialized');
       }
 
+      const socketPath = process.platform === 'win32'
+        ? '\\\\.\\pipe\\fictionlab-workflow-runner'
+        : '/tmp/fictionlab-workflow-runner.sock';
+
+      this.log('info', `Creating IDE IPC server on ${socketPath}`);
       this.ipcServer = new IDEIPCServer(this.runner);
+
+      this.log('debug', 'Calling ipcServer.start()...');
       await this.ipcServer.start();
 
-      console.log('[Workflow Plugin] IDE IPC server started successfully');
-    } catch (error) {
-      console.error('[Workflow Plugin] Failed to start IDE IPC server:', error);
+      this.log('info', `IDE IPC server started successfully on ${socketPath}`);
+    } catch (error: any) {
+      this.log('error', 'Failed to start IDE IPC server:', error.message, error.stack);
       // Don't throw - IPC server is optional
     }
   }
