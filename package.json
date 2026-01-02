@@ -107,6 +107,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": ".claude/genre-packs",
+        "to": "genre-packs",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

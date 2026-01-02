@@ -2371,8 +2371,15 @@ function setupIPC(): void {
 
       // Copy genre pack if specified
       if (genrePack && genrePack !== 'none') {
-        const genrePackSource = path.join(app.getAppPath(), '.claude', 'genre-packs', genrePack);
+        // In production, genre packs are in resources/genre-packs
+        // In development, they're in .claude/genre-packs
+        const isProd = app.isPackaged;
+        const genrePackSource = isProd
+          ? path.join(process.resourcesPath, 'genre-packs', genrePack)
+          : path.join(app.getAppPath(), '.claude', 'genre-packs', genrePack);
         const genrePackDest = path.join(folderPath, '.claude', 'genre-packs', genrePack);
+
+        logWithCategory('debug', LogCategory.SYSTEM, `Looking for genre pack at: ${genrePackSource}`);
 
         if (await fse.pathExists(genrePackSource)) {
           await fse.copy(genrePackSource, genrePackDest);
@@ -2394,9 +2401,17 @@ function setupIPC(): void {
   ipcMain.handle('project:list-genre-packs', async () => {
     logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing genre packs');
     try {
-      const genrePacksDir = path.join(app.getAppPath(), '.claude', 'genre-packs');
+      // In production, genre packs are in resources/genre-packs
+      // In development, they're in .claude/genre-packs
+      const isProd = app.isPackaged;
+      const genrePacksDir = isProd
+        ? path.join(process.resourcesPath, 'genre-packs')
+        : path.join(app.getAppPath(), '.claude', 'genre-packs');
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Looking for genre packs in: ${genrePacksDir}`);
 
       if (!await fse.pathExists(genrePacksDir)) {
+        logWithCategory('debug', LogCategory.SYSTEM, 'Genre packs directory not found');
         return [];
       }
 
