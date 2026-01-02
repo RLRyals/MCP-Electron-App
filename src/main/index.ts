@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fse from 'fs-extra';
 import * as prerequisites from './prerequisites';
 import logger, { initializeLogger, getRecentLogs, LogCategory, logWithCategory } from './logger';
 import {
@@ -2340,6 +2341,78 @@ function setupIPC(): void {
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, `Failed to delete project: ${error.message}`);
       throw error;
+    }
+  });
+
+  // Initialize workspace structure with optional genre pack
+  ipcMain.handle('project:initialize-workspace', async (_event, options: {
+    folderPath: string;
+    projectName: string;
+    genrePack?: string;
+  }) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Initializing workspace at ${options.folderPath}`);
+    try {
+      const { folderPath, projectName, genrePack } = options;
+
+      // Create standard directories
+      await fse.ensureDir(path.join(folderPath, '.claude'));
+      await fse.ensureDir(path.join(folderPath, 'planning'));
+      await fse.ensureDir(path.join(folderPath, 'planning', 'character-profiles'));
+      await fse.ensureDir(path.join(folderPath, 'planning', 'world-building'));
+      await fse.ensureDir(path.join(folderPath, 'books'));
+      await fse.ensureDir(path.join(folderPath, 'exports'));
+
+      // Create settings.json
+      await fse.writeJson(path.join(folderPath, '.claude', 'settings.json'), {
+        name: projectName,
+        projectType: 'fiction-series',
+        createdAt: new Date().toISOString()
+      }, { spaces: 2 });
+
+      // Copy genre pack if specified
+      if (genrePack && genrePack !== 'none') {
+        const genrePackSource = path.join(app.getAppPath(), '.claude', 'genre-packs', genrePack);
+        const genrePackDest = path.join(folderPath, '.claude', 'genre-packs', genrePack);
+
+        if (await fse.pathExists(genrePackSource)) {
+          await fse.copy(genrePackSource, genrePackDest);
+          logWithCategory('info', LogCategory.SYSTEM, `Copied genre pack: ${genrePack}`);
+        } else {
+          logWithCategory('warn', LogCategory.SYSTEM, `Genre pack not found: ${genrePackSource}`);
+        }
+      }
+
+      logWithCategory('info', LogCategory.SYSTEM, `Workspace initialized at ${folderPath}`);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to initialize workspace: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // List available genre packs
+  ipcMain.handle('project:list-genre-packs', async () => {
+    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing genre packs');
+    try {
+      const genrePacksDir = path.join(app.getAppPath(), '.claude', 'genre-packs');
+
+      if (!await fse.pathExists(genrePacksDir)) {
+        return [];
+      }
+
+      const entries = await fse.readdir(genrePacksDir, { withFileTypes: true });
+      const packs = entries
+        .filter((e: any) => e.isDirectory() && !e.name.startsWith('_'))
+        .map((e: any) => ({
+          id: e.name,
+          name: e.name.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        }));
+
+      logWithCategory('debug', LogCategory.SYSTEM, `Found ${packs.length} genre packs`);
+      return packs;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to list genre packs: ${error.message}`);
+      return [];
     }
   });
 

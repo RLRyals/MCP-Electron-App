@@ -1531,6 +1531,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Project API
+   */
+  project: {
+    /**
+     * Initialize workspace structure with folders and optional genre pack
+     */
+    initializeWorkspace: (options: {
+      folderPath: string;
+      projectName: string;
+      genrePack?: string;
+    }): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('project:initialize-workspace', options);
+    },
+
+    /**
+     * List available genre packs
+     */
+    listGenrePacks: (): Promise<Array<{ id: string; name: string }>> => {
+      return ipcRenderer.invoke('project:list-genre-packs');
+    },
+  },
+
+  /**
    * Bundled Plugins API
    */
   bundledPlugins: {

@@ -3,8 +3,13 @@
  * Dialog for creating new projects
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Project } from '../../types/project';
+
+interface GenrePack {
+  id: string;
+  name: string;
+}
 
 export interface ProjectCreationDialogProps {
   isOpen: boolean;
@@ -22,6 +27,21 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
   const [folderPath, setFolderPath] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initializeWorkspace, setInitializeWorkspace] = useState(true);
+  const [genrePack, setGenrePack] = useState<string>('none');
+  const [genrePacks, setGenrePacks] = useState<GenrePack[]>([]);
+
+  // Load genre packs when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.project?.listGenrePacks) {
+        electronAPI.project.listGenrePacks()
+          .then((packs: GenrePack[]) => setGenrePacks(packs))
+          .catch((err: any) => console.error('[ProjectCreationDialog] Failed to load genre packs:', err));
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -72,12 +92,30 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
       });
 
       console.log('[ProjectCreationDialog] Project created:', project);
+
+      // Initialize workspace structure if checkbox is checked
+      if (initializeWorkspace) {
+        try {
+          await electronAPI.project.initializeWorkspace({
+            folderPath,
+            projectName: name.trim(),
+            genrePack: genrePack !== 'none' ? genrePack : undefined
+          });
+          console.log('[ProjectCreationDialog] Workspace initialized');
+        } catch (initErr: any) {
+          console.error('[ProjectCreationDialog] Failed to initialize workspace:', initErr);
+          // Don't fail the whole operation, just log the error
+        }
+      }
+
       onProjectCreated(project);
 
       // Reset form
       setName('');
       setDescription('');
       setFolderPath('');
+      setInitializeWorkspace(true);
+      setGenrePack('none');
       onClose();
     } catch (err: any) {
       console.error('[ProjectCreationDialog] Failed to create project:', err);
@@ -92,6 +130,8 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
     setDescription('');
     setFolderPath('');
     setError(null);
+    setInitializeWorkspace(true);
+    setGenrePack('none');
     onClose();
   };
 
@@ -258,6 +298,46 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
               </div>
             )}
           </div>
+
+          {/* Initialize Workspace Checkbox */}
+          <div style={formGroupStyle}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={initializeWorkspace}
+                onChange={(e) => setInitializeWorkspace(e.target.checked)}
+                disabled={creating}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                Initialize workspace structure
+              </span>
+            </label>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginLeft: '24px', marginTop: '4px' }}>
+              Creates .claude/, planning/, books/, and exports/ directories
+            </div>
+          </div>
+
+          {/* Genre Pack Selection (shown when initialize is checked) */}
+          {initializeWorkspace && (
+            <div style={formGroupStyle}>
+              <label style={labelStyle}>Genre Pack (optional)</label>
+              <select
+                value={genrePack}
+                onChange={(e) => setGenrePack(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+                disabled={creating}
+              >
+                <option value="none">None</option>
+                {genrePacks.map(pack => (
+                  <option key={pack.id} value={pack.id}>{pack.name}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Copies genre-specific templates to your project
+              </div>
+            </div>
+          )}
 
           <div style={buttonGroupStyle}>
             <button
