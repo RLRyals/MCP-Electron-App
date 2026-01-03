@@ -804,4 +804,123 @@ export class PersistentMCPClient {
       output_path: options?.outputPath
     });
   }
+
+  // ========================================
+  // Active Workflow Management Methods
+  // ========================================
+
+  /**
+   * List all active workflows across all sources
+   */
+  async listActiveWorkflows(): Promise<any[]> {
+    logWithCategory('info', LogCategory.WORKFLOW, 'Listing active workflows');
+    try {
+      const result = await this.callTool('list_active_workflows', {});
+      return Array.isArray(result) ? result : [];
+    } catch (error: any) {
+      logWithCategory('warn', LogCategory.WORKFLOW,
+        `list_active_workflows not available: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Register an active workflow
+   */
+  async registerActiveWorkflow(params: {
+    workflowDefId: string;
+    workflowName: string;
+    source: 'fictionlab_ui' | 'claude_code' | 'typingmind';
+    projectFolder: string;
+    projectName: string;
+    totalNodes: number;
+  }): Promise<{ registryId: string }> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Registering active workflow: ${params.workflowName} from ${params.source}`);
+
+    const result = await this.callTool('register_active_workflow', {
+      workflow_def_id: params.workflowDefId,
+      workflow_name: params.workflowName,
+      source: params.source,
+      project_folder: params.projectFolder,
+      project_name: params.projectName,
+      total_nodes: params.totalNodes
+    });
+
+    return { registryId: result?.registry_id || result?.id };
+  }
+
+  /**
+   * Update workflow progress
+   */
+  async updateWorkflowProgress(
+    registryId: string,
+    nodeId: string,
+    nodeName: string,
+    progressPercent: number,
+    completedNodes?: number
+  ): Promise<void> {
+    await this.callTool('update_workflow_progress', {
+      registry_id: registryId,
+      current_node_id: nodeId,
+      current_node_name: nodeName,
+      progress_percent: progressPercent,
+      completed_nodes: completedNodes
+    });
+  }
+
+  /**
+   * Pause a workflow
+   */
+  async pauseWorkflow(registryId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Pausing workflow: ${registryId}`);
+    await this.callTool('pause_workflow', { registry_id: registryId });
+  }
+
+  /**
+   * Resume a paused workflow
+   */
+  async resumeWorkflow(registryId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Resuming workflow: ${registryId}`);
+    await this.callTool('resume_workflow', { registry_id: registryId });
+  }
+
+  /**
+   * Cancel a workflow
+   */
+  async cancelWorkflow(registryId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Cancelling workflow: ${registryId}`);
+    await this.callTool('cancel_workflow', { registry_id: registryId });
+  }
+
+  /**
+   * Jump to a specific node in a workflow
+   */
+  async jumpToNode(registryId: string, nodeId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Jumping to node ${nodeId} in workflow: ${registryId}`);
+    await this.callTool('jump_to_node', {
+      registry_id: registryId,
+      node_id: nodeId
+    });
+  }
+
+  /**
+   * Mark a workflow as completed
+   */
+  async completeActiveWorkflow(registryId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Completing workflow: ${registryId}`);
+    await this.callTool('complete_workflow', { registry_id: registryId });
+  }
+
+  /**
+   * Mark a workflow as failed
+   */
+  async failActiveWorkflow(registryId: string, error: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Failing workflow: ${registryId}`);
+    await this.callTool('fail_workflow', {
+      registry_id: registryId,
+      error
+    });
+  }
 }

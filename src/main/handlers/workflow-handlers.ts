@@ -1,10 +1,11 @@
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
+import type { WorkflowUpdate } from '../../types/workflow';
 
 // Singleton instance of PersistentMCPClient for workflow operations
 let workflowClient: PersistentMCPClient | null = null;
@@ -376,5 +377,180 @@ export function registerWorkflowHandlers() {
     }
   });
 
-  logWithCategory('info', LogCategory.SYSTEM, 'Workflow IPC handlers registered');
+  // ============================================
+  // Active Workflow Management Handlers
+  // ============================================
+
+  /**
+   * Broadcast workflow updates to all renderer windows
+   */
+  function broadcastWorkflowUpdate(update: WorkflowUpdate) {
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('workflow:instance-updated', update);
+    });
+  }
+
+  // List all active workflows
+  ipcMain.handle('workflow:list-active', async () => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: List active workflows');
+    try {
+      const client = await getWorkflowClient();
+      const result = await client.listActiveWorkflows();
+      logWithCategory('info', LogCategory.WORKFLOW, `IPC: Found ${result?.length || 0} active workflows`);
+      return result || [];
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: List active workflows failed', { error: error.message });
+      // Return empty array on error - MCP tools may not be implemented yet
+      return [];
+    }
+  });
+
+  // Pause a workflow
+  ipcMain.handle('workflow:pause', async (_event, registryId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Pause workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.pauseWorkflow(registryId);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'status',
+        data: { status: 'paused' },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Pause workflow failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Resume a workflow
+  ipcMain.handle('workflow:resume', async (_event, registryId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Resume workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.resumeWorkflow(registryId);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'status',
+        data: { status: 'running' },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Resume workflow failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Cancel a workflow
+  ipcMain.handle('workflow:cancel', async (_event, registryId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Cancel workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.cancelWorkflow(registryId);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'status',
+        data: { status: 'cancelled' },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Cancel workflow failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Jump to a specific node in a workflow
+  ipcMain.handle('workflow:jump-to-node', async (_event, { registryId, nodeId }: { registryId: string; nodeId: string }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Jump to node ${nodeId} in workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.jumpToNode(registryId, nodeId);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'node_changed',
+        data: { currentNodeId: nodeId },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Jump to node failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Register an active workflow (called when starting a workflow)
+  ipcMain.handle('workflow:register-active', async (_event, params: {
+    workflowDefId: string;
+    workflowName: string;
+    source: 'fictionlab_ui' | 'claude_code' | 'typingmind';
+    projectFolder: string;
+    projectName: string;
+    totalNodes: number;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowDefId}`);
+    try {
+      const client = await getWorkflowClient();
+      const result = await client.registerActiveWorkflow(params);
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Register active workflow failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Update workflow progress (called during execution)
+  ipcMain.handle('workflow:update-progress', async (_event, {
+    registryId,
+    nodeId,
+    nodeName,
+    progressPercent,
+    completedNodes,
+  }: {
+    registryId: string;
+    nodeId: string;
+    nodeName: string;
+    progressPercent: number;
+    completedNodes: number;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update progress for ${registryId}: ${progressPercent}%`);
+    try {
+      const client = await getWorkflowClient();
+      await client.updateWorkflowProgress(registryId, nodeId, nodeName, progressPercent, completedNodes);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'progress',
+        data: {
+          currentNodeId: nodeId,
+          currentNodeName: nodeName,
+          progressPercent,
+          completedNodes,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Update progress failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  logWithCategory('info', LogCategory.SYSTEM, 'Workflow IPC handlers registered (including active workflow management)');
 }

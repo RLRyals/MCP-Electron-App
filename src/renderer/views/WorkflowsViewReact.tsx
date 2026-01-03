@@ -20,6 +20,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
+import { WorkflowManagerPanel } from '../components/WorkflowManagerPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
 import type { Project } from '../../types/project.js';
 
@@ -44,6 +45,10 @@ const WorkflowsApp: React.FC = () => {
   const [showSeriesDialog, setShowSeriesDialog] = useState(false);
   const [seriesDialogContext, setSeriesDialogContext] = useState<{ projectId: number; projectName: string } | null>(null);
   const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
+
+  // Workflow Manager Panel state
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [panelWidth, setPanelWidth] = useState(320);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -481,6 +486,14 @@ const WorkflowsApp: React.FC = () => {
         >
           🔄 Refresh
         </button>
+        <div style={{ flex: 1 }} /> {/* Spacer */}
+        <button
+          style={buttonStyle(isPanelOpen ? 'primary' : 'secondary')}
+          onClick={() => setIsPanelOpen(!isPanelOpen)}
+          title={isPanelOpen ? 'Hide panel' : 'Show panel'}
+        >
+          {isPanelOpen ? '◀ Hide Panel' : '▶ Show Panel'}
+        </button>
       </div>
 
       {/* Main Content */}
@@ -565,6 +578,17 @@ const WorkflowsApp: React.FC = () => {
             </div>
           )}
           </div>
+
+          {/* Workflow Manager Panel */}
+          <WorkflowManagerPanel
+            isOpen={isPanelOpen}
+            width={panelWidth}
+            onWidthChange={setPanelWidth}
+            onClose={() => setIsPanelOpen(false)}
+            availableWorkflows={workflows}
+            onSelectAvailableWorkflow={handleSelectWorkflow}
+            selectedAvailableWorkflowId={selectedWorkflow?.id}
+          />
         </div>
       </div>
 

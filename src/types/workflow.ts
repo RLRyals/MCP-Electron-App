@@ -254,3 +254,52 @@ export interface WorkflowExecutionResult {
   error?: string;
   errorPhase?: number;
 }
+
+/**
+ * Source of workflow execution
+ */
+export type WorkflowSource = 'fictionlab_ui' | 'claude_code' | 'typingmind';
+
+/**
+ * Active workflow instance status
+ */
+export type ActiveWorkflowStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * Active workflow instance for cross-project tracking
+ * Used by the Workflow Manager Panel to display all running workflows
+ */
+export interface ActiveWorkflowInstance {
+  id: string;
+  workflowDefId: string;
+  workflowName: string;
+  source: WorkflowSource;
+  projectFolder: string;
+  projectName: string;
+  currentNodeId: string;
+  currentNodeName: string;
+  status: ActiveWorkflowStatus;
+  progressPercent: number;
+  totalNodes: number;
+  completedNodes: number;
+  startedAt: string;
+  updatedAt: string;
+  availableNodes: { id: string; name: string }[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Workflow update event types
+ */
+export type WorkflowUpdateType = 'progress' | 'status' | 'node_changed' | 'completed' | 'failed';
+
+/**
+ * Workflow update event payload
+ * Broadcast via IPC when workflow state changes
+ */
+export interface WorkflowUpdate {
+  registryId: string;
+  type: WorkflowUpdateType;
+  data: Partial<ActiveWorkflowInstance>;
+  timestamp: string;
+}
