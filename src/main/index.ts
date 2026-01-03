@@ -407,6 +407,7 @@ function openTypingMindInBrowser(url: string): void {
 
 import { registerImportHandlers } from './handlers/import-handlers';
 import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handlers';
+import { registerWorkflowHandlers } from './handlers/workflow-handlers';
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -417,6 +418,9 @@ function setupIPC(): void {
 
   // Register bundled plugins handlers
   registerBundledPluginsHandlers();
+
+  // Register workflow handlers
+  registerWorkflowHandlers();
 
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {

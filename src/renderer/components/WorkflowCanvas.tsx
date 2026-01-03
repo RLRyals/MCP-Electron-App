@@ -45,6 +45,14 @@ function debounce<T extends (...args: any[]) => void>(
   };
 }
 
+// Check if an error is related to app shutdown (should be silently ignored)
+function isShutdownError(error: any): boolean {
+  const message = error?.message || String(error);
+  return message.includes('shutting down') ||
+         message.includes('MCP client') ||
+         message.includes('process exited');
+}
+
 // Register custom node types - all 10 types use PhaseNode
 const nodeTypes = {
   planning: PhaseNode,
@@ -537,7 +545,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
       setEditingNode(null);
     } catch (error: any) {
-      alert(`Failed to save node: ${error?.message || error}`);
+      if (!isShutdownError(error)) {
+        alert(`Failed to save node: ${error?.message || error}`);
+      }
     }
   }, [workflow, graphData, onWorkflowChange]);
 
@@ -566,7 +576,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
       setEditingDocument(null);
     } catch (error) {
-      alert(`Failed to save ${editingDocument.type}: ${error}`);
+      if (!isShutdownError(error)) {
+        alert(`Failed to save ${editingDocument.type}: ${error}`);
+      }
       throw error;
     }
   }, [editingDocument]);
@@ -671,7 +683,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         onWorkflowChange(result.workflow);
       }
     } catch (error) {
-      alert(`Failed to delete: ${error}`);
+      if (!isShutdownError(error)) {
+        alert(`Failed to delete: ${error}`);
+      }
       // Rollback on error - restore original workflow
       if (onWorkflowChange && originalWorkflow) {
         onWorkflowChange(originalWorkflow);
@@ -753,7 +767,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           positions
         });
       } catch (error) {
-        alert(`Failed to save node positions: ${error}`);
+        if (!isShutdownError(error)) {
+          alert(`Failed to save node positions: ${error}`);
+        }
       } finally {
         setIsSaving(false);
       }
@@ -825,7 +841,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           onWorkflowChange(result.workflow);
         }
       } catch (error) {
-        alert(`Failed to create connection: ${error}`);
+        if (!isShutdownError(error)) {
+          alert(`Failed to create connection: ${error}`);
+        }
         // Rollback on error - restore original workflow
         if (onWorkflowChange && workflow) {
           onWorkflowChange(workflow);
@@ -903,7 +921,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         onWorkflowChange(result.workflow);
       }
     } catch (error) {
-      alert(`Failed to save edge: ${error}`);
+      if (!isShutdownError(error)) {
+        alert(`Failed to save edge: ${error}`);
+      }
       // Rollback on error - restore original workflow
       if (onWorkflowChange && originalWorkflow) {
         onWorkflowChange(originalWorkflow);
