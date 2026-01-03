@@ -1,4 +1,7 @@
 import { ipcMain } from 'electron';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
@@ -207,6 +210,169 @@ export function registerWorkflowHandlers() {
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Get installed output-styles failed', { error: error.message, stack: error.stack });
       return [];
+    }
+  });
+
+  // ============================================
+  // Document Handlers (Agents, Skills, Output Styles)
+  // ============================================
+
+  // Read agent file from ~/.claude/agents/
+  ipcMain.handle('document:read-agent', async (_event, agentName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read agent file: ${agentName}`);
+    try {
+      const homeDir = os.homedir();
+      const agentPath = path.join(homeDir, '.claude', 'agents', `${agentName}.md`);
+
+      if (!await fs.pathExists(agentPath)) {
+        throw new Error(`Agent file not found: ${agentPath}`);
+      }
+
+      const content = await fs.readFile(agentPath, 'utf-8');
+      return { content, filePath: agentPath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Read agent failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Write agent file to ~/.claude/agents/
+  ipcMain.handle('document:write-agent', async (_event, agentName: string, content: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write agent file: ${agentName}`);
+    try {
+      const homeDir = os.homedir();
+      const agentsDir = path.join(homeDir, '.claude', 'agents');
+      const agentPath = path.join(agentsDir, `${agentName}.md`);
+
+      // Ensure agents directory exists
+      await fs.ensureDir(agentsDir);
+
+      await fs.writeFile(agentPath, content, 'utf-8');
+      return { success: true, filePath: agentPath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Write agent failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Read skill file from ~/.claude/skills/
+  // Supports both single file (.md) and directory format (SKILL.md)
+  ipcMain.handle('document:read-skill', async (_event, skillName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read skill file: ${skillName}`);
+    try {
+      const homeDir = os.homedir();
+      const skillsDir = path.join(homeDir, '.claude', 'skills');
+
+      // Try single file format first
+      const singleFilePath = path.join(skillsDir, `${skillName}.md`);
+      if (await fs.pathExists(singleFilePath)) {
+        const content = await fs.readFile(singleFilePath, 'utf-8');
+        return { content, filePath: singleFilePath };
+      }
+
+      // Try directory format
+      const directoryPath = path.join(skillsDir, skillName, 'SKILL.md');
+      if (await fs.pathExists(directoryPath)) {
+        const content = await fs.readFile(directoryPath, 'utf-8');
+        return { content, filePath: directoryPath };
+      }
+
+      throw new Error(`Skill file not found: ${skillName} (tried ${singleFilePath} and ${directoryPath})`);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Read skill failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Write skill file to ~/.claude/skills/
+  // Uses provided filePath or auto-detects format
+  ipcMain.handle('document:write-skill', async (_event, skillName: string, content: string, filePath?: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write skill file: ${skillName}`);
+    try {
+      const homeDir = os.homedir();
+      const skillsDir = path.join(homeDir, '.claude', 'skills');
+
+      let targetPath: string;
+
+      if (filePath) {
+        // Use provided path
+        targetPath = filePath;
+      } else {
+        // Auto-detect format - check if directory format exists
+        const directoryPath = path.join(skillsDir, skillName, 'SKILL.md');
+        if (await fs.pathExists(directoryPath)) {
+          targetPath = directoryPath;
+        } else {
+          // Default to single file format
+          targetPath = path.join(skillsDir, `${skillName}.md`);
+        }
+      }
+
+      // Ensure parent directory exists
+      await fs.ensureDir(path.dirname(targetPath));
+
+      await fs.writeFile(targetPath, content, 'utf-8');
+      return { success: true, filePath: targetPath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Write skill failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Read output-style file from ~/.claude/output-styles/
+  ipcMain.handle('document:read-output-style', async (_event, styleName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read output-style file: ${styleName}`);
+    try {
+      const homeDir = os.homedir();
+      const stylePath = path.join(homeDir, '.claude', 'output-styles', `${styleName}.md`);
+
+      if (!await fs.pathExists(stylePath)) {
+        throw new Error(`Output-style file not found: ${stylePath}`);
+      }
+
+      const content = await fs.readFile(stylePath, 'utf-8');
+      return { content, filePath: stylePath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Read output-style failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Write output-style file to ~/.claude/output-styles/
+  ipcMain.handle('document:write-output-style', async (_event, styleName: string, content: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write output-style file: ${styleName}`);
+    try {
+      const homeDir = os.homedir();
+      const stylesDir = path.join(homeDir, '.claude', 'output-styles');
+      const stylePath = path.join(stylesDir, `${styleName}.md`);
+
+      // Ensure output-styles directory exists
+      await fs.ensureDir(stylesDir);
+
+      await fs.writeFile(stylePath, content, 'utf-8');
+      return { success: true, filePath: stylePath };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Write output-style failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Delete output-style file
+  ipcMain.handle('document:delete-output-style', async (_event, styleName: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Delete output-style file: ${styleName}`);
+    try {
+      const homeDir = os.homedir();
+      const stylePath = path.join(homeDir, '.claude', 'output-styles', `${styleName}.md`);
+
+      if (!await fs.pathExists(stylePath)) {
+        throw new Error(`Output-style file not found: ${stylePath}`);
+      }
+
+      await fs.remove(stylePath);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Delete output-style failed', { error: error.message });
+      throw error;
     }
   });
 
