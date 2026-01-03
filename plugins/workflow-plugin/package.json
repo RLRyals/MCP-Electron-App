@@ -4,14 +4,15 @@
   "description": "FictionLab workflow execution plugin",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "node scripts/bundle-runner.js",
     "build": "tsc",
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@fictionlab/workflow-runner": "file:../../../workflow-runner",
     "fs-extra": "^11.2.0"
   },
   "devDependencies": {
+    "@fictionlab/workflow-runner": "file:../../../workflow-runner",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"

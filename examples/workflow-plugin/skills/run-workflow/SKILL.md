@@ -23,16 +23,16 @@ FictionLab must be running with:
 
 ```bash
 # List available workflows
-node ~/.claude/skills/run-workflow/ipc-client.js list
+node $HOME/.claude/skills/run-workflow/ipc-client.js list
 
 # Get workflow definition
-node ~/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
+node $HOME/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
 
 # Execute workflow (via FictionLab - legacy)
-node ~/.claude/skills/run-workflow/ipc-client.js execute <workflow-id>
+node $HOME/.claude/skills/run-workflow/ipc-client.js execute <workflow-id>
 
 # Resume from saved state
-node ~/.claude/skills/run-workflow/ipc-client.js load-state <workflow-id>
+node $HOME/.claude/skills/run-workflow/ipc-client.js load-state <workflow-id>
 ```
 
 ---
@@ -42,7 +42,7 @@ node ~/.claude/skills/run-workflow/ipc-client.js load-state <workflow-id>
 ### Step 1: Fetch Workflow Definition
 
 ```bash
-node ~/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
+node $HOME/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
 ```
 
 Parse the JSON response to extract:
@@ -92,7 +92,7 @@ For each node, execute based on its type:
 When `node.provider.config.headless != true`:
 ```
 1. If node.skill exists:
-   - Load skill file: ~/.claude/skills/{node.skill}.md
+   - Load skill file: $HOME/.claude/skills/{node.skill}.md
    - Follow skill's conversation protocol
 2. Substitute {{variables}} in node.prompt
 3. Conduct multi-turn conversation:
@@ -294,7 +294,7 @@ function evaluateCondition(condition, variables) {
 When a node has a `skill` field, load the skill file for conversation guidance:
 
 ```
-1. Read skill file: ~/.claude/skills/{node.skill}.md
+1. Read skill file: $HOME/.claude/skills/{node.skill}.md
 2. Parse skill's conversation protocol
 3. Follow skill's required outputs
 4. Execute skill's approval gate
