@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
-import { WorkflowList, WorkflowListItem } from '../components/WorkflowList.js';
+import type { WorkflowListItem } from '../components/WorkflowList.js';
 import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
@@ -444,12 +444,6 @@ const WorkflowsApp: React.FC = () => {
     overflow: 'hidden',
   };
 
-  const sidebarStyle: React.CSSProperties = {
-    width: '320px',
-    borderRight: '1px solid #e5e7eb',
-    overflow: 'auto',
-  };
-
   const canvasContainerStyle: React.CSSProperties = {
     flex: 1,
     padding: '16px',
@@ -499,17 +493,6 @@ const WorkflowsApp: React.FC = () => {
       {/* Main Content */}
       <div style={contentStyle}>
         <div style={mainContentStyle}>
-          {/* Sidebar with workflow list */}
-          <div style={sidebarStyle}>
-            <WorkflowList
-              workflows={workflows}
-              selectedId={selectedWorkflow?.id}
-              onSelect={handleSelectWorkflow}
-              onDelete={handleDeleteWorkflow}
-              onReimport={handleReimportWorkflow}
-            />
-          </div>
-
           {/* Canvas area */}
           <div style={canvasContainerStyle}>
           {selectedWorkflow ? (
@@ -574,7 +557,7 @@ const WorkflowsApp: React.FC = () => {
               color: '#9ca3af',
               fontSize: '14px',
             }}>
-              Select a workflow from the sidebar to visualize
+              Select a workflow from the panel to visualize
             </div>
           )}
           </div>
@@ -588,6 +571,8 @@ const WorkflowsApp: React.FC = () => {
             availableWorkflows={workflows}
             onSelectAvailableWorkflow={handleSelectWorkflow}
             selectedAvailableWorkflowId={selectedWorkflow?.id}
+            onDeleteWorkflow={handleDeleteWorkflow}
+            onReimportWorkflow={handleReimportWorkflow}
           />
         </div>
       </div>

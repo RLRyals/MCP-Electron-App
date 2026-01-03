@@ -5,7 +5,7 @@
  */
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { CollapsibleSection } from './CollapsibleSection.js';
 import { ActiveWorkflowCard } from './ActiveWorkflowCard.js';
 import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflow.js';
@@ -19,6 +19,8 @@ export interface WorkflowManagerPanelProps {
   availableWorkflows: WorkflowListItem[];
   onSelectAvailableWorkflow?: (workflowId: string) => void;
   selectedAvailableWorkflowId?: string;
+  onDeleteWorkflow?: (workflowId: string) => void;
+  onReimportWorkflow?: (workflowId: string) => void;
 }
 
 // Plugin IPC channel prefix
@@ -32,6 +34,8 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   availableWorkflows,
   onSelectAvailableWorkflow,
   selectedAvailableWorkflowId,
+  onDeleteWorkflow,
+  onReimportWorkflow,
 }) => {
   const [activeWorkflows, setActiveWorkflows] = useState<ActiveWorkflowInstance[]>([]);
   const [selectedActiveWorkflow, setSelectedActiveWorkflow] = useState<ActiveWorkflowInstance | null>(null);
@@ -40,7 +44,38 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     active: true,
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Filter available workflows by search query
+  const filteredAvailableWorkflows = useMemo(() => {
+    if (!searchQuery.trim()) return availableWorkflows;
+    const query = searchQuery.toLowerCase();
+    return availableWorkflows.filter(w =>
+      w.name.toLowerCase().includes(query) ||
+      (w.description && w.description.toLowerCase().includes(query))
+    );
+  }, [availableWorkflows, searchQuery]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      setOpenMenuId(null);
+    };
+
+    // Add listener on next tick to avoid immediate close
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [openMenuId]);
 
   // Load active workflows
   const loadActiveWorkflows = useCallback(async () => {
@@ -331,35 +366,223 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
         {/* Available Workflows Section */}
         <CollapsibleSection
           title="Available Workflows"
-          count={availableWorkflows.length}
+          count={filteredAvailableWorkflows.length}
           isExpanded={sectionsExpanded.available}
           onToggle={() => toggleSection('available')}
         >
+          {/* Search Input */}
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Search workflows..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '6px 28px 6px 10px',
+                  fontSize: '12px',
+                  background: 'var(--color-bg-secondary, #0D1F35)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '4px',
+                  color: 'var(--color-text-primary, rgba(255, 255, 255, 0.9))',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-accent, #00D4AA)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-text-tertiary, rgba(255, 255, 255, 0.5))',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    padding: '0 4px',
+                    lineHeight: 1,
+                  }}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
           {availableWorkflows.length === 0 ? (
             <div style={emptyStateStyle}>
               No workflows imported
             </div>
+          ) : filteredAvailableWorkflows.length === 0 ? (
+            <div style={emptyStateStyle}>
+              No workflows match "{searchQuery}"
+            </div>
           ) : (
-            availableWorkflows.map(workflow => (
-              <div
-                key={workflow.id}
-                style={availableItemStyle(workflow.id === selectedAvailableWorkflowId)}
-                onClick={() => onSelectAvailableWorkflow?.(workflow.id)}
-                title={workflow.description || workflow.name}
-                onMouseEnter={(e) => {
-                  if (workflow.id !== selectedAvailableWorkflowId) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (workflow.id !== selectedAvailableWorkflowId) {
-                    e.currentTarget.style.background = 'transparent';
-                  }
-                }}
-              >
-                {workflow.name}
-              </div>
-            ))
+            filteredAvailableWorkflows.map(workflow => {
+              const isSelected = workflow.id === selectedAvailableWorkflowId;
+              const isMenuOpen = openMenuId === workflow.id;
+              return (
+                <div
+                  key={workflow.id}
+                  style={{
+                    ...availableItemStyle(isSelected),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                  }}
+                  onClick={() => onSelectAvailableWorkflow?.(workflow.id)}
+                  title={workflow.description || workflow.name}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {workflow.name}
+                    </span>
+                    {workflow.version && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'var(--color-text-tertiary, rgba(255, 255, 255, 0.5))',
+                        flexShrink: 0,
+                      }}>
+                        v{workflow.version}
+                      </span>
+                    )}
+                  </div>
+                  {/* More Actions Button */}
+                  {(onDeleteWorkflow || onReimportWorkflow) && (
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(isMenuOpen ? null : workflow.id);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-text-tertiary, rgba(255, 255, 255, 0.5))',
+                          cursor: 'pointer',
+                          padding: '2px 6px',
+                          fontSize: '14px',
+                          borderRadius: '3px',
+                          lineHeight: 1,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.color = 'var(--color-text-primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = 'var(--color-text-tertiary)';
+                        }}
+                        title="More actions"
+                      >
+                        ⋯
+                      </button>
+                      {/* Dropdown Menu */}
+                      {isMenuOpen && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '100%',
+                            marginTop: '4px',
+                            background: 'var(--color-bg-secondary, #0D1F35)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                            zIndex: 1000,
+                            minWidth: '140px',
+                            overflow: 'hidden',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {onReimportWorkflow && (
+                            <button
+                              onClick={() => {
+                                onReimportWorkflow(workflow.id);
+                                setOpenMenuId(null);
+                              }}
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '8px 12px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--color-text-secondary, rgba(255, 255, 255, 0.7))',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                textAlign: 'left',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              Refresh from source
+                            </button>
+                          )}
+                          {onDeleteWorkflow && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete workflow "${workflow.name}"?`)) {
+                                  onDeleteWorkflow(workflow.id);
+                                }
+                                setOpenMenuId(null);
+                              }}
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '8px 12px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#f87171',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                textAlign: 'left',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              Delete workflow
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </CollapsibleSection>
       </div>
