@@ -509,20 +509,117 @@ export class PersistentMCPClient {
   }
 
   /**
-   * Update a specific phase in a workflow definition
+   * Update a node in the workflow graph
+   * Note: This updates the graph_json, not the legacy phases_json
    */
-  async updateWorkflowPhase(
+  async updateNode(
     workflowDefId: string,
-    phaseId: number,
-    updates: Partial<WorkflowPhase>
-  ): Promise<WorkflowPhase> {
+    nodeId: string,
+    updates: Record<string, any>
+  ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating phase ${phaseId} in workflow: ${workflowDefId}`);
+      `Updating node ${nodeId} in workflow: ${workflowDefId}`);
 
-    return await this.callTool('update_workflow_phase', {
+    return await this.callTool('update_node', {
       workflow_def_id: workflowDefId,
-      phase_id: phaseId,
+      node_id: nodeId,
       updates
+    });
+  }
+
+  /**
+   * Add a node to the workflow graph
+   */
+  async addNode(
+    workflowDefId: string,
+    nodeId: string,
+    nodeType: string,
+    nodeData: Record<string, any>
+  ): Promise<any> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Adding node ${nodeId} to workflow: ${workflowDefId}`);
+
+    return await this.callTool('add_node', {
+      workflow_def_id: workflowDefId,
+      node_id: nodeId,
+      node_type: nodeType,
+      node_data: nodeData
+    });
+  }
+
+  /**
+   * Delete a node from the workflow graph
+   */
+  async deleteNode(
+    workflowDefId: string,
+    nodeId: string
+  ): Promise<any> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Deleting node ${nodeId} from workflow: ${workflowDefId}`);
+
+    return await this.callTool('delete_node', {
+      workflow_def_id: workflowDefId,
+      node_id: nodeId
+    });
+  }
+
+  /**
+   * Create an edge in the workflow graph
+   */
+  async createEdge(
+    workflowDefId: string,
+    edgeId: string,
+    sourceNodeId: string,
+    targetNodeId: string,
+    edgeType?: string,
+    label?: string,
+    condition?: string
+  ): Promise<any> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Creating edge ${edgeId} in workflow: ${workflowDefId}`);
+
+    return await this.callTool('create_edge', {
+      workflow_def_id: workflowDefId,
+      edge_id: edgeId,
+      source_node_id: sourceNodeId,
+      target_node_id: targetNodeId,
+      edge_type: edgeType,
+      label,
+      condition
+    });
+  }
+
+  /**
+   * Update an edge in the workflow graph
+   */
+  async updateEdge(
+    workflowDefId: string,
+    edgeId: string,
+    updates: Record<string, any>
+  ): Promise<any> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Updating edge ${edgeId} in workflow: ${workflowDefId}`);
+
+    return await this.callTool('update_edge', {
+      workflow_def_id: workflowDefId,
+      edge_id: edgeId,
+      updates
+    });
+  }
+
+  /**
+   * Delete an edge from the workflow graph
+   */
+  async deleteEdge(
+    workflowDefId: string,
+    edgeId: string
+  ): Promise<any> {
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Deleting edge ${edgeId} from workflow: ${workflowDefId}`);
+
+    return await this.callTool('delete_edge', {
+      workflow_def_id: workflowDefId,
+      edge_id: edgeId
     });
   }
 
