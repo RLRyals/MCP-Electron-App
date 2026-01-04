@@ -23,16 +23,23 @@ FictionLab must be running with:
 
 ```bash
 # List available workflows
-node $HOME/.claude/skills/run-workflow/ipc-client.js list
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" list', {stdio:'inherit'})"
 
 # Get workflow definition
-node $HOME/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" get <workflow-id>', {stdio:'inherit'})"
 
 # Execute workflow (via FictionLab - legacy)
-node $HOME/.claude/skills/run-workflow/ipc-client.js execute <workflow-id>
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" execute <workflow-id>', {stdio:'inherit'})"
 
 # Resume from saved state
-node $HOME/.claude/skills/run-workflow/ipc-client.js load-state <workflow-id>
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" load-state <workflow-id>', {stdio:'inherit'})"
+
+# Active Workflow Registry (for FictionLab progress tracking)
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" register <workflow-id>', {stdio:'inherit'})"
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" update-progress <registry-id> <json>', {stdio:'inherit'})"
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" complete <registry-id>', {stdio:'inherit'})"
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" fail <registry-id> <error-message>', {stdio:'inherit'})"
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" list-active', {stdio:'inherit'})"
 ```
 
 ---
@@ -42,7 +49,7 @@ node $HOME/.claude/skills/run-workflow/ipc-client.js load-state <workflow-id>
 ### Step 1: Fetch Workflow Definition
 
 ```bash
-node $HOME/.claude/skills/run-workflow/ipc-client.js get <workflow-id>
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" get <workflow-id>', {stdio:'inherit'})"
 ```
 
 Parse the JSON response to extract:
@@ -68,9 +75,25 @@ const context = {
   completedNodes: [],             // Completed node IDs
   currentNodeId: entryNodeId,     // Current execution position
   loopStack: [],                  // For nested loops
-  outputs: {}                     // Final outputs
+  outputs: {},                    // Final outputs
+  registryId: null                // FictionLab active workflow registry ID
 };
 ```
+
+### Step 3.5: Register with Active Workflow Registry (REQUIRED)
+
+**IMPORTANT**: Register the workflow so it appears in FictionLab's Workflow Manager panel:
+
+```bash
+node -e "require('child_process').execSync('node \"' + require('path').join(require('os').homedir(), '.claude/skills/run-workflow/ipc-client.js') + '\" register <workflow-id>', {stdio:'inherit'})"
+```
+
+This returns a `registryId` (UUID). Save this for progress updates:
+```javascript
+context.registryId = "<returned-registry-id>";
+```
+
+**The workflow will now appear in FictionLab's Active Workflows panel!**
 
 ### Step 4: Execute Nodes
 
@@ -92,7 +115,7 @@ For each node, execute based on its type:
 When `node.provider.config.headless != true`:
 ```
 1. If node.skill exists:
-   - Load skill file: $HOME/.claude/skills/{node.skill}.md
+   - Load skill file: `path.join(os.homedir(), '.claude/skills', node.skill + '.md')`
    - Follow skill's conversation protocol
 2. Substitute {{variables}} in node.prompt
 3. Conduct multi-turn conversation:
@@ -193,18 +216,27 @@ When `node.provider.config.headless == true`:
 3. Mark completed
 ```
 
-### Step 5: State Management
+### Step 5: State Management & Progress Updates
 
 After each node completion:
 ```
-1. Save state to workspace:
+1. Update FictionLab active workflow registry:
+   node ipc-client.js update-progress <registryId> '{"currentNodeId":"<node-id>","currentNodeName":"<name>","progressPercent":<pct>,"completedNodes":<count>}'
+
+   Example:
+   node ipc-client.js update-progress abc-123 '{"currentNodeId":"node2","currentNodeName":"Write Chapter","progressPercent":50,"completedNodes":2}'
+
+2. Save state to workspace:
    .fictionlab/workflow-state/<instanceId>.json
-2. State includes:
-   - workflowId, instanceId
+
+3. State includes:
+   - workflowId, instanceId, registryId
    - completedNodes, currentNodeId
    - variables, loopStack
    - timestamp
 ```
+
+**Calculate progress percent:** `(completedNodes.length / totalNodes) * 100`
 
 To resume:
 ```
@@ -213,7 +245,19 @@ To resume:
 3. Continue from currentNodeId
 ```
 
-### Step 6: Report Results
+### Step 6: Complete or Fail Workflow
+
+**On successful completion:**
+```bash
+node ipc-client.js complete <registryId>
+```
+
+**On failure:**
+```bash
+node ipc-client.js fail <registryId> "Error message describing what failed"
+```
+
+### Step 7: Report Results
 
 When workflow completes:
 ```
@@ -294,7 +338,7 @@ function evaluateCondition(condition, variables) {
 When a node has a `skill` field, load the skill file for conversation guidance:
 
 ```
-1. Read skill file: $HOME/.claude/skills/{node.skill}.md
+1. Read skill file: `path.join(os.homedir(), '.claude/skills', node.skill + '.md')`
 2. Parse skill's conversation protocol
 3. Follow skill's required outputs
 4. Execute skill's approval gate
@@ -317,19 +361,29 @@ Cross-platform socket paths are built into ipc-client.js:
 > /run-workflow simple-test-2
 
 1. Fetch workflow definition
-2. Parse: Node 2 (planning) → Node 3 (file)
-3. Execute Node 2 (planning, brainstorming agent):
+2. Parse: Node 2 (planning) → Node 3 (file), totalNodes = 2
+3. REGISTER with FictionLab:
+   node ipc-client.js register simple-test-2
+   → Returns registryId: "abc-123-def"
+   → Workflow now visible in FictionLab Active Workflows panel!
+4. Execute Node 2 (planning, brainstorming agent):
    - "Let's brainstorm a new concept for your story..."
    - [Interactive conversation with user]
    - "Here's the concept we've developed: [summary]"
    - "Would you like to approve this?"
    - [User approves]
    - Store: context.variables.concept = output
-4. Execute Node 3 (file, write):
+   - UPDATE PROGRESS:
+     node ipc-client.js update-progress abc-123-def '{"currentNodeId":"node2","currentNodeName":"Brainstorm","progressPercent":50,"completedNodes":1}'
+5. Execute Node 3 (file, write):
    - Path: {{projectFolder}}/concept.md
    - Content: {{concept}}
    - Write file to workspace
-5. Report: "Workflow complete. Created concept.md"
+   - UPDATE PROGRESS:
+     node ipc-client.js update-progress abc-123-def '{"currentNodeId":"node3","currentNodeName":"Write File","progressPercent":100,"completedNodes":2}'
+6. COMPLETE workflow:
+   node ipc-client.js complete abc-123-def
+7. Report: "Workflow complete. Created concept.md"
 ```
 
 ---

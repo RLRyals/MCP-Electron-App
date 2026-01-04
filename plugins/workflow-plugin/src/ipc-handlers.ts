@@ -125,4 +125,112 @@ export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunn
       throw error;
     }
   });
+
+  // Register a new active workflow
+  context.ipc.handle('workflow:register-active', async (_event, params: {
+    workflowDefId: string;
+    workflowName?: string;
+    source: string;
+    projectFolder?: string;
+    projectName?: string;
+    totalNodes?: number;
+    metadata?: Record<string, any>;
+  }) => {
+    try {
+      const client = runner.getClient();
+      if (client && typeof (client as any).registerActiveWorkflow === 'function') {
+        const result = await (client as any).registerActiveWorkflow(params);
+        // Broadcast new workflow registered
+        if (result.registryId || result.registry_id) {
+          broadcastWorkflowUpdate({
+            registryId: result.registryId || result.registry_id,
+            type: 'status',
+            data: { status: 'running', ...params },
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return {
+          registryId: result.registryId || result.registry_id,
+          ...result
+        };
+      }
+      throw new Error('registerActiveWorkflow not available on client');
+    } catch (error: any) {
+      console.error('[workflow-plugin] Register workflow failed:', error.message);
+      throw error;
+    }
+  });
+
+  // Update workflow progress
+  context.ipc.handle('workflow:update-progress', async (_event, params: {
+    registryId: string;
+    currentNodeId?: string;
+    currentNodeName?: string;
+    progressPercent?: number;
+    completedNodes?: number;
+    metadata?: Record<string, any>;
+  }) => {
+    try {
+      const client = runner.getClient();
+      if (client && typeof (client as any).updateWorkflowProgress === 'function') {
+        await (client as any).updateWorkflowProgress(
+          params.registryId,
+          params.currentNodeId,
+          params.currentNodeName,
+          params.progressPercent,
+          params.completedNodes
+        );
+        broadcastWorkflowUpdate({
+          registryId: params.registryId,
+          type: 'progress',
+          data: params,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('[workflow-plugin] Update progress failed:', error.message);
+      throw error;
+    }
+  });
+
+  // Complete a workflow
+  context.ipc.handle('workflow:complete-active', async (_event, { registryId }: { registryId: string }) => {
+    try {
+      const client = runner.getClient();
+      if (client && typeof (client as any).completeActiveWorkflow === 'function') {
+        await (client as any).completeActiveWorkflow(registryId);
+        broadcastWorkflowUpdate({
+          registryId,
+          type: 'completed',
+          data: { status: 'completed' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('[workflow-plugin] Complete workflow failed:', error.message);
+      throw error;
+    }
+  });
+
+  // Mark a workflow as failed
+  context.ipc.handle('workflow:fail-active', async (_event, { registryId, errorMessage }: { registryId: string; errorMessage: string }) => {
+    try {
+      const client = runner.getClient();
+      if (client && typeof (client as any).failActiveWorkflow === 'function') {
+        await (client as any).failActiveWorkflow(registryId, errorMessage);
+        broadcastWorkflowUpdate({
+          registryId,
+          type: 'failed',
+          data: { status: 'failed', error: errorMessage },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('[workflow-plugin] Fail workflow failed:', error.message);
+      throw error;
+    }
+  });
 }
