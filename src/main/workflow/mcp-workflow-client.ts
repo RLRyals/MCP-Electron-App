@@ -11,39 +11,15 @@ import { app } from 'electron';
 import { logWithCategory, LogCategory } from '../logger';
 import { getDatabaseUrl } from '../database-connection';
 
-export interface WorkflowDefinition {
-  id: string;
-  name: string;
-  version: string;
-  description?: string;
-  graph_json: object;
-  dependencies_json: {
-    agents: string[];
-    skills: string[];
-    mcpServers: string[];
-    subWorkflows?: string[];
-  };
-  phases_json: WorkflowPhase[];
-  tags?: string[];
-  marketplace_metadata?: object;
-  is_system?: boolean;
-  created_by?: string;
-}
+// Import canonical types from shared types directory
+import type {
+  DatabaseWorkflowDefinition,
+  DatabaseWorkflowPhase,
+} from '../../types/workflow';
 
-export interface WorkflowPhase {
-  id: number;
-  name: string;
-  type: 'planning' | 'gate' | 'writing' | 'loop' | 'user' | 'subworkflow';
-  agent: string;
-  skill?: string;
-  prompt?: string;                  // Prompt template for agent nodes (CRITICAL for execution)
-  subWorkflowId?: string;
-  description: string;
-  gate: boolean;
-  gateCondition?: string;
-  requiresApproval: boolean;
-  position: { x: number; y: number };
-}
+// Re-export for backward compatibility
+export type WorkflowDefinition = DatabaseWorkflowDefinition;
+export type WorkflowPhase = DatabaseWorkflowPhase;
 
 export class MCPWorkflowClient {
   private mcpServerPath: string;

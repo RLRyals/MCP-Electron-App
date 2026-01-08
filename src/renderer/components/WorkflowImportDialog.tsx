@@ -20,10 +20,12 @@ export interface ImportResult {
     agents: string[];
     skills: string[];
     mcpServers: string[];
+    subWorkflows: string[];
   };
   installedComponents?: {
     agents: number;
     skills: number;
+    subWorkflows: number;
   };
 }
 
@@ -360,6 +362,9 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
                   {result.installedComponents.skills > 0 && (
                     <li>{result.installedComponents.skills} skill(s)</li>
                   )}
+                  {result.installedComponents.subWorkflows > 0 && (
+                    <li>{result.installedComponents.subWorkflows} sub-workflow(s)</li>
+                  )}
                 </ul>
               </div>
             )}
@@ -376,6 +381,14 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
                   )}
                   {result.missingDependencies.mcpServers.length > 0 && (
                     <li>MCP Servers: {result.missingDependencies.mcpServers.join(', ')}</li>
+                  )}
+                  {result.missingDependencies.subWorkflows && result.missingDependencies.subWorkflows.length > 0 && (
+                    <li style={{ color: '#b45309' }}>
+                      ⚠️ Sub-Workflows: {result.missingDependencies.subWorkflows.join(', ')}
+                      <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                        Import these sub-workflows from sibling folders before running
+                      </div>
+                    </li>
                   )}
                 </ul>
               </div>

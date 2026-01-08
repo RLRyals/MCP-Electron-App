@@ -24,13 +24,14 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { WorkflowNode } from '../../../types/workflow-nodes';
+import type { WorkflowNode, SubWorkflowNode } from '../../../types/workflow-nodes';
 import type { LLMProviderConfig } from '../../../types/llm-providers';
 import { AgentSkillSelector } from '../AgentSkillSelector.js';
 import { AgentSkillActionButtons } from '../AgentSkillActionButtons.js';
 import { CreateAgentDialog } from './CreateAgentDialog.js';
 import { CreateSkillDialog } from './CreateSkillDialog.js';
 import { DocumentEditDialog } from './DocumentEditDialog.js';
+import { SubWorkflowNodeConfig } from './config-panels/SubWorkflowNodeConfig.js';
 
 // ============================================================================
 // Types & Interfaces
@@ -41,6 +42,12 @@ export interface NodeConfigDialogProps {
   availableProviders: LLMProviderConfig[];
   onSave: (node: WorkflowNode) => void;
   onCancel: () => void;
+  availableWorkflows?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    versions?: Array<{ version: string; createdAt: string }>;
+  }>;
 }
 
 type TabId = 'basic' | 'config' | 'provider' | 'context' | 'advanced';
@@ -81,6 +88,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   availableProviders,
   onSave,
   onCancel,
+  availableWorkflows = [],
 }) => {
   // ============================================================================
   // State Management
@@ -1696,63 +1704,15 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
 
         {/* Subworkflow Node */}
         {formData.type === 'subworkflow' && (
-          <>
-            <div style={styles.field}>
-              <label htmlFor="config-subworkflow-id" style={styles.label}>
-                Sub-Workflow ID <span style={styles.required}>*</span>
-              </label>
-              <input
-                id="config-subworkflow-id"
-                type="text"
-                style={styles.input}
-                value={(formData as any).subWorkflowId || ''}
-                onChange={(e) => {
-                  setFormData({ ...formData, subWorkflowId: e.target.value } as any);
-                  setIsDirty(true);
-                }}
-                placeholder="chapter-writing-workflow"
-                aria-required="true"
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label htmlFor="config-subworkflow-version" style={styles.label}>
-                Version (Optional)
-              </label>
-              <input
-                id="config-subworkflow-version"
-                type="text"
-                style={styles.input}
-                value={(formData as any).version || ''}
-                onChange={(e) => {
-                  setFormData({ ...formData, version: e.target.value } as any);
-                  setIsDirty(true);
-                }}
-                placeholder="1.0.0 (leave empty for latest)"
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label htmlFor="config-subworkflow-mapping" style={styles.label}>
-                Input/Output Mapping (JSON)
-              </label>
-              <textarea
-                id="config-subworkflow-mapping"
-                style={{ ...styles.input, minHeight: '100px', fontFamily: 'monospace' }}
-                value={JSON.stringify((formData as any).variableMapping || {}, null, 2)}
-                onChange={(e) => {
-                  try {
-                    const variableMapping = JSON.parse(e.target.value);
-                    setFormData({ ...formData, variableMapping } as any);
-                    setIsDirty(true);
-                  } catch (err) {
-                    // Invalid JSON, keep editing
-                  }
-                }}
-                placeholder='{"inputVar": "{{parentVar}}", "output": "result"}'
-              />
-            </div>
-          </>
+          <SubWorkflowNodeConfig
+            node={formData as SubWorkflowNode}
+            onChange={(updates) => {
+              setFormData({ ...formData, ...updates } as any);
+              setIsDirty(true);
+            }}
+            errors={errors.reduce((acc, e) => ({ ...acc, [e.field]: e.message }), {})}
+            availableWorkflows={availableWorkflows}
+          />
         )}
       </div>
     );

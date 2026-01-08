@@ -20,6 +20,7 @@ export interface ExportResult {
     workflow: string;
     agents: string[];
     skills: string[];
+    subWorkflows: string[];
     readme: string;
   };
   error?: string;
@@ -42,6 +43,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
   const [includeAgents, setIncludeAgents] = useState(true);
   const [includeSkills, setIncludeSkills] = useState(true);
   const [includeReadme, setIncludeReadme] = useState(true);
+  const [includeSubWorkflows, setIncludeSubWorkflows] = useState(true);
   const [customPath, setCustomPath] = useState<string>('');
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState<ExportResult | null>(null);
@@ -49,6 +51,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
     agentCount: number;
     skillCount: number;
     phaseCount: number;
+    subWorkflowCount: number;
   } | null>(null);
 
   // Load preview data when dialog opens
@@ -70,25 +73,30 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
       const workflow = await electronAPI.invoke('workflow:get-definition', workflowId);
 
       if (workflow) {
-        // Count agents and skills from phases
-        const agents = new Set<string>();
-        const skills = new Set<string>();
+        // Count agents and skills from dependencies_json (authoritative source)
+        const agents = new Set<string>(workflow.dependencies_json?.agents || []);
+        const skills = new Set<string>(workflow.dependencies_json?.skills || []);
 
-        if (workflow.phases_json && Array.isArray(workflow.phases_json)) {
-          for (const phase of workflow.phases_json) {
-            if (phase.agent && phase.agent !== 'User' && phase.agent !== 'System') {
-              agents.add(phase.agent);
+        // Also extract from graph_json nodes
+        if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+          for (const node of workflow.graph_json.nodes) {
+            if (node.agent && node.agent !== 'User' && node.agent !== 'System') {
+              agents.add(node.agent);
             }
-            if (phase.skill) {
-              skills.add(phase.skill);
+            if (node.skill) {
+              skills.add(node.skill);
             }
           }
         }
 
+        // Count sub-workflows from dependencies
+        const subWorkflows = workflow.dependencies_json?.subWorkflows || [];
+
         setPreview({
           agentCount: agents.size,
           skillCount: skills.size,
-          phaseCount: workflow.phases_json?.length || 0,
+          phaseCount: workflow.graph_json?.nodes?.length || 0,
+          subWorkflowCount: subWorkflows.length,
         });
       }
     } catch (error: any) {
@@ -134,6 +142,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
         includeAgents,
         includeSkills,
         includeReadme,
+        includeSubWorkflows,
         outputPath: customPath || undefined,
       });
 
@@ -151,7 +160,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
         success: false,
         outputPath: '',
         message: error.message || 'Unknown error occurred',
-        exportedFiles: { workflow: '', agents: [], skills: [], readme: '' },
+        exportedFiles: { workflow: '', agents: [], skills: [], subWorkflows: [], readme: '' },
         error: error.message,
       });
     } finally {
@@ -435,6 +444,17 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
                   />
                   Generate README.md
                 </label>
+                {(preview?.subWorkflowCount || 0) > 0 && (
+                  <label style={checkboxLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={includeSubWorkflows}
+                      onChange={(e) => setIncludeSubWorkflows(e.target.checked)}
+                      disabled={exporting}
+                    />
+                    Include sub-workflow files ({preview?.subWorkflowCount || 0} sub-workflows)
+                  </label>
+                )}
               </div>
             </div>
 
@@ -461,6 +481,12 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
                     <div style={previewItemStyle}>
                       <span>Skills:</span>
                       <span style={{ fontWeight: 600 }}>{preview.skillCount}</span>
+                    </div>
+                  )}
+                  {includeSubWorkflows && preview.subWorkflowCount > 0 && (
+                    <div style={previewItemStyle}>
+                      <span>Sub-workflows:</span>
+                      <span style={{ fontWeight: 600 }}>{preview.subWorkflowCount}</span>
                     </div>
                   )}
                   {includeReadme && (
@@ -494,6 +520,9 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
                 )}
                 {result.exportedFiles.skills.length > 0 && (
                   <div style={fileItemStyle}>Skills: {result.exportedFiles.skills.length} file(s)</div>
+                )}
+                {result.exportedFiles.subWorkflows && result.exportedFiles.subWorkflows.length > 0 && (
+                  <div style={fileItemStyle}>Sub-workflows: {result.exportedFiles.subWorkflows.length} file(s)</div>
                 )}
                 {result.exportedFiles.readme && (
                   <div style={fileItemStyle}>README: {result.exportedFiles.readme}</div>

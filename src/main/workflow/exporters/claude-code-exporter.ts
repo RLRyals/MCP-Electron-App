@@ -31,6 +31,7 @@ export interface ExportResult {
     workflow: string;
     agents: string[];
     skills: string[];
+    subWorkflows: string[];
     readme: string;
   };
   error?: string;
@@ -40,6 +41,8 @@ export interface ExportOptions {
   version?: string;
   includeAgents?: boolean;
   includeSkills?: boolean;
+  includeSubWorkflows?: boolean;
+  includeReadme?: boolean;
   format?: 'yaml' | 'json';
   outputPath?: string;
 }
@@ -81,7 +84,7 @@ export class ClaudeCodeExporter {
           success: false,
           outputPath: '',
           message: `Workflow not found: ${workflowId}`,
-          exportedFiles: { workflow: '', agents: [], skills: [], readme: '' },
+          exportedFiles: { workflow: '', agents: [], skills: [], subWorkflows: [], readme: '' },
           error: 'Workflow not found'
         };
       }
@@ -93,12 +96,13 @@ export class ClaudeCodeExporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Export output path: ${outputPath}`);
 
-      // 3. Find all referenced agents and skills
+      // 3. Find all referenced agents, skills, and sub-workflows
       const agents = await this.findReferencedAgents(workflow);
       const skills = await this.findReferencedSkills(workflow);
+      const subWorkflowIds = this.findReferencedSubWorkflows(workflow);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Found ${agents.length} agents, ${skills.length} skills`);
+        `Found ${agents.length} agents, ${skills.length} skills, ${subWorkflowIds.length} sub-workflows`);
 
       // 4. Export workflow YAML/JSON
       const workflowFile = await this.exportWorkflowFile(workflow, outputPath, options.format);
@@ -115,8 +119,17 @@ export class ClaudeCodeExporter {
         skillFiles.push(...await this.copySkills(skills, outputPath));
       }
 
-      // 7. Generate README
-      const readmeFile = await this.generateReadme(workflow, agents, skills, outputPath);
+      // 7. Export sub-workflows (if enabled)
+      const subWorkflowFiles: string[] = [];
+      if (options.includeSubWorkflows !== false && subWorkflowIds.length > 0) {
+        subWorkflowFiles.push(...await this.exportSubWorkflows(subWorkflowIds, outputPath, options.format));
+      }
+
+      // 8. Generate README (if enabled)
+      let readmeFile = '';
+      if (options.includeReadme !== false) {
+        readmeFile = await this.generateReadme(workflow, agents, skills, subWorkflowIds, outputPath);
+      }
 
       logWithCategory('info', LogCategory.WORKFLOW,
         `Export complete: ${workflowFile}`);
@@ -129,6 +142,7 @@ export class ClaudeCodeExporter {
           workflow: workflowFile,
           agents: agentFiles,
           skills: skillFiles,
+          subWorkflows: subWorkflowFiles,
           readme: readmeFile
         }
       };
@@ -141,7 +155,7 @@ export class ClaudeCodeExporter {
         success: false,
         outputPath: options.outputPath || '',
         message: `Export failed: ${error.message}`,
-        exportedFiles: { workflow: '', agents: [], skills: [], readme: '' },
+        exportedFiles: { workflow: '', agents: [], skills: [], subWorkflows: [], readme: '' },
         error: error.message
       };
     }
@@ -164,25 +178,28 @@ export class ClaudeCodeExporter {
   }
 
   /**
-   * Find all agents referenced in workflow phases
+   * Find all agents referenced in workflow
+   * Prioritizes dependencies_json (authoritative) then graph_json nodes
    */
   private async findReferencedAgents(workflow: WorkflowDefinition): Promise<string[]> {
     const agents = new Set<string>();
 
-    // Extract agents from phases_json
-    if (workflow.phases_json && Array.isArray(workflow.phases_json)) {
-      for (const phase of workflow.phases_json) {
-        if (phase.agent && phase.agent !== 'User' && phase.agent !== 'System') {
-          const agentSlug = this.agentNameToSlug(phase.agent);
-          agents.add(agentSlug);
-        }
-      }
-    }
-
-    // Also check dependencies_json
+    // Primary: Extract agents from dependencies_json (authoritative source)
     if (workflow.dependencies_json?.agents) {
       for (const agent of workflow.dependencies_json.agents) {
         agents.add(agent);
+      }
+    }
+
+    // Secondary: Extract from graph_json nodes (agent property exists on agent node types)
+    if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+      for (const node of workflow.graph_json.nodes) {
+        // Check for agent property (exists on planning, writing, gate nodes)
+        const nodeAgent = (node as any).agent;
+        if (nodeAgent && nodeAgent !== 'User' && nodeAgent !== 'System') {
+          const agentSlug = this.agentNameToSlug(nodeAgent);
+          agents.add(agentSlug);
+        }
       }
     }
 
@@ -190,28 +207,133 @@ export class ClaudeCodeExporter {
   }
 
   /**
-   * Find all skills referenced in workflow phases
+   * Find all skills referenced in workflow
+   * Prioritizes dependencies_json (authoritative) then graph_json nodes
    */
   private async findReferencedSkills(workflow: WorkflowDefinition): Promise<string[]> {
     const skills = new Set<string>();
 
-    // Extract skills from phases_json
-    if (workflow.phases_json && Array.isArray(workflow.phases_json)) {
-      for (const phase of workflow.phases_json) {
-        if (phase.skill) {
-          skills.add(phase.skill);
-        }
-      }
-    }
-
-    // Also check dependencies_json
+    // Primary: Extract from dependencies_json (authoritative source)
     if (workflow.dependencies_json?.skills) {
       for (const skill of workflow.dependencies_json.skills) {
         skills.add(skill);
       }
     }
 
+    // Secondary: Extract from graph_json nodes (skill property exists on agent node types)
+    if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+      for (const node of workflow.graph_json.nodes) {
+        // Check for skill property (exists on planning, writing, gate nodes)
+        const nodeSkill = (node as any).skill;
+        if (nodeSkill) {
+          skills.add(nodeSkill);
+        }
+      }
+    }
+
     return Array.from(skills);
+  }
+
+  /**
+   * Find all sub-workflows referenced in workflow dependencies
+   */
+  private findReferencedSubWorkflows(workflow: WorkflowDefinition): string[] {
+    const subWorkflows = new Set<string>();
+
+    // Get from dependencies_json
+    if (workflow.dependencies_json?.subWorkflows) {
+      for (const subWorkflow of workflow.dependencies_json.subWorkflows) {
+        subWorkflows.add(subWorkflow);
+      }
+    }
+
+    // Also check graph_json nodes for subworkflow type
+    if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+      for (const node of workflow.graph_json.nodes) {
+        if (node.type === 'subworkflow' && node.subWorkflowId) {
+          subWorkflows.add(node.subWorkflowId);
+        }
+      }
+    }
+
+    return Array.from(subWorkflows);
+  }
+
+  /**
+   * Export sub-workflows to export directory
+   */
+  private async exportSubWorkflows(
+    subWorkflowIds: string[],
+    outputPath: string,
+    format: 'yaml' | 'json' = 'yaml'
+  ): Promise<string[]> {
+    const subWorkflowsDir = path.join(outputPath, 'sub-workflows');
+    await fs.ensureDir(subWorkflowsDir);
+
+    const exportedFiles: string[] = [];
+
+    for (const subWorkflowId of subWorkflowIds) {
+      try {
+        // Get sub-workflow from MCP
+        const subWorkflow = await this.getWorkflowDefinition(subWorkflowId);
+
+        if (subWorkflow) {
+          // Create directory for sub-workflow
+          const subWorkflowDir = path.join(subWorkflowsDir, subWorkflowId);
+          await fs.ensureDir(subWorkflowDir);
+
+          // Export the sub-workflow file
+          const exportData = this.convertToExportFormat(subWorkflow);
+          const filename = `workflow.${format}`;
+          const filepath = path.join(subWorkflowDir, filename);
+
+          if (format === 'yaml') {
+            await this.parser.exportToYAML(exportData, filepath);
+          } else {
+            await this.parser.exportToJSON(exportData, filepath);
+          }
+
+          exportedFiles.push(filepath);
+
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Exported sub-workflow: ${subWorkflowId}`);
+
+          // Recursively export nested sub-workflows
+          const nestedSubWorkflows = this.findReferencedSubWorkflows(subWorkflow);
+          if (nestedSubWorkflows.length > 0) {
+            // Filter out already exported ones to prevent infinite loops
+            const newSubWorkflows = nestedSubWorkflows.filter(id => !subWorkflowIds.includes(id));
+            if (newSubWorkflows.length > 0) {
+              const nestedFiles = await this.exportSubWorkflows(newSubWorkflows, outputPath, format);
+              exportedFiles.push(...nestedFiles);
+            }
+          }
+
+          // Also export agents/skills from sub-workflow to the main export directory
+          const subAgents = await this.findReferencedAgents(subWorkflow);
+          const subSkills = await this.findReferencedSkills(subWorkflow);
+
+          if (subAgents.length > 0) {
+            await this.copyAgents(subAgents, outputPath);
+          }
+          if (subSkills.length > 0) {
+            await this.copySkills(subSkills, outputPath);
+          }
+
+        } else {
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Sub-workflow not found: ${subWorkflowId} (skipping)`);
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Failed to export sub-workflow ${subWorkflowId}: ${error.message}`);
+      }
+    }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Exported ${exportedFiles.length}/${subWorkflowIds.length} sub-workflows`);
+
+    return exportedFiles;
   }
 
   /**
@@ -256,33 +378,16 @@ export class ClaudeCodeExporter {
 
   /**
    * Convert workflow from database format to export format
+   * Uses graph_json as the primary source (modern format)
    */
   private convertToExportFormat(workflow: WorkflowDefinition): any {
-    // Convert phases_json back to phases array
-    const phases = workflow.phases_json?.map((phase: any) => ({
-      id: phase.id,
-      name: phase.name,
-      fullName: phase.name,
-      type: phase.type,
-      agent: phase.agent,
-      skill: phase.skill,
-      subWorkflowId: phase.subWorkflowId,
-      description: phase.description,
-      process: [],
-      output: '',
-      mcp: 'Workflow manager',
-      gate: phase.gate || false,
-      gateCondition: phase.gateCondition,
-      requiresApproval: phase.requiresApproval || false,
-      position: phase.position
-    })) || [];
-
     return {
       id: workflow.id,
       name: workflow.name,
       version: workflow.version,
       description: workflow.description || '',
-      phases,
+      // Export graph_json directly - this is the primary format
+      graph_json: workflow.graph_json,
       dependencies: workflow.dependencies_json || {
         agents: [],
         skills: [],
@@ -383,9 +488,34 @@ export class ClaudeCodeExporter {
     workflow: WorkflowDefinition,
     agents: string[],
     skills: string[],
+    subWorkflows: string[],
     outputPath: string
   ): Promise<string> {
     const readmePath = path.join(outputPath, 'README.md');
+
+    // Build structure section dynamically
+    const structureLines = [
+      '.',
+      '├── workflows/',
+      `│   └── ${workflow.id}.yaml          # Main workflow definition`,
+    ];
+
+    if (agents.length > 0) {
+      structureLines.push(`├── agents/                          # Agent personas (${agents.length} total)`);
+      agents.forEach(a => structureLines.push(`│   └── ${a}.md`));
+    }
+
+    if (skills.length > 0) {
+      structureLines.push(`├── skills/                          # Executable skills (${skills.length} total)`);
+      skills.forEach(s => structureLines.push(`│   └── ${s}.md`));
+    }
+
+    if (subWorkflows.length > 0) {
+      structureLines.push(`├── sub-workflows/                   # Sub-workflow definitions (${subWorkflows.length} total)`);
+      subWorkflows.forEach(sw => structureLines.push(`│   └── ${sw}/workflow.yaml`));
+    }
+
+    structureLines.push('└── README.md                        # This file');
 
     const content = `# ${workflow.name}
 
@@ -398,18 +528,12 @@ ${workflow.version}
 ## Overview
 
 This workflow package contains everything needed to run the "${workflow.name}" workflow in Claude Code or other compatible AI tools.
+${subWorkflows.length > 0 ? `\nThis is a **composite workflow** that orchestrates ${subWorkflows.length} sub-workflow(s).` : ''}
 
 ## Structure
 
 \`\`\`
-.
-├── workflows/
-│   └── ${workflow.id}.yaml          # Workflow definition
-├── agents/                          # Agent personas (${agents.length} total)
-${agents.map(a => `│   └── ${a}.md`).join('\n')}
-├── skills/                          # Executable skills (${skills.length} total)
-${skills.map(s => `│   └── ${s}.md`).join('\n')}
-└── README.md                        # This file
+${structureLines.join('\n')}
 \`\`\`
 
 ## Dependencies
@@ -420,19 +544,23 @@ ${agents.length > 0 ? agents.map(a => `- ${a}`).join('\n') : 'None'}
 ### Skills (${skills.length})
 ${skills.length > 0 ? skills.map(s => `- ${s}`).join('\n') : 'None'}
 
+### Sub-Workflows (${subWorkflows.length})
+${subWorkflows.length > 0 ? subWorkflows.map(sw => `- ${sw}`).join('\n') : 'None'}
+
 ### MCP Servers
-${workflow.dependencies_json?.mcpServers?.length > 0
-  ? workflow.dependencies_json.mcpServers.map(m => `- ${m}`).join('\n')
+${(workflow.dependencies_json?.mcpServers?.length ?? 0) > 0
+  ? workflow.dependencies_json!.mcpServers!.map(m => `- ${m}`).join('\n')
   : 'None'}
 
-## Phases (${workflow.phases_json?.length || 0})
+## Nodes (${workflow.graph_json?.nodes?.length || 0})
 
-${workflow.phases_json?.map((phase: any, index: number) => `
-${index + 1}. **${phase.name}** (${phase.type})
-   - Agent: ${phase.agent}
-   ${phase.skill ? `- Skill: ${phase.skill}` : ''}
-   - Description: ${phase.description || 'N/A'}
-`).join('') || 'No phases defined'}
+${workflow.graph_json?.nodes?.map((node: any, index: number) => `
+${index + 1}. **${node.name}** (${node.type})
+   ${node.agent ? `- Agent: ${node.agent}` : ''}
+   ${node.skill ? `- Skill: ${node.skill}` : ''}
+   ${node.subWorkflowId ? `- Sub-Workflow: ${node.subWorkflowId}` : ''}
+   - Description: ${node.description || 'N/A'}
+`).join('') || 'No nodes defined'}
 
 ## Installation
 
@@ -452,6 +580,12 @@ ${index + 1}. **${phase.name}** (${phase.type})
    \`\`\`bash
    cp workflows/${workflow.id}.yaml ~/.claude/workflows/
    \`\`\`
+${subWorkflows.length > 0 ? `
+4. Import sub-workflows:
+   \`\`\`bash
+   cp -r sub-workflows/* ~/.claude/workflows/
+   \`\`\`
+` : ''}
 
 ### For FictionLab
 
@@ -460,6 +594,7 @@ ${index + 1}. **${phase.name}** (${phase.type})
    - Navigate to Workflows
    - Click "Import Workflow Package"
    - Select this folder
+   ${subWorkflows.length > 0 ? '- Sub-workflows will be imported automatically' : ''}
 
 ## Usage
 

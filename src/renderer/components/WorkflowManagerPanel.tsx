@@ -23,9 +23,6 @@ export interface WorkflowManagerPanelProps {
   onReimportWorkflow?: (workflowId: string) => void;
 }
 
-// Plugin IPC channel prefix
-const WORKFLOW_PLUGIN = 'plugin:fictionlab-workflow:';
-
 export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   isOpen,
   width,
@@ -86,7 +83,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
         return;
       }
 
-      const result = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:list-active`);
+      const result = await electronAPI.invoke('workflow:list-active');
       console.log('[WorkflowManagerPanel] Loaded active workflows:', result);
 
       if (Array.isArray(result)) {
@@ -181,7 +178,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   const handlePause = async (registryId: string) => {
     try {
       const electronAPI = (window as any).electronAPI;
-      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:pause`, registryId);
+      await electronAPI.invoke('workflow:pause', registryId);
       loadActiveWorkflows();
     } catch (error) {
       console.error('[WorkflowManagerPanel] Failed to pause workflow:', error);
@@ -191,7 +188,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   const handleResume = async (registryId: string) => {
     try {
       const electronAPI = (window as any).electronAPI;
-      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:resume`, registryId);
+      await electronAPI.invoke('workflow:resume', registryId);
       loadActiveWorkflows();
     } catch (error) {
       console.error('[WorkflowManagerPanel] Failed to resume workflow:', error);
@@ -201,7 +198,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   const handleCancel = async (registryId: string) => {
     try {
       const electronAPI = (window as any).electronAPI;
-      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:cancel`, registryId);
+      await electronAPI.invoke('workflow:cancel', registryId);
       loadActiveWorkflows();
     } catch (error) {
       console.error('[WorkflowManagerPanel] Failed to cancel workflow:', error);
@@ -211,7 +208,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   const handleJumpToNode = async (registryId: string, nodeId: string) => {
     try {
       const electronAPI = (window as any).electronAPI;
-      await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:jump-to-node`, { registryId, nodeId });
+      await electronAPI.invoke('workflow:jump-to-node', { registryId, nodeId });
       loadActiveWorkflows();
     } catch (error) {
       console.error('[WorkflowManagerPanel] Failed to jump to node:', error);

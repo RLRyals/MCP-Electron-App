@@ -303,3 +303,83 @@ export interface WorkflowUpdate {
   data: Partial<ActiveWorkflowInstance>;
   timestamp: string;
 }
+
+// ============================================================================
+// DATABASE FORMAT TYPES
+// These types represent workflows as stored in the database via MCP
+// The "_json" suffix indicates fields that are serialized JSON in the database
+// but typed objects in TypeScript
+// ============================================================================
+
+/**
+ * Workflow definition as stored in database
+ * This is the format returned by MCP workflow-manager server
+ *
+ * Key differences from file-based WorkflowDefinition:
+ * - Uses `graph_json` instead of a separate graph property
+ * - Uses `dependencies_json` instead of `dependencies`
+ * - Includes database-specific fields like `tags`, `is_system`, `created_by`
+ */
+export interface DatabaseWorkflowDefinition {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+
+  /**
+   * Graph-based workflow structure (PRIMARY)
+   * Contains nodes and edges for the workflow canvas
+   */
+  graph_json?: WorkflowGraph;
+
+  /**
+   * Dependencies required to run this workflow
+   */
+  dependencies_json?: WorkflowDependencies;
+
+  /**
+   * Legacy phase array format (DEPRECATED - use graph_json)
+   * Kept for backward compatibility with older workflows
+   * @deprecated Use graph_json instead
+   */
+  phases_json?: DatabaseWorkflowPhase[];
+
+  /** Tags for categorization and filtering */
+  tags?: string[];
+
+  /** Marketplace/sharing metadata */
+  marketplace_metadata?: Record<string, unknown>;
+
+  /** Whether this is a system-provided workflow */
+  is_system?: boolean;
+
+  /** Who created this workflow */
+  created_by?: string;
+}
+
+/**
+ * Phase as stored in database (legacy format)
+ * Used in phases_json for backward compatibility
+ * New workflows should use graph_json with WorkflowNode instead
+ * @deprecated Use graph_json with EnhancedWorkflowNode instead
+ */
+export interface DatabaseWorkflowPhase {
+  id: number | string;
+  name: string;
+  type: PhaseType;
+  agent?: string;
+  skill?: string;
+  prompt?: string;
+  subWorkflowId?: string;
+  description?: string;
+  gate?: boolean;
+  gateCondition?: string;
+  requiresApproval?: boolean;
+  position?: { x: number; y: number };
+}
+
+/**
+ * Type alias for backward compatibility
+ * Use DatabaseWorkflowDefinition in new code
+ */
+export type MCPWorkflowDefinition = DatabaseWorkflowDefinition;

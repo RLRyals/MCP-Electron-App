@@ -512,7 +512,7 @@ const WorkflowsApp: React.FC = () => {
                   </div>
                 )}
                 <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-                  Version {String(selectedWorkflow.version || '1.0')} • {selectedWorkflow.phases_json?.length || 0} phases
+                  Version {String(selectedWorkflow.version || '1.0')} • {selectedWorkflow.graph_json?.nodes?.length || 0} nodes
                 </div>
               </div>
               {(() => {
@@ -523,8 +523,10 @@ const WorkflowsApp: React.FC = () => {
                         id: selectedWorkflow.id,
                         name: String(selectedWorkflow.name),
                         version: String(selectedWorkflow.version),
-                        graph_json: selectedWorkflow.graph_json,
-                        phases_json: selectedWorkflow.phases_json || []
+                        graph_json: selectedWorkflow.graph_json ? {
+                          nodes: selectedWorkflow.graph_json.nodes || [],
+                          edges: selectedWorkflow.graph_json.edges || []
+                        } : undefined
                       }}
                       executionStatus={executionStatus}
                       onNodeClick={(nodeId: string, phase: any) => {
@@ -540,6 +542,12 @@ const WorkflowsApp: React.FC = () => {
                         // Reload workflows list to ensure it's in sync
                         loadWorkflows();
                       }}
+                      availableWorkflows={workflows.map(w => ({
+                        id: w.id,
+                        name: String(w.name),
+                        description: w.description,
+                        version: w.version
+                      }))}
                     />
                   );
                 } catch (error) {

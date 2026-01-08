@@ -18,8 +18,12 @@ export interface WorkflowListItem {
   description?: string;
   tags?: string[];
   is_system?: boolean;
-  phases_json: any[];
-  graph_json?: any; // Graph-based workflow representation
+  /** @deprecated Use graph_json.nodes instead */
+  phases_json?: any[];
+  graph_json?: {
+    nodes?: any[];
+    edges?: any[];
+  };
 }
 
 export interface WorkflowListProps {
@@ -267,7 +271,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                   </div>
                 )}
                 <div style={workflowMetaStyle(isSelected)}>
-                  {workflow.phases_json?.length || 0} phases
+                  {workflow.graph_json?.nodes?.length || 0} nodes
                 </div>
                 {workflow.tags && Array.isArray(workflow.tags) && workflow.tags.length > 0 && (
                   <div style={tagsContainerStyle}>
@@ -338,7 +342,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                   </div>
                 )}
                 <div style={workflowMetaStyle(isSelected)}>
-                  {workflow.phases_json?.length || 0} phases
+                  {workflow.graph_json?.nodes?.length || 0} nodes
                 </div>
                 {workflow.tags && Array.isArray(workflow.tags) && workflow.tags.length > 0 && (
                   <div style={tagsContainerStyle}>

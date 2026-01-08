@@ -125,6 +125,12 @@ export interface WorkflowCanvasProps {
   onNodeClick?: (nodeId: string, phase: any) => void;
   onWorkflowChange?: (workflow: any) => void;
   onOpenSubWorkflow?: (subWorkflowId: string) => void;
+  availableWorkflows?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    versions?: Array<{ version: string; createdAt: string }>;
+  }>;
 }
 
 export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
@@ -133,6 +139,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   onNodeClick,
   onWorkflowChange,
   onOpenSubWorkflow,
+  availableWorkflows = [],
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -1095,6 +1102,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           availableProviders={availableProviders}
           onSave={handleSaveNode}
           onCancel={() => setEditingNode(null)}
+          availableWorkflows={availableWorkflows}
         />
       )}
 

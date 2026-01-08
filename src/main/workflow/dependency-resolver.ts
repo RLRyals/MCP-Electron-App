@@ -137,7 +137,7 @@ export class DependencyResolver {
   /**
    * Check sub-workflows (query workflow_definitions table)
    */
-  private async checkSubWorkflows(subWorkflows: string[]): Promise<DependencyCheckResult> {
+  async checkSubWorkflows(subWorkflows: string[]): Promise<DependencyCheckResult> {
     if (subWorkflows.length === 0) {
       return { installed: [], missing: [] };
     }

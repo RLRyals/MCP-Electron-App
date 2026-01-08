@@ -34,6 +34,7 @@ export interface ImportResult {
   installedComponents?: {
     agents: number;
     skills: number;
+    subWorkflows: number;
   };
 }
 
@@ -140,17 +141,25 @@ export class FolderImporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Dependency check complete: ` +
         `${depCheck.agents.missing.length} agents missing, ` +
-        `${depCheck.skills.missing.length} skills missing`);
+        `${depCheck.skills.missing.length} skills missing, ` +
+        `${depCheck.subWorkflows.missing.length} sub-workflows missing`);
 
-      // 4. Install missing components
+      // 4a. Try to import missing sub-workflows from sibling folders
+      const subWorkflowsInstalled = await this.importSubWorkflowsFromSiblings(
+        folderPath,
+        depCheck.subWorkflows.missing
+      );
+
+      // 4b. Install missing agents and skills
       const installedCounts = await this.installComponents(
         folderPath,
         depCheck.agents.missing,
         depCheck.skills.missing
       );
+      installedCounts.subWorkflows = subWorkflowsInstalled;
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Installed ${installedCounts.agents} agents, ${installedCounts.skills} skills`);
+        `Installed ${installedCounts.agents} agents, ${installedCounts.skills} skills, ${installedCounts.subWorkflows} sub-workflows`);
 
       // 5. Convert workflow to database format (use original graph_json from file)
       const workflowDefinition = this.convertToWorkflowDefinition(workflow, rawWorkflowData);
@@ -164,6 +173,11 @@ export class FolderImporter {
       // 7. Record import
       await this.recordImport(result.workflow_def_id, folderPath, installedCounts);
 
+      // Re-check sub-workflows after import attempt
+      const remainingSubWorkflows = await this.depResolver.checkSubWorkflows(
+        depCheck.subWorkflows.missing
+      );
+
       return {
         success: true,
         workflowId: result.workflow_def_id,
@@ -171,10 +185,10 @@ export class FolderImporter {
         message: result.message,
         installedComponents: installedCounts,
         missingDependencies: {
-          agents: depCheck.agents.missing.filter(a => !installedCounts.agents),
-          skills: depCheck.skills.missing.filter(s => !installedCounts.skills),
+          agents: depCheck.agents.missing.filter(_a => !installedCounts.agents),
+          skills: depCheck.skills.missing.filter(_s => !installedCounts.skills),
           mcpServers: depCheck.mcpServers.missing,
-          subWorkflows: depCheck.subWorkflows.missing
+          subWorkflows: remainingSubWorkflows.missing
         }
       };
 
@@ -207,30 +221,15 @@ export class FolderImporter {
 
   /**
    * Convert WorkflowDefinition to database format
-   * Uses the original graph_json from the file (already in correct WorkflowNode format)
+   * Uses graph_json as the primary format (phases_json is deprecated)
    */
   private convertToWorkflowDefinition(workflow: any, rawData: any): any {
-    //Convert phases to a minimal format for database (keeping for compatibility)
-    const phases_json = workflow.phases.map((phase: any) => ({
-      id: phase.id,
-      name: phase.name,
-      type: phase.type,
-      agent: phase.agent,
-      skill: phase.skill,
-      subWorkflowId: phase.subWorkflowId,
-      description: phase.description,
-      gate: phase.gate,
-      gateCondition: phase.gateCondition,
-      requiresApproval: phase.requiresApproval,
-      position: phase.position
-    }));
-
     return {
       id: workflow.id,
       name: workflow.name,
       version: workflow.version,
       description: workflow.description,
-      // Use the original graph_json from the file (already in WorkflowNode format!)
+      // Primary: graph_json from the file (already in WorkflowNode format!)
       graph_json: rawData.graph_json,
       dependencies_json: {
         agents: workflow.dependencies.agents,
@@ -238,7 +237,9 @@ export class FolderImporter {
         mcpServers: workflow.dependencies.mcpServers,
         subWorkflows: workflow.dependencies.subWorkflows
       },
-      phases_json,  // Include for MCP compatibility
+      // Deprecated: phases_json only included for MCP backward compatibility
+      // Will be removed when MCP server is updated
+      phases_json: rawData.phases_json || [],
       tags: rawData.tags || workflow.metadata?.tags || [],
       marketplace_metadata: workflow.metadata || {},
       created_by: workflow.metadata?.author || 'FictionLab',
@@ -253,7 +254,7 @@ export class FolderImporter {
     folderPath: string,
     missingAgents: string[],
     missingSkills: string[]
-  ): Promise<{ agents: number; skills: number }> {
+  ): Promise<{ agents: number; skills: number; subWorkflows: number }> {
     let agentsInstalled = 0;
     let skillsInstalled = 0;
 
@@ -304,7 +305,7 @@ export class FolderImporter {
         `No skills folder found in workflow package`);
     }
 
-    return { agents: agentsInstalled, skills: skillsInstalled };
+    return { agents: agentsInstalled, skills: skillsInstalled, subWorkflows: 0 };
   }
 
   /**
@@ -336,6 +337,67 @@ export class FolderImporter {
       logWithCategory('warn', LogCategory.WORKFLOW,
         `Failed to record import: ${error.message}`);
     }
+  }
+
+  /**
+   * Import sub-workflows from sibling folders
+   * Looks for folders with matching workflow IDs in the parent directory
+   */
+  private async importSubWorkflowsFromSiblings(
+    folderPath: string,
+    missingSubWorkflows: string[]
+  ): Promise<number> {
+    if (missingSubWorkflows.length === 0) {
+      return 0;
+    }
+
+    let imported = 0;
+    const parentDir = path.dirname(folderPath);
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Looking for sub-workflows in parent directory: ${parentDir}`);
+
+    // Check each sibling folder for matching sub-workflow
+    for (const subWorkflowId of missingSubWorkflows) {
+      // Try common naming patterns
+      const candidates = [
+        path.join(parentDir, subWorkflowId),
+        path.join(parentDir, subWorkflowId.replace(/-/g, '_')),
+      ];
+
+      for (const candidatePath of candidates) {
+        if (await fs.pathExists(candidatePath)) {
+          const workflowFile = await this.findWorkflowFile(candidatePath);
+          if (workflowFile) {
+            try {
+              // Verify this is the right workflow
+              const preview = await this.previewWorkflow(candidatePath);
+              if (preview && (preview.id === subWorkflowId || preview.id.includes(subWorkflowId))) {
+                logWithCategory('info', LogCategory.WORKFLOW,
+                  `Found sub-workflow ${subWorkflowId} at ${candidatePath}, importing...`);
+
+                // Recursively import (this will handle nested sub-workflows too)
+                const result = await this.importFromFolder(candidatePath);
+                if (result.success) {
+                  imported++;
+                  logWithCategory('info', LogCategory.WORKFLOW,
+                    `Successfully imported sub-workflow: ${subWorkflowId}`);
+                } else {
+                  logWithCategory('warn', LogCategory.WORKFLOW,
+                    `Failed to import sub-workflow ${subWorkflowId}: ${result.message}`);
+                }
+                break; // Found and processed, move to next sub-workflow
+              }
+            } catch (error: any) {
+              logWithCategory('warn', LogCategory.WORKFLOW,
+                `Error importing sub-workflow ${subWorkflowId}: ${error.message}`);
+            }
+          }
+        }
+      }
+    }
+
+    return imported;
   }
 
   /**
