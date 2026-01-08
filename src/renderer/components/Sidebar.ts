@@ -84,7 +84,6 @@ export class Sidebar {
     }
 
     items.push(
-      { id: 'library', label: 'Library', icon: '📚', section: 'primary' },
       { id: 'plugins', label: 'Plugins', icon: '🔌', section: 'primary' },
       {
         id: 'settings',
