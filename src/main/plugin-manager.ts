@@ -84,6 +84,16 @@ class PluginManager {
   }
 
   /**
+   * Check if the main window is still valid for IPC communication
+   */
+  private isWindowValid(): boolean {
+    return this.mainWindow !== null &&
+           !this.mainWindow.isDestroyed() &&
+           this.mainWindow.webContents &&
+           !this.mainWindow.webContents.isDestroyed();
+  }
+
+  /**
    * Set up event listeners for plugin events
    */
   private setupEventListeners(): void {
@@ -101,9 +111,9 @@ class PluginManager {
       // Update plugin menu
       this.updatePluginMenu();
 
-      // Notify renderer of plugin state change
-      if (this.mainWindow) {
-        this.mainWindow.webContents.send('plugin-state-changed', { pluginId, state: 'activated' });
+      // Notify renderer of plugin state change (check window is still valid)
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('plugin-state-changed', { pluginId, state: 'activated' });
       }
     });
 
@@ -113,18 +123,18 @@ class PluginManager {
       // Update plugin menu
       this.updatePluginMenu();
 
-      // Notify renderer of plugin state change
-      if (this.mainWindow) {
-        this.mainWindow.webContents.send('plugin-state-changed', { pluginId, state: 'deactivated' });
+      // Notify renderer of plugin state change (check window is still valid)
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('plugin-state-changed', { pluginId, state: 'deactivated' });
       }
     });
 
     this.registry.on('plugin-error', (pluginId: string, error: Error) => {
       logWithCategory('error', LogCategory.SYSTEM, `Plugin error (${pluginId}):`, error);
 
-      // Show error notification to user
-      if (this.mainWindow) {
-        dialog.showMessageBox(this.mainWindow, {
+      // Show error notification to user (check window is still valid)
+      if (this.isWindowValid()) {
+        dialog.showMessageBox(this.mainWindow!, {
           type: 'error',
           title: 'Plugin Error',
           message: `Plugin ${pluginId} encountered an error`,
@@ -147,7 +157,7 @@ class PluginManager {
    * Show a notification from a plugin
    */
   private showPluginNotification(pluginId: string, notification: PluginNotification): void {
-    if (!this.mainWindow) {
+    if (!this.isWindowValid()) {
       return;
     }
 
@@ -156,7 +166,7 @@ class PluginManager {
       ? 'info'
       : notification.type;
 
-    dialog.showMessageBox(this.mainWindow, {
+    dialog.showMessageBox(this.mainWindow!, {
       type: dialogType,
       title: notification.title || `Plugin: ${pluginId}`,
       message: notification.message,
@@ -278,13 +288,13 @@ class PluginManager {
    * Open the plugin manager UI
    */
   private openPluginManager(): void {
-    if (!this.mainWindow) {
-      logWithCategory('warn', LogCategory.SYSTEM, 'Cannot open plugin manager: no main window');
+    if (!this.isWindowValid()) {
+      logWithCategory('warn', LogCategory.SYSTEM, 'Cannot open plugin manager: no valid window');
       return;
     }
 
     // Send message to renderer to show plugin manager
-    this.mainWindow.webContents.send('show-plugin-manager');
+    this.mainWindow!.webContents.send('show-plugin-manager');
 
     logWithCategory('debug', LogCategory.SYSTEM, 'Opening plugin manager UI');
   }
@@ -304,9 +314,9 @@ class PluginManager {
     const channelName = `plugin:${pluginId}:${action}`;
 
     try {
-      if (this.mainWindow) {
+      if (this.isWindowValid()) {
         // Send event to renderer to invoke the handler
-        this.mainWindow.webContents.send('plugin-action', {
+        this.mainWindow!.webContents.send('plugin-action', {
           pluginId,
           action,
           channelName
@@ -318,8 +328,8 @@ class PluginManager {
       logWithCategory('error', LogCategory.SYSTEM, `Plugin action ${channelName} failed:`, error);
 
       // Show error notification
-      if (this.mainWindow) {
-        this.mainWindow.webContents.send('show-notification', {
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('show-notification', {
           type: 'error',
           message: `Plugin action failed: ${error.message}`,
         });

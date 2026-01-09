@@ -15,7 +15,7 @@ import * as os from 'os';
 export default class WorkflowPlugin implements FictionLabPlugin {
   readonly id = 'fictionlab-workflow';
   readonly name = 'Workflow System';
-  readonly version = '1.0.0';
+  readonly version = '1.1.0';
 
   private runner: WorkflowRunner | null = null;
   private ipcServer: IDEIPCServer | null = null;

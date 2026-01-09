@@ -1,7 +1,7 @@
 {
   "id": "fictionlab-workflow",
   "name": "Workflow System",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Execute multi-step AI workflows for fiction writing",
   "author": "FictionLab",
   "icon": "🔧",

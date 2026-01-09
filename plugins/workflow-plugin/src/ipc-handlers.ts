@@ -9,7 +9,10 @@ import { FolderImporter } from '../../../src/main/workflow/folder-importer';
  */
 function broadcastWorkflowUpdate(update: WorkflowUpdate) {
   BrowserWindow.getAllWindows().forEach(win => {
-    win.webContents.send('workflow:instance-updated', update);
+    // Check if window and webContents are still valid before sending
+    if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+      win.webContents.send('workflow:instance-updated', update);
+    }
   });
 }
 

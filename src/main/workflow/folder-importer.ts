@@ -51,9 +51,15 @@ export class FolderImporter {
 
   /**
    * Preview workflow metadata without importing
-   * Returns the workflow ID, name, and version
+   * Returns the workflow ID, name, version, and duplicate detection info
    */
-  async previewWorkflow(folderPath: string): Promise<{ id: string; name: string; version: string } | null> {
+  async previewWorkflow(folderPath: string): Promise<{
+    id: string;
+    name: string;
+    version: string;
+    suggestedId: string;
+    isDuplicate: boolean
+  } | null> {
     try {
       const workflowFile = await this.findWorkflowFile(folderPath);
       if (!workflowFile) {
@@ -61,10 +67,37 @@ export class FolderImporter {
       }
 
       const workflow = await this.parser.parseWorkflow(workflowFile);
+
+      // Check for existing workflows with same ID
+      let suggestedId = workflow.id;
+      let isDuplicate = false;
+
+      try {
+        const existingWorkflows = await this.workflowClient.getWorkflowDefinitions();
+        const existingIds = new Set(existingWorkflows.map(w => w.id));
+
+        if (existingIds.has(workflow.id)) {
+          isDuplicate = true;
+          // Find next available ID by appending incrementing number
+          let counter = 2;
+          while (existingIds.has(`${workflow.id}-${counter}`)) {
+            counter++;
+          }
+          suggestedId = `${workflow.id}-${counter}`;
+        }
+      } catch (error: any) {
+        // If we can't check for duplicates (e.g., MCP not running),
+        // just use the original ID
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Could not check for duplicate workflows: ${error.message}`);
+      }
+
       return {
         id: workflow.id,
         name: workflow.name,
-        version: workflow.version
+        version: workflow.version,
+        suggestedId,
+        isDuplicate
       };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, `Failed to preview workflow: ${error.message}`);
