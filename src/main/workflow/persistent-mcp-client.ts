@@ -420,7 +420,7 @@ export class PersistentMCPClient {
    * Import workflow definition
    */
   async importWorkflowDefinition(workflow: WorkflowDefinition): Promise<{
-    workflow_def_id: string;
+    workflow_id: string;
     version: string;
     message: string;
   }> {
@@ -459,11 +459,11 @@ export class PersistentMCPClient {
    * Get specific workflow definition
    */
   async getWorkflowDefinition(
-    workflowDefId: string,
+    workflowId: string,
     version?: string
   ): Promise<WorkflowDefinition | null> {
     return await this.callTool('get_workflow_definition', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version
     });
   }
@@ -472,14 +472,14 @@ export class PersistentMCPClient {
    * Update node positions in workflow definition
    */
   async updateNodePositions(
-    workflowDefId: string,
+    workflowId: string,
     positions: Record<string, { x: number; y: number }>
   ): Promise<void> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating node positions for workflow: ${workflowDefId}`);
+      `Updating node positions for workflow: ${workflowId}`);
 
     await this.callTool('update_workflow_positions', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       positions
     });
   }
@@ -489,15 +489,15 @@ export class PersistentMCPClient {
    * Note: This updates the graph_json, not the legacy phases_json
    */
   async updateNode(
-    workflowDefId: string,
+    workflowId: string,
     nodeId: string,
     updates: Record<string, any>
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating node ${nodeId} in workflow: ${workflowDefId}`);
+      `Updating node ${nodeId} in workflow: ${workflowId}`);
 
     return await this.callTool('update_node', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       node_id: nodeId,
       updates
     });
@@ -507,16 +507,16 @@ export class PersistentMCPClient {
    * Add a node to the workflow graph
    */
   async addNode(
-    workflowDefId: string,
+    workflowId: string,
     nodeId: string,
     nodeType: string,
     nodeData: Record<string, any>
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Adding node ${nodeId} to workflow: ${workflowDefId}`);
+      `Adding node ${nodeId} to workflow: ${workflowId}`);
 
     return await this.callTool('add_node', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       node_id: nodeId,
       node_type: nodeType,
       node_data: nodeData
@@ -527,14 +527,14 @@ export class PersistentMCPClient {
    * Delete a node from the workflow graph
    */
   async deleteNode(
-    workflowDefId: string,
+    workflowId: string,
     nodeId: string
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Deleting node ${nodeId} from workflow: ${workflowDefId}`);
+      `Deleting node ${nodeId} from workflow: ${workflowId}`);
 
     return await this.callTool('delete_node', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       node_id: nodeId
     });
   }
@@ -543,7 +543,7 @@ export class PersistentMCPClient {
    * Create an edge in the workflow graph
    */
   async createEdge(
-    workflowDefId: string,
+    workflowId: string,
     edgeId: string,
     sourceNodeId: string,
     targetNodeId: string,
@@ -552,10 +552,10 @@ export class PersistentMCPClient {
     condition?: string
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Creating edge ${edgeId} in workflow: ${workflowDefId}`);
+      `Creating edge ${edgeId} in workflow: ${workflowId}`);
 
     return await this.callTool('create_edge', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       edge_id: edgeId,
       source_node_id: sourceNodeId,
       target_node_id: targetNodeId,
@@ -569,15 +569,15 @@ export class PersistentMCPClient {
    * Update an edge in the workflow graph
    */
   async updateEdge(
-    workflowDefId: string,
+    workflowId: string,
     edgeId: string,
     updates: Record<string, any>
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating edge ${edgeId} in workflow: ${workflowDefId}`);
+      `Updating edge ${edgeId} in workflow: ${workflowId}`);
 
     return await this.callTool('update_edge', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       edge_id: edgeId,
       updates
     });
@@ -587,14 +587,14 @@ export class PersistentMCPClient {
    * Delete an edge from the workflow graph
    */
   async deleteEdge(
-    workflowDefId: string,
+    workflowId: string,
     edgeId: string
   ): Promise<any> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Deleting edge ${edgeId} from workflow: ${workflowDefId}`);
+      `Deleting edge ${edgeId} from workflow: ${workflowId}`);
 
     return await this.callTool('delete_edge', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       edge_id: edgeId
     });
   }
@@ -603,7 +603,7 @@ export class PersistentMCPClient {
    * Create workflow version
    */
   async createWorkflowVersion(
-    workflowDefId: string,
+    workflowId: string,
     version: string,
     definitionJson: object,
     changelog: string,
@@ -611,7 +611,7 @@ export class PersistentMCPClient {
     createdBy?: string
   ): Promise<any> {
     return await this.callTool('create_workflow_version', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version,
       definition_json: definitionJson,
       changelog,
@@ -623,9 +623,9 @@ export class PersistentMCPClient {
   /**
    * Get workflow versions
    */
-  async getWorkflowVersions(workflowDefId: string): Promise<any[]> {
+  async getWorkflowVersions(workflowId: string): Promise<any[]> {
     const result = await this.callTool('get_workflow_versions', {
-      workflow_def_id: workflowDefId
+      workflow_id: workflowId
     });
     return Array.isArray(result) ? result : [];
   }
@@ -634,12 +634,12 @@ export class PersistentMCPClient {
    * Lock workflow version during execution
    */
   async lockWorkflowVersion(
-    workflowDefId: string,
+    workflowId: string,
     version: string,
     instanceId: number
   ): Promise<void> {
     await this.callTool('lock_workflow_version', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version,
       instance_id: instanceId
     });
@@ -649,12 +649,12 @@ export class PersistentMCPClient {
    * Unlock workflow version
    */
   async unlockWorkflowVersion(
-    workflowDefId: string,
+    workflowId: string,
     version: string,
     instanceId: number
   ): Promise<void> {
     await this.callTool('unlock_workflow_version', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version,
       instance_id: instanceId
     });
@@ -672,7 +672,7 @@ export class PersistentMCPClient {
     return await this.callTool('start_sub_workflow', {
       parent_instance_id: parentInstanceId,
       parent_phase_number: parentPhaseNumber,
-      sub_workflow_def_id: subWorkflowDefId,
+      sub_workflow_id: subWorkflowDefId,
       sub_workflow_version: subWorkflowVersion
     });
   }
@@ -762,7 +762,7 @@ export class PersistentMCPClient {
    * Export workflow package for sharing/marketplace
    */
   async exportWorkflowPackage(
-    workflowDefId: string,
+    workflowId: string,
     options?: {
       version?: string;
       includeAgents?: boolean;
@@ -772,7 +772,7 @@ export class PersistentMCPClient {
     }
   ): Promise<any> {
     return await this.callTool('export_workflow_package', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version: options?.version,
       include_agents: options?.includeAgents ?? true,
       include_skills: options?.includeSkills ?? true,
@@ -804,7 +804,7 @@ export class PersistentMCPClient {
    * Register an active workflow
    */
   async registerActiveWorkflow(params: {
-    workflowDefId: string;
+    workflowId: string;
     workflowName: string;
     source: 'fictionlab_ui' | 'claude_code' | 'typingmind';
     projectFolder: string;
@@ -815,7 +815,7 @@ export class PersistentMCPClient {
       `Registering active workflow: ${params.workflowName} from ${params.source}`);
 
     const result = await this.callTool('register_active_workflow', {
-      workflow_def_id: params.workflowDefId,
+      workflow_id: params.workflowId,
       workflow_name: params.workflowName,
       source: params.source,
       project_folder: params.projectFolder,

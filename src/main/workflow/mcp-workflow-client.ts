@@ -167,7 +167,7 @@ export class MCPWorkflowClient {
    * Import workflow definition
    */
   async importWorkflowDefinition(workflow: WorkflowDefinition): Promise<{
-    workflow_def_id: string;
+    workflow_id: string;
     version: string;
     message: string;
   }> {
@@ -213,11 +213,11 @@ export class MCPWorkflowClient {
    * Get specific workflow definition
    */
   async getWorkflowDefinition(
-    workflowDefId: string,
+    workflowId: string,
     version?: string
   ): Promise<WorkflowDefinition | null> {
     return await this.callTool('get_workflow_definition', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version
     });
   }
@@ -226,33 +226,15 @@ export class MCPWorkflowClient {
    * Update node positions in workflow definition
    */
   async updateNodePositions(
-    workflowDefId: string,
+    workflowId: string,
     positions: Record<string, { x: number; y: number }>
   ): Promise<void> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating node positions for workflow: ${workflowDefId}`);
+      `Updating node positions for workflow: ${workflowId}`);
 
     await this.callTool('update_workflow_positions', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       positions
-    });
-  }
-
-  /**
-   * Update a specific phase in a workflow definition
-   */
-  async updateWorkflowPhase(
-    workflowDefId: string,
-    phaseId: number,
-    updates: Partial<WorkflowPhase>
-  ): Promise<WorkflowPhase> {
-    logWithCategory('info', LogCategory.WORKFLOW,
-      `Updating phase ${phaseId} in workflow: ${workflowDefId}`);
-
-    return await this.callTool('update_workflow_phase', {
-      workflow_def_id: workflowDefId,
-      phase_id: phaseId,
-      updates
     });
   }
 
@@ -260,7 +242,7 @@ export class MCPWorkflowClient {
    * Create workflow version
    */
   async createWorkflowVersion(
-    workflowDefId: string,
+    workflowId: string,
     version: string,
     definitionJson: object,
     changelog: string,
@@ -268,7 +250,7 @@ export class MCPWorkflowClient {
     createdBy?: string
   ): Promise<any> {
     return await this.callTool('create_workflow_version', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version,
       definition_json: definitionJson,
       changelog,
@@ -280,42 +262,13 @@ export class MCPWorkflowClient {
   /**
    * Get workflow versions
    */
-  async getWorkflowVersions(workflowDefId: string): Promise<any[]> {
+  async getWorkflowVersions(workflowId: string): Promise<any[]> {
     const result = await this.callTool('get_workflow_versions', {
-      workflow_def_id: workflowDefId
+      workflow_id: workflowId
     });
     return Array.isArray(result) ? result : [];
   }
 
-  /**
-   * Lock workflow version during execution
-   */
-  async lockWorkflowVersion(
-    workflowDefId: string,
-    version: string,
-    instanceId: number
-  ): Promise<void> {
-    await this.callTool('lock_workflow_version', {
-      workflow_def_id: workflowDefId,
-      version,
-      instance_id: instanceId
-    });
-  }
-
-  /**
-   * Unlock workflow version
-   */
-  async unlockWorkflowVersion(
-    workflowDefId: string,
-    version: string,
-    instanceId: number
-  ): Promise<void> {
-    await this.callTool('unlock_workflow_version', {
-      workflow_def_id: workflowDefId,
-      version,
-      instance_id: instanceId
-    });
-  }
 
   /**
    * Start sub-workflow
@@ -329,7 +282,7 @@ export class MCPWorkflowClient {
     return await this.callTool('start_sub_workflow', {
       parent_instance_id: parentInstanceId,
       parent_phase_number: parentPhaseNumber,
-      sub_workflow_def_id: subWorkflowDefId,
+      sub_workflow_id: subWorkflowDefId,
       sub_workflow_version: subWorkflowVersion
     });
   }
@@ -419,7 +372,7 @@ export class MCPWorkflowClient {
    * Export workflow package for sharing/marketplace
    */
   async exportWorkflowPackage(
-    workflowDefId: string,
+    workflowId: string,
     options?: {
       version?: string;
       includeAgents?: boolean;
@@ -429,7 +382,7 @@ export class MCPWorkflowClient {
     }
   ): Promise<any> {
     return await this.callTool('export_workflow_package', {
-      workflow_def_id: workflowDefId,
+      workflow_id: workflowId,
       version: options?.version,
       include_agents: options?.includeAgents ?? true,
       include_skills: options?.includeSkills ?? true,

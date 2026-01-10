@@ -76,6 +76,9 @@ export function registerWorkflowHandlers() {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Add node to workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
+      if (!node) {
+        throw new Error('No node provided to add');
+      }
       const { id, type, ...nodeData } = node;
       const result = await client.addNode(workflowId, String(id), type, nodeData);
       return result;
@@ -495,14 +498,14 @@ export function registerWorkflowHandlers() {
 
   // Register an active workflow (called when starting a workflow)
   ipcMain.handle('workflow:register-active', async (_event, params: {
-    workflowDefId: string;
+    workflowId: string;
     workflowName: string;
     source: 'fictionlab_ui' | 'claude_code' | 'typingmind';
     projectFolder: string;
     projectName: string;
     totalNodes: number;
   }) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowDefId}`);
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowId}`);
     try {
       const client = await getWorkflowClient();
       const result = await client.registerActiveWorkflow(params);

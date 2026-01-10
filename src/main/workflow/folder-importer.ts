@@ -201,10 +201,10 @@ export class FolderImporter {
       const result = await this.workflowClient.importWorkflowDefinition(workflowDefinition);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Workflow imported to database: ${result.workflow_def_id} v${result.version}`);
+        `Workflow imported to database: ${result.workflow_id} v${result.version}`);
 
       // 7. Record import
-      await this.recordImport(result.workflow_def_id, folderPath, installedCounts);
+      await this.recordImport(result.workflow_id, folderPath, installedCounts);
 
       // Re-check sub-workflows after import attempt
       const remainingSubWorkflows = await this.depResolver.checkSubWorkflows(
@@ -213,7 +213,7 @@ export class FolderImporter {
 
       return {
         success: true,
-        workflowId: result.workflow_def_id,
+        workflowId: result.workflow_id,
         version: result.version,
         message: result.message,
         installedComponents: installedCounts,
@@ -345,7 +345,7 @@ export class FolderImporter {
    * Record import in workflow_imports table
    */
   private async recordImport(
-    workflowDefId: string,
+    workflowId: string,
     sourcePath: string,
     installed: { agents: number; skills: number }
   ): Promise<void> {
@@ -353,18 +353,18 @@ export class FolderImporter {
       const pool = getDatabasePool();
 
       await pool.query(`
-        INSERT INTO workflow_imports (
-          workflow_def_id, source_type, source_path, installation_log
+        INSERT INTO fictionlab.workflow_imports (
+          workflow_id, source_type, source_path, installation_log
         ) VALUES ($1, $2, $3, $4)
       `, [
-        workflowDefId,
+        workflowId,
         'folder',
         sourcePath,
         { timestamp: new Date().toISOString(), installed }
       ]);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Recorded import in database for workflow: ${workflowDefId}`);
+        `Recorded import in database for workflow: ${workflowId}`);
     } catch (error: any) {
       // Log but don't fail the import if recording fails
       logWithCategory('warn', LogCategory.WORKFLOW,
