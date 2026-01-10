@@ -71,6 +71,8 @@ import {
   DialogResult,
   PluginError,
   PluginErrorType,
+  WorkflowService,
+  WorkflowImportResult,
 } from '../types/plugin-api';
 import { logWithCategory, LogCategory } from './logger';
 
@@ -118,6 +120,7 @@ function createPluginServices(
     fileSystem: createFileSystemService(pluginId, permissions),
     docker: permissions.docker ? createDockerService(pluginId) : undefined,
     environment: createEnvironmentService(),
+    workflow: createWorkflowService(pluginId, permissions),
   };
 }
 
@@ -621,6 +624,91 @@ function createEnvironmentService(): EnvironmentService {
 
     isDevelopment(): boolean {
       return !app.isPackaged;
+    },
+  };
+}
+
+/**
+ * Creates workflow service
+ *
+ * Provides workflow import/delete operations through the plugin API
+ * instead of requiring plugins to import internal modules directly
+ */
+function createWorkflowService(
+  pluginId: string,
+  permissions: PluginPermissions
+): WorkflowService | undefined {
+  // Check if plugin has MCP permission for workflow-manager
+  const hasMcpPermission = Array.isArray(permissions.mcp)
+    ? permissions.mcp.includes('workflow-manager')
+    : permissions.mcp && typeof permissions.mcp === 'object' &&
+      (permissions.mcp as any).enabled &&
+      Array.isArray((permissions.mcp as any).servers) &&
+      (permissions.mcp as any).servers.includes('workflow-manager');
+
+  if (!hasMcpPermission) {
+    return undefined;
+  }
+
+  // Lazy import to avoid circular dependencies
+  const getFolderImporter = async () => {
+    const { FolderImporter } = await import('./workflow/folder-importer');
+    return new FolderImporter();
+  };
+
+  return {
+    async importFromFolder(
+      folderPath: string,
+      customId?: string,
+      customName?: string
+    ): Promise<WorkflowImportResult> {
+      try {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Plugin ${pluginId} importing workflow from: ${folderPath}`);
+
+        const importer = await getFolderImporter();
+        const result = await importer.importFromFolder(folderPath, customId, customName);
+
+        return {
+          success: true,
+          workflowId: result.workflowId,
+          message: result.message,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Plugin ${pluginId} workflow import failed:`, error);
+
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+    },
+
+    async deleteWorkflow(workflowId: string): Promise<void> {
+      try {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Plugin ${pluginId} deleting workflow: ${workflowId}`);
+
+        const client = await getWorkflowMCPClient();
+        await client.callTool('delete_workflow_definition', { id: workflowId });
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Plugin ${pluginId} workflow delete failed:`, error);
+        throw error;
+      }
+    },
+
+    async getImportSource(workflowId: string): Promise<string | null> {
+      try {
+        const client = await getWorkflowMCPClient();
+        const result = await client.callTool('get_workflow_import_source', { id: workflowId });
+        return result?.sourcePath || null;
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.SYSTEM,
+          `Plugin ${pluginId} could not get import source for ${workflowId}:`, error.message);
+        return null;
+      }
     },
   };
 }

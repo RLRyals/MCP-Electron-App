@@ -470,31 +470,77 @@ class PluginManager {
       logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
       await fs.copy(sourcePath, destPath, { overwrite: true });
 
-      // 3.5. Install dependencies if needed
+      // 3.5. Setup bundled dependencies and install external dependencies if needed
       const nodeModulesPath = path.join(destPath, 'node_modules');
       const packageJsonPath = path.join(destPath, 'package.json');
+      const bundledPath = path.join(destPath, 'bundled');
 
-      // Only install if package.json exists AND node_modules doesn't exist (bundled plugins have node_modules)
-      if (await fs.pathExists(packageJsonPath) && !await fs.pathExists(nodeModulesPath)) {
-        logWithCategory('info', LogCategory.SYSTEM, `Installing plugin dependencies...`);
+      // First, link any bundled dependencies into node_modules
+      // This handles packages like @fictionlab/workflow-runner that are bundled with the plugin
+      if (await fs.pathExists(bundledPath)) {
+        logWithCategory('info', LogCategory.SYSTEM, `Setting up bundled dependencies...`);
         try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
+          const bundledEntries = await fs.readdir(bundledPath, { withFileTypes: true });
 
-          // Run npm install in the plugin directory
-          await execAsync('npm install --omit=dev', {
-            cwd: destPath,
-            timeout: 120000 // 2 minute timeout
-          });
+          for (const entry of bundledEntries) {
+            if (entry.isDirectory()) {
+              const bundledPkgPath = path.join(bundledPath, entry.name, 'package.json');
 
-          logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies installed successfully`);
+              if (await fs.pathExists(bundledPkgPath)) {
+                const bundledPkg = await fs.readJson(bundledPkgPath);
+                const pkgName = bundledPkg.name || entry.name;
+
+                // Determine target path in node_modules (handles scoped packages like @fictionlab/workflow-runner)
+                let targetPath: string;
+                if (pkgName.startsWith('@')) {
+                  const [scope, name] = pkgName.split('/');
+                  const scopePath = path.join(nodeModulesPath, scope);
+                  await fs.ensureDir(scopePath);
+                  targetPath = path.join(scopePath, name);
+                } else {
+                  await fs.ensureDir(nodeModulesPath);
+                  targetPath = path.join(nodeModulesPath, pkgName);
+                }
+
+                // Copy bundled package to node_modules (more reliable than symlinks on Windows)
+                const bundledSrcPath = path.join(bundledPath, entry.name);
+                await fs.copy(bundledSrcPath, targetPath, { overwrite: true });
+
+                logWithCategory('info', LogCategory.SYSTEM, `Linked bundled dependency: ${pkgName}`);
+              }
+            }
+          }
         } catch (error: any) {
-          logWithCategory('error', LogCategory.SYSTEM, `Failed to install plugin dependencies:`, error);
-          // Don't throw - try to load anyway in case dependencies are optional
+          logWithCategory('error', LogCategory.SYSTEM, `Failed to setup bundled dependencies:`, error);
+          // Continue - the plugin might still work
         }
-      } else if (await fs.pathExists(nodeModulesPath)) {
-        logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies already present (bundled)`);
+      }
+
+      // Then install any external dependencies if needed
+      if (await fs.pathExists(packageJsonPath)) {
+        // Check if package.json has dependencies that need installing
+        const packageJson = await fs.readJson(packageJsonPath);
+        const hasDependencies = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
+
+        if (hasDependencies) {
+          logWithCategory('info', LogCategory.SYSTEM, `Installing plugin dependencies...`);
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+
+            // Run npm install in the plugin directory
+            await execAsync('npm install --omit=dev', {
+              cwd: destPath,
+              timeout: 120000 // 2 minute timeout
+            });
+
+            logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies installed successfully`);
+          } catch (error: any) {
+            logWithCategory('error', LogCategory.SYSTEM, `Failed to install plugin dependencies:`, error);
+            // Don't throw - try to load anyway in case dependencies are optional
+          }
+        }
       }
 
       // 4. Load the new plugin

@@ -189,6 +189,9 @@ export interface PluginServices {
 
   /** Environment configuration */
   environment: EnvironmentService;
+
+  /** Workflow management (if permission granted) */
+  workflow?: WorkflowService;
 }
 
 /**
@@ -284,6 +287,45 @@ export interface MCPServerInfo {
     description?: string;
     inputSchema?: any;
   }>;
+}
+
+/**
+ * Workflow Service
+ *
+ * Provides workflow management operations for plugins
+ */
+export interface WorkflowService {
+  /**
+   * Import a workflow from a folder
+   * @param folderPath Path to the workflow folder
+   * @param customId Optional custom ID for the workflow
+   * @param customName Optional custom display name
+   * @returns Import result with workflow ID
+   */
+  importFromFolder(folderPath: string, customId?: string, customName?: string): Promise<WorkflowImportResult>;
+
+  /**
+   * Delete a workflow definition
+   * @param workflowId ID of the workflow to delete
+   */
+  deleteWorkflow(workflowId: string): Promise<void>;
+
+  /**
+   * Get the source path for an imported workflow (for reimport)
+   * @param workflowId ID of the workflow
+   * @returns Source path if available
+   */
+  getImportSource(workflowId: string): Promise<string | null>;
+}
+
+/**
+ * Workflow import result
+ */
+export interface WorkflowImportResult {
+  success: boolean;
+  workflowId?: string;
+  message?: string;
+  error?: string;
 }
 
 /**
