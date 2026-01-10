@@ -155,11 +155,40 @@ jobs:
             out/checksums-linux.txt
           retention-days: 1
 
+  build-claude-desktop-skill:
+    name: Build Claude Desktop Skill
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Claude Desktop Skill ZIP
+        run: |
+          cd claude-desktop-skills
+          zip -r fictionlab-workflow.zip fictionlab-workflow/
+
+          # Generate checksum
+          sha256sum fictionlab-workflow.zip > fictionlab-workflow.zip.sha256
+
+          echo "Created skill ZIP:"
+          ls -lh fictionlab-workflow.zip
+          cat fictionlab-workflow.zip.sha256
+
+      - name: Upload skill artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-desktop-skill
+          path: |
+            claude-desktop-skills/fictionlab-workflow.zip
+            claude-desktop-skills/fictionlab-workflow.zip.sha256
+          retention-days: 1
+
   create-release:
     name: Create Release
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-macos, build-linux, build-claude-desktop-skill]
     runs-on: ubuntu-latest
-    if: always() && needs.build-windows.result == 'success' && needs.build-macos.result == 'success' && needs.build-linux.result == 'success'
+    if: always() && needs.build-windows.result == 'success' && needs.build-macos.result == 'success' && needs.build-linux.result == 'success' && needs.build-claude-desktop-skill.result == 'success'
 
     steps:
       - name: Checkout code
@@ -196,6 +225,12 @@ jobs:
           name: linux-installer
           path: release-assets/linux
 
+      - name: Download Claude Desktop Skill
+        uses: actions/download-artifact@v4
+        with:
+          name: claude-desktop-skill
+          path: release-assets/skill
+
       - name: List downloaded artifacts
         run: |
           echo "Downloaded artifacts:"
@@ -221,27 +256,43 @@ jobs:
 
           ## Installation
 
-          ### Windows
-          Download and run the installer executable for Windows.
+          ### FictionLab App
 
-          ### macOS
-          Download the DMG file, mount it, and drag the app to Applications.
+          **Windows**: Download and run the installer executable for Windows.
 
-          ### Linux
-          **AppImage**: Download the AppImage file, make it executable, and run:
+          **macOS**: Download the DMG file, mount it, and drag the app to Applications.
+
+          **Linux AppImage**: Download the AppImage file, make it executable, and run:
           \`\`\`bash
           chmod +x FictionLab-*.AppImage
           ./FictionLab-*.AppImage
           \`\`\`
 
-          **Debian/Ubuntu**: Download and install the .deb package:
+          **Linux Debian/Ubuntu**: Download and install the .deb package:
           \`\`\`bash
           sudo dpkg -i fictionlab_*.deb
           \`\`\`
 
+          ### Claude Desktop Skill
+
+          Execute FictionLab workflows directly from Claude Desktop conversations!
+
+          **Installation**:
+          1. Download \`fictionlab-workflow.zip\`
+          2. Extract the ZIP file
+          3. Copy the \`fictionlab-workflow\` folder to:
+             - **Windows**: \`%APPDATA%\\Claude\\skills\\\`
+             - **Mac**: \`~/Library/Application Support/Claude/skills/\`
+          4. Restart Claude Desktop
+          5. Use \`/fictionlab-workflow\` in conversations
+
+          See \`QUICKSTART.md\` inside the ZIP for detailed instructions.
+
+          **Requirements**: FictionLab app must be running for the skill to work.
+
           ## Checksums (SHA256)
 
-          Checksums are included in the \`checksums-*.txt\` files for each platform.
+          Checksums are included in the \`checksums-*.txt\` and \`.sha256\` files for verification.
 
           ## Notes
 
@@ -269,6 +320,8 @@ jobs:
             release-assets/linux/*.AppImage
             release-assets/linux/*.deb
             release-assets/linux/checksums-linux.txt
+            release-assets/skill/fictionlab-workflow.zip
+            release-assets/skill/fictionlab-workflow.zip.sha256
 
   release-complete:
     name: Release Complete
