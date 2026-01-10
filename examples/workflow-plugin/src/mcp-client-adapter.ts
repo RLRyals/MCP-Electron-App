@@ -1,5 +1,5 @@
-import { IMCPClient } from '../bundled/workflow-runner/dist';
-import { PluginContext } from './types/plugin-api';
+import { IMCPClient } from '@fictionlab/workflow-runner';
+import { PluginContext } from '../../../src/types/plugin-api';
 
 /**
  * Adapter that wraps FictionLab's PersistentMCPClient

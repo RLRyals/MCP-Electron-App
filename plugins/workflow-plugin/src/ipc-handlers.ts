@@ -1,8 +1,16 @@
 import { PluginContext } from '../../../src/types/plugin-api';
-import { WorkflowRunner, WorkflowClient } from '@fictionlab/workflow-runner';
+import { WorkflowRunner } from '@fictionlab/workflow-runner';
 import { BrowserWindow } from 'electron';
-import type { WorkflowUpdate } from '../../../src/types/workflow';
-import { FolderImporter } from '../../../src/main/workflow/folder-importer';
+
+/**
+ * WorkflowUpdate type for broadcasting updates
+ */
+interface WorkflowUpdate {
+  registryId: string;
+  type: 'status' | 'progress' | 'node_changed' | 'completed' | 'failed';
+  data: Record<string, any>;
+  timestamp: string;
+}
 
 /**
  * Broadcast workflow updates to all renderer windows
@@ -17,6 +25,10 @@ function broadcastWorkflowUpdate(update: WorkflowUpdate) {
 }
 
 export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunner) {
+  const logger = context.logger;
+  const mcp = context.services.mcp;
+  const workflow = context.services.workflow;
+
   // List workflows
   context.ipc.handle('workflow:list', async (_event, filters) => {
     return runner.listWorkflows(filters);
@@ -34,164 +46,131 @@ export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunn
 
   // ============================================
   // Workflow Import/Delete Handlers
+  // These use context.services.workflow provided by the main app
   // ============================================
 
   // Import workflow from folder
   context.ipc.handle('workflow:import-from-folder', async (_event, folderPath: string, customId?: string, customName?: string) => {
-    console.log('[workflow-plugin] Import from folder:', folderPath, customId, customName);
-    try {
-      const importer = new FolderImporter();
-      const result = await importer.importFromFolder(folderPath, customId, customName);
-      return result;
-    } catch (error: any) {
-      console.error('[workflow-plugin] Import failed:', error.message);
-      throw error;
+    logger.info(`Import from folder: ${folderPath}`);
+
+    if (!workflow) {
+      throw new Error('Workflow service not available. Check plugin permissions.');
     }
+
+    const result = await workflow.importFromFolder(folderPath, customId, customName);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Import failed');
+    }
+
+    return result;
   });
 
-  // Delete workflow - uses PersistentMCPClient to call MCP tool
+  // Delete workflow
   context.ipc.handle('workflow:delete', async (_event, workflowId: string) => {
-    console.log('[workflow-plugin] Delete workflow:', workflowId);
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      // Call delete_workflow_definition MCP tool
-      await client.callTool('delete_workflow_definition', { id: workflowId });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Delete workflow failed:', error.message);
-      throw error;
+    logger.info(`Delete workflow: ${workflowId}`);
+
+    if (!workflow) {
+      throw new Error('Workflow service not available. Check plugin permissions.');
     }
+
+    await workflow.deleteWorkflow(workflowId);
+    return { success: true };
   });
 
   // Reimport workflow (delete and re-import from original source)
   context.ipc.handle('workflow:reimport', async (_event, workflowId: string) => {
-    console.log('[workflow-plugin] Reimport workflow:', workflowId);
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
+    logger.info(`Reimport workflow: ${workflowId}`);
 
-      // Get source path from workflow_imports via MCP tool
-      const importInfo = await client.callTool('get_workflow_import_source', { id: workflowId });
-
-      if (!importInfo || !importInfo.sourcePath) {
-        throw new Error('Cannot reimport: workflow source path not found');
-      }
-
-      const sourcePath = importInfo.sourcePath;
-
-      // Delete the workflow via MCP
-      await client.callTool('delete_workflow_definition', { id: workflowId });
-
-      // Re-import from the same folder
-      const importer = new FolderImporter();
-      const importResult = await importer.importFromFolder(sourcePath);
-      return importResult;
-    } catch (error: any) {
-      console.error('[workflow-plugin] Reimport workflow failed:', error.message);
-      throw error;
+    if (!workflow) {
+      throw new Error('Workflow service not available. Check plugin permissions.');
     }
+
+    // Get source path
+    const sourcePath = await workflow.getImportSource(workflowId);
+
+    if (!sourcePath) {
+      throw new Error('Cannot reimport: workflow source path not found');
+    }
+
+    // Delete the workflow
+    await workflow.deleteWorkflow(workflowId);
+
+    // Re-import from the same folder
+    const result = await workflow.importFromFolder(sourcePath);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Reimport failed');
+    }
+
+    return result;
   });
 
   // ============================================
   // Active Workflow Management Handlers
-  // These handlers use PersistentMCPClient directly for active workflow operations
+  // These use context.services.mcp.callTool to communicate with workflow-manager
   // ============================================
 
   // List all active workflows
   context.ipc.handle('workflow:list-active', async () => {
     try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      const result = await client.listActiveWorkflows();
+      const result = await mcp.callTool('workflow-manager', 'list_active_workflows', {});
       return result || [];
     } catch (error: any) {
-      console.error('[workflow-plugin] List active workflows failed:', error.message);
+      logger.error('List active workflows failed:', error.message);
       return [];
     }
   });
 
   // Pause a workflow
   context.ipc.handle('workflow:pause', async (_event, registryId: string) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.pauseWorkflow(registryId);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'status',
-        data: { status: 'paused' },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Pause workflow failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'pause_workflow', { registry_id: registryId });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'status',
+      data: { status: 'paused' },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Resume a workflow
   context.ipc.handle('workflow:resume', async (_event, registryId: string) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.resumeWorkflow(registryId);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'status',
-        data: { status: 'running' },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Resume workflow failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'resume_workflow', { registry_id: registryId });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'status',
+      data: { status: 'running' },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Cancel a workflow
   context.ipc.handle('workflow:cancel', async (_event, registryId: string) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.cancelWorkflow(registryId);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'status',
-        data: { status: 'cancelled' },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Cancel workflow failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'cancel_workflow', { registry_id: registryId });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'status',
+      data: { status: 'cancelled' },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Jump to a specific node
   context.ipc.handle('workflow:jump-to-node', async (_event, { registryId, nodeId }: { registryId: string; nodeId: string }) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.jumpToNode(registryId, nodeId);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'node_changed',
-        data: { currentNodeId: nodeId },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Jump to node failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'jump_to_node', {
+      registry_id: registryId,
+      node_id: nodeId
+    });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'node_changed',
+      data: { currentNodeId: nodeId },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Register a new active workflow
@@ -204,29 +183,29 @@ export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunn
     totalNodes?: number;
     metadata?: Record<string, any>;
   }) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      const result = await client.registerActiveWorkflow(params as any);
-      // Broadcast new workflow registered
-      const regId = result.registryId || (result as any).registry_id;
-      if (regId) {
-        broadcastWorkflowUpdate({
-          registryId: regId,
-          type: 'status',
-          data: { status: 'running' },
-          timestamp: new Date().toISOString(),
-        });
-      }
-      return {
-        ...result,
-        registryId: regId
-      };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Register workflow failed:', error.message);
-      throw error;
+    const result = await mcp.callTool('workflow-manager', 'register_active_workflow', {
+      workflow_def_id: params.workflowDefId,
+      workflow_name: params.workflowName,
+      source: params.source,
+      project_folder: params.projectFolder,
+      project_name: params.projectName,
+      total_nodes: params.totalNodes,
+      metadata: params.metadata,
+    });
+
+    const regId = result.registryId || result.registry_id;
+    if (regId) {
+      broadcastWorkflowUpdate({
+        registryId: regId,
+        type: 'status',
+        data: { status: 'running' },
+        timestamp: new Date().toISOString(),
+      });
     }
+    return {
+      ...result,
+      registryId: regId
+    };
   });
 
   // Update workflow progress
@@ -238,67 +217,46 @@ export function registerIPCHandlers(context: PluginContext, runner: WorkflowRunn
     completedNodes?: number;
     metadata?: Record<string, any>;
   }) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.updateWorkflowProgress(
-        params.registryId,
-        params.currentNodeId || '',
-        params.currentNodeName || '',
-        params.progressPercent || 0,
-        params.completedNodes || 0
-      );
-      broadcastWorkflowUpdate({
-        registryId: params.registryId,
-        type: 'progress',
-        data: params,
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Update progress failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'update_workflow_progress', {
+      registry_id: params.registryId,
+      current_node_id: params.currentNodeId || '',
+      current_node_name: params.currentNodeName || '',
+      progress_percent: params.progressPercent || 0,
+      completed_nodes: params.completedNodes || 0,
+    });
+    broadcastWorkflowUpdate({
+      registryId: params.registryId,
+      type: 'progress',
+      data: params,
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Complete a workflow
   context.ipc.handle('workflow:complete-active', async (_event, { registryId }: { registryId: string }) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.completeActiveWorkflow(registryId);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'completed',
-        data: { status: 'completed' },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Complete workflow failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'complete_workflow', { registry_id: registryId });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'completed',
+      data: { status: 'completed' },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 
   // Mark a workflow as failed
   context.ipc.handle('workflow:fail-active', async (_event, { registryId, errorMessage }: { registryId: string; errorMessage: string }) => {
-    try {
-      const { PersistentMCPClient } = await import('../../../src/main/workflow/persistent-mcp-client');
-      const client = new PersistentMCPClient();
-      await client.start();
-      await client.failActiveWorkflow(registryId, errorMessage);
-      broadcastWorkflowUpdate({
-        registryId,
-        type: 'failed',
-        data: { status: 'failed' as const },
-        timestamp: new Date().toISOString(),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[workflow-plugin] Fail workflow failed:', error.message);
-      throw error;
-    }
+    await mcp.callTool('workflow-manager', 'fail_workflow', {
+      registry_id: registryId,
+      error_message: errorMessage,
+    });
+    broadcastWorkflowUpdate({
+      registryId,
+      type: 'failed',
+      data: { status: 'failed' },
+      timestamp: new Date().toISOString(),
+    });
+    return { success: true };
   });
 }

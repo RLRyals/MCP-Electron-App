@@ -1,5 +1,5 @@
-import { PlatformAdapter } from '../bundled/workflow-runner/dist';
-import { PluginContext } from './types/plugin-api';
+import { PlatformAdapter } from '@fictionlab/workflow-runner';
+import { PluginContext } from '../../../src/types/plugin-api';
 import { BrowserWindow } from 'electron';
 
 /**
@@ -12,9 +12,24 @@ export class ElectronPlatformAdapter implements PlatformAdapter {
     private mainWindow: BrowserWindow
   ) {}
 
+  /**
+   * Check if the window is still valid for IPC communication
+   */
+  private isWindowValid(): boolean {
+    return this.mainWindow &&
+           !this.mainWindow.isDestroyed() &&
+           this.mainWindow.webContents &&
+           !this.mainWindow.webContents.isDestroyed();
+  }
+
   async executeAgentNode(node: any, context: any): Promise<any> {
     // Use FictionLab's LLM provider system
     // This will be integrated with existing LLMProviderManager
+
+    // Check if window is still valid
+    if (!this.isWindowValid()) {
+      return { error: 'Window is no longer available' };
+    }
 
     // For now, send to renderer for UI handling
     return new Promise((resolve) => {
@@ -25,7 +40,9 @@ export class ElectronPlatformAdapter implements PlatformAdapter {
 
       // Listen for response from renderer
       const handler = (_event: any, result: any) => {
-        (this.mainWindow.webContents as any).removeListener('workflow:agent-node-result', handler);
+        if (this.isWindowValid()) {
+          (this.mainWindow.webContents as any).removeListener('workflow:agent-node-result', handler);
+        }
         resolve(result);
       };
       (this.mainWindow.webContents as any).on('workflow:agent-node-result', handler);
@@ -33,12 +50,19 @@ export class ElectronPlatformAdapter implements PlatformAdapter {
   }
 
   async promptUser(prompt: string, options: any): Promise<string> {
+    // Check if window is still valid
+    if (!this.isWindowValid()) {
+      return '';
+    }
+
     // Show dialog in Electron UI
     return new Promise((resolve) => {
       this.mainWindow.webContents.send('workflow:prompt-user', { prompt, options });
 
       const handler = (_event: any, response: string) => {
-        (this.mainWindow.webContents as any).removeListener('workflow:user-response', handler);
+        if (this.isWindowValid()) {
+          (this.mainWindow.webContents as any).removeListener('workflow:user-response', handler);
+        }
         resolve(response);
       };
       (this.mainWindow.webContents as any).on('workflow:user-response', handler);
