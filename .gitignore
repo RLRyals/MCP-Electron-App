@@ -168,3 +168,4 @@ workflows/series-architect/series-architect-orchestrator/README.md
 workflows/series-architect/series-architect-orchestrator/workflow.json
 workflows/series-architect/series-architect-output/workflow.json
 workflows/series-architect/series-architect-research/workflow.json
+database-migrations/Workflow table definitions.sql
