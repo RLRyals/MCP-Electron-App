@@ -1,7 +1,7 @@
 ---
 name: fictionlab-workflow
 description: Execute FictionLab workflows from Claude Desktop. Connects to running FictionLab app via IPC for workflow execution.
-tools:
+allowed-tools:
   - bash
 ---
 
