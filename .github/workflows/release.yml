@@ -17,48 +17,28 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout MCP-Electron-App
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: MCP-Electron-App
-
-      - name: Checkout fictionlab-workflow
-        uses: actions/checkout@v4
-        with:
-          repository: RLRyals/fictionlab-workflow
-          path: fictionlab-workflow
-          token: ${{ secrets.WORKFLOW_REPO_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: MCP-Electron-App/package-lock.json
-
-      - name: Install and build workflow packages
-        working-directory: fictionlab-workflow
-        run: |
-          npm ci
-          npm run build
 
       - name: Install dependencies
-        working-directory: MCP-Electron-App
         run: npm ci
 
       - name: Build TypeScript
-        working-directory: MCP-Electron-App
         run: npm run build
 
       - name: Build Windows app
-        working-directory: MCP-Electron-App
         run: npm run package:win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Generate checksums
         shell: powershell
-        working-directory: MCP-Electron-App
         run: |
           $releaseDir = Join-Path $PWD 'out\release'
           New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
@@ -81,8 +61,8 @@ jobs:
         with:
           name: windows-installer
           path: |
-            MCP-Electron-App/out/release/*.exe
-            MCP-Electron-App/out/checksums-windows.txt
+            out/release/*.exe
+            out/checksums-windows.txt
           retention-days: 1
 
   build-macos:
@@ -90,47 +70,27 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout MCP-Electron-App
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: MCP-Electron-App
-
-      - name: Checkout fictionlab-workflow
-        uses: actions/checkout@v4
-        with:
-          repository: RLRyals/fictionlab-workflow
-          path: fictionlab-workflow
-          token: ${{ secrets.WORKFLOW_REPO_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: MCP-Electron-App/package-lock.json
-
-      - name: Install and build workflow packages
-        working-directory: fictionlab-workflow
-        run: |
-          npm ci
-          npm run build
 
       - name: Install dependencies
-        working-directory: MCP-Electron-App
         run: npm ci
 
       - name: Build TypeScript
-        working-directory: MCP-Electron-App
         run: npm run build
 
       - name: Build macOS app
-        working-directory: MCP-Electron-App
         run: npm run package:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Generate checksums
-        working-directory: MCP-Electron-App
         run: |
           cd out
           find . -type f \( -name "*.dmg" -o -name "*.zip" \) -exec sh -c '
@@ -146,9 +106,9 @@ jobs:
         with:
           name: macos-installer
           path: |
-            MCP-Electron-App/out/*.dmg
-            MCP-Electron-App/out/*.zip
-            MCP-Electron-App/out/checksums-macos.txt
+            out/*.dmg
+            out/*.zip
+            out/checksums-macos.txt
           retention-days: 1
 
   build-linux:
@@ -156,45 +116,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout MCP-Electron-App
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: MCP-Electron-App
-
-      - name: Checkout fictionlab-workflow
-        uses: actions/checkout@v4
-        with:
-          repository: RLRyals/fictionlab-workflow
-          path: fictionlab-workflow
-          token: ${{ secrets.WORKFLOW_REPO_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: MCP-Electron-App/package-lock.json
-
-      - name: Install and build workflow packages
-        working-directory: fictionlab-workflow
-        run: |
-          npm ci
-          npm run build
 
       - name: Install dependencies
-        working-directory: MCP-Electron-App
         run: npm ci
 
       - name: Build TypeScript
-        working-directory: MCP-Electron-App
         run: npm run build
 
       - name: Build Linux app
-        working-directory: MCP-Electron-App
         run: npm run package:linux
 
       - name: Generate checksums
-        working-directory: MCP-Electron-App
         run: |
           cd out
           find . -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec sh -c '
@@ -210,9 +150,9 @@ jobs:
         with:
           name: linux-installer
           path: |
-            MCP-Electron-App/out/*.AppImage
-            MCP-Electron-App/out/*.deb
-            MCP-Electron-App/out/checksums-linux.txt
+            out/*.AppImage
+            out/*.deb
+            out/checksums-linux.txt
           retention-days: 1
 
   build-claude-desktop-skill:
@@ -220,13 +160,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout MCP-Electron-App
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: MCP-Electron-App
 
       - name: Create Claude Desktop Skill ZIP
-        working-directory: MCP-Electron-App
         run: |
           cd claude-desktop-skills
           zip -r fictionlab-workflow.zip fictionlab-workflow/
@@ -243,8 +180,8 @@ jobs:
         with:
           name: claude-desktop-skill
           path: |
-            MCP-Electron-App/claude-desktop-skills/fictionlab-workflow.zip
-            MCP-Electron-App/claude-desktop-skills/fictionlab-workflow.zip.sha256
+            claude-desktop-skills/fictionlab-workflow.zip
+            claude-desktop-skills/fictionlab-workflow.zip.sha256
           retention-days: 1
 
   create-release:
