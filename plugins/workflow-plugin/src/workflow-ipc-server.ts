@@ -2,12 +2,13 @@ import * as net from 'net';
 import { WorkflowRunner } from '@fictionlab/workflow-runner';
 
 /**
- * IDE IPC Server
+ * Workflow IPC Server
  *
- * Listens for workflow execution requests from Claude Code skill.
+ * Listens for workflow execution requests from any platform client.
+ * Supports Claude Desktop, VS Code extensions, TypingMind, and custom clients.
  * Uses Unix domain socket (or named pipe on Windows) for IPC.
  */
-export class IDEIPCServer {
+export class WorkflowIPCServer {
   private server: net.Server | null = null;
   private socketPath: string;
   private runner: WorkflowRunner;
@@ -29,7 +30,7 @@ export class IDEIPCServer {
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.server = net.createServer((socket) => {
-        console.log('[IDE IPC Server] Client connected');
+        console.log('[Workflow IPC Server] Client connected');
 
         let buffer = '';
 
@@ -58,17 +59,17 @@ export class IDEIPCServer {
         });
 
         socket.on('end', () => {
-          console.log('[IDE IPC Server] Client disconnected');
+          console.log('[Workflow IPC Server] Client disconnected');
         });
 
         socket.on('error', (err) => {
-          console.error('[IDE IPC Server] Socket error:', err);
+          console.error('[Workflow IPC Server] Socket error:', err);
         });
       });
 
       this.server.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EADDRINUSE') {
-          console.error('[IDE IPC Server] Socket already in use, cleaning up...');
+          console.error('[Workflow IPC Server] Socket already in use, cleaning up...');
           // Try to remove old socket and retry
           if (process.platform !== 'win32') {
             try {
@@ -86,7 +87,7 @@ export class IDEIPCServer {
       });
 
       this.server.listen(this.socketPath, () => {
-        console.log(`[IDE IPC Server] Listening on ${this.socketPath}`);
+        console.log(`[Workflow IPC Server] Listening on ${this.socketPath}`);
         resolve();
       });
     });
@@ -108,6 +109,22 @@ export class IDEIPCServer {
       case 'workflow:execute':
         return await this.runner.execute(params?.workflowId, params?.options);
 
+      // Active Workflow Registry methods
+      case 'workflow:register-active':
+        return await this.runner.registerActiveWorkflow(params);
+
+      case 'workflow:update-progress':
+        return await this.runner.updateWorkflowProgress(params);
+
+      case 'workflow:complete-active':
+        return await this.runner.completeWorkflow(params?.registryId);
+
+      case 'workflow:fail-active':
+        return await this.runner.failWorkflow(params?.registryId, params?.errorMessage);
+
+      case 'workflow:list-active':
+        return await this.runner.listActiveWorkflows();
+
       default:
         throw new Error(`Unknown method: ${method}`);
     }
@@ -120,7 +137,7 @@ export class IDEIPCServer {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('[IDE IPC Server] Server closed');
+          console.log('[Workflow IPC Server] Server closed');
 
           // Clean up socket file on Unix-like systems
           if (process.platform !== 'win32') {

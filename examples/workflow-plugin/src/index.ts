@@ -6,7 +6,7 @@ import { WorkflowRunner } from '@fictionlab/workflow-runner';
 import { MCPClientAdapter } from './mcp-client-adapter';
 import { ElectronPlatformAdapter } from './electron-platform-adapter';
 import { registerIPCHandlers } from './ipc-handlers';
-import { IDEIPCServer } from './ide-ipc-server';
+import { WorkflowIPCServer } from './workflow-ipc-server';
 import { BrowserWindow } from 'electron';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -18,7 +18,7 @@ export default class WorkflowPlugin implements FictionLabPlugin {
   readonly version = '1.1.0';
 
   private runner: WorkflowRunner | null = null;
-  private ipcServer: IDEIPCServer | null = null;
+  private ipcServer: WorkflowIPCServer | null = null;
   private context: PluginContext | null = null;
 
   private log(level: 'info' | 'warn' | 'error' | 'debug', message: string, ...args: any[]): void {
@@ -59,7 +59,7 @@ export default class WorkflowPlugin implements FictionLabPlugin {
 
       // 6. Start IDE IPC server for Claude Code skill
       this.log('info', 'Starting IDE IPC server...');
-      await this.startIDEIPCServer();
+      await this.startWorkflowIPCServer();
 
       this.log('info', 'Workflow plugin activated successfully');
     } catch (error: any) {
@@ -123,7 +123,7 @@ export default class WorkflowPlugin implements FictionLabPlugin {
   /**
    * Start IDE IPC server for Claude Code skill communication
    */
-  private async startIDEIPCServer(): Promise<void> {
+  private async startWorkflowIPCServer(): Promise<void> {
     try {
       if (!this.runner) {
         throw new Error('Workflow runner not initialized');
@@ -134,7 +134,7 @@ export default class WorkflowPlugin implements FictionLabPlugin {
         : '/tmp/fictionlab-workflow-runner.sock';
 
       this.log('info', `Creating IDE IPC server on ${socketPath}`);
-      this.ipcServer = new IDEIPCServer(this.runner);
+      this.ipcServer = new WorkflowIPCServer(this.runner);
 
       this.log('debug', 'Calling ipcServer.start()...');
       await this.ipcServer.start();
