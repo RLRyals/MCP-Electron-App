@@ -32,7 +32,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
-    "@fictionlab/workflow-runner": "file:../workflow-runner",
+    "@fictionlab/workflow-runner": "file:../fictionlab-workflow/packages/workflow-runner",
+    "@fictionlab/workflow-plugin": "file:../fictionlab-workflow/packages/workflow-plugin",
+    "@fictionlab/types": "file:../fictionlab-workflow/packages/types",
     "@google/generative-ai": "^0.24.1",
     "@xyflow/react": "^12.10.0",
     "axios": "^1.13.2",
@@ -102,10 +104,12 @@
         "to": "nginx.conf"
       },
       {
-        "from": "examples",
-        "to": "example-plugins",
+        "from": "../fictionlab-workflow/packages/workflow-plugin",
+        "to": "example-plugins/workflow-plugin",
         "filter": [
-          "**/*"
+          "dist/**/*",
+          "plugin.json",
+          "skills/**/*"
         ]
       },
       {
