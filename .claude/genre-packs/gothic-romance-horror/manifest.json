@@ -1,0 +1,287 @@
+{
+  "name": "Steampunk Gothic Horror Romance",
+  "id": "steampunk-gothic-hr-v1",
+  "version": "1.0.0",
+  "description": "Complete genre pack for Steampunk Gothic Horror Romance novels featuring Victorian-era steam technology, atmospheric dread, forbidden romance, and industrial beauty merged with decay. Perfect for stories that blend brass and darkness, desire and death, innovation and the supernatural.",
+  "author": "BQ Studio",
+  "created": "2025-11-23",
+  "last_updated": "2025-11-23",
+
+  "compatible_skills": {
+    "series-planning-skill": ">=1.0",
+    "book-planning-skill": ">=1.0",
+    "chapter-planning-skill": ">=1.0",
+    "scene-writing-skill": ">=1.0",
+    "review-qa-skill": ">=1.0"
+  },
+
+  "genre_characteristics": {
+    "primary_genre": "Romance",
+    "sub_genre": "Steampunk Gothic Horror Romance",
+    "setting": "Victorian/Edwardian era with advanced steam technology, gothic manors merged with industrial machinery",
+    "protagonist_archetype": "Inventor/Engineer/Scientist navigating class divide, propriety, and forbidden knowledge",
+    "core_conflict": "Balancing desire with propriety, innovation with ethics, humanity with mechanical transformation, while uncovering dark secrets",
+    "tone": ["Gothic", "Romantic", "Industrial", "Atmospheric", "Dark"],
+    "pacing": "Slow-burn dread with romantic tension escalation"
+  },
+
+  "beat_sheets": {
+    "gothic-romance-structure": {
+      "file": "beat-sheets/gothic-romance-structure.md",
+      "description": "15-beat gothic romance framework with horror overlay",
+      "usage": "Primary structure for gothic romance with supernatural/horror elements and potential tragic or dark endings"
+    },
+    "steampunk-mystery-romance": {
+      "file": "beat-sheets/steampunk-mystery-romance.md",
+      "description": "12-beat steampunk mystery romance with investigation plotline",
+      "usage": "For stories emphasizing invention, mystery-solving, and professional partnership romance"
+    }
+  },
+
+  "style_guides": {
+    "steampunk-gothic-atmosphere": {
+      "file": "style-guides/steampunk-gothic-atmosphere.md",
+      "description": "Comprehensive guide to blending Victorian propriety, industrial machinery, and gothic dread",
+      "usage": "Scene-level writing for authentic steampunk gothic voice with three-layer atmosphere technique"
+    }
+  },
+
+  "validation_rules": {
+    "romance-horror-balance": {
+      "file": "validation-rules/romance-horror-balance.md",
+      "description": "Checklist for balancing romantic tension with horror/dread elements",
+      "usage": "Review phase validation to ensure neither romance nor horror overwhelms the other"
+    },
+    "victorian-authenticity": {
+      "file": "validation-rules/victorian-authenticity.md",
+      "description": "Period accuracy checklist for social rules, technology limits, and class dynamics",
+      "usage": "Ensure Victorian setting feels authentic while maintaining readability"
+    },
+    "atmospheric-consistency": {
+      "file": "validation-rules/atmospheric-consistency.md",
+      "description": "Validation for maintaining dread, beauty in decay, and mechanical atmosphere",
+      "usage": "Check that gothic atmosphere and steampunk elements remain consistent"
+    }
+  },
+
+  "npe_physics": {
+    "character-logic": {
+      "file": "npe-physics/character-logic.json",
+      "description": "Character behavior consistency for gothic protagonists, trauma responses, transformation acceptance, Victorian propriety vs. desire",
+      "usage": "Validate character actions align with wounds, transformation state, and period constraints"
+    },
+    "dialogue-physics": {
+      "file": "npe-physics/dialogue-physics.json",
+      "description": "Period-appropriate dialogue rules, class-based speech patterns, subtext requirements for Victorian propriety",
+      "usage": "Scene writing and review for dialogue authenticity and gothic atmosphere"
+    },
+    "information-economy": {
+      "file": "npe-physics/information-economy.json",
+      "description": "Rules for secret reveals, mystery pacing, dark family history revelation timing",
+      "usage": "Gothic mystery plotting and revelation pacing"
+    },
+    "pacing-rules": {
+      "file": "npe-physics/pacing-rules.json",
+      "description": "Slow-burn dread escalation, romantic tension buildup, horror beat placement",
+      "usage": "Book planning and scene writing for optimal gothic romance pacing"
+    },
+    "scene-architecture": {
+      "file": "npe-physics/scene-architecture.json",
+      "description": "Gothic scene structure: atmosphere building, dread escalation, romantic tension beats",
+      "usage": "Scene planning and writing for proper gothic romantic scene structure"
+    },
+    "stakes-pressure": {
+      "file": "npe-physics/stakes-pressure.json",
+      "description": "Rules for establishing and escalating dread, romantic stakes, and horror throughout narrative",
+      "usage": "Book planning and scene writing for tension escalation in gothic romance horror"
+    }
+  },
+
+  "templates": {
+    "steampunk-character": {
+      "file": "templates/steampunk-character-template.md",
+      "description": "Comprehensive character template for inventors, engineers, mechanically-transformed characters, and gothic protagonists",
+      "usage": "Character creation during series planning phase—includes Victorian class, mechanical transformation, wounds, and romantic obstacles"
+    },
+    "steampunk-setting": {
+      "file": "templates/steampunk-setting-template.md",
+      "description": "Setting template for gothic manors with machinery, industrial factories, airships, and haunted industrial spaces",
+      "usage": "World-building during series planning phase—includes atmosphere, dangers, secrets, and how setting isolates characters"
+    }
+  },
+
+  "recommended_workflow": {
+    "series_planning": [
+      "1. Use steampunk-setting-template.md to establish gothic industrial location (manor/factory/airship)",
+      "2. Use steampunk-character-template.md for protagonist and love interest (include transformation status, class, expertise)",
+      "3. Define the dark secret/curse/threat that drives the horror",
+      "4. Establish Victorian social constraints that complicate romance",
+      "5. Plan mechanical/supernatural threat and how it relates to characters"
+    ],
+    "book_planning": [
+      "1. Choose beat sheet: gothic-romance-structure.md for horror-heavy, steampunk-mystery-romance.md for investigation-focused",
+      "2. Map character wounds and transformation arcs to beat structure",
+      "3. Plan secret revelation timing (use information-economy NPE rules)",
+      "4. Balance romantic escalation with dread escalation",
+      "5. Determine ending type: tragic, dark happy, bittersweet, mechanical immortality"
+    ],
+    "scene_writing": [
+      "1. Apply steampunk-gothic-atmosphere.md three-layer technique (Victorian + Industrial + Gothic)",
+      "2. Use mechanical metaphors for emotions",
+      "3. Build dread through atmospheric escalation",
+      "4. Create romantic tension through propriety violations and forbidden proximity",
+      "5. Juxtapose beauty and horror in every scene"
+    ],
+    "review": [
+      "1. Validate romance-horror balance (neither overwhelming the other)",
+      "2. Check Victorian authenticity (social rules, class dynamics, technology limits)",
+      "3. Verify atmospheric consistency (dread maintained, mechanical elements present, gothic tone)",
+      "4. Validate character logic (transformation acceptance, wound-driven behavior, period-appropriate)",
+      "5. Check secret pacing (reveals timed for maximum impact)"
+    ]
+  },
+
+  "quality_metrics": {
+    "fitness_for_purpose": 4.5,
+    "fitness_for_use": 4.0,
+    "completeness": 4.0,
+    "genre_authenticity": 5.0
+  },
+
+  "content_ratings": {
+    "violence": "medium-to-high (industrial accidents, body horror from mechanical transformation, creature attacks, potential graphic deaths)",
+    "heat_level": "variable (sweet to explicit depending on author preference; Victorian propriety creates tension regardless of heat level)",
+    "language": "moderate (Victorian formality with occasional strong language in emotional moments)",
+    "dark_themes": true,
+    "trigger_warnings": [
+      "Body horror (mechanical transformation)",
+      "Death and mortality",
+      "Industrial accidents",
+      "Class-based oppression",
+      "Potential consent issues (power imbalance, transformation without full consent)",
+      "Grief and loss",
+      "Isolation and entrapment"
+    ]
+  },
+
+  "structure": {
+    "typical_word_count": {
+      "min": 80000,
+      "max": 120000,
+      "target": 95000
+    },
+    "typical_chapter_count": {
+      "min": 20,
+      "max": 35,
+      "target": 25
+    },
+    "series_structure": "standalone|duet|trilogy",
+    "notes": "Gothic romance horror often works well as standalones or duets. Trilogies possible if exploring multi-generational curse or series of inventions/transformations. Avoid open-ended series—gothic romance needs closure (even if dark)."
+  },
+
+  "notes": [
+    "This genre pack emphasizes the unique fusion of three elements: Victorian social constraints, steam-powered industrial progress, and gothic atmospheric horror",
+    "Romance is complicated by class divide, propriety, mechanical transformation, and dark secrets",
+    "Horror comes from body transformation, industrial danger, supernatural threats, and the cost of progress",
+    "Atmosphere is critical—every scene should layer Victorian propriety, industrial machinery, and gothic dread",
+    "Endings can range from tragic to dark-happy (mechanical immortality together) to bittersweet",
+    "Strong emphasis on sensory detail: sound of steam, smell of oil and decay, touch of cold brass, Victorian formality contrasted with mechanical precision",
+    "Character wounds typically relate to loss, transformation, class shame, forbidden knowledge, or family curses",
+    "Settings function almost as characters—isolating, oppressive, beautiful, and dangerous"
+  ],
+
+  "tags": [
+    "steampunk",
+    "gothic-romance",
+    "horror-romance",
+    "victorian",
+    "industrial",
+    "mechanical-transformation",
+    "body-horror",
+    "dark-romance",
+    "forbidden-romance",
+    "class-divide",
+    "inventor-protagonist",
+    "atmospheric",
+    "slow-burn-dread",
+    "beauty-in-decay",
+    "brass-and-darkness"
+  ],
+
+  "character_archetypes": [
+    "Brilliant inventor navigating class barriers",
+    "Mechanically-transformed aristocrat seeking redemption or revenge",
+    "Engineer uncovering dark family secrets through forbidden science",
+    "Governess/companion drawn into gothic household mysteries",
+    "Airship captain fleeing or pursuing supernatural threat",
+    "Factory owner dealing with consequences of unethical innovation",
+    "Scientist whose experiments have monstrous results",
+    "Automaton gaining consciousness and desire"
+  ],
+
+  "common_tropes": [
+    "The Forbidden Workshop (where protagonist and love interest work together alone)",
+    "Mechanical Transformation (becoming part machine, losing humanity, questioning soul)",
+    "The Gothic Manor-Factory Hybrid (beauty merged with industrial horror)",
+    "Class-Crossed Romance (aristocrat/mechanic, owner/worker, patron/inventor)",
+    "Dangerous Invention (creation that kills, transforms, or curses)",
+    "Family Curse meets Industrial Progress (ancestral sin expressed through machinery)",
+    "Beauty in Brass (mechanical parts that are beautiful but cold, precise but inhuman)",
+    "The Ticking Heart (clockwork replacement, constant reminder of transformation)",
+    "Fog and Steam (atmospheric concealment, industrial pollution, gothic mist)",
+    "The Secret in the Sealed Wing (forbidden knowledge, previous victims, dark experiments)"
+  ],
+
+  "market_positioning": {
+    "target_audience": "Adult readers who love historical romance with dark elements, steampunk aesthetics, and gothic atmosphere. Fans of Mary Shelley, Gail Carriger's darker works, Meljean Brook's Iron Seas, G.D. Falksen's steampunk gothic.",
+    "comp_titles": [
+      "The Iron Duke by Meljean Brook (steampunk romance with darkness)",
+      "Soulless by Gail Carriger (but darker, more gothic)",
+      "Boneshaker by Cherie Priest (atmospheric steampunk with horror)",
+      "The Inventor's Secret series by Andrea Cremer (YA steampunk gothic)",
+      "Crimson Peak (film - gothic romance horror aesthetic)"
+    ],
+    "unique_selling_points": [
+      "Three-layer atmosphere technique (Victorian + Industrial + Gothic)",
+      "Mechanical transformation as body horror and romance complication",
+      "Class conflict enhanced by industrial revolution setting",
+      "Slow-burn dread escalation alongside romantic tension",
+      "Beauty in decay aesthetic—brass and darkness intertwined",
+      "Period-appropriate propriety creating romantic tension",
+      "Innovation as both salvation and damnation"
+    ],
+    "reader_expectations": [
+      "Rich atmospheric description (fog, steam, gaslight, decay)",
+      "Forbidden or complicated romance (class, propriety, transformation)",
+      "Dark secrets revealed gradually",
+      "Victorian social constraints creating tension",
+      "Beautiful mechanical descriptions",
+      "Horror elements (body horror, supernatural, industrial danger)",
+      "Sensory immersion (sounds of machinery, smells of oil and roses, cold brass touch)",
+      "Endings that may be tragic, dark-happy, or bittersweet—not necessarily HEA"
+    ]
+  },
+
+  "subgenre_variations": {
+    "Historical Steampunk Gothic (1850-1900)": {
+      "emphasis": "Victorian accuracy, strict social rules, historical events as backdrop",
+      "heat_level": "Sweet to warm (propriety more restrictive)",
+      "technology_level": "Grounded in real Victorian tech, modest advances"
+    },
+    "Fantastical Steampunk Gothic": {
+      "emphasis": "Advanced technology, flying cities, etheric power, clockwork AI",
+      "heat_level": "Warm to explicit",
+      "technology_level": "Wildly advanced, magic-tech fusion possible"
+    },
+    "Horror-Heavy Gothic Romance": {
+      "emphasis": "Body horror, high death count, supernatural threat dominant, romance secondary",
+      "heat_level": "Variable",
+      "violence_level": "High, graphic"
+    },
+    "Romance-Heavy with Gothic Spice": {
+      "emphasis": "Romantic tension primary, gothic atmosphere for flavor, lower body count",
+      "heat_level": "Warm to explicit",
+      "violence_level": "Medium, more implied"
+    }
+  }
+}

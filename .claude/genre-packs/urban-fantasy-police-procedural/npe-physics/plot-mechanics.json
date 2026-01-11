@@ -1,0 +1,234 @@
+{
+  "category": "plot-mechanics",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Plot mechanics rules governing causality, pacing, and story physics for urban fantasy detective narratives",
+
+  "rules": {
+    "causality": {
+      "description": "Every plot event must have a traceable cause within the story system",
+      "validations": [
+        {
+          "rule_id": "PM-001",
+          "name": "no-deus-ex-machina",
+          "severity": "critical",
+          "description": "Major plot resolutions must be earned through established character actions, clues, or magic system rules",
+          "examples": {
+            "violation": "Detective suddenly remembers a crucial spell they never learned",
+            "compliant": "Detective uses protection ward taught by mentor in Chapter 2 to survive ambush"
+          },
+          "validation_query": "Does this plot resolution reference previously established character knowledge, skills, or story elements?"
+        },
+        {
+          "rule_id": "PM-002",
+          "name": "causal-chain-integrity",
+          "severity": "high",
+          "description": "Each scene must have clear cause-effect links to prior scenes",
+          "examples": {
+            "violation": "Character arrives at crime scene with no explanation of how they learned about it",
+            "compliant": "Dispatch call in previous scene leads detective to new crime scene"
+          },
+          "validation_query": "Can you trace this event back to a specific prior cause in the narrative?"
+        },
+        {
+          "rule_id": "PM-003",
+          "name": "coincidence-budget",
+          "severity": "medium",
+          "description": "Limit coincidences to 1 per 50k words; must be minor plot elements only",
+          "examples": {
+            "violation": "Detective randomly bumps into key witness at coffee shop, solving case",
+            "compliant": "Detective's favorite coffee shop happens to be near precinct (worldbuilding detail)"
+          },
+          "validation_query": "Is this event driven by character choice or pure coincidence? How many coincidences have occurred in this story arc?"
+        },
+        {
+          "rule_id": "PM-004",
+          "name": "foreshadowing-callback",
+          "severity": "medium",
+          "description": "Major plot reveals must be foreshadowed at least 2 chapters prior",
+          "examples": {
+            "violation": "Villain's magical ability revealed for first time during climax fight",
+            "compliant": "Villain's shadow-walking ability mentioned in witness statement (Ch 3), glimpsed in security footage (Ch 7), fully deployed in climax (Ch 12)"
+          },
+          "validation_query": "Was this story element mentioned or hinted at earlier? When and where?"
+        }
+      ]
+    },
+
+    "investigation_physics": {
+      "description": "Procedural detective work must follow realistic investigation patterns",
+      "validations": [
+        {
+          "rule_id": "PM-101",
+          "name": "clue-discovery-rhythm",
+          "severity": "high",
+          "description": "Clues must be discovered through active investigation, not passive receipt",
+          "examples": {
+            "violation": "Witness volunteers crucial information unprompted",
+            "compliant": "Detective asks targeted questions based on previous clues, gradually extracting information"
+          },
+          "validation_query": "Did the character take an investigative action to obtain this clue?"
+        },
+        {
+          "rule_id": "PM-102",
+          "name": "red-herring-ratio",
+          "severity": "medium",
+          "description": "Maintain 2:1 ratio of real clues to red herrings in investigation scenes",
+          "examples": {
+            "violation": "Every clue directly points to correct suspect",
+            "compliant": "Crime scene yields 6 pieces of evidence: 4 point toward truth, 2 mislead toward false suspect"
+          },
+          "validation_query": "What percentage of recent clues are misdirection vs. genuine leads?"
+        },
+        {
+          "rule_id": "PM-103",
+          "name": "case-momentum",
+          "severity": "high",
+          "description": "Investigation must progress or regress each scene; no stagnation",
+          "examples": {
+            "violation": "Detective has same interview three times with no new information",
+            "compliant": "Second interview reveals witness lied in first interview when confronted with phone records"
+          },
+          "validation_query": "Did this investigation scene change the detective's understanding or position in the case?"
+        }
+      ]
+    },
+
+    "pacing_consistency": {
+      "description": "Story rhythm must follow urban fantasy procedural pacing patterns",
+      "validations": [
+        {
+          "rule_id": "PM-201",
+          "name": "action-reflection-ratio",
+          "severity": "medium",
+          "description": "Maintain 60% action/investigation, 30% character interaction, 10% reflection",
+          "examples": {
+            "violation": "Five consecutive scenes of internal monologue without investigation progress",
+            "compliant": "Interview scene (action) → partner debrief (interaction) → brief reflection while driving to next location"
+          },
+          "validation_query": "What is the action/interaction/reflection breakdown for the last 5 scenes?"
+        },
+        {
+          "rule_id": "PM-202",
+          "name": "magical-mundane-balance",
+          "severity": "medium",
+          "description": "Urban fantasy requires juxtaposition: 1 magical element per 3-5 mundane procedural elements",
+          "examples": {
+            "violation": "Entire investigation relies solely on magical divination",
+            "compliant": "Detective uses normal forensics, witness interviews, and database searches, then consults magical expert for supernatural angle"
+          },
+          "validation_query": "How many mundane investigative actions occurred since last magical element?"
+        },
+        {
+          "rule_id": "PM-203",
+          "name": "tension-escalation",
+          "severity": "high",
+          "description": "Each act must raise stakes above previous act; no de-escalation until resolution",
+          "examples": {
+            "violation": "Act 2 villain is less threatening than Act 1 villain",
+            "compliant": "Act 1: property crime → Act 2: assault → Act 3: murder → Climax: serial murders"
+          },
+          "validation_query": "Are the current stakes higher than the previous major plot point?"
+        }
+      ]
+    },
+
+    "scene_purpose": {
+      "description": "Every scene must serve at least 2 of: plot advancement, character development, worldbuilding, or tension",
+      "validations": [
+        {
+          "rule_id": "PM-301",
+          "name": "dual-purpose-minimum",
+          "severity": "critical",
+          "description": "Scene must accomplish minimum 2 narrative functions",
+          "examples": {
+            "violation": "Scene only shows detective eating lunch with no plot or character development",
+            "compliant": "Lunch scene reveals partner's troubled home life (character) while informant approaches with new lead (plot)"
+          },
+          "validation_query": "What are the 2+ purposes this scene serves? (plot/character/world/tension)"
+        },
+        {
+          "rule_id": "PM-302",
+          "name": "no-empty-transitions",
+          "severity": "medium",
+          "description": "Travel/transition scenes must contain character or plot development",
+          "examples": {
+            "violation": "Detective drives to interview location with no story content",
+            "compliant": "During drive, detective reviews case file and notices pattern in victim locations"
+          },
+          "validation_query": "Does this transition scene advance story or can it be summarized in one line?"
+        }
+      ]
+    },
+
+    "magic_system_physics": {
+      "description": "Magical elements must follow established rules and costs",
+      "validations": [
+        {
+          "rule_id": "PM-401",
+          "name": "magic-cost-consistency",
+          "severity": "critical",
+          "description": "Magical abilities must have consistent costs/limitations established in worldbuilding",
+          "examples": {
+            "violation": "Divination spell costs nothing in Ch 3, drains caster unconscious in Ch 8",
+            "compliant": "All divination spells require 24hr recovery period as established in Ch 1"
+          },
+          "validation_query": "Does this magical action respect the costs/limits previously established?"
+        },
+        {
+          "rule_id": "PM-402",
+          "name": "no-magic-investigation-shortcuts",
+          "severity": "high",
+          "description": "Magic cannot solve investigations without detective work; must complement not replace",
+          "examples": {
+            "violation": "Detective uses mind-reading spell to identify killer",
+            "compliant": "Detective uses trace-detection spell to confirm suspect touched murder weapon, still needs motive/opportunity"
+          },
+          "validation_query": "Does magic solve the mystery or provide one piece requiring traditional detective work?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "bailey": "Validate plot events during drafting; ensure causal chains are established",
+      "tessa": "Check for plot holes, coincidences, and causality breaks during continuity review",
+      "miranda": "Final validation that chapter meets dual-purpose rule and pacing ratios"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_causality_chains", "npe_causal_links", "npe_scene_metrics"],
+      "validation_triggers": ["scene_complete", "chapter_complete", "act_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "coincidence_count",
+        "threshold": "≤1 per 50k words",
+        "severity": "medium"
+      },
+      {
+        "metric": "red_herring_ratio",
+        "threshold": "2:1 real clues to red herrings",
+        "severity": "medium"
+      },
+      {
+        "metric": "action_reflection_ratio",
+        "threshold": "60/30/10 split",
+        "severity": "low"
+      },
+      {
+        "metric": "magical_mundane_ratio",
+        "threshold": "1:3-5 magical to mundane",
+        "severity": "medium"
+      },
+      {
+        "metric": "dual_purpose_compliance",
+        "threshold": "100% of scenes",
+        "severity": "high"
+      }
+    ]
+  }
+}

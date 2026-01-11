@@ -1,0 +1,253 @@
+{
+  "name": "Urban Fantasy Police Procedural",
+  "id": "ufpp-v1",
+  "version": "1.0.0",
+  "description": "Complete genre pack for Urban Fantasy Police Procedural novels featuring supernatural investigations, magical crime-solving, and procedural authenticity blended with fantasy worldbuilding.",
+  "author": "BQ Studio",
+  "created": "2025-11-20",
+  "last_updated": "2025-11-20",
+
+  "compatible_skills": {
+    "series-planning-skill": ">=1.0",
+    "book-planning-skill": ">=1.0",
+    "chapter-planning-skill": ">=1.0",
+    "scene-writing-skill": ">=1.0",
+    "review-qa-skill": ">=1.0"
+  },
+
+  "genre_characteristics": {
+    "primary_genre": "Urban Fantasy",
+    "sub_genre": "Police Procedural",
+    "setting": "Contemporary urban environment with hidden magical world",
+    "protagonist_archetype": "Detective/Investigator with magical abilities or supernatural awareness",
+    "core_conflict": "Solving supernatural crimes while navigating both mundane law enforcement and magical politics",
+    "tone": ["Noir", "Gritty", "Procedural", "Supernatural"],
+    "pacing": "Balanced between investigation beats and character development"
+  },
+
+  "beat_sheets": {
+    "investigation-structure": {
+      "file": "beat-sheets/investigation-structure.md",
+      "description": "9-beat investigation framework for police procedural overlay on story structure",
+      "usage": "Apply to book-level and scene-level planning for case-of-the-week plots"
+    },
+    "case-of-the-week": {
+      "file": "beat-sheets/case-of-the-week.md",
+      "description": "Standalone case patterns with series arc hooks",
+      "usage": "Structure individual book investigations while advancing overarching series plots"
+    },
+    "series-arc-integration": {
+      "file": "beat-sheets/series-arc-integration.md",
+      "description": "Patterns for weaving multi-book arcs through episodic cases",
+      "usage": "Balance standalone satisfaction with serial momentum across series"
+    },
+    "relationship-progression": {
+      "file": "beat-sheets/relationship-progression.md",
+      "description": "Partnership and romantic relationship development in procedural context",
+      "usage": "Plan relationship arcs that enhance rather than distract from investigations"
+    }
+  },
+
+  "style_guides": {
+    "mundane-magical-juxtaposition": {
+      "file": "style-guides/mundane-magical-juxtaposition.md",
+      "description": "Techniques for blending everyday reality with supernatural elements",
+      "usage": "Scene-level writing to achieve authentic urban fantasy voice"
+    },
+    "procedural-authenticity": {
+      "file": "style-guides/procedural-authenticity.md",
+      "description": "Real-world police procedures adapted for supernatural investigations",
+      "usage": "Ensure investigation scenes feel grounded and believable"
+    },
+    "urban-fantasy-voice": {
+      "file": "style-guides/urban-fantasy-voice.md",
+      "description": "Tone, voice modes, and sensory detail protocols for urban fantasy",
+      "usage": "Maintain consistent genre voice across noir, procedural, action, and personal scenes"
+    },
+    "worldbuilding-integration": {
+      "file": "style-guides/worldbuilding-integration.md",
+      "description": "Techniques for revealing world rules through investigation rather than exposition",
+      "usage": "Natural worldbuilding integration during scene writing"
+    }
+  },
+
+  "validation_rules": {
+    "magic-system-consistency": {
+      "file": "validation-rules/magic-system-consistency.md",
+      "description": "Checklist for validating magic rules remain consistent across scenes and books",
+      "usage": "Review phase validation of supernatural elements"
+    },
+    "investigation-logic": {
+      "file": "validation-rules/investigation-logic.md",
+      "description": "Validation checklist for procedurally sound investigations",
+      "usage": "Ensure case progression is logical and clues are fair-play"
+    },
+    "character-knowledge-tracking": {
+      "file": "validation-rules/character-knowledge-tracking.md",
+      "description": "Critical validation for what characters know, when they learn it, and how",
+      "usage": "Prevent knowledge continuity errors in mystery/investigation plotting"
+    },
+    "procedural-accuracy": {
+      "file": "validation-rules/procedural-accuracy.md",
+      "description": "Common procedural pitfalls and accuracy checklist",
+      "usage": "Review scenes for authentic police/investigative work"
+    }
+  },
+
+  "npe_physics": {
+    "character-logic": {
+      "file": "npe-physics/character-logic.json",
+      "description": "Character behavior consistency rules governing decisions, emotional authenticity, and behavioral palettes",
+      "usage": "Validate character actions align with established palette (V1-V4 framework) and knowledge state"
+    },
+    "dialogue-physics": {
+      "file": "npe-physics/dialogue-physics.json",
+      "description": "Rules for authentic dialogue flow, subtext, and character voice consistency",
+      "usage": "Scene writing and review for dialogue authenticity"
+    },
+    "information-economy": {
+      "file": "npe-physics/information-economy.json",
+      "description": "Rules for pacing information revelation and managing reader knowledge",
+      "usage": "Mystery plotting and fair-play clue distribution"
+    },
+    "offstage-narrative": {
+      "file": "npe-physics/offstage-narrative.json",
+      "description": "Guidelines for handling events that occur off-page and their impact",
+      "usage": "Scene planning and chapter transitions"
+    },
+    "pacing-rules": {
+      "file": "npe-physics/pacing-rules.json",
+      "description": "Scene and chapter-level pacing physics for tension management",
+      "usage": "Book planning and scene writing for optimal pacing"
+    },
+    "plot-mechanics": {
+      "file": "npe-physics/plot-mechanics.json",
+      "description": "Core plot construction rules and cause-effect chains",
+      "usage": "Book and chapter planning for logical plot progression"
+    },
+    "pov-physics": {
+      "file": "npe-physics/pov-physics.json",
+      "description": "Point-of-view rules and perspective consistency guidelines",
+      "usage": "Scene writing for POV discipline and reader orientation"
+    },
+    "scene-architecture": {
+      "file": "npe-physics/scene-architecture.json",
+      "description": "Structural rules for scene construction and sequel patterns",
+      "usage": "Scene planning and writing for proper scene structure"
+    },
+    "stakes-pressure": {
+      "file": "npe-physics/stakes-pressure.json",
+      "description": "Rules for establishing and escalating stakes throughout narrative",
+      "usage": "Book planning and scene writing for tension escalation"
+    },
+    "transitions": {
+      "file": "npe-physics/transitions.json",
+      "description": "Guidelines for smooth scene-to-scene and chapter-to-chapter transitions",
+      "usage": "Chapter planning and scene writing for narrative flow"
+    }
+  },
+
+  "character_systems": {
+    "behavioral-palettes": {
+      "file": "character-systems/behavioral-palettes.json",
+      "description": "V1-V4 character behavioral framework defining core identity through emotional states",
+      "usage": "Character creation and consistency validation across all phases"
+    }
+  },
+
+  "relationship_architecture": {
+    "tension-axes": {
+      "file": "relationship-architecture/tension-axes.json",
+      "description": "Framework for building and tracking relationship dynamics and tension",
+      "usage": "Character relationship planning and progression tracking"
+    }
+  },
+
+  "templates": {
+    "detective-character": {
+      "file": "templates/detective-character-template.md",
+      "description": "Character template for protagonist investigators",
+      "usage": "Character creation during series planning phase"
+    },
+    "procedural-setting": {
+      "file": "templates/procedural-setting-template.md",
+      "description": "Setting template for precincts, investigation units, and operational environments",
+      "usage": "World-building during series planning phase"
+    },
+    "urban-fantasy-world": {
+      "file": "templates/urban-fantasy-world-template.md",
+      "description": "Comprehensive world template for urban fantasy magic systems and supernatural society",
+      "usage": "World-building during series planning phase"
+    },
+    "case-structure": {
+      "file": "templates/case-structure-template.md",
+      "description": "Template for planning individual cases/investigations",
+      "usage": "Book planning phase for case-of-the-week plots"
+    }
+  },
+
+  "writing_agents": {
+    "detective-logan": {
+      "file": "../agents/detective-logan.md",
+      "description": "Police procedural expert sub-agent for investigation authenticity",
+      "usage": "Invoke for procedural validation, investigation planning, and case structure"
+    }
+  },
+
+  "recommended_workflow": {
+    "series_planning": [
+      "1. Use urban-fantasy-world-template.md to establish magic system and supernatural society",
+      "2. Use detective-character-template.md for protagonist and team creation",
+      "3. Use procedural-setting-template.md to build investigation infrastructure",
+      "4. Apply series-arc-integration.md patterns for multi-book planning",
+      "5. Validate with magic-system-consistency.md and character-knowledge-tracking.md"
+    ],
+    "book_planning": [
+      "1. Use case-structure-template.md for primary investigation",
+      "2. Apply investigation-structure.md beat sheet",
+      "3. Integrate case-of-the-week.md patterns",
+      "4. Layer relationship-progression.md beats",
+      "5. Validate with investigation-logic.md"
+    ],
+    "scene_writing": [
+      "1. Apply mundane-magical-juxtaposition.md techniques",
+      "2. Follow procedural-authenticity.md guidelines",
+      "3. Use urban-fantasy-voice.md for tone consistency",
+      "4. Apply worldbuilding-integration.md for natural exposition",
+      "5. Validate with procedural-accuracy.md"
+    ],
+    "review": [
+      "1. Run character-knowledge-tracking.md validation",
+      "2. Check investigation-logic.md for case coherence",
+      "3. Verify magic-system-consistency.md",
+      "4. Validate procedural-accuracy.md",
+      "5. Invoke detective-logan agent for final procedural review"
+    ]
+  },
+
+  "quality_metrics": {
+    "fitness_for_purpose": 4.5,
+    "fitness_for_use": 4.0,
+    "completeness": 4.5,
+    "genre_authenticity": 5.0
+  },
+
+  "notes": [
+    "This genre pack is designed to work seamlessly with the BQ Studio modular skill system",
+    "Skills will automatically load appropriate genre pack files based on user selection",
+    "Friends can clone the repo and create their own genre packs following this structure",
+    "All templates use markdown format for easy editing and version control",
+    "Validation rules can be run manually or integrated into automated review workflows"
+  ],
+
+  "tags": [
+    "urban-fantasy",
+    "police-procedural",
+    "mystery",
+    "supernatural",
+    "detective-fiction",
+    "contemporary-fantasy",
+    "investigation",
+    "procedural"
+  ]
+}

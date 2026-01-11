@@ -1,0 +1,330 @@
+{
+  "category": "pacing-rules",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Pacing rhythm rules governing scene tempo, chapter structure, and narrative momentum for detective stories",
+
+  "story_structure": {
+    "three_act_framework": {
+      "act_1_setup": {
+        "duration": "20-25% of total word count",
+        "key_beats": [
+          "Inciting incident (case discovery/assignment)",
+          "Detective's normal world established",
+          "Initial investigation and first clues",
+          "End on first major complication or twist"
+        ]
+      },
+      "act_2_investigation": {
+        "duration": "50-60% of total word count",
+        "key_beats": [
+          "Deepening investigation",
+          "False leads and red herrings",
+          "Midpoint revelation (case is bigger than initially thought)",
+          "Rising stakes and complications",
+          "End on major setback or 'all is lost' moment"
+        ]
+      },
+      "act_3_resolution": {
+        "duration": "20-25% of total word count",
+        "key_beats": [
+          "Detective regroups and forms new theory",
+          "Final investigation push",
+          "Climactic confrontation",
+          "Case resolution and denouement"
+        ]
+      }
+    }
+  },
+
+  "rules": {
+    "scene_rhythm": {
+      "description": "Individual scene pacing must create varied reading experience",
+      "validations": [
+        {
+          "rule_id": "PR-001",
+          "name": "scene-length-variation",
+          "severity": "medium",
+          "description": "Vary scene lengths to control pacing; avoid monotonous rhythm",
+          "examples": {
+            "violation": "Ten consecutive scenes all exactly 1500 words",
+            "compliant": "Mix of short action scenes (500-800 words), medium investigation scenes (1200-1800 words), and occasional long interrogation scenes (2500+ words)"
+          },
+          "validation_query": "What is the word count distribution of the last 10 scenes? Is there variety?",
+          "target_distribution": {
+            "short_scenes_500_1000": "20-30%",
+            "medium_scenes_1000_2000": "50-60%",
+            "long_scenes_2000_plus": "10-20%"
+          }
+        },
+        {
+          "rule_id": "PR-002",
+          "name": "tension-beat-rhythm",
+          "severity": "high",
+          "description": "Alternate high-tension and lower-tension scenes; avoid exhaustion or boredom",
+          "examples": {
+            "violation": "Five consecutive high-action chase/fight scenes with no breathing room",
+            "compliant": "Chase scene → quiet partner debrief → tense interrogation → reflective investigation → explosive confrontation"
+          },
+          "validation_query": "Map the tension levels of last 5 scenes. Is there escalation and variation?",
+          "pattern": "tension_peak → recovery → building → peak (repeat, with each peak higher than last)"
+        },
+        {
+          "rule_id": "PR-003",
+          "name": "no-filler-scenes",
+          "severity": "high",
+          "description": "Every scene must advance plot, character, or both; cut scenes that only mark time",
+          "examples": {
+            "violation": "Detective drives to location, nothing happens during drive, arrives at location",
+            "compliant": "During drive, detective receives urgent call changing destination, revealing new information"
+          },
+          "validation_query": "If this scene were cut, what would the reader miss? Is it essential?"
+        }
+      ]
+    },
+
+    "chapter_structure": {
+      "description": "Chapter pacing creates momentum and reading addiction",
+      "validations": [
+        {
+          "rule_id": "PR-101",
+          "name": "chapter-hooks",
+          "severity": "high",
+          "description": "Every chapter must end on question, revelation, or escalation to drive reading forward",
+          "examples": {
+            "violation": "Chapter ends with detective going to sleep after routine day",
+            "compliant": "Chapter ends with detective receiving midnight call about second victim"
+          },
+          "validation_query": "Does this chapter ending create urgent desire to know what happens next?",
+          "hook_types": [
+            "cliffhanger (imminent danger)",
+            "revelation (shocking discovery)",
+            "question (mystery deepens)",
+            "escalation (stakes rise)",
+            "decision (character must choose)"
+          ]
+        },
+        {
+          "rule_id": "PR-102",
+          "name": "chapter-length-consistency",
+          "severity": "low",
+          "description": "Maintain relatively consistent chapter lengths (±30%) except for deliberate effect",
+          "examples": {
+            "violation": "Random mix of 2k, 8k, 3k, 12k word chapters with no pattern",
+            "compliant": "Chapters average 4-6k words, with occasional short 2k 'breakthrough' chapter or long 8k climax chapter"
+          },
+          "validation_query": "What is the chapter length variance? Are outliers justified by content?",
+          "target": "4000-6000 words per chapter for full-length novel"
+        },
+        {
+          "rule_id": "PR-103",
+          "name": "chapter-arc-completion",
+          "severity": "medium",
+          "description": "Each chapter should complete a mini-arc while contributing to larger arc",
+          "examples": {
+            "violation": "Chapter starts mid-interrogation, ends mid-interrogation with no progress",
+            "compliant": "Chapter starts with new lead, detective investigates, discovers complication, chapter ends with new question"
+          },
+          "validation_query": "Does this chapter have beginning/middle/end structure? What changed from start to finish?"
+        }
+      ]
+    },
+
+    "act_pacing": {
+      "description": "Large-scale story rhythm must follow three-act structure",
+      "validations": [
+        {
+          "rule_id": "PR-201",
+          "name": "act-length-ratios",
+          "severity": "medium",
+          "description": "Maintain approximately 25/50/25 word count split across three acts",
+          "examples": {
+            "violation": "60k word novel with 40k word Act 1, rushed Acts 2-3",
+            "compliant": "80k word novel: Act 1 (20k), Act 2 (40k), Act 3 (20k)"
+          },
+          "validation_query": "What is the current word count distribution across acts? Does it match target ratios?",
+          "target_ratios": {
+            "act_1": "20-25%",
+            "act_2": "50-60%",
+            "act_3": "20-25%"
+          }
+        },
+        {
+          "rule_id": "PR-202",
+          "name": "midpoint-revelation",
+          "severity": "high",
+          "description": "Act 2 midpoint must feature major revelation that reframes investigation",
+          "examples": {
+            "violation": "Investigation proceeds linearly from case start to solution with no major shifts",
+            "compliant": "Midpoint: Detective discovers 'random murder' is actually part of serial killer pattern, entire investigation focus shifts"
+          },
+          "validation_query": "What major revelation occurs at story midpoint? How does it change detective's approach?"
+        },
+        {
+          "rule_id": "PR-203",
+          "name": "act-2-escalation",
+          "severity": "high",
+          "description": "Act 2 must raise stakes progressively; each complication worse than last",
+          "examples": {
+            "violation": "Multiple complications but stakes remain constant",
+            "compliant": "Complication 1: Case stalls → Complication 2: Captain threatens to close case → Complication 3: Killer targets detective's partner"
+          },
+          "validation_query": "List Act 2 complications in order. Does each raise stakes higher than previous?"
+        }
+      ]
+    },
+
+    "investigative_pacing": {
+      "description": "Detective work must follow realistic yet dramatic timing",
+      "validations": [
+        {
+          "rule_id": "PR-301",
+          "name": "clue-discovery-rhythm",
+          "severity": "medium",
+          "description": "Space major clues to maintain momentum: 1 significant clue per 3-5k words",
+          "examples": {
+            "violation": "20k words of investigation with no new clues discovered",
+            "compliant": "Regular pattern of clue discovery creates sense of progress even when leads mislead"
+          },
+          "validation_query": "When was the last significant clue discovered? Are we due for progress?"
+        },
+        {
+          "rule_id": "PR-302",
+          "name": "investigation-setback-ratio",
+          "severity": "medium",
+          "description": "Maintain 2:1 ratio of progress to setbacks in Act 2 to create tension without frustration",
+          "examples": {
+            "violation": "Every single lead is a dead end (reader frustration)",
+            "compliant": "Detective makes 2 steps forward (solid progress), 1 step back (complication), repeat"
+          },
+          "validation_query": "Count recent progress vs setbacks. Is ratio approximately 2:1?"
+        },
+        {
+          "rule_id": "PR-303",
+          "name": "time-pressure-escalation",
+          "severity": "high",
+          "description": "Introduce or tighten time pressure as story progresses",
+          "examples": {
+            "violation": "Detective has unlimited time throughout entire investigation",
+            "compliant": "Act 1: routine investigation → Act 2: pattern suggests killer will strike again soon → Act 3: 24-hour countdown to next predicted murder"
+          },
+          "validation_query": "What time constraints exist? Do they increase as story progresses?"
+        }
+      ]
+    },
+
+    "action_sequence_pacing": {
+      "description": "Action and confrontation scenes require specific tempo control",
+      "validations": [
+        {
+          "rule_id": "PR-401",
+          "name": "action-sentence-rhythm",
+          "severity": "medium",
+          "description": "Action scenes use shorter sentences and paragraphs; average 12-15 words per sentence",
+          "examples": {
+            "violation": "Chase scene with long, complex sentences breaking flow",
+            "compliant": "She ran. Footsteps behind her. Gaining. The alley ahead—blocked. She pivoted left."
+          },
+          "validation_query": "What is average sentence length in this action sequence? Is it appropriately shorter than dialogue scenes?"
+        },
+        {
+          "rule_id": "PR-402",
+          "name": "action-duration-limit",
+          "severity": "medium",
+          "description": "Sustained high-intensity action limited to 1000-1500 words before requiring brief respite",
+          "examples": {
+            "violation": "5000-word continuous fight scene with no variations in intensity",
+            "compliant": "800-word intense fight → 200-word tactical pause/dialogue → 600-word renewed combat"
+          },
+          "validation_query": "How long has current action sequence run? Does it need a brief respite beat?"
+        },
+        {
+          "rule_id": "PR-403",
+          "name": "fight-magic-balance",
+          "severity": "medium",
+          "description": "Urban fantasy combat blends magical and physical elements with varied pacing",
+          "examples": {
+            "violation": "Pure spell-slinging with no physical components or environmental interaction",
+            "compliant": "Detective casts shield spell (magic), dives behind car (physical), hurls trash can with telekinesis (magic + environment)"
+          },
+          "validation_query": "Does this action sequence blend magical and mundane elements?"
+        }
+      ]
+    },
+
+    "dialogue_scene_tempo": {
+      "description": "Conversation scenes require different pacing than action",
+      "validations": [
+        {
+          "rule_id": "PR-501",
+          "name": "interrogation-escalation",
+          "severity": "medium",
+          "description": "Interview scenes must escalate tension through progressive revelation or confrontation",
+          "examples": {
+            "violation": "Flat interrogation where all questions produce same resistance level",
+            "compliant": "Start cordial → witness hedges → detective presents contradicting evidence → witness becomes defensive → breakthrough or stonewalling"
+          },
+          "validation_query": "Map the tension curve of this interrogation scene. Does it escalate?"
+        },
+        {
+          "rule_id": "PR-502",
+          "name": "dialogue-action-beats",
+          "severity": "low",
+          "description": "Long dialogue scenes need physical action beats every 8-12 exchanges",
+          "examples": {
+            "violation": "30 lines of pure dialogue with no physical movement or description",
+            "compliant": "Dialogue interrupted by: witness lights cigarette, detective checks phone, server brings coffee, etc."
+          },
+          "validation_query": "How many dialogue exchanges since last action beat? Is scene feeling static?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "bailey": "Monitor scene pacing during drafting; ensure varied rhythm and appropriate tension beats",
+      "edna": "Primary validator for pacing; analyze chapter hooks, act structure, and momentum",
+      "miranda": "Final approval of pacing across chapters; ensure three-act structure maintained"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_scene_metrics", "npe_pacing_analysis", "npe_tension_tracking"],
+      "validation_triggers": ["scene_complete", "chapter_complete", "act_milestone"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "scene_length_variance",
+        "threshold": "Coefficient of variation 0.3-0.6",
+        "severity": "low"
+      },
+      {
+        "metric": "chapter_hook_strength",
+        "threshold": "100% chapters end with hook",
+        "severity": "high"
+      },
+      {
+        "metric": "act_length_ratios",
+        "threshold": "Within ±5% of 25/50/25 split",
+        "severity": "medium"
+      },
+      {
+        "metric": "clue_discovery_frequency",
+        "threshold": "1 major clue per 3-5k words",
+        "severity": "medium"
+      },
+      {
+        "metric": "progress_setback_ratio",
+        "threshold": "Approximately 2:1 in Act 2",
+        "severity": "medium"
+      },
+      {
+        "metric": "action_sentence_length",
+        "threshold": "12-15 words average during action",
+        "severity": "low"
+      }
+    ]
+  }
+}

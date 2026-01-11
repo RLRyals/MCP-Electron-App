@@ -1,0 +1,307 @@
+{
+  "category": "scene-architecture",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Scene construction rules governing structure, purpose, entry/exit points, and narrative function",
+
+  "scene_types": {
+    "investigation_scenes": {
+      "description": "Crime scene analysis, evidence review, database searches",
+      "required_elements": ["clear objective", "discovery or obstacle", "impact on case theory"],
+      "typical_length": "1200-2000 words"
+    },
+    "interrogation_scenes": {
+      "description": "Witness interviews, suspect questioning, informant meetings",
+      "required_elements": ["character dynamics", "information exchange", "tension escalation or resolution"],
+      "typical_length": "1500-2500 words"
+    },
+    "action_scenes": {
+      "description": "Chases, fights, confrontations, arrests",
+      "required_elements": ["clear stakes", "obstacle progression", "physical and emotional consequences"],
+      "typical_length": "800-1500 words"
+    },
+    "character_scenes": {
+      "description": "Partner dynamics, personal life, relationship development",
+      "required_elements": ["emotional authenticity", "relationship progression", "connection to main plot"],
+      "typical_length": "1000-1800 words"
+    },
+    "revelation_scenes": {
+      "description": "Breakthrough moments, case connections, puzzle pieces clicking",
+      "required_elements": ["earned through prior clues", "changes investigation direction", "reader can follow logic"],
+      "typical_length": "800-1500 words"
+    }
+  },
+
+  "rules": {
+    "scene_structure": {
+      "description": "Every scene must follow goal-conflict-disaster or goal-conflict-resolution pattern",
+      "validations": [
+        {
+          "rule_id": "SA-001",
+          "name": "scene-goal-clarity",
+          "severity": "high",
+          "description": "Reader must understand what character wants in this scene within first 100 words",
+          "examples": {
+            "violation": "Scene meanders with unclear purpose; reader unsure what character is trying to accomplish",
+            "compliant": "Detective enters precinct to review forensic report (clear goal), scene begins with her approaching lab door"
+          },
+          "validation_query": "What does the POV character want to achieve in this scene? When does reader learn this?"
+        },
+        {
+          "rule_id": "SA-002",
+          "name": "conflict-obstacle-requirement",
+          "severity": "critical",
+          "description": "Every scene must contain obstacle preventing easy achievement of goal",
+          "examples": {
+            "violation": "Detective wants forensic report, gets report, leaves (no conflict)",
+            "compliant": "Detective wants report but lab tech is defensive about contaminated evidence, requiring negotiation and revealing department tensions"
+          },
+          "validation_query": "What prevents the character from easily achieving their scene goal?"
+        },
+        {
+          "rule_id": "SA-003",
+          "name": "scene-ending-impact",
+          "severity": "high",
+          "description": "Scene must end with yes-but, no-and, or no-but (never plain yes/no)",
+          "examples": {
+            "violation": "Detective gets exactly what they wanted with no complications (plain yes)",
+            "compliant": "Detective gets forensic report (yes) BUT it contradicts witness testimony, deepening mystery (yes-but)"
+          },
+          "validation_query": "How does this scene end? Does it create new questions, complications, or costs?",
+          "ending_patterns": {
+            "yes_but": "Character achieves goal BUT at a cost or with complication",
+            "no_and": "Character fails to achieve goal AND situation worsens",
+            "no_but": "Character fails to achieve goal BUT discovers alternative path or information"
+          }
+        }
+      ]
+    },
+
+    "scene_purpose": {
+      "description": "Scenes must serve multiple narrative functions simultaneously",
+      "validations": [
+        {
+          "rule_id": "SA-101",
+          "name": "dual-purpose-minimum",
+          "severity": "critical",
+          "description": "Every scene must accomplish minimum 2 of: plot advancement, character development, worldbuilding, relationship dynamics, tension escalation",
+          "examples": {
+            "violation": "Scene only shows detective driving to location with no other content",
+            "compliant": "During drive, detective argues with partner about case approach (relationship dynamics) while receiving call about new lead (plot advancement)"
+          },
+          "validation_query": "List all narrative functions this scene serves. Are there at least 2?"
+        },
+        {
+          "rule_id": "SA-102",
+          "name": "investigation-advancement",
+          "severity": "high",
+          "description": "Every 3rd scene must materially advance investigation (new clue, eliminated suspect, changed theory)",
+          "examples": {
+            "violation": "Five consecutive scenes with no change in detective's understanding of case",
+            "compliant": "Scene 1: character development, Scene 2: relationship dynamics, Scene 3: discovers crucial timeline discrepancy"
+          },
+          "validation_query": "When was the last scene that changed detective's understanding of the case?"
+        },
+        {
+          "rule_id": "SA-103",
+          "name": "no-placeholder-scenes",
+          "severity": "critical",
+          "description": "Scenes existing only to move characters from A to B must be cut or combined",
+          "examples": {
+            "violation": "Full scene of detective entering car, starting engine, driving, parking, exiting car",
+            "compliant": "Previous scene ends at precinct, next scene begins at crime scene with single transition line"
+          },
+          "validation_query": "What would be lost if this scene were summarized in one sentence?"
+        }
+      ]
+    },
+
+    "scene_entry_exit": {
+      "description": "Scenes must begin late and end early to maintain momentum",
+      "validations": [
+        {
+          "rule_id": "SA-201",
+          "name": "late-entry",
+          "severity": "medium",
+          "description": "Enter scene as close to core conflict as possible; skip preliminaries",
+          "examples": {
+            "violation": "Scene starts with detective waking up, showering, eating breakfast, driving to precinct, walking to captain's office",
+            "compliant": "Scene opens mid-conversation with captain already underway: 'The mayor wants this case closed by Friday.'"
+          },
+          "validation_query": "Could this scene start later without losing critical information?"
+        },
+        {
+          "rule_id": "SA-202",
+          "name": "early-exit",
+          "severity": "medium",
+          "description": "Exit scene immediately after key moment; don't linger through denouement",
+          "examples": {
+            "violation": "Interrogation breaks suspect, then 300 words of detective leaving room, walking down hall, exiting building",
+            "compliant": "Suspect confesses. Hard cut to next scene."
+          },
+          "validation_query": "Could this scene end earlier without losing impact?"
+        },
+        {
+          "rule_id": "SA-203",
+          "name": "transition-efficiency",
+          "severity": "low",
+          "description": "Scene transitions should be single sentence or paragraph unless transition itself serves narrative purpose",
+          "examples": {
+            "violation": "Full paragraph describing walk from interrogation room to parking lot",
+            "compliant": "She left him in the interrogation room and headed for the precinct garage. (single sentence)"
+          },
+          "validation_query": "Does this transition contain information essential to plot/character/world?"
+        }
+      ]
+    },
+
+    "investigation_scene_specifics": {
+      "description": "Detective procedural scenes have specific structural requirements",
+      "validations": [
+        {
+          "rule_id": "SA-301",
+          "name": "crime-scene-examination-structure",
+          "severity": "medium",
+          "description": "Crime scene investigations must balance: sensory details (20%), technical procedure (30%), deduction/theory (30%), character reaction (20%)",
+          "examples": {
+            "violation": "Pure technical description with no character response or deductive reasoning",
+            "compliant": "Sensory: blood pattern description → Technical: forensic tech's explanation → Deduction: detective's theory about sequence of events → Character: emotional impact of violence"
+          },
+          "validation_query": "What is the balance of elements in this crime scene investigation?"
+        },
+        {
+          "rule_id": "SA-302",
+          "name": "clue-presentation",
+          "severity": "high",
+          "description": "Clues must be presented to reader with equal or slightly greater emphasis than red herrings",
+          "examples": {
+            "violation": "Critical clue mentioned in passing while red herring gets detailed focus",
+            "compliant": "Both genuine clue and red herring receive similar narrative attention, letting reader process both"
+          },
+          "validation_query": "Is this clue given appropriate narrative weight for reader to notice?"
+        },
+        {
+          "rule_id": "SA-303",
+          "name": "evidence-chain-tracking",
+          "severity": "medium",
+          "description": "Show evidence collection and processing to maintain procedural authenticity",
+          "examples": {
+            "violation": "Evidence appears in lab analysis with no mention of collection",
+            "compliant": "Detective bags evidence at scene → mentions sending to lab → later scene shows lab results"
+          },
+          "validation_query": "Has this evidence's chain of custody been established on-page?"
+        }
+      ]
+    },
+
+    "interrogation_scene_specifics": {
+      "description": "Interview and interrogation scenes follow specific dramatic patterns",
+      "validations": [
+        {
+          "rule_id": "SA-401",
+          "name": "interrogation-power-dynamics",
+          "severity": "medium",
+          "description": "Interview scenes must establish and shift power balance between interviewer and subject",
+          "examples": {
+            "violation": "Flat interrogation where detective asks questions, witness answers cooperatively throughout",
+            "compliant": "Detective starts in control → witness deflects and gains upper hand → detective reveals evidence and reclaims power → witness cracks or stonewalls"
+          },
+          "validation_query": "How does the power dynamic shift during this interrogation?"
+        },
+        {
+          "rule_id": "SA-402",
+          "name": "information-exchange-realism",
+          "severity": "high",
+          "description": "Witnesses/suspects should not volunteer key information without pressure or motivation",
+          "examples": {
+            "violation": "Witness unprompted confesses crucial details without detective asking",
+            "compliant": "Witness hedges → detective asks targeted question based on prior clue → witness reluctantly confirms → detective presses for details"
+          },
+          "validation_query": "What motivates this character to reveal information at this moment?"
+        },
+        {
+          "rule_id": "SA-403",
+          "name": "interrogation-technique-variety",
+          "severity": "low",
+          "description": "Use varied interview approaches: rapport-building, direct accusation, evidence presentation, emotional appeal",
+          "examples": {
+            "violation": "Detective uses identical interrogation approach for every witness",
+            "compliant": "Frightened witness: rapport-building → Hostile suspect: evidence presentation → Grieving family: emotional appeal"
+          },
+          "validation_query": "Is this interview technique appropriate for this specific subject and situation?"
+        }
+      ]
+    },
+
+    "magical_scene_integration": {
+      "description": "Urban fantasy elements must be integrated into scene structure, not tacked on",
+      "validations": [
+        {
+          "rule_id": "SA-501",
+          "name": "magic-as-tool-not-solution",
+          "severity": "high",
+          "description": "Magical elements should complicate or provide partial information, not solve scene objective outright",
+          "examples": {
+            "violation": "Detective uses spell to instantly identify killer, scene ends",
+            "compliant": "Detective uses detection spell to confirm magical residue at scene, raising question of whether mundane investigation missed magical component"
+          },
+          "validation_query": "Does magic solve this scene's conflict or add complexity to it?"
+        },
+        {
+          "rule_id": "SA-502",
+          "name": "mundane-magical-juxtaposition",
+          "severity": "medium",
+          "description": "Urban fantasy scenes should blend everyday procedural elements with supernatural aspects",
+          "examples": {
+            "violation": "Entire scene takes place in purely magical realm divorced from urban setting",
+            "compliant": "Detective examines crime scene using standard forensics while noting magical wards that failed (blending mundane and magical)"
+          },
+          "validation_query": "Does this scene juxtapose mundane and magical elements?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "bailey": "Apply scene structure rules during drafting; ensure dual-purpose compliance",
+      "edna": "Validate scene entry/exit timing and narrative efficiency",
+      "tessa": "Check scene purpose continuity and investigation advancement tracking",
+      "miranda": "Final approval of scene function across chapter arcs"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_scene_metrics", "npe_scene_purpose_tracking", "npe_investigation_progress"],
+      "validation_triggers": ["scene_complete", "chapter_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "dual_purpose_compliance",
+        "threshold": "100% of scenes serve ≥2 functions",
+        "severity": "critical"
+      },
+      {
+        "metric": "scene_ending_pattern_distribution",
+        "threshold": "0% plain yes/no endings",
+        "severity": "high"
+      },
+      {
+        "metric": "investigation_advancement_frequency",
+        "threshold": "≥1 per 3 scenes",
+        "severity": "high"
+      },
+      {
+        "metric": "late_entry_early_exit_compliance",
+        "threshold": "≥80% of scenes",
+        "severity": "medium"
+      },
+      {
+        "metric": "crime_scene_element_balance",
+        "threshold": "20/30/30/20 sensory/technical/deduction/character",
+        "severity": "low"
+      }
+    ]
+  }
+}

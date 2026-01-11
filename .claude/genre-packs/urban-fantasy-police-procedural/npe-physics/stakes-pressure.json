@@ -1,0 +1,361 @@
+{
+  "category": "stakes-pressure",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Stakes escalation and pressure-building rules governing tension progression, consequences, and urgency in detective narratives",
+
+  "stakes_philosophy": "Reader investment requires meaningful consequences. Stakes must be personal, escalating, and tangible. Abstract stakes ('justice must prevail') are weak; specific stakes ('partner will die if case not solved by midnight') create urgency.",
+
+  "stakes_categories": {
+    "professional": "Career consequences, department politics, case closure pressure",
+    "personal": "Relationships, reputation, personal safety",
+    "moral": "Innocent people at risk, justice vs. expedience decisions",
+    "physical": "Life-or-death danger to detective or others",
+    "emotional": "Psychological toll, trauma, personal demons"
+  },
+
+  "rules": {
+    "stakes_establishment": {
+      "description": "Stakes must be clearly defined and matter to characters",
+      "validations": [
+        {
+          "rule_id": "SP-001",
+          "name": "concrete-stakes-definition",
+          "severity": "critical",
+          "description": "Stakes must be specific and tangible, not abstract; reader must understand exactly what's at risk",
+          "examples": {
+            "violation": "'The detective needed to solve the case' (why? what happens if they don't?)",
+            "compliant": "'Three victims in three weeks. If she didn't catch this killer before the next full moon, there'd be a fourth.' (specific consequences: another death, time pressure)"
+          },
+          "validation_query": "What exactly will happen if the protagonist fails? Is it specific and tangible?"
+        },
+        {
+          "rule_id": "SP-002",
+          "name": "personal-investment",
+          "severity": "high",
+          "description": "Stakes must matter personally to detective, not just professionally",
+          "examples": {
+            "violation": "Detective has no personal connection; just another case",
+            "compliant": "Victim reminds detective of their sister; or case threatens partner; or failure could end career after captain's warning"
+          },
+          "validation_query": "Why does this case matter personally to the detective beyond professional duty?"
+        },
+        {
+          "rule_id": "SP-003",
+          "name": "multiple-stake-layers",
+          "severity": "medium",
+          "description": "Combine professional, personal, and moral stakes for maximum investment",
+          "examples": {
+            "violation": "Only professional stakes: solve case or face captain's disapproval",
+            "compliant": "Professional: case closure pressure. Personal: partner is suspect's next target. Moral: innocent person in jail for crime they didn't commit."
+          },
+          "validation_query": "How many types of stakes are active? Are they layered for complexity?"
+        }
+      ]
+    },
+
+    "stakes_escalation": {
+      "description": "Stakes must increase throughout story; never de-escalate until resolution",
+      "validations": [
+        {
+          "rule_id": "SP-101",
+          "name": "progressive-raising",
+          "severity": "critical",
+          "description": "Each act must have higher stakes than previous; each major scene should add pressure",
+          "examples": {
+            "violation": "Act 2 threat level same or lower than Act 1",
+            "compliant": "Act 1: property crime → Act 2: assault, pattern suggests escalation → Act 3: serial murders, detective personally targeted"
+          },
+          "validation_query": "Are current stakes higher than they were 5 chapters ago? Than at story start?"
+        },
+        {
+          "rule_id": "SP-102",
+          "name": "midpoint-stakes-raise",
+          "severity": "high",
+          "description": "Story midpoint should significantly raise stakes through revelation or complication",
+          "examples": {
+            "violation": "Midpoint revelation doesn't change threat level or urgency",
+            "compliant": "Midpoint: discovered 'isolated murder' is actually serial killer; threat level jumps from single case to ongoing danger"
+          },
+          "validation_query": "How does the midpoint raise stakes? What new pressure is added?"
+        },
+        {
+          "rule_id": "SP-103",
+          "name": "act-2-complication-progression",
+          "severity": "high",
+          "description": "Act 2 should feature 3-5 major complications, each worse than the last",
+          "examples": {
+            "violation": "Obstacles appear but don't increase in severity",
+            "compliant": "Complication 1: witness refuses to talk → 2: evidence contaminated → 3: captain threatens to close case → 4: partner suspended → 5: killer targets detective's family"
+          },
+          "validation_query": "List Act 2 complications. Does each raise stakes above the previous?"
+        }
+      ]
+    },
+
+    "time_pressure": {
+      "description": "Ticking clocks create urgency and force action",
+      "validations": [
+        {
+          "rule_id": "SP-201",
+          "name": "deadline-introduction",
+          "severity": "high",
+          "description": "Introduce time pressure by end of Act 1 or early Act 2 at latest",
+          "examples": {
+            "violation": "No time constraints until final chapter; detective can investigate indefinitely",
+            "compliant": "Act 1: pattern suggests killer strikes every 72 hours. Act 2: countdown to next predicted murder creates urgency."
+          },
+          "validation_query": "What time constraints exist? When were they established?"
+        },
+        {
+          "rule_id": "SP-202",
+          "name": "deadline-tightening",
+          "severity": "medium",
+          "description": "Time pressure should increase; introduce additional deadlines or accelerate existing ones",
+          "examples": {
+            "violation": "Same deadline throughout; no increasing urgency",
+            "compliant": "Initial deadline: 1 week to solve case. Midpoint: killer accelerates schedule to 48 hours. Act 3: race against 6-hour countdown."
+          },
+          "validation_query": "Has time pressure increased from when first introduced?"
+        },
+        {
+          "rule_id": "SP-203",
+          "name": "realistic-time-constraints",
+          "severity": "medium",
+          "description": "Deadlines must be justified by plot logic, not arbitrary authorial imposition",
+          "examples": {
+            "violation": "Captain gives detective 24 hours to solve case for no clear reason",
+            "compliant": "Evidence suggests killer will strike again at next full moon (3 days); or political pressure from mayor's office demands results before press conference (48 hours)"
+          },
+          "validation_query": "What in-story logic justifies this deadline? Why this timeframe specifically?"
+        }
+      ]
+    },
+
+    "threat_escalation": {
+      "description": "Danger level must increase as story progresses",
+      "validations": [
+        {
+          "rule_id": "SP-301",
+          "name": "personal-danger-progression",
+          "severity": "high",
+          "description": "Threat should move from abstract to personal; detective becomes target",
+          "examples": {
+            "violation": "Detective investigates safely throughout; no personal risk",
+            "compliant": "Act 1: detective investigates crime. Act 2: killer knows detective is investigating. Act 3: detective receives direct threats, loved ones endangered."
+          },
+          "validation_query": "How has the threat to the detective personally escalated?"
+        },
+        {
+          "rule_id": "SP-302",
+          "name": "expanding-victim-pool",
+          "severity": "medium",
+          "description": "In serial cases, victim count or threat scope should expand",
+          "examples": {
+            "violation": "Single victim throughout; no escalating danger",
+            "compliant": "First victim → second victim establishes pattern → third victim shows escalation → detective realizes anyone matching profile is at risk"
+          },
+          "validation_query": "How has the scope of danger expanded from story opening?"
+        },
+        {
+          "rule_id": "SP-303",
+          "name": "antagonist-capability-demonstration",
+          "severity": "medium",
+          "description": "Regularly demonstrate antagonist's power/danger to maintain threat credibility",
+          "examples": {
+            "violation": "Villain is described as dangerous but never shown being effective",
+            "compliant": "Antagonist evades police surveillance, outsmarts detective's trap, eliminates witness, demonstrating continued capability"
+          },
+          "validation_query": "When was antagonist's competence/danger last demonstrated on-page?"
+        }
+      ]
+    },
+
+    "consequence_delivery": {
+      "description": "Threatened consequences must actually occur; empty threats destroy tension",
+      "validations": [
+        {
+          "rule_id": "SP-401",
+          "name": "follow-through-ratio",
+          "severity": "critical",
+          "description": "At least 60-70% of threatened consequences must occur or nearly occur; avoid crying wolf",
+          "examples": {
+            "violation": "Every threatened death is prevented; reader stops believing stakes are real",
+            "compliant": "Threats: 1) witness might die (happens), 2) partner in danger (barely saved), 3) case might be closed (prevented), 4) suspect might escape (happens). Mix of realized and prevented consequences."
+          },
+          "validation_query": "How many threatened consequences have actually occurred vs. been prevented?"
+        },
+        {
+          "rule_id": "SP-402",
+          "name": "cost-of-victory",
+          "severity": "high",
+          "description": "Success should come at a cost; perfect victories reduce stakes credibility",
+          "examples": {
+            "violation": "Detective solves case with no personal or professional costs",
+            "compliant": "Case solved BUT: partner seriously injured, detective's relationship damaged, career advancement opportunity lost, or detective forced to compromise principles"
+          },
+          "validation_query": "What does the detective sacrifice or lose in achieving their goal?"
+        },
+        {
+          "rule_id": "SP-403",
+          "name": "permanent-consequences",
+          "severity": "medium",
+          "description": "Some consequences should be permanent, not easily reversed",
+          "examples": {
+            "violation": "All damage undone by story end; status quo fully restored",
+            "compliant": "Detective wins but: witness is dead (permanent), partner transfers (lasting change), or detective's worldview fundamentally altered"
+          },
+          "validation_query": "What changes from this case cannot be undone?"
+        }
+      ]
+    },
+
+    "emotional_pressure": {
+      "description": "Psychological and emotional toll must be tracked and shown",
+      "validations": [
+        {
+          "rule_id": "SP-501",
+          "name": "cumulative-stress-impact",
+          "severity": "medium",
+          "description": "Investigation stress should accumulate and affect detective's performance/wellbeing",
+          "examples": {
+            "violation": "Detective experiences trauma and stress but shows no effects",
+            "compliant": "Exhaustion from 72-hour investigation affects judgment; witnessing violent crime scenes causes nightmares; pressure from captain creates tension with partner"
+          },
+          "validation_query": "How is the cumulative stress of this investigation affecting the detective?"
+        },
+        {
+          "rule_id": "SP-502",
+          "name": "moral-dilemma-pressure",
+          "severity": "medium",
+          "description": "Force detective to make difficult choices between competing values",
+          "examples": {
+            "violation": "All decisions are clear-cut right vs. wrong",
+            "compliant": "Detective must choose: break rules to save innocent life, or follow procedure and risk victim's death; sacrifice personal relationship for case, or compromise investigation"
+          },
+          "validation_query": "What impossible choices has the detective faced? What did they sacrifice?"
+        }
+      ]
+    },
+
+    "procedural_specific_stakes": {
+      "description": "Detective procedurals have specific professional pressures",
+      "validations": [
+        {
+          "rule_id": "SP-601",
+          "name": "departmental-pressure",
+          "severity": "medium",
+          "description": "Include pressure from department politics, captain, or institutional constraints",
+          "examples": {
+            "violation": "Detective operates in vacuum with no institutional oversight or pressure",
+            "compliant": "Captain demands results before media circus; internal affairs investigating detective's methods; department politics threaten case resources"
+          },
+          "validation_query": "What institutional pressures complicate the investigation?"
+        },
+        {
+          "rule_id": "SP-602",
+          "name": "procedural-vs-results-tension",
+          "severity": "medium",
+          "description": "Create tension between doing things correctly and getting results quickly",
+          "examples": {
+            "violation": "Detective never faces choice between proper procedure and expediency",
+            "compliant": "Warrant will take 24 hours but suspect might flee; or pressure to arrest obvious suspect vs. waiting for conclusive evidence"
+          },
+          "validation_query": "When has proper procedure conflicted with urgent need for results?"
+        },
+        {
+          "rule_id": "SP-603",
+          "name": "partner-stakes",
+          "severity": "medium",
+          "description": "Use partner relationship as source of emotional stakes and pressure",
+          "examples": {
+            "violation": "Partner is background presence with no stake-raising role",
+            "compliant": "Partner disagrees with detective's theory, creating tension; or partner endangered by investigation; or partner's trust must be earned after previous betrayal"
+          },
+          "validation_query": "How does the partnership dynamic create pressure or raise stakes?"
+        }
+      ]
+    },
+
+    "magical_stakes_escalation": {
+      "description": "Urban fantasy allows unique stake-raising through magical consequences",
+      "validations": [
+        {
+          "rule_id": "SP-701",
+          "name": "magical-cost-accumulation",
+          "severity": "medium",
+          "description": "If magic has costs, they should accumulate and create pressure",
+          "examples": {
+            "violation": "Detective uses magic freely with no accumulating consequences",
+            "compliant": "Each spell drains detective; accumulated magical exhaustion becomes liability; or magical debt to powerful entity comes due"
+          },
+          "validation_query": "Are magical costs accumulating to create pressure?"
+        },
+        {
+          "rule_id": "SP-702",
+          "name": "supernatural-threat-escalation",
+          "severity": "medium",
+          "description": "Magical antagonists can escalate threat in ways mundane criminals cannot",
+          "examples": {
+            "violation": "Magical antagonist uses same tactics as non-magical criminal",
+            "compliant": "Antagonist: starts with subtle magic (disguise, influence) → escalates to overt supernatural attacks (curses, summonings) → final confrontation threatens reality-warping consequences"
+          },
+          "validation_query": "How does magical capability escalate threat beyond mundane danger?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "edna": "Primary validator for stakes escalation and pacing tension",
+      "miranda": "Track stakes progression across story arc; ensure proper escalation",
+      "bailey": "Monitor pressure building during scene drafting",
+      "dr_viktor": "Validate emotional consequences and psychological toll authenticity"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_stakes_tracking",
+        "npe_tension_metrics",
+        "npe_consequence_log",
+        "npe_deadline_tracking"
+      ],
+      "validation_triggers": ["act_milestone", "major_complication", "consequence_event", "chapter_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "stakes_escalation_trajectory",
+        "threshold": "Measurable increase each act",
+        "severity": "critical"
+      },
+      {
+        "metric": "time_pressure_presence",
+        "threshold": "Introduced by end Act 1",
+        "severity": "high"
+      },
+      {
+        "metric": "consequence_follow_through",
+        "threshold": "60-70% of threats realized",
+        "severity": "critical"
+      },
+      {
+        "metric": "personal_vs_professional_stakes",
+        "threshold": "Both present and layered",
+        "severity": "high"
+      },
+      {
+        "metric": "cost_of_victory",
+        "threshold": "≥1 significant permanent cost",
+        "severity": "medium"
+      },
+      {
+        "metric": "antagonist_demonstration_frequency",
+        "threshold": "Every 10-15k words",
+        "severity": "medium"
+      }
+    ]
+  }
+}

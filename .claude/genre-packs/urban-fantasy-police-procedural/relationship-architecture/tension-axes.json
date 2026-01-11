@@ -1,0 +1,633 @@
+{
+  "category": "tension-axes",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Relationship tension system defining bidirectional dramatic forces between character pairs across multiple axes to create authentic interpersonal dynamics",
+
+  "tension_axis_framework": {
+    "description": "Each character relationship operates across multiple independent tension axes that create multidimensional dynamics",
+    "core_principles": [
+      "Tension is bidirectional: Character A→B may differ from Character B→A",
+      "Multiple axes operate simultaneously; professional tension can coexist with personal harmony",
+      "Tension is not inherently negative; creative tension drives collaboration",
+      "Axes evolve based on shared experiences tracked in narrative",
+      "Zero tension = boring relationship; some tension on some axis is always present"
+    ]
+  },
+
+  "axis_types": {
+    "description": "Standard tension axes for urban fantasy procedural relationships",
+    "professional_axis": {
+      "description": "Work-related dynamics, competence, and collaboration",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Significant professional friction",
+          "manifestations": [
+            "Disagreement on investigation approach",
+            "Competence questioned or threatened",
+            "Authority conflict (rank, jurisdiction, expertise)",
+            "Competition for resources or recognition"
+          ],
+          "narrative_function": "Creates obstacles, forces characters to compromise or prove themselves",
+          "resolution_paths": ["Shared success proves competence", "Clear hierarchy established", "Complementary skills recognized"]
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Creative tension that drives improvement",
+          "manifestations": [
+            "Different methodologies but mutual respect",
+            "Healthy competition",
+            "Mentor pushing mentee beyond comfort zone",
+            "Specialists deferring to each other's domains"
+          ],
+          "narrative_function": "Generates interesting problem-solving dynamics without relationship damage",
+          "resolution_paths": ["Temporary alignment around urgent case", "Gradual appreciation of different approach"]
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Harmonious professional collaboration",
+          "manifestations": [
+            "Synchronized investigation style",
+            "Anticipate each other's moves",
+            "Complementary skills mesh perfectly",
+            "Established roles and trust"
+          ],
+          "narrative_function": "Shows competence, allows focus on external conflicts",
+          "caution": "If too low for too long, relationship becomes static; introduce external pressure"
+        }
+      },
+      "bidirectional_notes": {
+        "asymmetric_example": "Veteran (A) to Rookie (B): Low tension, confident in teaching. Rookie (B) to Veteran (A): Moderate tension, proving competence",
+        "symmetric_example": "Two equal-rank detectives: Both moderate tension, competing for promotion"
+      }
+    },
+
+    "trust_axis": {
+      "description": "Reliability, honesty, and faith in the other person",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Active distrust or suspicion",
+          "manifestations": [
+            "Withholds information",
+            "Verifies other's claims independently",
+            "Suspects ulterior motives",
+            "Won't rely on partner in critical moment"
+          ],
+          "narrative_function": "Creates betrayal stakes, requires proof of trustworthiness",
+          "resolution_paths": ["Partner proves reliable in crisis", "Honest confrontation and explanation", "Gradual rebuilding through consistent behavior"],
+          "caution": "Cannot sustain 8+ tension while remaining partners; forces resolution or separation"
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Provisional trust with reservations",
+          "manifestations": [
+            "Trusts in some areas but not others",
+            "Tests partner with small risks before large ones",
+            "Occasional doubt when stressed",
+            "Growing but not complete trust"
+          ],
+          "narrative_function": "Shows realistic relationship development; allows trust-building arc",
+          "resolution_paths": ["Time + consistent behavior", "Vulnerability shared and respected"]
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Deep trust and reliability",
+          "manifestations": [
+            "Would trust with own life",
+            "Shares secrets and vulnerabilities",
+            "Benefit of doubt given automatically",
+            "Backs partner's play without question"
+          ],
+          "narrative_function": "Allows characters to take risks together; external threats more impactful",
+          "vulnerability": "Deep trust creates leverage for villains; betrayal more devastating"
+        }
+      },
+      "trust_earning_rules": {
+        "description": "Trust cannot jump multiple levels without on-page justification",
+        "progression": "High→Moderate: 3-5 instances of reliable behavior. Moderate→Low: Life-or-death trust validation",
+        "regression": "Low→High: Single major betrayal. Moderate→High: Repeated small failures or one significant lie"
+      }
+    },
+
+    "personal_intimacy_axis": {
+      "description": "Emotional closeness, vulnerability, and friendship depth",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Emotional distance or active conflict",
+          "manifestations": [
+            "Purely professional; no personal sharing",
+            "Active dislike or personality clash",
+            "Recent personal conflict unresolved",
+            "Boundaries rigidly maintained"
+          ],
+          "narrative_function": "Characters must navigate work relationship despite personal friction",
+          "resolution_paths": ["Forced to work closely, discover common ground", "Shared trauma creates bond", "Honest conversation clears misunderstanding"]
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Friendly but guarded",
+          "manifestations": [
+            "Share some personal details but not deep vulnerabilities",
+            "Socialize occasionally but not regularly",
+            "Support each other professionally, less so personally",
+            "Growing friendship with hesitations"
+          ],
+          "narrative_function": "Allows gradual deepening; creates stakes as intimacy increases",
+          "resolution_paths": ["Gradual opening up", "Personal crisis where support offered/accepted"]
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Deep personal bond",
+          "manifestations": [
+            "Share fears, hopes, and vulnerabilities",
+            "Check on each other's wellbeing",
+            "Know each other's personal history",
+            "Family-like loyalty"
+          ],
+          "narrative_function": "Makes threats to relationship devastating; creates powerful motivation",
+          "vulnerability": "Personal intimacy means hurting one impacts both"
+        }
+      },
+      "asymmetric_intimacy": {
+        "description": "One character may feel closer than the other",
+        "example": "Character A sees B as best friend (tension: 2), Character B sees A as close colleague (tension: 5)",
+        "narrative_potential": "Creates unspoken tension; eventual recognition/addressing of imbalance is powerful scene"
+      }
+    },
+
+    "romantic_attraction_axis": {
+      "description": "Romantic and sexual tension (optional axis; only present if relevant)",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Strong attraction with major obstacles",
+          "manifestations": [
+            "Mutual attraction but can't act (workplace rules, existing relationships, etc.)",
+            "Unrequited attraction creating awkwardness",
+            "Former lovers with unresolved feelings",
+            "Attraction conflicts with other values"
+          ],
+          "narrative_function": "Creates longing, near-misses, and eventual payoff when resolved",
+          "resolution_paths": ["Obstacles removed, relationship begins", "Rejected clearly, axis dissolves", "Slow burn acknowledgment"]
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Acknowledged attraction with complications",
+          "manifestations": [
+            "Dating but keeping it quiet from team",
+            "New relationship, still figuring out dynamics",
+            "Attraction acknowledged but timing wrong",
+            "On-again-off-again pattern"
+          ],
+          "narrative_function": "Relationship affects case decisions; creates internal conflict",
+          "resolution_paths": ["Relationship stabilizes (tension drops)", "Breaks definitively (axis dissolves)", "Circumstances change"]
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Stable romantic relationship",
+          "manifestations": [
+            "Committed partnership",
+            "Integrated into each other's lives",
+            "Sexual/romantic tension resolved into intimacy",
+            "Comfortable with each other"
+          ],
+          "narrative_function": "Creates protective stakes; relationship becomes target",
+          "caution": "Risk of becoming boring; maintain other axes of tension, or introduce external relationship threat"
+        }
+      },
+      "presence_rules": {
+        "description": "This axis only exists if romantic potential is part of relationship",
+        "activation": "Axis appears when first romantic moment occurs on-page",
+        "dissolution": "Axis can permanently resolve to 0 (happily together) or be removed entirely (one party clearly not interested)"
+      }
+    },
+
+    "power_hierarchy_axis": {
+      "description": "Authority, rank, and influence dynamics",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Hierarchical conflict or power struggle",
+          "manifestations": [
+            "Junior openly questions senior authority",
+            "Superior micromanages, undermines confidence",
+            "Competing for same position",
+            "Authority without earned respect"
+          ],
+          "narrative_function": "Creates obstacles to collaboration; forces growth or separation",
+          "resolution_paths": ["Junior proves competence, earns autonomy", "Superior learns to trust", "One changes position/role"]
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Acknowledged hierarchy with occasional friction",
+          "manifestations": [
+            "Junior sometimes chafes at restrictions",
+            "Senior delegates but double-checks",
+            "Respectful disagreement handled professionally",
+            "Growing into new power dynamic"
+          ],
+          "narrative_function": "Realistic workplace dynamics; allows growth moments",
+          "resolution_paths": ["Time and consistency build comfort", "Crisis forces trust in hierarchy"]
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Hierarchy accepted and functional",
+          "manifestations": [
+            "Clear roles; no resentment",
+            "Mentor/mentee relationship healthy",
+            "Equal partners with natural leader emergence",
+            "Authority earned through respect"
+          ],
+          "narrative_function": "Allows efficient teamwork; hierarchy invisible in smooth operation",
+          "caution": "If hierarchy never tested, lacks realism; introduce stressor occasionally"
+        }
+      },
+      "asymmetry_note": "Always asymmetric; superior feels different hierarchy tension than subordinate"
+    },
+
+    "ideological_axis": {
+      "description": "Philosophical, moral, or methodological differences",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Fundamental disagreement on values or methods",
+          "manifestations": [
+            "By-the-book vs. break-the-rules approaches",
+            "Different views on magic use ethics",
+            "Punishment vs. rehabilitation philosophies",
+            "Ends-justify-means vs. process-matters divide"
+          ],
+          "narrative_function": "Forces characters to articulate values; creates moral dilemmas",
+          "resolution_paths": ["Find middle ground", "Agree to disagree within bounds", "One changes view through experience"],
+          "caution": "Cannot remain 9-10 tension long-term without partnership dissolving"
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Different approaches with overlapping goals",
+          "manifestations": [
+            "Same destination, different paths",
+            "Healthy debate on best approach",
+            "Challenge each other's thinking constructively",
+            "Complementary philosophies"
+          ],
+          "narrative_function": "Creates rich dialogue and problem-solving scenes",
+          "sweet_spot": "Ideal for long-term partnerships; prevents groupthink, maintains interest"
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Aligned values and methods",
+          "manifestations": [
+            "Finish each other's sentences",
+            "Intuitive agreement on approach",
+            "Shared moral framework",
+            "Synchronized methodology"
+          ],
+          "narrative_function": "Shows deep partnership; allows external focus",
+          "caution": "Too aligned = echo chamber; maintain some tension elsewhere"
+        }
+      }
+    },
+
+    "protective_investment_axis": {
+      "description": "How much emotional energy invested in other's wellbeing",
+      "tension_range": {
+        "high_tension": {
+          "value_range": "7-10",
+          "description": "Deeply protective; partner's safety is priority",
+          "manifestations": [
+            "Makes case decisions based on partner's safety",
+            "Hypervigilant about threats to partner",
+            "Willing to take bullet for partner",
+            "Partner's pain causes own emotional distress"
+          ],
+          "narrative_function": "Creates vulnerability; villains exploit this care",
+          "caution": "High protective tension makes threats to partner extremely powerful story lever"
+        },
+        "moderate_tension": {
+          "value_range": "4-6",
+          "description": "Professionally concerned but trusts partner's competence",
+          "manifestations": [
+            "Watches partner's back in dangerous situations",
+            "Concerned when partner hurt but trusts recovery",
+            "Balances care with respect for autonomy",
+            "Standard partner loyalty"
+          ],
+          "narrative_function": "Baseline partnership care without overwhelming other priorities"
+        },
+        "low_tension": {
+          "value_range": "0-3",
+          "description": "Minimal emotional investment in partner's wellbeing",
+          "manifestations": [
+            "New partnership, still proving out",
+            "Professional concern only",
+            "Actively don't care (conflict on other axes)",
+            "Not close enough to be protective"
+          ],
+          "narrative_function": "Shows early relationship or damaged relationship; room for growth",
+          "resolution_paths": ["Shared danger increases investment", "Personal connection builds care"]
+        }
+      },
+      "asymmetric_protection": {
+        "description": "Protection often asymmetric; mentor more protective of mentee than reverse",
+        "narrative_use": "Asymmetry reveals character priorities and relationship nature"
+      }
+    }
+  },
+
+  "tension_dynamics": {
+    "description": "How tension axes interact and evolve through narrative",
+    "multi_axis_states": {
+      "description": "Characters rarely have tension on only one axis",
+      "examples": [
+        {
+          "relationship": "New partners",
+          "professional": 5,
+          "trust": 6,
+          "personal_intimacy": 7,
+          "power_hierarchy": 4,
+          "ideological": 5,
+          "protective_investment": 6,
+          "description": "Moderate tension across all axes; establishing relationship phase"
+        },
+        {
+          "relationship": "Established partners, deep bond",
+          "professional": 2,
+          "trust": 1,
+          "personal_intimacy": 2,
+          "power_hierarchy": 2,
+          "ideological": 4,
+          "protective_investment": 9,
+          "description": "Low tension except ideological (keeps interesting) and high protection (deep care)"
+        },
+        {
+          "relationship": "Antagonistic colleagues forced to work together",
+          "professional": 8,
+          "trust": 7,
+          "personal_intimacy": 9,
+          "power_hierarchy": 6,
+          "ideological": 8,
+          "protective_investment": 3,
+          "description": "High tension most axes; low protection shows lack of bond"
+        },
+        {
+          "relationship": "Romantic slow burn partners",
+          "professional": 3,
+          "trust": 2,
+          "personal_intimacy": 3,
+          "romantic_attraction": 8,
+          "power_hierarchy": 3,
+          "ideological": 4,
+          "protective_investment": 8,
+          "description": "Low tension most axes BUT high attraction tension + high protection = romantic tension"
+        }
+      ]
+    },
+    "tension_evolution_triggers": {
+      "description": "Specific story events that shift tension levels",
+      "triggers": [
+        {
+          "event": "partner_saves_life",
+          "trust_impact": "-2 (increases trust)",
+          "personal_intimacy_impact": "-1 to -3 (increases closeness)",
+          "protective_investment_impact": "+1 to +2 (saved party feels more protective)",
+          "professional_impact": "0 (unless save demonstrated competence)"
+        },
+        {
+          "event": "partner_lies_caught",
+          "trust_impact": "+3 to +5 (decreases trust)",
+          "personal_intimacy_impact": "+2 (increases distance)",
+          "professional_impact": "+1 to +3 if lie affected work",
+          "protective_investment_impact": "-1 (care decreases when hurt)"
+        },
+        {
+          "event": "successful_case_collaboration",
+          "professional_impact": "-1 (increases professional harmony)",
+          "trust_impact": "-1 (builds reliability)",
+          "ideological_impact": "0 or -1 if methods aligned"
+        },
+        {
+          "event": "personal_vulnerability_shared",
+          "personal_intimacy_impact": "-2 to -4 (significantly increases closeness)",
+          "trust_impact": "-1 (sharing = trust)",
+          "professional_impact": "0 (usually)"
+        },
+        {
+          "event": "professional_disagreement_escalates",
+          "professional_impact": "+2 (increases friction)",
+          "ideological_impact": "+1 to +2 (highlights differences)",
+          "personal_intimacy_impact": "+1 if taken personally"
+        },
+        {
+          "event": "partner_endangered_willingly_for_case",
+          "protective_investment_impact": "+2 (fear increases protectiveness)",
+          "professional_impact": "+1 to +2 (frustration at recklessness)",
+          "personal_intimacy_impact": "-1 (crisis brings closer) OR +1 (angry at risk)"
+        },
+        {
+          "event": "romantic_moment_acknowledged",
+          "romantic_attraction_impact": "axis activates or intensifies +2",
+          "personal_intimacy_impact": "-2 (usually increases) OR +2 (if rejected/awkward)",
+          "professional_impact": "+1 (complication) OR -1 (brings together)"
+        }
+      ]
+    },
+    "tension_rules": {
+      "description": "Governing principles for realistic tension evolution",
+      "rules": [
+        {
+          "rule_id": "TA-001",
+          "name": "no-instant-shifts",
+          "description": "Tension cannot jump more than 3 points in single event unless catastrophic",
+          "severity": "high",
+          "example": "Partner lying doesn't instantly destroy deep trust (2→10); it damages trust (2→5), requires repair"
+        },
+        {
+          "rule_id": "TA-002",
+          "name": "cascading-tension",
+          "description": "High tension on one axis affects others; purely professional relationship impossible when personal intimacy very low",
+          "severity": "medium",
+          "example": "If personal intimacy 9 (actively dislike), professional tension minimum 5 (conflict bleeds into work)"
+        },
+        {
+          "rule_id": "TA-003",
+          "name": "tension-requires-attention",
+          "description": "8+ tension on any axis must be addressed within 3 chapters or relationship fractures",
+          "severity": "high",
+          "example": "Partners can't maintain 9 trust tension (active distrust) for 30k words; forces confrontation or separation"
+        },
+        {
+          "rule_id": "TA-004",
+          "name": "zero-tension-danger",
+          "description": "If all axes drop to 0-2, relationship becomes narratively inert; introduce new tension",
+          "severity": "medium",
+          "example": "Perfect partners need external stressor (one offered job elsewhere, moral dilemma splits them) to maintain story interest"
+        },
+        {
+          "rule_id": "TA-005",
+          "name": "earned-tension-reduction",
+          "description": "Reducing tension requires on-page relationship work proportional to tension level",
+          "severity": "critical",
+          "example": "Reducing trust tension from 8 to 4 requires 10k+ words of consistent trustworthy behavior shown on-page"
+        }
+      ]
+    }
+  },
+
+  "visualization_data_model": {
+    "description": "Data structure for Interactive Tension Axis Graph component",
+    "relationship_object": {
+      "character_pair": {
+        "character_a": "string (character identifier)",
+        "character_b": "string (character identifier)",
+        "relationship_type": "string (partners, mentor-mentee, romantic, adversarial, etc.)"
+      },
+      "tension_axes": {
+        "professional": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string (chapter/scene reference)",
+          "trajectory": "string (increasing, decreasing, stable)"
+        },
+        "trust": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string",
+          "trajectory": "string"
+        },
+        "personal_intimacy": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string",
+          "trajectory": "string"
+        },
+        "romantic_attraction": {
+          "a_to_b": "number (0-10) OR null if axis not present",
+          "b_to_a": "number (0-10) OR null if axis not present",
+          "last_updated": "string OR null",
+          "trajectory": "string OR null"
+        },
+        "power_hierarchy": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string",
+          "trajectory": "string",
+          "note": "Always asymmetric"
+        },
+        "ideological": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string",
+          "trajectory": "string"
+        },
+        "protective_investment": {
+          "a_to_b": "number (0-10)",
+          "b_to_a": "number (0-10)",
+          "last_updated": "string",
+          "trajectory": "string"
+        }
+      },
+      "recent_events": [
+        {
+          "chapter": "string",
+          "event_description": "string",
+          "axes_affected": ["array of axis names"],
+          "tension_changes": {
+            "axis_name": "±number"
+          }
+        }
+      ],
+      "relationship_health": {
+        "overall_score": "number (calculated from axes)",
+        "status": "string (thriving, stable, strained, critical)",
+        "recommendation": "string (narrative guidance)"
+      }
+    }
+  },
+
+  "urban_fantasy_procedural_specifics": {
+    "description": "Genre-specific relationship tension considerations",
+    "partner_dynamics": {
+      "description": "Detective partnerships are core relationship in procedural",
+      "essential_tensions": [
+        "Professional axis (investigation approach)",
+        "Trust axis (life-or-death reliability)",
+        "Ideological axis (justice philosophy)",
+        "Protective investment (partner safety)"
+      ],
+      "common_arcs": [
+        "Hostile to reluctant to functional to protective (classic buddy cop)",
+        "Mentor-mentee to equals (growth arc)",
+        "Professional to romantic (slow burn)",
+        "Partners to betrayal to redemption (trust arc)"
+      ]
+    },
+    "magical_hierarchy_tension": {
+      "description": "Urban fantasy adds magical competence hierarchy",
+      "tension_source": "Non-magical partnered with magical, or different magical traditions",
+      "axes_affected": [
+        "Professional (magical partner more effective in supernatural cases)",
+        "Power hierarchy (magical ability = informal authority)",
+        "Ideological (different views on magic use ethics)"
+      ]
+    },
+    "civilian_relationships": {
+      "description": "Detective relationships with non-LEO characters",
+      "tension_sources": [
+        "Can't share case details (personal intimacy limited)",
+        "Danger to civilian loved ones (protective investment high, creates guilt)",
+        "Irregular hours damage relationships (trust/intimacy suffer)",
+        "Moral weight of job not understood by civilians (ideological distance)"
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "dr_viktor": "Primary validator for relationship dynamics and emotional authenticity of tension",
+      "bailey": "References tension axes during drafting; ensures character interactions reflect current tension levels",
+      "tessa": "Tracks tension evolution across chapters; validates consistency and earned changes",
+      "miranda": "Oversees relationship arcs across series; ensures tension serves story"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_relationship_tensions",
+        "npe_tension_history",
+        "npe_relationship_events"
+      ],
+      "validation_triggers": ["relationship_interaction", "tension_shift", "chapter_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "unaddressed_critical_tension",
+        "threshold": "No 8+ tension unaddressed for >3 chapters",
+        "severity": "critical"
+      },
+      {
+        "metric": "tension_shift_justification",
+        "threshold": "100% of ±3 or greater shifts have on-page event",
+        "severity": "high"
+      },
+      {
+        "metric": "relationship_narratively_inert",
+        "threshold": "No relationships with all axes 0-2 for >5 chapters",
+        "severity": "medium"
+      },
+      {
+        "metric": "bidirectional_asymmetry_realism",
+        "threshold": "Power and protection axes must be asymmetric",
+        "severity": "medium"
+      },
+      {
+        "metric": "tension_cascade_validation",
+        "threshold": "High tension one axis affects related axes appropriately",
+        "severity": "medium"
+      }
+    ]
+  }
+}

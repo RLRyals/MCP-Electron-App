@@ -1,0 +1,289 @@
+{
+  "category": "character-logic",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Character behavior consistency rules governing decisions, emotional authenticity, and behavioral palettes",
+
+  "behavioral_palettes": {
+    "description": "Character behavior must stay within established palette unless major arc justifies shift",
+    "palette_levels": {
+      "V1_core_identity": {
+        "description": "Unchangeable core traits (personality type, moral framework, fundamental skills)",
+        "mutability": "never",
+        "examples": [
+          "Introverted detective remains introverted (may improve social skills but won't become extroverted)",
+          "Character with strong justice drive won't become corrupt without catastrophic arc"
+        ]
+      },
+      "V2_learned_behaviors": {
+        "description": "Skills, habits, coping mechanisms acquired through experience",
+        "mutability": "slow_evolution",
+        "examples": [
+          "Combat skills improve through training",
+          "Trust issues may soften through positive relationships"
+        ]
+      },
+      "V3_situational_responses": {
+        "description": "Context-dependent reactions within character's range",
+        "mutability": "moderate",
+        "examples": [
+          "Normally calm character shows anger when partner is threatened",
+          "Professional demeanor drops in private with close friend"
+        ]
+      },
+      "V4_emotional_states": {
+        "description": "Temporary emotional conditions affecting behavior",
+        "mutability": "high",
+        "examples": [
+          "Exhaustion after 48hr stakeout affects judgment",
+          "Grief over victim impacts investigation focus"
+        ]
+      }
+    }
+  },
+
+  "rules": {
+    "behavioral_consistency": {
+      "description": "Character actions must align with established behavioral palette",
+      "validations": [
+        {
+          "rule_id": "CL-001",
+          "name": "palette-adherence",
+          "severity": "critical",
+          "description": "Actions must fall within character's established V1-V4 range",
+          "examples": {
+            "violation": "Cautious, by-the-book detective suddenly breaks into suspect's home without warrant or character development justifying shift",
+            "compliant": "By-the-book detective bends rules (V3 situational) when partner's life is at stake, then feels guilty (V1 core morality intact)"
+          },
+          "validation_query": "Is this behavior consistent with character's palette? If not, has sufficient character development occurred to justify expansion?"
+        },
+        {
+          "rule_id": "CL-002",
+          "name": "competence-consistency",
+          "severity": "high",
+          "description": "Character skills and knowledge must remain consistent; sudden expertise requires prior establishment",
+          "examples": {
+            "violation": "Detective who struggled with basic spell in Ch 2 casts complex ritual in Ch 4 with no training shown",
+            "compliant": "Detective's growing magical competence shown through training montages, mentor sessions, and gradual skill progression"
+          },
+          "validation_query": "Has this skill/knowledge been previously established? If new, was acquisition shown on-page?"
+        },
+        {
+          "rule_id": "CL-003",
+          "name": "emotional-momentum",
+          "severity": "medium",
+          "description": "Emotional states (V4) must have realistic duration; no instant recovery from trauma",
+          "examples": {
+            "violation": "Character witnesses partner's death, is cheerful next scene",
+            "compliant": "Character's grief affects sleep, appetite, and focus for multiple chapters; gradually processes trauma"
+          },
+          "validation_query": "Is this emotional recovery/shift realistic given the triggering event's severity?"
+        }
+      ]
+    },
+
+    "decision_validation": {
+      "description": "Character decisions must be motivated by knowledge, goals, and personality",
+      "validations": [
+        {
+          "rule_id": "CL-101",
+          "name": "knowledge-based-decisions",
+          "severity": "critical",
+          "description": "Characters can only act on information they actually possess",
+          "examples": {
+            "violation": "Detective goes to warehouse where hostage is held despite no clue pointing there",
+            "compliant": "Detective finds shipping receipt in suspect's trash, leading to warehouse location"
+          },
+          "validation_query": "What information does this character currently possess that would lead to this decision?"
+        },
+        {
+          "rule_id": "CL-102",
+          "name": "goal-aligned-actions",
+          "severity": "high",
+          "description": "Actions must serve character's current goals or believable subgoals",
+          "examples": {
+            "violation": "Detective pursuing serial killer stops investigation to help stranger find lost cat",
+            "compliant": "Detective helps stranger, discovers stranger is witness to case (subgoal aligned with main goal)"
+          },
+          "validation_query": "How does this action serve the character's established goals or motivations?"
+        },
+        {
+          "rule_id": "CL-103",
+          "name": "personality-congruent-choices",
+          "severity": "medium",
+          "description": "Decision-making style must match character personality",
+          "examples": {
+            "violation": "Analytical, methodical detective makes sudden impulsive decision with no justification",
+            "compliant": "Analytical detective's impulsive action justified by extreme time pressure and partial information suggesting partner in danger"
+          },
+          "validation_query": "Is this decision-making process consistent with character's established thinking style?"
+        },
+        {
+          "rule_id": "CL-104",
+          "name": "no-idiot-plots",
+          "severity": "critical",
+          "description": "Characters cannot make obviously stupid choices solely to create plot tension",
+          "examples": {
+            "violation": "Experienced detective investigates creepy basement alone without backup despite multiple warnings",
+            "compliant": "Detective investigates basement alone because backup is 30min away and victim's screams heard from below (time pressure justifies risk)"
+          },
+          "validation_query": "Would a competent person in this situation make this choice? What constraints justify risky decisions?"
+        }
+      ]
+    },
+
+    "relationship_dynamics": {
+      "description": "Relationships must evolve based on shared experiences and demonstrated behavior",
+      "validations": [
+        {
+          "rule_id": "CL-201",
+          "name": "trust-earned-not-given",
+          "severity": "high",
+          "description": "Trust between characters must be built through on-page interactions",
+          "examples": {
+            "violation": "Detective instantly trusts new informant with no verification",
+            "compliant": "Detective tests informant with verifiable tip (Ch 3), informant proves reliable (Ch 5), detective gradually increases trust (Ch 7)"
+          },
+          "validation_query": "What specific on-page interactions have built or damaged trust in this relationship?"
+        },
+        {
+          "rule_id": "CL-202",
+          "name": "relationship-momentum",
+          "severity": "medium",
+          "description": "Relationships progress or regress based on character actions; no static relationships",
+          "examples": {
+            "violation": "Partners have same surface-level dynamic across 50k words despite intense shared experiences",
+            "compliant": "Partnership deepens as they save each other's lives, share vulnerabilities, and develop private communication"
+          },
+          "validation_query": "How has this relationship changed based on recent shared experiences?"
+        },
+        {
+          "rule_id": "CL-203",
+          "name": "conflict-resolution-authenticity",
+          "severity": "medium",
+          "description": "Interpersonal conflicts require realistic resolution; no hand-waving",
+          "examples": {
+            "violation": "Major betrayal forgiven off-page with no discussion",
+            "compliant": "Betrayal leads to confrontation scene, apology, probationary trust period, gradual rebuilding"
+          },
+          "validation_query": "Does the resolution of this conflict match its severity and the characters involved?"
+        }
+      ]
+    },
+
+    "detective_specific_logic": {
+      "description": "Detective characters in procedural must follow professional investigative reasoning",
+      "validations": [
+        {
+          "rule_id": "CL-301",
+          "name": "evidence-based-reasoning",
+          "severity": "high",
+          "description": "Detective conclusions must be supported by evidence presented to reader",
+          "examples": {
+            "violation": "Detective names suspect based on 'gut feeling' with no supporting clues",
+            "compliant": "Detective's theory supported by: motive (victim had restraining order), means (suspect owns matching weapon), opportunity (no alibi for time of death)"
+          },
+          "validation_query": "What evidence supports this investigative conclusion? Has reader been shown this evidence?"
+        },
+        {
+          "rule_id": "CL-302",
+          "name": "professional-competence",
+          "severity": "high",
+          "description": "Detective must demonstrate professional-level investigation skills appropriate to rank/experience",
+          "examples": {
+            "violation": "20-year veteran detective makes rookie mistake of contaminating crime scene",
+            "compliant": "Rookie detective makes understandable error, veteran partner corrects and teaches proper procedure"
+          },
+          "validation_query": "Is this mistake/success appropriate for character's experience level?"
+        },
+        {
+          "rule_id": "CL-303",
+          "name": "interrogation-consistency",
+          "severity": "medium",
+          "description": "Interview/interrogation tactics must match character's training and style",
+          "examples": {
+            "violation": "Empathetic detective uses aggressive interrogation tactics with no justification",
+            "compliant": "Empathetic detective uses rapport-building approach, switches to controlled confrontation only when witness lies"
+          },
+          "validation_query": "Do these interrogation tactics align with character's established interview style?"
+        }
+      ]
+    },
+
+    "magical_aptitude_consistency": {
+      "description": "Characters' magical abilities must follow established rules and growth patterns",
+      "validations": [
+        {
+          "rule_id": "CL-401",
+          "name": "magical-skill-progression",
+          "severity": "high",
+          "description": "Magical competence grows through training, practice, or plot-justified power gain",
+          "examples": {
+            "violation": "Non-magical character suddenly casts spell with no explanation",
+            "compliant": "Latent magical character's power awakens during life-threatening moment (Ch 3), seeks training (Ch 4-6), practices and improves (Ch 7+)"
+          },
+          "validation_query": "Has magical growth been earned through training/experience, or justified by plot event?"
+        },
+        {
+          "rule_id": "CL-402",
+          "name": "power-limitation-respect",
+          "severity": "critical",
+          "description": "Characters cannot exceed established magical limitations without cost or explanation",
+          "examples": {
+            "violation": "Character who can detect lies within 10ft suddenly senses deception across city",
+            "compliant": "Character exceeds normal range through dangerous ritual with 1-week recovery cost"
+          },
+          "validation_query": "Does this magical action respect previously established limits? If exceeded, what's the cost/justification?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "dr_viktor": "Primary validator for character consistency, emotional authenticity, and behavioral palette adherence",
+      "bailey": "Check character decisions during drafting; ensure knowledge-based choices",
+      "tessa": "Verify character competence consistency and relationship progression tracking",
+      "miranda": "Final validation of character arcs and relationship dynamics across chapters"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_character_states",
+        "npe_character_decisions",
+        "npe_relationship_events",
+        "npe_knowledge_tracking"
+      ],
+      "validation_triggers": ["character_decision", "relationship_interaction", "skill_usage", "emotional_state_change"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "palette_violations",
+        "threshold": "0 V1/V2 violations per chapter",
+        "severity": "critical"
+      },
+      {
+        "metric": "knowledge_inconsistencies",
+        "threshold": "0 per chapter",
+        "severity": "critical"
+      },
+      {
+        "metric": "relationship_progression_rate",
+        "threshold": "Measurable change every 3-5 chapters",
+        "severity": "medium"
+      },
+      {
+        "metric": "idiot_plot_incidents",
+        "threshold": "0 per story",
+        "severity": "critical"
+      },
+      {
+        "metric": "competence_consistency",
+        "threshold": "95%+ actions match experience level",
+        "severity": "high"
+      }
+    ]
+  }
+}

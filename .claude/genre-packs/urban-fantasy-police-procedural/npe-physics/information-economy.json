@@ -1,0 +1,332 @@
+{
+  "category": "information-economy",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Information revelation rules governing mystery management, clue distribution, and reader knowledge in detective narratives",
+
+  "core_principle": "Detective fiction is fundamentally about information control: what the reader knows, when they know it, and how they learn it determines the mystery experience",
+
+  "knowledge_layers": {
+    "reader_knows_detective_doesnt": "Dramatic irony—reader sees threat detective misses",
+    "detective_knows_reader_doesnt": "Surprise—detective withholds or reader doesn't connect dots",
+    "both_know_together": "Fair play mystery—reader has same clues as detective",
+    "neither_knows": "Puzzle pieces not yet discovered"
+  },
+
+  "rules": {
+    "fair_play_mystery": {
+      "description": "Reader must have access to clues needed to theoretically solve mystery before reveal",
+      "validations": [
+        {
+          "rule_id": "IE-001",
+          "name": "clue-accessibility",
+          "severity": "critical",
+          "description": "All clues essential to solution must be presented to reader before detective solves case",
+          "examples": {
+            "violation": "Detective solves case using evidence never shown to reader",
+            "compliant": "Reader sees all crime scene details, witness statements, and forensic reports that detective uses to solve case"
+          },
+          "validation_query": "Has the reader been shown every piece of evidence the detective uses in their solution?"
+        },
+        {
+          "rule_id": "IE-002",
+          "name": "clue-emphasis-balance",
+          "severity": "high",
+          "description": "Crucial clues should receive similar narrative emphasis as red herrings; not hidden or spotlighted",
+          "examples": {
+            "violation": "Critical clue mentioned in passing half-sentence buried in paragraph; red herrings get detailed focus",
+            "compliant": "Crucial clue and red herrings both described with similar detail, allowing reader to weigh all evidence"
+          },
+          "validation_query": "Is this crucial clue given appropriate narrative weight for reader to notice without being obviously flagged?"
+        },
+        {
+          "rule_id": "IE-003",
+          "name": "solution-logic-chain",
+          "severity": "critical",
+          "description": "Detective's solution must follow from presented clues; reader should be able to reconstruct logic",
+          "examples": {
+            "violation": "Detective makes logical leap based on information not established or shown",
+            "compliant": "Detective's deduction: victim's phone records (shown) + warehouse receipt (shown) + suspect's alibi inconsistency (shown) = suspect lied about location"
+          },
+          "validation_query": "Can you trace every step of detective's logic back to clues presented to reader?"
+        }
+      ]
+    },
+
+    "clue_distribution": {
+      "description": "Clues must be spaced for momentum and progressive revelation",
+      "validations": [
+        {
+          "rule_id": "IE-101",
+          "name": "clue-rhythm",
+          "severity": "medium",
+          "description": "Distribute major clues at regular intervals: 1 significant clue per 3-5k words",
+          "examples": {
+            "violation": "All clues dumped in two scenes; 30k words with no new information",
+            "compliant": "Steady discovery rhythm maintains momentum: crime scene clues (Ch 1) → forensics (Ch 3) → witness revelation (Ch 5) → breakthrough connection (Ch 7)"
+          },
+          "validation_query": "When was the last significant clue discovered? Is it time for new information?"
+        },
+        {
+          "rule_id": "IE-102",
+          "name": "progressive-revelation",
+          "severity": "high",
+          "description": "Later clues should build on earlier ones; create sense of puzzle pieces connecting",
+          "examples": {
+            "violation": "Each clue is isolated; no sense of building understanding",
+            "compliant": "Clue 1: victim knew attacker. Clue 2: attacker left through back door. Clue 3: back door requires key card. Clue 4: only three people have that key card. (Each narrows possibilities)"
+          },
+          "validation_query": "How does this new clue connect to or narrow down previous information?"
+        },
+        {
+          "rule_id": "IE-103",
+          "name": "red-herring-ratio",
+          "severity": "medium",
+          "description": "Maintain approximately 2:1 ratio of genuine clues to red herrings to avoid frustration",
+          "examples": {
+            "violation": "Every lead is false; reader loses trust in narrative",
+            "compliant": "Of 9 major clues, 6 point toward truth, 3 mislead—creating challenge without frustration"
+          },
+          "validation_query": "What's the current ratio of real clues to misdirection? Is it balanced?"
+        }
+      ]
+    },
+
+    "mystery_preservation": {
+      "description": "Maintain appropriate level of mystery without cheating reader",
+      "validations": [
+        {
+          "rule_id": "IE-201",
+          "name": "no-withheld-pov-information",
+          "severity": "critical",
+          "description": "POV character cannot hide crucial information from reader; no 'detective knows but won't share' moments",
+          "examples": {
+            "violation": "Detective has breakthrough realization, narration says 'She finally understood' but doesn't reveal what; saves for dramatic reveal later",
+            "compliant": "When detective makes connection, reader sees the thought process: 'The timeline didn't work. Unless... She grabbed the phone records again.'"
+          },
+          "validation_query": "If the POV character knows this, why wouldn't reader also know it?"
+        },
+        {
+          "rule_id": "IE-202",
+          "name": "suspect-revelation-timing",
+          "severity": "high",
+          "description": "Primary suspect/culprit should be introduced in first 1/3 of story; mystery is 'whodunit' not 'who-is-this-random-person'",
+          "examples": {
+            "violation": "Killer revealed in Act 3 as character never previously mentioned",
+            "compliant": "All viable suspects introduced by end of Act 1; mystery is determining which one and proving it"
+          },
+          "validation_query": "Have all potential culprits been introduced by the story's 1/3 mark?"
+        },
+        {
+          "rule_id": "IE-203",
+          "name": "misdirection-authenticity",
+          "severity": "medium",
+          "description": "Red herrings must be plausible and based on real evidence, not authorial lying",
+          "examples": {
+            "violation": "Narration describes character as 'looking guilty' but character is innocent and had no reason to appear guilty",
+            "compliant": "Character appears guilty because they were hiding different secret (affair, financial crime); evidence genuinely points their way until deeper investigation"
+          },
+          "validation_query": "Is this misdirection based on plausible evidence or narrative cheating?"
+        }
+      ]
+    },
+
+    "information_revelation_techniques": {
+      "description": "Methods of revealing information to reader must feel natural, not contrived",
+      "validations": [
+        {
+          "rule_id": "IE-301",
+          "name": "active-discovery",
+          "severity": "high",
+          "description": "Detective should actively seek and earn information through investigation, not passively receive it",
+          "examples": {
+            "violation": "Witness volunteers crucial information unprompted; evidence conveniently appears",
+            "compliant": "Detective asks targeted questions based on prior clues, searches for evidence, follows logical investigative steps to discover information"
+          },
+          "validation_query": "What investigative action led to this information being discovered?"
+        },
+        {
+          "rule_id": "IE-302",
+          "name": "no-convenient-confessions",
+          "severity": "high",
+          "description": "Major revelations shouldn't come from characters suddenly deciding to confess; earn breakthrough through detective work",
+          "examples": {
+            "violation": "Character randomly decides to tell truth after lying for 10 chapters",
+            "compliant": "Detective presents contradicting evidence, catches witness in lie, applies pressure, witness reluctantly admits truth"
+          },
+          "validation_query": "What pressure or evidence forces this character to reveal information?"
+        },
+        {
+          "rule_id": "IE-303",
+          "name": "document-discovery-realism",
+          "severity": "medium",
+          "description": "Convenient document discoveries (diary, letter, recording) must be earned and plausible",
+          "examples": {
+            "violation": "Detective randomly finds diary that explains entire mystery",
+            "compliant": "Detective methodically searches victim's belongings, finds hidden phone, requires tech expert to unlock it, discovers partial information that raises new questions"
+          },
+          "validation_query": "Is this document discovery the result of thorough investigation or convenient plotting?"
+        }
+      ]
+    },
+
+    "worldbuilding_information": {
+      "description": "Urban fantasy requires revealing magical system rules without info-dumping",
+      "validations": [
+        {
+          "rule_id": "IE-401",
+          "name": "magic-rules-through-demonstration",
+          "severity": "high",
+          "description": "Reveal magical system rules through character actions, not exposition",
+          "examples": {
+            "violation": "Character explains: 'As you know, detection spells require line of sight and fade after 6 hours.'",
+            "compliant": "Detective attempts detection spell at crime scene 8 hours old, nothing happens. 'Damn. Too late. Signature fades after six hours.'"
+          },
+          "validation_query": "Is this worldbuilding information shown through action or explained through exposition?"
+        },
+        {
+          "rule_id": "IE-402",
+          "name": "worldbuilding-need-to-know",
+          "severity": "medium",
+          "description": "Only reveal worldbuilding details relevant to current investigation; don't explain entire magical system upfront",
+          "examples": {
+            "violation": "Chapter-long explanation of magical politics unrelated to case",
+            "compliant": "Reveal specific magical rule when it becomes relevant: 'Ward magic required blood binding. That meant the victim had to have willingly given permission at some point.'"
+          },
+          "validation_query": "Is this worldbuilding detail immediately relevant to the current investigation?"
+        }
+      ]
+    },
+
+    "reader_engagement": {
+      "description": "Information pacing should keep reader actively theorizing",
+      "validations": [
+        {
+          "rule_id": "IE-501",
+          "name": "theory-evolution",
+          "severity": "medium",
+          "description": "New information should regularly force detective (and reader) to revise theories",
+          "examples": {
+            "violation": "First theory is correct; no revision needed; no surprises",
+            "compliant": "Initial theory: random murder → Clue forces revision: targeted hit → New evidence: victim was hiding identity → Final truth: victim was undercover operative"
+          },
+          "validation_query": "How many times has the working theory changed? Are revelations forcing reassessment?"
+        },
+        {
+          "rule_id": "IE-502",
+          "name": "competing-theories",
+          "severity": "low",
+          "description": "Multiple viable theories should exist simultaneously based on available evidence",
+          "examples": {
+            "violation": "Only one possible interpretation of evidence; no ambiguity",
+            "compliant": "Evidence supports Theory A (professional hit) and Theory B (crime of passion) until crucial clue tips scales"
+          },
+          "validation_query": "Could current evidence support multiple theories? Is there productive ambiguity?"
+        },
+        {
+          "rule_id": "IE-503",
+          "name": "aha-moment-setup",
+          "severity": "high",
+          "description": "Major revelations should create 'aha!' reaction where reader sees clues snap into place",
+          "examples": {
+            "violation": "Revelation comes from nowhere; reader can't reconstruct logic",
+            "compliant": "Revelation connects previously established details reader saw but didn't connect: 'The security footage, the missing key card, the maintenance schedule—suddenly it all made sense.'"
+          },
+          "validation_query": "Will the reader experience recognition when this revelation occurs? Can they trace back to earlier clues?"
+        }
+      ]
+    },
+
+    "pacing_information_flow": {
+      "description": "Control information release rate to maintain momentum",
+      "validations": [
+        {
+          "rule_id": "IE-601",
+          "name": "no-information-drought",
+          "severity": "high",
+          "description": "Avoid extended periods (>10k words) without new information or progress",
+          "examples": {
+            "violation": "Five chapters of investigation yielding no new clues or understanding",
+            "compliant": "Even failed leads provide information: 'Three alibis checked out. Whoever did this, it wasn't one of the obvious suspects. She needed a new angle.'"
+          },
+          "validation_query": "When was the last time detective (and reader) learned something new about the case?"
+        },
+        {
+          "rule_id": "IE-602",
+          "name": "midpoint-revelation-impact",
+          "severity": "critical",
+          "description": "Story midpoint should feature major information reveal that reframes entire investigation",
+          "examples": {
+            "violation": "Investigation proceeds linearly with no major perspective shifts",
+            "compliant": "Midpoint: 'It wasn't a murder. It was a cover-up.' or 'The victim wasn't the target. She was the killer.'"
+          },
+          "validation_query": "Does the midpoint revelation fundamentally change understanding of the case?"
+        },
+        {
+          "rule_id": "IE-603",
+          "name": "climax-final-pieces",
+          "severity": "high",
+          "description": "Final confrontation can add last puzzle piece, but 80%+ of solution should be established before climax",
+          "examples": {
+            "violation": "Entire solution revealed in climax exposition with no prior setup",
+            "compliant": "Detective has 80% of puzzle solved through investigation; final confrontation confirms theory and reveals killer's specific motive"
+          },
+          "validation_query": "How much of the solution has been established before the final confrontation?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "miranda": "Track information economy across story arc; ensure fair play and proper pacing",
+      "tessa": "Verify clue accessibility and logic chain continuity",
+      "bailey": "Monitor clue distribution during drafting",
+      "detective_logan": "Validate investigative realism and active discovery patterns"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_clue_tracking",
+        "npe_information_reveals",
+        "npe_mystery_state",
+        "npe_character_knowledge"
+      ],
+      "validation_triggers": ["clue_discovered", "theory_revision", "chapter_complete", "act_milestone"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "fair_play_compliance",
+        "threshold": "100% of solution clues shown to reader",
+        "severity": "critical"
+      },
+      {
+        "metric": "clue_discovery_frequency",
+        "threshold": "1 significant clue per 3-5k words",
+        "severity": "medium"
+      },
+      {
+        "metric": "red_herring_ratio",
+        "threshold": "Approximately 2:1 real:false clues",
+        "severity": "medium"
+      },
+      {
+        "metric": "information_drought_length",
+        "threshold": "≤10k words between discoveries",
+        "severity": "high"
+      },
+      {
+        "metric": "theory_revision_count",
+        "threshold": "≥3 major theory shifts",
+        "severity": "low"
+      },
+      {
+        "metric": "withheld_pov_information",
+        "threshold": "0 instances",
+        "severity": "critical"
+      }
+    ]
+  }
+}

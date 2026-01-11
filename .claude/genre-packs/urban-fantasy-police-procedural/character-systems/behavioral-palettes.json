@@ -1,0 +1,538 @@
+{
+  "category": "behavioral-palettes",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Character evolution framework defining V1-V4 behavioral layers, emotional ranges, wound progression, and contextual states for authentic character development",
+
+  "v1_core_identity": {
+    "description": "Immutable personality foundation; these traits never fundamentally change",
+    "mutability": "never",
+    "framework": {
+      "personality_axes": {
+        "description": "Core personality dimensions that define character essence",
+        "dimensions": [
+          {
+            "axis": "introversion_extroversion",
+            "examples": {
+              "introvert": "Recharged by solitude; processes internally; small social circles",
+              "extrovert": "Energized by interaction; thinks aloud; broad social networks"
+            },
+            "evolution_note": "Introverts may learn social skills but won't become extroverts; extroverts may learn to enjoy quiet but won't become introverts"
+          },
+          {
+            "axis": "analytical_intuitive",
+            "examples": {
+              "analytical": "Data-driven; systematic; wants hard evidence",
+              "intuitive": "Pattern-recognition; gut feelings; reads between lines"
+            },
+            "evolution_note": "Core thinking style remains; may adopt complementary skills but defaults to primary mode under stress"
+          },
+          {
+            "axis": "emotional_stoic",
+            "examples": {
+              "emotional": "Feelings visible; empathetic; connects through emotion",
+              "stoic": "Controlled affect; rational; compartmentalizes feelings"
+            },
+            "evolution_note": "Emotional display preference is core; may learn regulation but natural expression remains"
+          },
+          {
+            "axis": "risk_averse_risk_seeking",
+            "examples": {
+              "risk_averse": "Cautious; plans thoroughly; values security",
+              "risk_seeking": "Bold; acts quickly; thrives on uncertainty"
+            },
+            "evolution_note": "Risk tolerance can shift slightly but baseline remains consistent"
+          }
+        ]
+      },
+      "moral_framework": {
+        "description": "Fundamental ethical foundation; deeply resistant to change",
+        "types": [
+          {
+            "framework": "lawful_good",
+            "description": "Rules protect people; justice through proper channels",
+            "breaking_point": "Only violates rules when rule itself is immoral and lives hang in balance"
+          },
+          {
+            "framework": "chaotic_good",
+            "description": "Results matter more than process; ends justify means if noble",
+            "breaking_point": "Won't harm innocents even for greater good"
+          },
+          {
+            "framework": "pragmatic_neutral",
+            "description": "Situational ethics; context determines right action",
+            "breaking_point": "Won't betray core loyalties regardless of situation"
+          },
+          {
+            "framework": "redemption_seeking",
+            "description": "Past mistakes drive current morality; proving worthiness",
+            "breaking_point": "Can't return to old ways without complete character breakdown"
+          }
+        ],
+        "corruption_rules": {
+          "description": "V1 moral framework can only change through catastrophic arc",
+          "requirements": [
+            "Betrayal by institution character believed in",
+            "Loss of person who anchored moral identity",
+            "Gradual erosion shown across 30k+ words",
+            "Multiple on-page moments of moral compromise building"
+          ]
+        }
+      },
+      "fundamental_skills": {
+        "description": "Core competencies that define professional identity",
+        "examples": [
+          "Detective with 15 years experience has investigative instincts",
+          "Former military has tactical awareness under fire",
+          "Street kid has survival skills and danger sense"
+        ],
+        "rule": "Cannot lose fundamental skills without trauma/injury; no sudden incompetence"
+      }
+    }
+  },
+
+  "v2_learned_behaviors": {
+    "description": "Acquired skills, habits, and coping mechanisms; evolves through sustained experience",
+    "mutability": "slow_evolution",
+    "framework": {
+      "skill_acquisition": {
+        "description": "New abilities learned through training, mentorship, or repeated practice",
+        "progression_model": {
+          "novice": {
+            "word_count": "0-5k words of practice/training shown",
+            "performance": "Shaky execution; requires focus; fails under pressure"
+          },
+          "competent": {
+            "word_count": "5k-15k words of practice",
+            "performance": "Reliable in normal conditions; struggles with complexity"
+          },
+          "proficient": {
+            "word_count": "15k-30k words of practice",
+            "performance": "Second nature; handles complications; teachable to others"
+          },
+          "expert": {
+            "word_count": "30k+ words OR major time skip with justification",
+            "performance": "Intuitive mastery; adapts creatively; mentors others"
+          }
+        },
+        "examples": [
+          {
+            "skill": "magical_sensing",
+            "v2_progression": "Ch 1: Can't detect magic → Ch 5: Detects obvious spells → Ch 10: Senses subtle enchantments → Ch 15: Identifies specific spell types"
+          },
+          {
+            "skill": "combat_proficiency",
+            "v2_progression": "Ch 2: Loses every fight → Ch 6: Holds own with training → Ch 11: Wins against skilled opponents → Ch 16: Trains others"
+          },
+          {
+            "skill": "interrogation_technique",
+            "v2_progression": "Ch 3: Witnesses clam up → Ch 7: Gets basic info → Ch 12: Reads microexpressions → Ch 17: Extracts hidden truths"
+          }
+        ]
+      },
+      "coping_mechanisms": {
+        "description": "Emotional regulation strategies developed in response to trauma or stress",
+        "types": [
+          {
+            "mechanism": "compartmentalization",
+            "development": "Forms after repeated exposure to violence/trauma",
+            "function": "Separates work horror from personal life",
+            "failure_point": "Breaks down when trauma becomes personal"
+          },
+          {
+            "mechanism": "dark_humor",
+            "development": "Adopted from mentor or team culture",
+            "function": "Defuses tension; builds camaraderie",
+            "failure_point": "Stops working when stakes too high"
+          },
+          {
+            "mechanism": "hypervigilance",
+            "development": "After being ambushed/caught off-guard",
+            "function": "Constant threat assessment; hard to surprise",
+            "failure_point": "Exhausting; damages relationships"
+          },
+          {
+            "mechanism": "emotional_walls",
+            "development": "After betrayal or loss",
+            "function": "Prevents vulnerability and hurt",
+            "failure_point": "Isolates; prevents intimacy"
+          }
+        ],
+        "evolution_rule": "Can be unlearned with 15k+ words of positive counter-experiences and conscious work"
+      },
+      "habit_formation": {
+        "description": "Repeated behaviors that become automatic",
+        "examples": [
+          "Always checks exits when entering room (after ambush)",
+          "Triple-checks spell components (after backfire incident)",
+          "Calls partner before entering dangerous location (after near-death)"
+        ],
+        "rule": "Habits form after 5+ repetitions shown on-page; breaking habits requires 10+ instances of conscious override"
+      }
+    }
+  },
+
+  "v3_situational_responses": {
+    "description": "Context-dependent behavior within character's established range; moderate flexibility",
+    "mutability": "moderate",
+    "framework": {
+      "context_states": {
+        "description": "Different situations pull different aspects of character's palette",
+        "baseline_context": {
+          "description": "Normal operating mode; typical behavior",
+          "characteristics": [
+            "Access to full skillset",
+            "V1 personality expressed naturally",
+            "V2 learned behaviors deployed appropriately",
+            "Emotional regulation functional"
+          ]
+        },
+        "stress_context": {
+          "description": "High pressure but still functional; elevated state",
+          "triggers": [
+            "Time pressure (ticking clock on case)",
+            "Multiple competing priorities",
+            "Sleep deprivation (24+ hours awake)",
+            "Minor physical injury"
+          ],
+          "behavioral_shifts": [
+            "More irritable; snaps at colleagues",
+            "Relies more heavily on V1 core traits (analytical becomes more rigid, intuitive trusts gut more)",
+            "V2 skills remain but with slightly degraded performance",
+            "Emotional regulation weakens (stoic shows frustration, emotional becomes volatile)"
+          ]
+        },
+        "extreme_context": {
+          "description": "Life-or-death; survival mode engaged",
+          "triggers": [
+            "Partner's life in immediate danger",
+            "Personal life-threatening situation",
+            "Civilian hostage scenario",
+            "Magical backlash/overwhelming power"
+          ],
+          "behavioral_shifts": [
+            "V1 core traits amplified to extreme",
+            "V2 learned skills: trained responses become automatic, untrained skills inaccessible",
+            "V3 situation responses: may act outside normal behavior if survival requires",
+            "Fight-or-flight: raw personality emerges"
+          ],
+          "examples": [
+            "By-the-book detective breaks into warehouse without warrant (partner screaming inside)",
+            "Stoic detective screams in rage when confronting partner's killer",
+            "Risk-averse detective takes suicidal chance when no other option exists"
+          ]
+        },
+        "recovery_context": {
+          "description": "Post-trauma processing; reduced capacity",
+          "triggers": [
+            "After violent confrontation",
+            "Witness death (especially civilian)",
+            "Major betrayal or loss",
+            "Failed to save someone"
+          ],
+          "duration": "Minimum 1 chapter; severe trauma requires 3-5 chapters",
+          "behavioral_shifts": [
+            "Withdrawn; seeks solitude or trusted companion",
+            "V2 skills unreliable (shaky hands, poor focus)",
+            "V3 responses muted (emotionally flat or overwhelmed)",
+            "Sleep disturbance, appetite changes"
+          ]
+        }
+      },
+      "relationship_modulation": {
+        "description": "Character presents differently based on relationship dynamics",
+        "professional_context": {
+          "description": "Work relationships; role-appropriate behavior",
+          "characteristics": [
+            "Maintains professional boundaries",
+            "Formal language with superiors",
+            "Mentor/mentee dynamics with junior/senior partners",
+            "Competence on display"
+          ]
+        },
+        "personal_context": {
+          "description": "Close relationships; authentic self",
+          "characteristics": [
+            "Vulnerable; shares fears and doubts",
+            "Informal language; inside jokes",
+            "Seeks/offers emotional support",
+            "V1 core personality most visible"
+          ]
+        },
+        "adversarial_context": {
+          "description": "Interrogation, negotiation, conflict",
+          "characteristics": [
+            "Guarded; reveals nothing personal",
+            "Strategic presentation of self",
+            "May deploy false personas (part of V2 trained skills)",
+            "Heightened awareness of power dynamics"
+          ]
+        }
+      }
+    }
+  },
+
+  "v4_emotional_states": {
+    "description": "Temporary emotional conditions that color all behavior; high mutability",
+    "mutability": "high",
+    "framework": {
+      "primary_emotions": {
+        "description": "Core emotional experiences that drive behavior in the moment",
+        "emotions": [
+          {
+            "emotion": "fear",
+            "behavioral_impact": [
+              "Risk-averse: heightened caution, seeks backup",
+              "Risk-seeking: may freeze (counter to nature)",
+              "Analytical: overthinks, paralysis by analysis",
+              "Intuitive: gut screams warnings, may flee"
+            ],
+            "physical_markers": "Elevated heart rate, sweating, shallow breathing, hypervigilance",
+            "duration": "Minutes to hours; lingers as anxiety if unresolved"
+          },
+          {
+            "emotion": "anger",
+            "behavioral_impact": [
+              "Stoic: cold fury, controlled lashing out",
+              "Emotional: hot rage, visible aggression",
+              "All types: reduced impulse control, tunnel vision on target"
+            ],
+            "physical_markers": "Tension, raised voice, aggressive posture, flushed face",
+            "duration": "Minutes to days depending on trigger severity"
+          },
+          {
+            "emotion": "grief",
+            "behavioral_impact": [
+              "All types: motivation reduced, focus impaired",
+              "Emotional: visible crying, seeks comfort",
+              "Stoic: withdraws, processes internally",
+              "Can't sustain high performance; needs time to process"
+            ],
+            "physical_markers": "Fatigue, tears, loss of appetite, sleep disruption",
+            "duration": "Days to weeks for major loss; ongoing background ache"
+          },
+          {
+            "emotion": "love_connection",
+            "behavioral_impact": [
+              "Increased protectiveness of loved one",
+              "Willingness to take risks for their safety",
+              "Improved mood baseline; more resilient",
+              "Vulnerability: loved one becomes leverage point"
+            ],
+            "physical_markers": "Relaxed around person, seeks proximity, softened expression",
+            "duration": "Ongoing state; deepens over time"
+          },
+          {
+            "emotion": "guilt_shame",
+            "behavioral_impact": [
+              "Self-punishment through overwork",
+              "Avoidance of trigger situations",
+              "Reckless behavior (proving worth or seeking punishment)",
+              "Impacts decision-making: may refuse similar choices"
+            ],
+            "physical_markers": "Avoids eye contact, slumped posture, self-criticism",
+            "duration": "Days to weeks without resolution; can become chronic"
+          }
+        ]
+      },
+      "compound_states": {
+        "description": "Multiple emotions creating complex behavioral patterns",
+        "examples": [
+          {
+            "state": "fear_plus_anger",
+            "scenario": "Partner endangered by suspect",
+            "behavior": "Aggressive interrogation fueled by fear of loss; may cross ethical lines"
+          },
+          {
+            "state": "grief_plus_guilt",
+            "scenario": "Failed to prevent civilian death",
+            "behavior": "Obsessive case focus; ignores self-care; pushes away support"
+          },
+          {
+            "state": "love_plus_fear",
+            "scenario": "Romantic partner threatened",
+            "behavior": "Hyperprotective; may make poor tactical choices to ensure safety"
+          }
+        ]
+      },
+      "physical_impacts": {
+        "description": "Bodily states that affect emotional stability and performance",
+        "factors": [
+          {
+            "factor": "sleep_deprivation",
+            "threshold": "24+ hours awake",
+            "impact": "Emotional regulation degrades; irritability increases; V2 skills decline 20%"
+          },
+          {
+            "factor": "injury_pain",
+            "threshold": "Moderate injury requiring ongoing attention",
+            "impact": "Focus divided; pain creates background stress; may trigger fear response"
+          },
+          {
+            "factor": "hunger_dehydration",
+            "threshold": "Skipped 2+ meals",
+            "impact": "Mood dysregulation; poor decision-making; reduced physical performance"
+          },
+          {
+            "factor": "magical_exhaustion",
+            "threshold": "Exceeded established magical limits",
+            "impact": "Physical weakness + emotional volatility; compare to severe illness"
+          }
+        ]
+      },
+      "emotional_momentum": {
+        "description": "Emotions don't reset instantly; they have realistic duration and fade patterns",
+        "rules": [
+          {
+            "rule": "acute_emotion_duration",
+            "description": "Peak intensity lasts minutes to hours; character can't maintain heightened state indefinitely"
+          },
+          {
+            "rule": "residual_effects",
+            "description": "After peak passes, lingering effects remain (irritability after anger, fatigue after fear)"
+          },
+          {
+            "rule": "no_instant_recovery",
+            "description": "Cannot go from devastated to cheerful within a scene unless using unhealthy compartmentalization (V2 coping mechanism)"
+          },
+          {
+            "rule": "cumulative_stress",
+            "description": "Multiple V4 states compound; character operating under grief + fear + exhaustion degrades rapidly"
+          }
+        ]
+      }
+    }
+  },
+
+  "wound_progression": {
+    "description": "Psychological injuries that affect character across all palette levels",
+    "framework": {
+      "wound_types": [
+        {
+          "wound": "trust_betrayal",
+          "origin": "Betrayed by authority figure, partner, or institution",
+          "v1_impact": "None (core identity intact)",
+          "v2_impact": "Forms 'trust slowly' coping mechanism; requires proof of reliability",
+          "v3_impact": "Guarded in professional contexts; slow to open up personally",
+          "v4_impact": "Triggered by situations resembling betrayal; anxiety spikes",
+          "healing_path": "15k+ words of consistent trustworthy behavior from new relationship; gradual risk-taking"
+        },
+        {
+          "wound": "failure_guilt",
+          "origin": "Failed to prevent death or serious harm",
+          "v1_impact": "May question moral framework if failure violated core belief",
+          "v2_impact": "Develops hypervigilance; overworks to prevent repeat",
+          "v3_impact": "Avoids similar situations; may freeze when triggered",
+          "v4_impact": "Guilt resurfaces in similar cases; affects decision-making",
+          "healing_path": "Successful save in similar situation + processing guilt with trusted person"
+        },
+        {
+          "wound": "abandonment",
+          "origin": "Lost parent/partner/mentor through death or leaving",
+          "v1_impact": "None (but informs baseline personality if childhood wound)",
+          "v2_impact": "Keeps people at distance; sabotages intimacy",
+          "v3_impact": "Pushes people away when closeness increases",
+          "v4_impact": "Fear spikes when relationship deepens",
+          "healing_path": "Partner stays despite push-away; proves abandonment won't repeat"
+        },
+        {
+          "wound": "powerlessness",
+          "origin": "Experienced situation where competence didn't matter; overwhelmed by force",
+          "v1_impact": "None",
+          "v2_impact": "Obsessive skill development; needs control",
+          "v3_impact": "Aggressive assertion of control in work contexts",
+          "v4_impact": "Panic when facing similar powerless situation",
+          "healing_path": "Accepting help; trusting partner's competence; learning limits aren't failure"
+        }
+      ],
+      "wound_activation": {
+        "description": "Wounds are activated by situational triggers, not constantly present",
+        "baseline": "Character functions normally; wound is background element",
+        "triggered": "Situation resembles original wounding event; wound impacts behavior",
+        "rule": "Don't overuse wound triggers; 1-2 times per 25k words maintains realism"
+      }
+    }
+  },
+
+  "integration_rules": {
+    "description": "How all four palette levels interact during character action",
+    "decision_hierarchy": [
+      {
+        "priority": 1,
+        "level": "V1_core_identity",
+        "function": "Sets boundaries for possible actions; character won't violate V1 without catastrophic arc"
+      },
+      {
+        "priority": 2,
+        "level": "V4_emotional_state",
+        "function": "Colors how character experiences situation and urgency of response"
+      },
+      {
+        "priority": 3,
+        "level": "V3_situational_context",
+        "function": "Determines which behavioral range within V1 is appropriate"
+      },
+      {
+        "priority": 4,
+        "level": "V2_learned_behaviors",
+        "function": "Provides tools and skills to execute decision within constraints"
+      }
+    ],
+    "example_integration": {
+      "scenario": "Detective's partner taken hostage by killer",
+      "v1_decision": "Will attempt rescue (loyalty is core trait)",
+      "v4_emotion": "Fear + anger creates urgency; reduces caution",
+      "v3_context": "Extreme context allows behavior outside normal range (may break rules)",
+      "v2_execution": "Uses trained tactical skills + learned magical abilities to attempt rescue",
+      "result": "By-the-book detective (V1 lawful) breaks into building without warrant (V3 extreme context justified by V4 fear for partner) using trained entry techniques (V2 skills)"
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "dr_viktor": "Primary validator for palette consistency; ensures V1 never violated, V2 evolution properly paced, V3 context appropriate, V4 emotions realistic",
+      "bailey": "References palette during drafting; character decisions stay within established range",
+      "tessa": "Validates palette consistency across chapters; tracks V2 skill progression",
+      "miranda": "Oversees character arcs; ensures palette evolution aligns with story events"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_character_palettes",
+        "npe_palette_evolution",
+        "npe_wound_tracking",
+        "npe_emotional_states"
+      ],
+      "validation_triggers": ["character_action", "emotional_shift", "skill_usage", "wound_trigger"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "v1_violations",
+        "threshold": "0 per story arc (unless catastrophic arc)",
+        "severity": "critical"
+      },
+      {
+        "metric": "v2_skill_progression_rate",
+        "threshold": "Novice→Competent: 5k words minimum",
+        "severity": "high"
+      },
+      {
+        "metric": "v3_context_appropriateness",
+        "threshold": "100% of context shifts justified by situation",
+        "severity": "high"
+      },
+      {
+        "metric": "v4_emotional_momentum",
+        "threshold": "0 instant emotional resets without justification",
+        "severity": "medium"
+      },
+      {
+        "metric": "wound_activation_frequency",
+        "threshold": "1-2 triggers per 25k words",
+        "severity": "low"
+      }
+    ]
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "category": "transitions",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Scene and chapter transition rules governing temporal flow, spatial movement, and narrative continuity",
+
+  "transition_principles": {
+    "efficiency": "Minimize transition prose; maximize forward momentum",
+    "clarity": "Reader must always know when/where they are",
+    "purpose": "Transitions should advance story, not just mark time",
+    "variety": "Use different transition techniques to avoid monotony"
+  },
+
+  "rules": {
+    "temporal_transitions": {
+      "description": "Time passage must be clear and efficient",
+      "validations": [
+        {
+          "rule_id": "TR-001",
+          "name": "time-passage-clarity",
+          "severity": "high",
+          "description": "Reader must always know how much time has passed between scenes",
+          "examples": {
+            "violation": "Scene ends at crime scene at night, next scene begins somewhere else with no time reference",
+            "compliant": "'Three hours later, she sat in the precinct break room...' or 'The next morning brought...'"
+          },
+          "validation_query": "Does the reader know how much time elapsed between these scenes?"
+        },
+        {
+          "rule_id": "TR-002",
+          "name": "time-jump-justification",
+          "severity": "medium",
+          "description": "Large time jumps (>12 hours) should be earned by narrative need; summarize skipped events if relevant",
+          "examples": {
+            "violation": "Critical case day skipped with no explanation of investigative progress",
+            "compliant": "'She spent the next two days running down dead-end leads. Witness alibis checked out. Forensics had nothing. On Thursday morning, her phone finally rang with something promising.'"
+          },
+          "validation_query": "What important events occurred during this time skip? Should reader know about them?"
+        },
+        {
+          "rule_id": "TR-003",
+          "name": "investigation-time-realism",
+          "severity": "medium",
+          "description": "Allow realistic time passage for investigative procedures: lab results, database searches, surveillance",
+          "examples": {
+            "violation": "DNA results come back in 10 minutes",
+            "compliant": "'The DNA analysis would take 48 hours. She'd have to pursue other leads while waiting.' [Scene skip to 2 days later when results arrive]"
+          },
+          "validation_query": "Is this timeframe realistic for the investigative procedure described?"
+        }
+      ]
+    },
+
+    "spatial_transitions": {
+      "description": "Location changes must be clear and efficient",
+      "validations": [
+        {
+          "rule_id": "TR-101",
+          "name": "location-establishment",
+          "severity": "high",
+          "description": "New location must be established within first sentence or two of scene",
+          "examples": {
+            "violation": "Scene begins with dialogue; reader doesn't learn location for 2 paragraphs",
+            "compliant": "'The medical examiner's office smelled like industrial disinfectant and death.' or 'She found him in the precinct garage, leaning against his cruiser.'"
+          },
+          "validation_query": "When does the reader learn where this scene takes place?"
+        },
+        {
+          "rule_id": "TR-102",
+          "name": "travel-minimization",
+          "severity": "high",
+          "description": "Don't show routine travel unless it serves plot/character purpose; use hard cuts",
+          "examples": {
+            "violation": "'She got in her car, started the engine, drove through traffic, parked, and entered the building.'",
+            "compliant": "Previous scene ends at precinct. Next scene opens: 'The witness lived in a fourth-floor walkup in Chelsea.' (travel implied, not shown)"
+          },
+          "validation_query": "What narrative purpose does showing this travel serve?"
+        },
+        {
+          "rule_id": "TR-103",
+          "name": "meaningful-travel-scenes",
+          "severity": "medium",
+          "description": "When showing travel, use it for character development, deduction, or plot advancement",
+          "examples": {
+            "violation": "Detailed description of commute with no story content",
+            "compliant": "During drive, detective reviews case file mentally, noticing pattern in victim locations; or partner conversation reveals relationship tension"
+          },
+          "validation_query": "What story function does this travel scene serve beyond moving character from A to B?"
+        }
+      ]
+    },
+
+    "scene_to_scene_flow": {
+      "description": "Transitions between scenes must maintain momentum and clarity",
+      "validations": [
+        {
+          "rule_id": "TR-201",
+          "name": "hard-cut-preference",
+          "severity": "low",
+          "description": "Use hard cuts (scene break line) instead of prose transitions when possible for pace",
+          "examples": {
+            "violation": "She left the crime scene, drove back to the precinct, parked in the garage, walked through the building, climbed the stairs, entered the bullpen, and sat at her desk.",
+            "compliant": "Scene ends at crime scene. ### Scene begins at desk in bullpen."
+          },
+          "validation_query": "Could this transition be replaced with a scene break?"
+        },
+        {
+          "rule_id": "TR-202",
+          "name": "transition-sentence-economy",
+          "severity": "medium",
+          "description": "When prose transitions are needed, limit to 1-2 sentences maximum",
+          "examples": {
+            "violation": "Full paragraph describing journey from interview to next location",
+            "compliant": "'Twenty minutes later, she pulled up to the warehouse district.' (single sentence, establishes time and location)"
+          },
+          "validation_query": "Can this transition be shortened to 1-2 sentences?"
+        },
+        {
+          "rule_id": "TR-203",
+          "name": "momentum-preservation",
+          "severity": "high",
+          "description": "Scene transitions should maintain or increase narrative momentum, never deflate it",
+          "examples": {
+            "violation": "High-tension scene ends, transition dwells on mundane logistics, deflating tension",
+            "compliant": "High-tension scene ends on hook → brief transition maintaining urgency → next scene begins at similar or higher tension"
+          },
+          "validation_query": "Does this transition maintain the story's forward momentum?"
+        }
+      ]
+    },
+
+    "chapter_transitions": {
+      "description": "Chapter breaks have specific transition requirements",
+      "validations": [
+        {
+          "rule_id": "TR-301",
+          "name": "chapter-end-hooks",
+          "severity": "high",
+          "description": "Chapters must end on hooks that create urgency to continue reading",
+          "examples": {
+            "violation": "Chapter ends with character going to sleep after routine day",
+            "compliant": "Chapter ends with: revelation, cliffhanger, question, decision point, or escalation"
+          },
+          "validation_query": "Does this chapter ending create desire to keep reading?"
+        },
+        {
+          "rule_id": "TR-302",
+          "name": "chapter-opening-grounding",
+          "severity": "medium",
+          "description": "New chapters should quickly reorient reader to time, place, and situation",
+          "examples": {
+            "violation": "Chapter opens with abstract musing or dialogue with no context",
+            "compliant": "Opening sentence establishes when/where: 'The call came at 3 AM.' or 'She arrived at the precinct to find her captain waiting.'"
+          },
+          "validation_query": "Does chapter opening quickly establish context for reader?"
+        },
+        {
+          "rule_id": "TR-303",
+          "name": "chapter-break-timing",
+          "severity": "low",
+          "description": "Place chapter breaks at natural story beats: after major scenes, before POV shifts, at time jumps",
+          "examples": {
+            "violation": "Chapter break mid-interrogation scene with no narrative justification",
+            "compliant": "Chapter ends after interrogation concludes (even on cliffhanger), new chapter begins next scene"
+          },
+          "validation_query": "Is this chapter break placed at a natural story beat?"
+        }
+      ]
+    },
+
+    "pov_transitions": {
+      "description": "POV character changes require clear signaling",
+      "validations": [
+        {
+          "rule_id": "TR-401",
+          "name": "pov-shift-markers",
+          "severity": "critical",
+          "description": "POV changes must be marked with scene break (###) or chapter break, plus clear character establishment",
+          "examples": {
+            "violation": "POV shifts from detective to partner mid-scene with no break or warning",
+            "compliant": "Detective POV scene ends. ### [New scene] 'Marcus had seen that look before.' (immediately establishes new POV character by name and perspective)"
+          },
+          "validation_query": "Is the POV shift clearly marked with visual break and immediate new character establishment?"
+        },
+        {
+          "rule_id": "TR-402",
+          "name": "pov-character-naming",
+          "severity": "high",
+          "description": "Establish new POV character's name in first sentence or two to avoid confusion",
+          "examples": {
+            "violation": "New POV begins with 'He walked into the room' with no indication of who 'he' is",
+            "compliant": "'Marcus spotted her across the precinct bullpen.' (immediately identifies POV as Marcus)"
+          },
+          "validation_query": "Does the reader immediately know whose perspective they're reading?"
+        }
+      ]
+    },
+
+    "act_transitions": {
+      "description": "Major story structure shifts need special handling",
+      "validations": [
+        {
+          "rule_id": "TR-501",
+          "name": "act-break-chapter-alignment",
+          "severity": "low",
+          "description": "Major act breaks should align with chapter breaks for clear structure",
+          "examples": {
+            "violation": "Act 1 ends mid-chapter, Act 2 begins without clear marker",
+            "compliant": "Act 1 ends at chapter conclusion, Act 2 begins new chapter with changed situation"
+          },
+          "validation_query": "Does this major structural shift occur at a chapter boundary?"
+        },
+        {
+          "rule_id": "TR-502",
+          "name": "act-two-midpoint-signaling",
+          "severity": "medium",
+          "description": "Midpoint revelation should be clearly marked as major turning point",
+          "examples": {
+            "violation": "Midpoint revelation buried in middle of routine scene",
+            "compliant": "Midpoint revelation gets its own dramatic scene, possibly ends chapter with major hook"
+          },
+          "validation_query": "Is the story midpoint given appropriate structural emphasis?"
+        }
+      ]
+    },
+
+    "investigation_continuity": {
+      "description": "Detective work creates specific transition challenges",
+      "validations": [
+        {
+          "rule_id": "TR-601",
+          "name": "case-status-orientation",
+          "severity": "medium",
+          "description": "After time jumps, briefly orient reader to current case status",
+          "examples": {
+            "violation": "Two days skip, reader unsure what investigative progress occurred",
+            "compliant": "'Three days of interviews had yielded nothing. The case was going cold.' (establishes current status post-skip)"
+          },
+          "validation_query": "After this time jump, does reader know current case status?"
+        },
+        {
+          "rule_id": "TR-602",
+          "name": "parallel-investigation-tracking",
+          "severity": "medium",
+          "description": "When showing multiple investigation threads, clearly signal which thread is being followed",
+          "examples": {
+            "violation": "Rapid cutting between investigation threads with no clear markers",
+            "compliant": "Each thread gets clear scene breaks and opening orientation: 'While she interviewed the witness, her partner was running down the financial angle.'"
+          },
+          "validation_query": "Can reader easily track which investigation thread they're currently following?"
+        }
+      ]
+    },
+
+    "magical_world_transitions": {
+      "description": "Urban fantasy may include transitions to magical spaces or altered states",
+      "validations": [
+        {
+          "rule_id": "TR-701",
+          "name": "reality-shift-clarity",
+          "severity": "high",
+          "description": "Transitions into magical spaces/visions/altered states must be immediately clear to reader",
+          "examples": {
+            "violation": "Character slips into vision, reader confused about whether events are real",
+            "compliant": "'The world tilted. Suddenly she wasn't in the precinct anymore.' or 'The vision hit like a freight train—'"
+          },
+          "validation_query": "Does the reader know they're entering a magical/altered state?"
+        },
+        {
+          "rule_id": "TR-702",
+          "name": "reality-return-marking",
+          "severity": "high",
+          "description": "Transitions back to mundane reality must be equally clear",
+          "examples": {
+            "violation": "Vision ends ambiguously, unclear when character returns to normal perception",
+            "compliant": "'She gasped, back in her body, gripping the desk. Her partner was staring.' (clear return to normal reality)"
+          },
+          "validation_query": "Is the return to mundane reality clearly marked?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "bailey": "Monitor transitions during drafting; ensure clarity and efficiency",
+      "edna": "Validate transition pacing; identify unnecessary transitions to cut",
+      "tessa": "Check temporal and spatial continuity across transitions",
+      "miranda": "Review chapter break placement and hook effectiveness"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_scene_metadata", "npe_timeline_tracking", "npe_location_tracking"],
+      "validation_triggers": ["scene_transition", "chapter_boundary", "pov_shift"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "unnecessary_travel_scenes",
+        "threshold": "≤5% of total scenes",
+        "severity": "medium"
+      },
+      {
+        "metric": "temporal_clarity_failures",
+        "threshold": "0 per chapter",
+        "severity": "high"
+      },
+      {
+        "metric": "spatial_clarity_failures",
+        "threshold": "0 per chapter",
+        "severity": "high"
+      },
+      {
+        "metric": "chapter_hook_presence",
+        "threshold": "100% of chapters",
+        "severity": "high"
+      },
+      {
+        "metric": "pov_shift_clarity",
+        "threshold": "100% clearly marked",
+        "severity": "critical"
+      },
+      {
+        "metric": "transition_sentence_count",
+        "threshold": "≤2 sentences per transition",
+        "severity": "low"
+      }
+    ]
+  }
+}

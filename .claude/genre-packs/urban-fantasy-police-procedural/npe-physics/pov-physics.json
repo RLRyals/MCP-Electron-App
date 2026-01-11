@@ -1,0 +1,317 @@
+{
+  "category": "pov-physics",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Point-of-view consistency rules governing perspective, psychic distance, and narrative voice in detective fiction",
+
+  "recommended_pov": {
+    "primary": "Third person limited (single or dual POV)",
+    "justification": "Detective procedurals benefit from mystery preservation through limited perspective while allowing intimate character access",
+    "alternatives": {
+      "first_person": "Strong voice intimacy but limits ability to show scenes without protagonist",
+      "third_person_multiple": "Allows showing antagonist perspective but risks diluting mystery tension"
+    }
+  },
+
+  "rules": {
+    "pov_consistency": {
+      "description": "Point of view must remain consistent within scenes; shifts must be clearly marked",
+      "validations": [
+        {
+          "rule_id": "POV-001",
+          "name": "single-pov-per-scene",
+          "severity": "critical",
+          "description": "Each scene must maintain single POV character perspective; no head-hopping mid-scene",
+          "examples": {
+            "violation": "Scene starts in detective's POV, suddenly reveals suspect's thoughts mid-paragraph, returns to detective",
+            "compliant": "Entire scene stays in detective's POV; suspect's thoughts shown only through observable behavior and dialogue"
+          },
+          "validation_query": "Whose perspective controls this entire scene from start to finish?"
+        },
+        {
+          "rule_id": "POV-002",
+          "name": "pov-shift-signaling",
+          "severity": "high",
+          "description": "POV changes must be marked by scene breaks (### or clear white space)",
+          "examples": {
+            "violation": "POV shifts from detective to partner within continuous prose",
+            "compliant": "Detective POV scene ends, clear scene break (###), new scene begins in partner's POV"
+          },
+          "validation_query": "Is the POV shift marked with clear visual break for reader?"
+        },
+        {
+          "rule_id": "POV-003",
+          "name": "pov-character-knowledge-limits",
+          "severity": "critical",
+          "description": "Narration can only reveal information POV character knows/observes/deduces",
+          "examples": {
+            "violation": "Detective POV narration reveals killer's identity despite detective not knowing",
+            "compliant": "Detective observes suspect's nervous behavior and theorizes guilt, but narration doesn't confirm truth"
+          },
+          "validation_query": "How does the POV character know this information being narrated?"
+        }
+      ]
+    },
+
+    "psychic_distance": {
+      "description": "Control intimacy level between reader and character; maintain consistency",
+      "levels": {
+        "level_1_distant": "Distant third person focusing on actions: 'The detective entered the room.'",
+        "level_2_moderate": "Moderate closeness with some internalization: 'She scanned the room, noting the overturned furniture.'",
+        "level_3_close": "Close third with thoughts: 'The scene didn't make sense. Why trash the place if this was a professional hit?'",
+        "level_4_intimate": "Deep POV with character voice coloring narration: 'Professional hit, her ass. Pros didn't throw temper tantrums.'"
+      },
+      "validations": [
+        {
+          "rule_id": "POV-101",
+          "name": "distance-consistency",
+          "severity": "medium",
+          "description": "Maintain relatively consistent psychic distance for each POV character; avoid jarring shifts",
+          "examples": {
+            "violation": "Paragraph 1: distant observation. Paragraph 2: deep intimate thoughts. Paragraph 3: back to distant.",
+            "compliant": "Detective POV consistently stays at level 3-4 (close to intimate) throughout scene"
+          },
+          "validation_query": "What psychic distance level is this scene maintaining? Are there inconsistent jumps?"
+        },
+        {
+          "rule_id": "POV-102",
+          "name": "tension-distance-correlation",
+          "severity": "low",
+          "description": "Increase intimacy (closer distance) during high-emotion moments; can pull back for action",
+          "examples": {
+            "violation": "Emotional breakthrough moment described in distant third person",
+            "compliant": "Emotional scenes: intimate distance showing internal reaction. Action scenes: moderate distance focusing on physical events."
+          },
+          "validation_query": "Does the psychic distance match the emotional intensity of this moment?"
+        }
+      ]
+    },
+
+    "sensory_filtering": {
+      "description": "All sensory description must be filtered through POV character's perception",
+      "validations": [
+        {
+          "rule_id": "POV-201",
+          "name": "character-filtered-description",
+          "severity": "high",
+          "description": "Descriptions should reflect POV character's observational priorities and biases",
+          "examples": {
+            "violation": "Detective enters room, narration provides objective architectural description irrelevant to character",
+            "compliant": "Detective enters room, immediately notes security camera placement and exit routes (professional POV filter)"
+          },
+          "validation_query": "Why would this POV character notice and describe these specific details?"
+        },
+        {
+          "rule_id": "POV-202",
+          "name": "emotional-coloring",
+          "severity": "medium",
+          "description": "Descriptions should be colored by character's emotional state when appropriate",
+          "examples": {
+            "violation": "Grieving character describes environment in neutral, cheerful terms",
+            "compliant": "Grieving character sees surroundings as muted, notices objects connected to loss, describes setting with melancholic word choice"
+          },
+          "validation_query": "Does the descriptive language reflect the character's current emotional state?"
+        },
+        {
+          "rule_id": "POV-203",
+          "name": "professional-perspective",
+          "severity": "medium",
+          "description": "Detective POV should notice details relevant to investigation; civilians notice different things",
+          "examples": {
+            "violation": "Experienced detective overlooks obvious evidence in crime scene description",
+            "compliant": "Detective notices: blood spatter pattern, defensive wounds, missing items, while civilian witness focuses on emotional impact"
+          },
+          "validation_query": "Does this character's observation pattern match their profession and experience?"
+        }
+      ]
+    },
+
+    "internal_monologue": {
+      "description": "Character thoughts must be authentic to personality and situation",
+      "validations": [
+        {
+          "rule_id": "POV-301",
+          "name": "thought-voice-consistency",
+          "severity": "high",
+          "description": "Internal thoughts should match character's established speaking voice and personality",
+          "examples": {
+            "violation": "Street-smart detective's thoughts use formal academic language inconsistent with dialogue",
+            "compliant": "Detective's internal voice matches their dialogue style: same vocabulary, sentence structure, humor"
+          },
+          "validation_query": "Would this character think in these words, or are they thinking in author's voice?"
+        },
+        {
+          "rule_id": "POV-302",
+          "name": "natural-thought-flow",
+          "severity": "medium",
+          "description": "Thoughts should be realistic: associative, sometimes fragmented, not perfectly organized speeches",
+          "examples": {
+            "violation": "Character's thoughts are perfectly structured arguments with topic sentences and conclusions",
+            "compliant": "Thoughts jump between observations, memories, questions, reactions—mimicking actual thinking patterns"
+          },
+          "validation_query": "Do these thoughts sound like natural thinking or like written analysis?"
+        },
+        {
+          "rule_id": "POV-303",
+          "name": "no-self-evident-thoughts",
+          "severity": "medium",
+          "description": "Characters don't think about things they already know unless processing/questioning",
+          "examples": {
+            "violation": "'I'm a detective with twenty years of experience,' she thought",
+            "compliant": "'Twenty years on the job and this case still doesn't make sense'"
+          },
+          "validation_query": "Why would this character be thinking this at this moment? What triggers it?"
+        }
+      ]
+    },
+
+    "observation_limits": {
+      "description": "POV character cannot observe what they cannot see/hear/sense",
+      "validations": [
+        {
+          "rule_id": "POV-401",
+          "name": "physical-observation-constraints",
+          "severity": "critical",
+          "description": "Character can only observe what's physically possible from their position",
+          "examples": {
+            "violation": "Detective in interrogation room describes what suspect is doing in holding cell down the hall",
+            "compliant": "Detective observes only what's visible in current location; learns about other locations through reports/cameras/witnesses"
+          },
+          "validation_query": "Can the POV character actually see/hear/perceive this from their current position?"
+        },
+        {
+          "rule_id": "POV-402",
+          "name": "magical-perception-consistency",
+          "severity": "high",
+          "description": "If character has magical senses, their range and limits must be consistent",
+          "examples": {
+            "violation": "Character detects magic within 50ft in Ch 3, suddenly senses magic miles away in Ch 8 with no explanation",
+            "compliant": "Character's magical perception has consistent range; extended perception requires specific ritual or effort with cost"
+          },
+          "validation_query": "Is this magical observation consistent with previously established sensory limits?"
+        },
+        {
+          "rule_id": "POV-403",
+          "name": "no-mind-reading",
+          "severity": "critical",
+          "description": "POV character cannot know other characters' thoughts unless they have established telepathy",
+          "examples": {
+            "violation": "Detective knows suspect is lying because narration says 'The suspect was lying'",
+            "compliant": "Detective suspects lying based on observable tells: 'His eyes shifted left. The classic tell.'"
+          },
+          "validation_query": "Is this presented as POV character's deduction or as omniscient fact?"
+        }
+      ]
+    },
+
+    "multiple_pov_management": {
+      "description": "When using multiple POV characters, maintain clear rules and purpose",
+      "validations": [
+        {
+          "rule_id": "POV-501",
+          "name": "limited-pov-cast",
+          "severity": "medium",
+          "description": "Limit POV characters to 2-3 maximum for procedural; typically protagonist detective + 1-2 others",
+          "examples": {
+            "violation": "Story uses 6+ POV characters, diluting focus and mystery",
+            "compliant": "Primary detective POV (80% of scenes) + antagonist POV (15%, to show threat) + partner POV (5%, when separated)"
+          },
+          "validation_query": "How many POV characters are there? Does each serve clear narrative purpose?"
+        },
+        {
+          "rule_id": "POV-502",
+          "name": "pov-distribution-balance",
+          "severity": "low",
+          "description": "Maintain clear primary POV; secondary POVs should be significantly less frequent",
+          "examples": {
+            "violation": "Three POV characters each get equal page time, no clear protagonist",
+            "compliant": "Detective POV: 70-80% of scenes. Partner POV: 15-20%. Antagonist POV: 5-10%"
+          },
+          "validation_query": "What is the POV distribution? Is there a clear primary perspective?"
+        },
+        {
+          "rule_id": "POV-503",
+          "name": "antagonist-pov-mystery-preservation",
+          "severity": "high",
+          "description": "If using antagonist POV, must preserve mystery without revealing identity or full plan",
+          "examples": {
+            "violation": "Antagonist POV reveals their identity, complete plan, and timeline—eliminating mystery",
+            "compliant": "Antagonist POV shows menace and methods without revealing identity (unnamed, no mirrors) or full scheme"
+          },
+          "validation_query": "Does this antagonist POV maintain mystery tension or spoil the investigation?"
+        }
+      ]
+    },
+
+    "narrative_voice": {
+      "description": "Narrative voice must be consistent and appropriate to POV style",
+      "validations": [
+        {
+          "rule_id": "POV-601",
+          "name": "voice-pov-alignment",
+          "severity": "medium",
+          "description": "Third person limited should use more neutral voice than deep POV; deep POV uses character's voice",
+          "examples": {
+            "violation": "Third limited suddenly uses heavy character slang in narration inconsistently",
+            "compliant": "Deep POV: 'The perp was a ghost. No prints, no trace, no nothing.' vs Third limited: 'The suspect had left no evidence.'"
+          },
+          "validation_query": "Does the narrative voice match the intended POV intimacy level?"
+        },
+        {
+          "rule_id": "POV-602",
+          "name": "tense-consistency",
+          "severity": "critical",
+          "description": "Maintain consistent past or present tense throughout; no random shifts",
+          "examples": {
+            "violation": "Past tense narration suddenly shifts to present tense mid-scene without stylistic purpose",
+            "compliant": "Entire manuscript in consistent past tense"
+          },
+          "validation_query": "Is the narrative tense consistent throughout this section?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "finn": "Primary validator for POV consistency and narrative voice",
+      "tessa": "Check for POV violations, head-hopping, and knowledge inconsistencies",
+      "bailey": "Monitor POV during drafting; ensure sensory filtering appropriate to character",
+      "dr_viktor": "Validate internal monologue authenticity and thought-voice consistency"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_pov_tracking", "npe_character_knowledge", "npe_scene_metadata"],
+      "validation_triggers": ["scene_complete", "pov_shift", "chapter_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "head_hopping_violations",
+        "threshold": "0 per manuscript",
+        "severity": "critical"
+      },
+      {
+        "metric": "pov_character_count",
+        "threshold": "≤3 characters",
+        "severity": "medium"
+      },
+      {
+        "metric": "primary_pov_percentage",
+        "threshold": "≥70% for main character",
+        "severity": "low"
+      },
+      {
+        "metric": "psychic_distance_consistency",
+        "threshold": "≤1 level variation within scenes",
+        "severity": "medium"
+      },
+      {
+        "metric": "observation_impossibilities",
+        "threshold": "0 per chapter",
+        "severity": "critical"
+      }
+    ]
+  }
+}

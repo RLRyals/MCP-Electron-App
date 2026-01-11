@@ -1,0 +1,321 @@
+{
+  "category": "dialogue-physics",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Dialogue realism rules governing conversation patterns, speech authenticity, and information exchange in detective narratives",
+
+  "dialogue_principles": {
+    "naturalistic_speech": "Real people interrupt, deflect, misunderstand, and rarely speak in perfect sentences",
+    "subtext_over_text": "Characters often say one thing while meaning another; avoid on-the-nose dialogue",
+    "conflict_in_conversation": "Dialogue scenes need tension from disagreement, withholding, or misalignment",
+    "voice_distinction": "Each character should have recognizable speech patterns without caricature",
+    "efficiency": "Every line must serve purpose: characterization, information, relationship, or tension"
+  },
+
+  "rules": {
+    "dialogue_realism": {
+      "description": "Conversations must sound like actual human speech while remaining readable",
+      "validations": [
+        {
+          "rule_id": "DP-001",
+          "name": "no-exposition-dumps",
+          "severity": "critical",
+          "description": "Characters cannot info-dump; they don't explain things both speakers already know",
+          "examples": {
+            "violation": "'As you know, John, we've been partners for five years and you always order the turkey sandwich.'",
+            "compliant": "'Turkey sandwich again?' 'You know it.'"
+          },
+          "validation_query": "Why would this character be saying this information to this listener at this moment?"
+        },
+        {
+          "rule_id": "DP-002",
+          "name": "interruption-overlap",
+          "severity": "medium",
+          "description": "In tense/emotional scenes, characters should interrupt and talk over each other realistically",
+          "examples": {
+            "violation": "Heated argument where each character waits politely for the other to finish speaking",
+            "compliant": "'You can't just—' 'Watch me.' 'That's not what I—' 'I don't care what you meant.'"
+          },
+          "validation_query": "Given the emotional stakes, would these characters really wait turns to speak?"
+        },
+        {
+          "rule_id": "DP-003",
+          "name": "fragmented-natural-speech",
+          "severity": "low",
+          "description": "Real speech includes fragments, trailing off, self-correction",
+          "examples": {
+            "violation": "All dialogue is perfectly formed complete sentences",
+            "compliant": "'I thought maybe... No, never mind.' 'Tell me.' 'It's just—there was this thing with the timing.'"
+          },
+          "validation_query": "Does this dialogue sound like written speech or natural human conversation?"
+        },
+        {
+          "rule_id": "DP-004",
+          "name": "response-relevance",
+          "severity": "high",
+          "description": "Characters respond to what was actually said; avoid non-sequiturs unless deliberate",
+          "examples": {
+            "violation": "Character A asks about evidence, Character B responds about unrelated topic with no acknowledgment",
+            "compliant": "'What about the evidence?' 'I'll get to that. First, we need to talk about your partner.'"
+          },
+          "validation_query": "Does this response connect logically to the previous line?"
+        }
+      ]
+    },
+
+    "subtext_and_conflict": {
+      "description": "Dialogue must contain layers; characters often don't say what they mean directly",
+      "validations": [
+        {
+          "rule_id": "DP-101",
+          "name": "subtext-presence",
+          "severity": "high",
+          "description": "At least 40% of dialogue should have meaning beyond literal words",
+          "examples": {
+            "violation": "'I'm angry at you for lying.' 'I apologize for lying.' (no subtext)",
+            "compliant": "'Nice of you to show up.' 'Traffic was hell.' 'I'm sure it was.' (anger conveyed through tone, not stated)"
+          },
+          "validation_query": "What is being communicated beyond the literal words? Is there tension between what's said and what's meant?"
+        },
+        {
+          "rule_id": "DP-102",
+          "name": "conversational-resistance",
+          "severity": "medium",
+          "description": "Characters should not immediately give direct answers; use deflection, partial answers, counter-questions",
+          "examples": {
+            "violation": "'Where were you last night?' 'I was at the bar from 9 to midnight.'",
+            "compliant": "'Where were you last night?' 'Why?' 'Just answer the question.' 'I went out.' 'Where?' 'Does it matter?'"
+          },
+          "validation_query": "Does this character have motivation to answer directly, or would they resist/deflect?"
+        },
+        {
+          "rule_id": "DP-103",
+          "name": "power-dynamic-expression",
+          "severity": "medium",
+          "description": "Relationship hierarchy and power should be evident in speech patterns",
+          "examples": {
+            "violation": "Rookie and veteran speak identically to each other",
+            "compliant": "Rookie: 'Do you think we should check the alibi?' Veteran: 'We check the alibi.'"
+          },
+          "validation_query": "How does the power dynamic between these characters show in their speech?"
+        }
+      ]
+    },
+
+    "voice_distinction": {
+      "description": "Each character needs recognizable speech patterns without resorting to dialect or tics",
+      "validations": [
+        {
+          "rule_id": "DP-201",
+          "name": "vocabulary-consistency",
+          "severity": "medium",
+          "description": "Character word choice should reflect education, background, profession",
+          "examples": {
+            "violation": "Street informant uses formal academic language inconsistent with background",
+            "compliant": "Forensic expert: 'The contusion pattern suggests blunt force trauma.' Street informant: 'Someone beat him with something heavy.'"
+          },
+          "validation_query": "Is this vocabulary consistent with character's background and education?"
+        },
+        {
+          "rule_id": "DP-202",
+          "name": "sentence-structure-variation",
+          "severity": "low",
+          "description": "Different characters should have different typical sentence lengths and complexity",
+          "examples": {
+            "violation": "All characters speak in identical sentence structures",
+            "compliant": "Analytical detective: longer, complex sentences. Action-oriented partner: short, direct sentences."
+          },
+          "validation_query": "Could this dialogue be spoken by any character, or is it distinctive to this person?"
+        },
+        {
+          "rule_id": "DP-203",
+          "name": "verbal-tic-restraint",
+          "severity": "medium",
+          "description": "Limit verbal tics to 1-2 per character; use sparingly to avoid caricature",
+          "examples": {
+            "violation": "Character says 'you know' after every sentence, 'like' multiple times per line",
+            "compliant": "Character occasionally ends statements with 'yeah?' when seeking agreement (used 2-3 times per scene max)"
+          },
+          "validation_query": "Is this speech pattern distinctive without being cartoonish?"
+        }
+      ]
+    },
+
+    "interrogation_dialogue": {
+      "description": "Detective interview dialogue has specific patterns and techniques",
+      "validations": [
+        {
+          "rule_id": "DP-301",
+          "name": "question-progression",
+          "severity": "high",
+          "description": "Interrogations should follow pattern: open questions → targeted questions → confrontation",
+          "examples": {
+            "violation": "Detective immediately accuses suspect without establishing baseline",
+            "compliant": "Start with background questions → narrow to relevant timeframe → present contradicting evidence → direct accusation"
+          },
+          "validation_query": "Does this interrogation follow a logical progression of question types?"
+        },
+        {
+          "rule_id": "DP-302",
+          "name": "witness-evasion-patterns",
+          "severity": "medium",
+          "description": "Witnesses/suspects should use realistic evasion: vagueness, deflection, counter-questions, selective memory",
+          "examples": {
+            "violation": "Suspect either lies obviously or tells complete truth",
+            "compliant": "Suspect: 'I don't remember exactly.' 'Maybe around 9?' 'Like I said, I wasn't really paying attention to the time.'"
+          },
+          "validation_query": "Are evasion tactics realistic for someone under questioning?"
+        },
+        {
+          "rule_id": "DP-303",
+          "name": "information-extraction-realism",
+          "severity": "high",
+          "description": "Key information should be extracted through detective skill, not volunteered",
+          "examples": {
+            "violation": "Witness spontaneously reveals crucial detail without prompting",
+            "compliant": "Detective notices inconsistency in statement → asks targeted follow-up → witness reluctantly clarifies → detective catches slip"
+          },
+          "validation_query": "What detective technique prompted this revelation?"
+        }
+      ]
+    },
+
+    "partner_banter": {
+      "description": "Detective partnerships require specific dialogue dynamics",
+      "validations": [
+        {
+          "rule_id": "DP-401",
+          "name": "shorthand-communication",
+          "severity": "low",
+          "description": "Long-term partners develop abbreviated communication patterns",
+          "examples": {
+            "violation": "Partners always speak in full explanatory sentences to each other",
+            "compliant": "'Check the alibi?' 'On it.' 'And the phone records?' 'Already requested.'"
+          },
+          "validation_query": "Do these partners communicate like people who work together daily?"
+        },
+        {
+          "rule_id": "DP-402",
+          "name": "disagreement-expression",
+          "severity": "medium",
+          "description": "Partners should disagree on approach/theory without hostility (unless relationship is hostile)",
+          "examples": {
+            "violation": "Partners always agree or fight bitterly with no middle ground",
+            "compliant": "'I think we're looking at the wrong suspect.' 'Maybe. But the evidence points here.' 'What if the evidence is staged?' 'Then we find proof of that.'"
+          },
+          "validation_query": "Do partner disagreements feel like professional debate or personal conflict?"
+        }
+      ]
+    },
+
+    "magical_world_dialogue": {
+      "description": "Urban fantasy dialogue must integrate magical concepts naturally",
+      "validations": [
+        {
+          "rule_id": "DP-501",
+          "name": "magic-normalization",
+          "severity": "medium",
+          "description": "In established magical world, characters don't over-explain magical concepts; it's normal to them",
+          "examples": {
+            "violation": "'As you know, when a ward is broken by someone with malicious intent, it releases a magical signature that trained sensitives can detect for up to 72 hours.'",
+            "compliant": "'Ward's broken.' 'How long ago?' 'Signature's still fresh. Maybe six hours.'"
+          },
+          "validation_query": "Would characters in a magical world explain this to each other, or is it common knowledge?"
+        },
+        {
+          "rule_id": "DP-502",
+          "name": "mundane-magical-blend",
+          "severity": "low",
+          "description": "Characters should discuss magical and mundane investigative elements with equal casualness",
+          "examples": {
+            "violation": "Character discusses fingerprints normally but speaks in awed tones about magical trace evidence",
+            "compliant": "'Fingerprints came back clean. No magical residue either. Guy's a ghost.'"
+          },
+          "validation_query": "Is magic treated as exceptional or as another tool in the investigative toolkit?"
+        }
+      ]
+    },
+
+    "dialogue_mechanics": {
+      "description": "Technical execution of dialogue formatting and beats",
+      "validations": [
+        {
+          "rule_id": "DP-601",
+          "name": "tag-economy",
+          "severity": "low",
+          "description": "Use 'said' for clarity; limit adverbs; convey emotion through dialogue/action, not tags",
+          "examples": {
+            "violation": "'I can't believe this,' she said angrily and disappointedly",
+            "compliant": "'I can't believe this.' She slammed the file on the desk."
+          },
+          "validation_query": "Can emotion be conveyed through words/actions rather than dialogue tags?"
+        },
+        {
+          "rule_id": "DP-602",
+          "name": "action-beat-integration",
+          "severity": "medium",
+          "description": "Break up dialogue with action beats every 3-5 exchanges to maintain physicality",
+          "examples": {
+            "violation": "20 lines of pure dialogue with no physical action or setting detail",
+            "compliant": "Dialogue exchange → character gestures or moves → dialogue exchange → environmental detail → dialogue exchange"
+          },
+          "validation_query": "When was the last action beat in this dialogue sequence?"
+        },
+        {
+          "rule_id": "DP-603",
+          "name": "white-space-rhythm",
+          "severity": "low",
+          "description": "Vary paragraph length in dialogue scenes; avoid walls of text",
+          "examples": {
+            "violation": "Multiple consecutive 8-line dialogue paragraphs",
+            "compliant": "Mix of single-line dialogue, 2-3 line exchanges, occasional longer monologue (4-5 lines max)"
+          },
+          "validation_query": "Is there visual variety in dialogue paragraph lengths?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "finn": "Primary validator for dialogue quality, voice distinction, and subtext",
+      "bailey": "Check dialogue realism during drafting; ensure interrogation patterns",
+      "tessa": "Verify dialogue consistency with character voice and relationship dynamics",
+      "detective_logan": "Validate interrogation techniques and police procedural dialogue accuracy"
+    },
+    "mcp_validation": {
+      "required_tables": ["npe_dialogue_analysis", "npe_character_voice_tracking"],
+      "validation_triggers": ["dialogue_scene_complete", "interrogation_scene_complete"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "exposition_dump_violations",
+        "threshold": "0 per chapter",
+        "severity": "critical"
+      },
+      {
+        "metric": "subtext_ratio",
+        "threshold": "≥40% of dialogue exchanges",
+        "severity": "high"
+      },
+      {
+        "metric": "voice_distinction_score",
+        "threshold": "≥3 characters identifiable by speech alone",
+        "severity": "medium"
+      },
+      {
+        "metric": "said_bookmark_ratio",
+        "threshold": "≥70% use 'said/asked' vs fancy tags",
+        "severity": "low"
+      },
+      {
+        "metric": "action_beat_frequency",
+        "threshold": "1 per 3-5 dialogue exchanges",
+        "severity": "medium"
+      }
+    ]
+  }
+}

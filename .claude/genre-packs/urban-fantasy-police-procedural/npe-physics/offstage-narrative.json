@@ -1,0 +1,340 @@
+{
+  "category": "offstage-narrative",
+  "version": "1.0",
+  "genre": "urban-fantasy-procedural",
+  "description": "Background continuity rules governing events occurring outside POV awareness, world consistency, and narrative reality maintenance",
+
+  "core_principle": "The story world exists continuously, not just when POV character is present. Characters, antagonists, and world events continue offstage following established patterns and motivations.",
+
+  "offstage_categories": {
+    "antagonist_actions": "Villain's plans proceed whether or not detective is observing",
+    "supporting_character_lives": "Partners, witnesses, suspects have ongoing lives and motivations",
+    "world_continuity": "City, department, magical community operate continuously",
+    "parallel_investigations": "Other detectives, cases, and law enforcement activity",
+    "time_passage_effects": "Realistic consequences of elapsed time"
+  },
+
+  "rules": {
+    "antagonist_continuity": {
+      "description": "Antagonist acts according to their goals continuously, not just in response to protagonist",
+      "validations": [
+        {
+          "rule_id": "ON-001",
+          "name": "antagonist-proactive-planning",
+          "severity": "high",
+          "description": "Antagonist should have independent goals and plans proceeding offstage, not just reacting to detective",
+          "examples": {
+            "violation": "Killer sits idle until detective makes next move",
+            "compliant": "While detective interviews witnesses, killer is simultaneously: eliminating evidence, preparing next strike, or evading surveillance (revealed later through consequences or secondary POV)"
+          },
+          "validation_query": "What is the antagonist doing during this scene when detective is elsewhere?"
+        },
+        {
+          "rule_id": "ON-002",
+          "name": "offstage-antagonist-logic",
+          "severity": "critical",
+          "description": "Antagonist's offstage actions must follow their established goals, knowledge, and capabilities",
+          "examples": {
+            "violation": "Killer somehow knows detective's investigation focus despite no plausible information source",
+            "compliant": "Killer has informant in department (established earlier) who tips them off; or killer monitors police radio; or killer observes detective's routine"
+          },
+          "validation_query": "How does antagonist know what they know? What's their information source?"
+        },
+        {
+          "rule_id": "ON-003",
+          "name": "antagonist-resource-consistency",
+          "severity": "high",
+          "description": "Antagonist's capabilities offstage must match what's been established; no sudden power-ups",
+          "examples": {
+            "violation": "Street-level criminal suddenly has access to military-grade equipment with no explanation",
+            "compliant": "Antagonist's escalating resources foreshadowed: early scene shows criminal contact, later reveals this led to weapons supplier"
+          },
+          "validation_query": "Have antagonist's current capabilities been previously established or foreshadowed?"
+        }
+      ]
+    },
+
+    "supporting_character_continuity": {
+      "description": "Non-POV characters have ongoing lives, motivations, and arcs",
+      "validations": [
+        {
+          "rule_id": "ON-101",
+          "name": "character-independent-existence",
+          "severity": "medium",
+          "description": "Supporting characters should have developments and concerns beyond serving protagonist's plot",
+          "examples": {
+            "violation": "Partner appears only when detective needs them, vanishes otherwise",
+            "compliant": "Partner mentions their own caseload, personal problems, or independent activities when reconnecting with protagonist"
+          },
+          "validation_query": "What has this character been doing since we last saw them? Do they have independent concerns?"
+        },
+        {
+          "rule_id": "ON-102",
+          "name": "offstage-character-progression",
+          "severity": "medium",
+          "description": "Character arcs and relationships should progress realistically during offstage time",
+          "examples": {
+            "violation": "Partners last spoke 3 days ago mid-argument; reunite with no reference to tension or resolution",
+            "compliant": "When partners reunite after offstage period, prior conflict has either escalated, been addressed, or evolved based on realistic timeframe"
+          },
+          "validation_query": "How have relationships/conflicts evolved during time off-page?"
+        },
+        {
+          "rule_id": "ON-103",
+          "name": "witness-suspect-awareness",
+          "severity": "medium",
+          "description": "Witnesses and suspects react to being investigated; their behavior continues offstage",
+          "examples": {
+            "violation": "Suspect interviewed Tuesday shows no reaction when detective returns Thursday; no preparation or concern",
+            "compliant": "Suspect has consulted lawyer (offstage), become more guarded, or fled—realistic response to being under investigation"
+          },
+          "validation_query": "How would this character realistically react offstage to being investigated?"
+        }
+      ]
+    },
+
+    "world_continuity": {
+      "description": "Story world operates consistently whether or not POV character is present",
+      "validations": [
+        {
+          "rule_id": "ON-201",
+          "name": "department-ongoing-activity",
+          "severity": "low",
+          "description": "Police department has other cases, politics, and operations beyond protagonist's investigation",
+          "examples": {
+            "violation": "Entire precinct seems to exist solely for protagonist's case",
+            "compliant": "Background details show: other detectives on other cases, department budget discussions, unrelated criminal activity, bureaucratic operations"
+          },
+          "validation_query": "What else is happening in this department/city beyond the main case?"
+        },
+        {
+          "rule_id": "ON-202",
+          "name": "magical-world-continuity",
+          "severity": "medium",
+          "description": "Magical community and supernatural elements continue operating according to established rules",
+          "examples": {
+            "violation": "Magical elements appear only when convenient to plot",
+            "compliant": "Magical community has ongoing politics, other magical crimes, and supernatural events proceeding independently of main plot"
+          },
+          "validation_query": "How does the magical world continue to operate offstage?"
+        },
+        {
+          "rule_id": "ON-203",
+          "name": "city-life-persistence",
+          "severity": "low",
+          "description": "Urban setting shows signs of continuous operation: weather, news, events",
+          "examples": {
+            "violation": "City is static backdrop with no independent life",
+            "compliant": "Background details: weather changes, unrelated news events, sports scores, traffic patterns—showing world continues beyond case"
+          },
+          "validation_query": "What background elements show the city operating continuously?"
+        }
+      ]
+    },
+
+    "time_passage_realism": {
+      "description": "Elapsed time has realistic consequences on offstage events",
+      "validations": [
+        {
+          "rule_id": "ON-301",
+          "name": "evidence-degradation",
+          "severity": "high",
+          "description": "Physical evidence, memories, and leads degrade realistically over time when not actively pursued",
+          "examples": {
+            "violation": "Week-old crime scene perfectly preserved with no degradation",
+            "compliant": "Returned to crime scene 5 days later: building cleaned, witnesses' memories faded, security footage overwritten on 72-hour loop"
+          },
+          "validation_query": "What realistic degradation has occurred during time elapsed?"
+        },
+        {
+          "rule_id": "ON-302",
+          "name": "suspect-opportunity-evolution",
+          "severity": "medium",
+          "description": "Delay gives suspects opportunity to act: flee, destroy evidence, prepare defenses",
+          "examples": {
+            "violation": "Suspect waits passively for days while detective investigates elsewhere",
+            "compliant": "When detective returns to question suspect 48 hours later, suspect has: lawyered up, fled, or destroyed incriminating evidence"
+          },
+          "validation_query": "What has the suspect done during this time gap to protect themselves?"
+        },
+        {
+          "rule_id": "ON-303",
+          "name": "procedural-timeframes",
+          "severity": "high",
+          "description": "Lab results, warrants, and bureaucratic processes take realistic time even offstage",
+          "examples": {
+            "violation": "DNA results appear instantly when needed for plot",
+            "compliant": "DNA sent to lab Monday, results arrive Thursday (realistic 72-hour processing); detective must pursue other leads meanwhile"
+          },
+          "validation_query": "Is this procedural timeframe realistic for the process described?"
+        }
+      ]
+    },
+
+    "parallel_plot_threads": {
+      "description": "Multiple investigation threads and storylines progress simultaneously",
+      "validations": [
+        {
+          "rule_id": "ON-401",
+          "name": "parallel-investigation-progress",
+          "severity": "medium",
+          "description": "When protagonist pursues one lead, other leads/team members continue working offstage",
+          "examples": {
+            "violation": "All investigation threads pause when not in current scene",
+            "compliant": "'While she interviewed the witness, her partner was running down the financial angle.' Results of parallel work appear later: 'Her partner called. The bank records came through.'"
+          },
+          "validation_query": "What other investigation work is proceeding offstage during this scene?"
+        },
+        {
+          "rule_id": "ON-402",
+          "name": "subplot-progression",
+          "severity": "low",
+          "description": "Personal and relationship subplots advance realistically during main plot time",
+          "examples": {
+            "violation": "Relationship conflict introduced in Chapter 2 is unchanged in Chapter 15 despite weeks passing",
+            "compliant": "Personal relationship evolves offstage: partner's mentioned family situation worsens, colleague's mentioned career opportunity develops"
+          },
+          "validation_query": "How have subplot elements evolved during story time passage?"
+        }
+      ]
+    },
+
+    "information_asymmetry": {
+      "description": "Characters know different things; information doesn't magically spread",
+      "validations": [
+        {
+          "rule_id": "ON-501",
+          "name": "knowledge-transfer-tracking",
+          "severity": "critical",
+          "description": "Track what each character knows; information requires on-page or justified offstage communication",
+          "examples": {
+            "violation": "Captain knows details detective discovered despite no shown communication",
+            "compliant": "Either show detective briefing captain, or justify: 'She must have read my report' or 'Word travels fast in this precinct'"
+          },
+          "validation_query": "How did this character learn this information? Was communication shown or reasonably implied?"
+        },
+        {
+          "rule_id": "ON-502",
+          "name": "offstage-communication-plausibility",
+          "severity": "high",
+          "description": "Offstage information transfer must be plausible given timeframe and relationships",
+          "examples": {
+            "violation": "Character knows details of private conversation they couldn't have heard",
+            "compliant": "Character learns through: report reading, gossip from colleague who was present, or surveillance (each justified by their access/capabilities)"
+          },
+          "validation_query": "Is it plausible this character gained this information offstage? Through what mechanism?"
+        }
+      ]
+    },
+
+    "cause_and_effect_continuity": {
+      "description": "Offstage events must have observable consequences when protagonist encounters them",
+      "validations": [
+        {
+          "rule_id": "ON-601",
+          "name": "offstage-action-consequences",
+          "severity": "high",
+          "description": "Major offstage events should leave observable traces detective can discover",
+          "examples": {
+            "violation": "Killer commits second murder offstage with no evidence, witnesses, or discoverable traces",
+            "compliant": "Offstage murder revealed through: body discovery, witness reports, security footage, forensic evidence—realistic consequences"
+          },
+          "validation_query": "What observable traces would this offstage event realistically leave?"
+        },
+        {
+          "rule_id": "ON-602",
+          "name": "detective-absence-impact",
+          "severity": "medium",
+          "description": "Detective's absence from location should have realistic impact on what happens there",
+          "examples": {
+            "violation": "Critical evidence sits untouched for days until detective returns to find it",
+            "compliant": "Evidence disturbed, contaminated, or collected by other officers; or crime scene cleaned by property owner; realistic consequences of detective not being present"
+          },
+          "validation_query": "What happened at this location while the detective was elsewhere?"
+        }
+      ]
+    },
+
+    "antagonist_pov_consistency": {
+      "description": "If using antagonist POV scenes, their offstage actions must match shown personality/goals",
+      "validations": [
+        {
+          "rule_id": "ON-701",
+          "name": "villain-pov-foreshadowing",
+          "severity": "medium",
+          "description": "Antagonist POV should foreshadow upcoming offstage actions without spoiling detective plot",
+          "examples": {
+            "violation": "Antagonist POV reveals nothing useful; serves no narrative purpose",
+            "compliant": "Antagonist POV shows: preparation for next action (without revealing target), building menace, demonstrating capability—creating dread without spoiling mystery"
+          },
+          "validation_query": "Does this antagonist POV scene build tension and foreshadow while preserving mystery?"
+        },
+        {
+          "rule_id": "ON-702",
+          "name": "antagonist-limitation-consistency",
+          "severity": "high",
+          "description": "Antagonist POV must respect their knowledge limitations; they can't know detective's private activities unless justified",
+          "examples": {
+            "violation": "Antagonist POV shows knowledge of detective's secret plan shared only with partner",
+            "compliant": "Antagonist only knows what they could plausibly learn: public actions, informant tips, surveillance, or lucky guesses"
+          },
+          "validation_query": "How would antagonist plausibly know what they know in this POV scene?"
+        }
+      ]
+    }
+  },
+
+  "enforcement": {
+    "agent_integration": {
+      "tessa": "Primary validator for continuity and offstage logic; track character knowledge and timeline",
+      "professor_mira": "Validate world consistency and magical system continuity",
+      "detective_logan": "Verify procedural realism in offstage investigation activities",
+      "miranda": "Track parallel plot threads and ensure offstage events align with story logic"
+    },
+    "mcp_validation": {
+      "required_tables": [
+        "npe_character_knowledge",
+        "npe_timeline_tracking",
+        "npe_location_states",
+        "npe_offstage_events",
+        "npe_evidence_tracking"
+      ],
+      "validation_triggers": ["time_jump", "character_reunion", "location_revisit", "information_reveal"]
+    }
+  },
+
+  "metrics": {
+    "tracked_values": [
+      {
+        "metric": "knowledge_consistency_violations",
+        "threshold": "0 per chapter",
+        "severity": "critical"
+      },
+      {
+        "metric": "time_passage_realism",
+        "threshold": "100% of time jumps have realistic consequences",
+        "severity": "high"
+      },
+      {
+        "metric": "antagonist_proactive_actions",
+        "threshold": "≥3 independent antagonist actions per act",
+        "severity": "medium"
+      },
+      {
+        "metric": "supporting_character_independence",
+        "threshold": "≥70% have offstage concerns/developments",
+        "severity": "low"
+      },
+      {
+        "metric": "procedural_timeframe_accuracy",
+        "threshold": "100% realistic",
+        "severity": "high"
+      },
+      {
+        "metric": "offstage_consequence_traces",
+        "threshold": "All major offstage events leave discoverable evidence",
+        "severity": "high"
+      }
+    ]
+  }
+}
