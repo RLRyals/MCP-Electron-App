@@ -45,7 +45,7 @@ jobs:
         with:
           repository: RLRyals/fictionlab-workflow
           path: fictionlab-workflow
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.WORKFLOW_REPO_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
