@@ -2373,24 +2373,11 @@ function setupIPC(): void {
         createdAt: new Date().toISOString()
       }, { spaces: 2 });
 
-      // Copy genre pack if specified
+      // Genre packs are now copied to the project folder when a workflow runs
+      // via the ResourceCopier in fictionlab-workflow/packages/workflow-runner
+      // No need to copy them here at project creation time
       if (genrePack && genrePack !== 'none') {
-        // In production, genre packs are in resources/genre-packs
-        // In development, they're in .claude/genre-packs
-        const isProd = app.isPackaged;
-        const genrePackSource = isProd
-          ? path.join(process.resourcesPath, 'genre-packs', genrePack)
-          : path.join(app.getAppPath(), '.claude', 'genre-packs', genrePack);
-        const genrePackDest = path.join(folderPath, '.claude', 'genre-packs', genrePack);
-
-        logWithCategory('debug', LogCategory.SYSTEM, `Looking for genre pack at: ${genrePackSource}`);
-
-        if (await fse.pathExists(genrePackSource)) {
-          await fse.copy(genrePackSource, genrePackDest);
-          logWithCategory('info', LogCategory.SYSTEM, `Copied genre pack: ${genrePack}`);
-        } else {
-          logWithCategory('warn', LogCategory.SYSTEM, `Genre pack not found: ${genrePackSource}`);
-        }
+        logWithCategory('info', LogCategory.SYSTEM, `Genre pack '${genrePack}' will be copied when workflow runs`);
       }
 
       logWithCategory('info', LogCategory.SYSTEM, `Workspace initialized at ${folderPath}`);
@@ -2402,37 +2389,14 @@ function setupIPC(): void {
   });
 
   // List available genre packs
+  // Genre packs are now managed by fictionlab-workflow/resources/genre-packs
+  // and copied to projects when workflows run. This handler returns an empty list
+  // since genre packs are no longer bundled with the Electron app.
   ipcMain.handle('project:list-genre-packs', async () => {
-    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing genre packs');
-    try {
-      // In production, genre packs are in resources/genre-packs
-      // In development, they're in .claude/genre-packs
-      const isProd = app.isPackaged;
-      const genrePacksDir = isProd
-        ? path.join(process.resourcesPath, 'genre-packs')
-        : path.join(app.getAppPath(), '.claude', 'genre-packs');
-
-      logWithCategory('debug', LogCategory.SYSTEM, `Looking for genre packs in: ${genrePacksDir}`);
-
-      if (!await fse.pathExists(genrePacksDir)) {
-        logWithCategory('debug', LogCategory.SYSTEM, 'Genre packs directory not found');
-        return [];
-      }
-
-      const entries = await fse.readdir(genrePacksDir, { withFileTypes: true });
-      const packs = entries
-        .filter((e: any) => e.isDirectory() && !e.name.startsWith('_'))
-        .map((e: any) => ({
-          id: e.name,
-          name: e.name.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-        }));
-
-      logWithCategory('debug', LogCategory.SYSTEM, `Found ${packs.length} genre packs`);
-      return packs;
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, `Failed to list genre packs: ${error.message}`);
-      return [];
-    }
+    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing genre packs (now workflow-driven)');
+    // Genre packs are now workflow-driven and copied from fictionlab-workflow
+    // when a workflow executes. Return empty list for project creation UI.
+    return [];
   });
 
   // ========================================

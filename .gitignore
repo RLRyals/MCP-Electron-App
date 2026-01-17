@@ -81,12 +81,7 @@ ehthumbs_vista.db
 .directory
 .Trash-*
 .claude/settings.local.json
-.claude/settings.local.json
 .claude/CLAUDE.MD
-.claude/agents/*
-.claude/genre-packs/_TEMPLATE_/
-.claude/skills/*
-.claude/templates/*
 workflows/series-architect-2/.gitattributes
 workflows/series-architect-2/.gitignore
 workflows/series-architect-2/QUICKSTART.md

@@ -99,13 +99,6 @@
       {
         "from": "nginx.conf",
         "to": "nginx.conf"
-      },
-      {
-        "from": ".claude/genre-packs",
-        "to": "genre-packs",
-        "filter": [
-          "**/*"
-        ]
       }
     ],
     "win": {
