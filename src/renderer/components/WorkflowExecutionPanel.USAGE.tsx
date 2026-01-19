@@ -43,7 +43,7 @@ export const FullScreenExecutionExample: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const id = await electronAPI.invoke('workflow:start', {
-        workflowDefId: workflowDef.id,
+        workflowId: workflowDef.id,
         seriesId: 1,
         userId: 1,
       });
@@ -138,7 +138,7 @@ export const SplitViewExecutionExample: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const instanceId = await electronAPI.invoke('workflow:start', {
-        workflowDefId: selectedWorkflow.id,
+        workflowId: selectedWorkflow.id,
         seriesId: 1,
         userId: 1,
       });
@@ -222,7 +222,7 @@ export const TabbedExecutionExample: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const instanceId = await electronAPI.invoke('workflow:start', {
-        workflowDefId: selectedWorkflow.id,
+        workflowId: selectedWorkflow.id,
         seriesId: 1,
         userId: 1,
       });
@@ -314,7 +314,7 @@ export const ModalExecutionExample: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const instanceId = await electronAPI.invoke('workflow:start', {
-        workflowDefId: selectedWorkflow.id,
+        workflowId: selectedWorkflow.id,
         seriesId: 1,
         userId: 1,
       });
@@ -418,7 +418,7 @@ export const ResponsiveExecutionExample: React.FC = () => {
     try {
       const electronAPI = (window as any).electronAPI;
       const instanceId = await electronAPI.invoke('workflow:start', {
-        workflowDefId: selectedWorkflow.id,
+        workflowId: selectedWorkflow.id,
         seriesId: 1,
         userId: 1,
       });

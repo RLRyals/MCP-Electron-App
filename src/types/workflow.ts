@@ -271,7 +271,7 @@ export type ActiveWorkflowStatus = 'running' | 'paused' | 'completed' | 'failed'
  */
 export interface ActiveWorkflowInstance {
   id: string;
-  workflowDefId: string;
+  workflowId: string;
   workflowName: string;
   source: WorkflowSource;
   projectFolder: string;

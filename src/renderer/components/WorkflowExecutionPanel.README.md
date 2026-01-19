@@ -179,7 +179,7 @@ function WorkflowExecutionView() {
 
   const handleStartWorkflow = async () => {
     const id = await electronAPI.invoke('workflow:start', {
-      workflowDefId: workflow.id,
+      workflowId: workflow.id,
       seriesId: 1,
       userId: 1,
     });
