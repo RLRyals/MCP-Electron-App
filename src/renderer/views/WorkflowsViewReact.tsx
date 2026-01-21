@@ -42,13 +42,14 @@ const WorkflowsApp: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
-  const [showSeriesDialog, setShowSeriesDialog] = useState(false);
-  const [seriesDialogContext, setSeriesDialogContext] = useState<{ projectId: number; projectName: string } | null>(null);
   const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
 
   // Workflow Manager Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [panelWidth, setPanelWidth] = useState(320);
+
+  // Active workflow tracking - which node is currently being executed
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -114,12 +115,6 @@ const WorkflowsApp: React.FC = () => {
         if (typeof (window as any).showNotification === 'function') {
           (window as any).showNotification(`Project "${data.projectName}" selected`, 'success');
         }
-      });
-
-      topBar.on('create-series', (data: { projectId: number; projectName: string }) => {
-        console.log('[WorkflowsViewReact] Create series event:', data);
-        setSeriesDialogContext(data);
-        setShowSeriesDialog(true);
       });
 
       topBar.on('series-selected', async (data: { seriesId: number; seriesName: string }) => {
@@ -209,10 +204,28 @@ const WorkflowsApp: React.FC = () => {
       console.log('[WorkflowsViewReact] Selected workflow result:', workflow);
 
       setSelectedWorkflow(workflow);
-      // Reset execution status when switching workflows
+      // Reset execution status and active node when switching workflows
       setExecutionStatus(new Map());
+      setActiveNodeId(null);
     } catch (error) {
       console.error('[WorkflowsViewReact] Failed to get workflow:', error);
+    }
+  };
+
+  // Handle active workflow selection - load workflow and highlight current node
+  const handleSelectActiveWorkflow = async (workflowId: string, currentNodeId?: string) => {
+    try {
+      console.log('[WorkflowsViewReact] Selecting active workflow:', workflowId, 'currentNode:', currentNodeId);
+      const electronAPI = (window as any).electronAPI;
+      const workflow = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:get`, { id: workflowId });
+
+      console.log('[WorkflowsViewReact] Loaded active workflow:', workflow);
+
+      setSelectedWorkflow(workflow);
+      setActiveNodeId(currentNodeId || null);
+      // Don't reset execution status - this is an active workflow
+    } catch (error) {
+      console.error('[WorkflowsViewReact] Failed to load active workflow:', error);
     }
   };
 
@@ -529,6 +542,7 @@ const WorkflowsApp: React.FC = () => {
                         } : undefined
                       }}
                       executionStatus={executionStatus}
+                      activeNodeId={activeNodeId}
                       onNodeClick={(nodeId: string, phase: any) => {
                         console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
                       }}
@@ -581,6 +595,7 @@ const WorkflowsApp: React.FC = () => {
             selectedAvailableWorkflowId={selectedWorkflow?.id}
             onDeleteWorkflow={handleDeleteWorkflow}
             onReimportWorkflow={handleReimportWorkflow}
+            onSelectActiveWorkflow={handleSelectActiveWorkflow}
           />
         </div>
       </div>

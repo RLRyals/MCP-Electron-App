@@ -21,6 +21,8 @@ export interface WorkflowManagerPanelProps {
   selectedAvailableWorkflowId?: string;
   onDeleteWorkflow?: (workflowId: string) => void;
   onReimportWorkflow?: (workflowId: string) => void;
+  /** Called when an active workflow is selected - loads it in the canvas with current node highlighted */
+  onSelectActiveWorkflow?: (workflowId: string, currentNodeId?: string) => void;
 }
 
 export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
@@ -33,6 +35,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   selectedAvailableWorkflowId,
   onDeleteWorkflow,
   onReimportWorkflow,
+  onSelectActiveWorkflow,
 }) => {
   const [activeWorkflows, setActiveWorkflows] = useState<ActiveWorkflowInstance[]>([]);
   const [selectedActiveWorkflow, setSelectedActiveWorkflow] = useState<ActiveWorkflowInstance | null>(null);
@@ -215,6 +218,15 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     }
   };
 
+  // Handle active workflow selection - highlight card AND load in canvas
+  const handleSelectActiveWorkflow = (workflow: ActiveWorkflowInstance) => {
+    setSelectedActiveWorkflow(workflow);
+    // Load the workflow definition in canvas with current node highlighted
+    if (onSelectActiveWorkflow) {
+      onSelectActiveWorkflow(workflow.workflowId, workflow.currentNodeId);
+    }
+  };
+
   if (!isOpen) return null;
 
   // Styles
@@ -353,7 +365,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                 onResume={handleResume}
                 onCancel={handleCancel}
                 onJumpToNode={handleJumpToNode}
-                onSelect={setSelectedActiveWorkflow}
+                onSelect={handleSelectActiveWorkflow}
                 isSelected={selectedActiveWorkflow?.id === workflow.id}
               />
             ))

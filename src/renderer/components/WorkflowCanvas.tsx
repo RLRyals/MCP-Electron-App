@@ -122,6 +122,8 @@ export interface WorkflowCanvasProps {
     }>;
   };
   executionStatus?: Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>;
+  /** ID of the currently active/executing node (from active workflow) - will be highlighted */
+  activeNodeId?: string | null;
   onNodeClick?: (nodeId: string, phase: any) => void;
   onWorkflowChange?: (workflow: any) => void;
   onOpenSubWorkflow?: (subWorkflowId: string) => void;
@@ -136,6 +138,7 @@ export interface WorkflowCanvasProps {
 export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   workflow,
   executionStatus,
+  activeNodeId,
   onNodeClick,
   onWorkflowChange,
   onOpenSubWorkflow,
@@ -737,13 +740,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       data: {
         ...node.baseData,
         status: executionStatus?.get(node.id) || 'pending',
+        isActiveNode: activeNodeId === node.id, // Highlight the currently executing node
         onEdit: () => handleEditNode(node.id), // Use new NodeConfigDialog
         onOpenSubWorkflow: node.baseData.phase.subWorkflowId
           ? () => handleOpenSubWorkflow(node.baseData.phase.subWorkflowId!)
           : undefined,
       },
     }));
-  }, [baseNodes, executionStatus, handleEditNode, handleOpenSubWorkflow]);
+  }, [baseNodes, executionStatus, activeNodeId, handleEditNode, handleOpenSubWorkflow]);
 
   // Update React Flow state when memoized values change
   useEffect(() => {

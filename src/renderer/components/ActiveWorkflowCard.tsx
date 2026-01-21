@@ -175,26 +175,31 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
 
   const jumpMenuStyle: React.CSSProperties = {
     position: 'absolute',
-    bottom: '100%',
+    top: '100%',
     left: 0,
     right: 0,
     background: 'var(--color-bg-secondary, #0D1F35)',
     border: '1px solid var(--color-border, rgba(255, 255, 255, 0.1))',
     borderRadius: '6px',
     padding: '4px',
-    marginBottom: '4px',
+    marginTop: '4px',
     maxHeight: '200px',
     overflowY: 'auto',
-    zIndex: 10,
+    overflowX: 'hidden',
+    zIndex: 1000,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
   };
 
   const jumpMenuItemStyle: React.CSSProperties = {
-    padding: '6px 8px',
-    fontSize: '11px',
+    padding: '8px 10px',
+    fontSize: '12px',
     color: 'var(--color-text-secondary, rgba(255, 255, 255, 0.7))',
     cursor: 'pointer',
     borderRadius: '4px',
     transition: 'background 0.15s ease',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   };
 
   const handleCardClick = (e: React.MouseEvent) => {

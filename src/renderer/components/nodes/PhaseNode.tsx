@@ -43,6 +43,8 @@ export interface PhaseNodeData {
     requiresApproval: boolean;
   };
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  /** True if this node is the currently executing node in an active workflow */
+  isActiveNode?: boolean;
   onEdit?: () => void;
   onOpenSubWorkflow?: () => void;
 }
@@ -153,8 +155,14 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
     }
   };
 
+  // Use existing in_progress styling pattern for active node - just override the border color
+  const activeNodeStyle: React.CSSProperties = data.isActiveNode ? {
+    border: '3px solid #60a5fa',
+    boxShadow: '0 4px 12px rgba(96, 165, 250, 0.3)',
+  } : {};
+
   return (
-    <div className="phase-node-container" style={nodeStyle} onDoubleClick={handleDoubleClick}>
+    <div className="phase-node-container" style={{ ...nodeStyle, ...activeNodeStyle }} onDoubleClick={handleDoubleClick}>
       <Handle
         type="target"
         position={Position.Left}
