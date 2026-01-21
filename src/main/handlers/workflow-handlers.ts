@@ -5,7 +5,31 @@ import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
-import type { WorkflowUpdate } from '../../types/workflow';
+import type { WorkflowUpdate, ActiveWorkflowInstance } from '../../types/workflow';
+
+/**
+ * Map active workflow data from MCP snake_case to TypeScript camelCase
+ */
+function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
+  return {
+    id: data.id,
+    workflowId: data.workflow_id,
+    workflowName: data.workflow_name,
+    source: data.source,
+    projectFolder: data.project_folder,
+    projectName: data.project_name,
+    currentNodeId: data.current_node_id,
+    currentNodeName: data.current_node_name,
+    status: data.status,
+    progressPercent: data.progress_percent ?? 0,
+    totalNodes: data.total_nodes ?? 0,
+    completedNodes: data.completed_nodes ?? 0,
+    startedAt: data.started_at,
+    updatedAt: data.updated_at,
+    availableNodes: data.available_nodes ?? [],
+    metadata: data.metadata,
+  };
+}
 
 // Singleton instance of PersistentMCPClient for workflow operations
 let workflowClient: PersistentMCPClient | null = null;
@@ -400,7 +424,8 @@ export function registerWorkflowHandlers() {
       const client = await getWorkflowClient();
       const result = await client.listActiveWorkflows();
       logWithCategory('info', LogCategory.WORKFLOW, `IPC: Found ${result?.length || 0} active workflows`);
-      return result || [];
+      // Map snake_case from MCP to camelCase for TypeScript
+      return (result || []).map(mapActiveWorkflow);
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: List active workflows failed', { error: error.message });
       // Return empty array on error - MCP tools may not be implemented yet

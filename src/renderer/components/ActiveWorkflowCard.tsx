@@ -286,7 +286,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
           ⏹
         </button>
 
-        {onJumpToNode && workflow.availableNodes.length > 0 && (
+        {onJumpToNode && workflow.availableNodes?.length > 0 && (
           <button
             style={buttonStyle}
             onClick={(e) => { e.stopPropagation(); setShowJumpMenu(!showJumpMenu); }}
@@ -301,7 +301,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
         {/* Jump to node dropdown */}
         {showJumpMenu && onJumpToNode && (
           <div style={jumpMenuStyle} className="jump-menu">
-            {workflow.availableNodes.map((node) => (
+            {workflow.availableNodes?.map((node) => (
               <div
                 key={node.id}
                 style={jumpMenuItemStyle}
