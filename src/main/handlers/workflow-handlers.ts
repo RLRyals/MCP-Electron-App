@@ -542,23 +542,37 @@ export function registerWorkflowHandlers() {
   });
 
   // Update workflow progress (called during execution)
-  ipcMain.handle('workflow:update-progress', async (_event, {
-    registryId,
-    nodeId,
-    nodeName,
-    progressPercent,
-    completedNodes,
-  }: {
+  // Accepts both naming conventions: nodeId/nodeName OR currentNodeId/currentNodeName
+  ipcMain.handle('workflow:update-progress', async (_event, params: {
     registryId: string;
-    nodeId: string;
-    nodeName: string;
+    nodeId?: string;
+    nodeName?: string;
+    currentNodeId?: string;
+    currentNodeName?: string;
     progressPercent: number;
     completedNodes: number;
+    breadcrumb?: string;  // JSON string of breadcrumb array for nested workflows
   }) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update progress for ${registryId}: ${progressPercent}%`);
+    // Support both naming conventions
+    const nodeId = params.nodeId || params.currentNodeId || '';
+    const nodeName = params.nodeName || params.currentNodeName || '';
+    const { registryId, progressPercent, completedNodes, breadcrumb } = params;
+
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update progress for ${registryId}: ${progressPercent}% at node ${nodeId}`);
     try {
       const client = await getWorkflowClient();
-      await client.updateWorkflowProgress(registryId, nodeId, nodeName, progressPercent, completedNodes);
+
+      // Parse breadcrumb if provided
+      let breadcrumbArray: import('../../types/workflow').WorkflowBreadcrumbEntry[] | undefined;
+      if (breadcrumb) {
+        try {
+          breadcrumbArray = JSON.parse(breadcrumb);
+        } catch (e) {
+          logWithCategory('warn', LogCategory.WORKFLOW, 'Failed to parse breadcrumb JSON', { breadcrumb });
+        }
+      }
+
+      await client.updateWorkflowProgress(registryId, nodeId, nodeName, progressPercent, completedNodes, breadcrumbArray);
 
       // Broadcast update
       broadcastWorkflowUpdate({
@@ -569,6 +583,7 @@ export function registerWorkflowHandlers() {
           currentNodeName: nodeName,
           progressPercent,
           completedNodes,
+          breadcrumb: breadcrumbArray,
         },
         timestamp: new Date().toISOString(),
       });
