@@ -106,6 +106,25 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
     whiteSpace: 'nowrap',
   };
 
+  const breadcrumbStyle: React.CSSProperties = {
+    fontSize: '10px',
+    color: 'var(--color-text-tertiary, rgba(255, 255, 255, 0.5))',
+    marginBottom: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '2px',
+  };
+
+  const breadcrumbSeparatorStyle: React.CSSProperties = {
+    color: 'var(--color-text-tertiary, rgba(255, 255, 255, 0.3))',
+  };
+
+  const breadcrumbItemStyle: React.CSSProperties = {
+    color: 'var(--color-text-secondary, rgba(255, 255, 255, 0.6))',
+    cursor: 'default',
+  };
+
   const currentNodeStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -238,6 +257,21 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
       <div style={projectPathStyle} title={workflow.projectFolder}>
         {workflow.projectName}
       </div>
+
+      {/* Breadcrumb trail for nested workflows */}
+      {workflow.breadcrumb && workflow.breadcrumb.length > 0 && (
+        <div style={breadcrumbStyle}>
+          {workflow.breadcrumb.map((entry, index) => (
+            <span key={`${entry.workflowId}-${entry.nodeId}`}>
+              {index > 0 && <span style={breadcrumbSeparatorStyle}> › </span>}
+              <span style={breadcrumbItemStyle} title={`${entry.workflowName}: ${entry.nodeName}`}>
+                {entry.nodeName}
+              </span>
+            </span>
+          ))}
+          <span style={breadcrumbSeparatorStyle}> › </span>
+        </div>
+      )}
 
       {/* Current node and status */}
       <div style={currentNodeStyle}>

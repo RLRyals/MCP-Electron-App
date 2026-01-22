@@ -29,6 +29,8 @@ if (typeof document !== 'undefined' && !document.getElementById('phase-node-styl
   document.head.appendChild(style);
 }
 
+import type { NodeExecutionStatus } from '../../../types/workflow.js';
+
 export interface PhaseNodeData {
   label: string;
   phase: {
@@ -42,7 +44,7 @@ export interface PhaseNodeData {
     gate: boolean;
     requiresApproval: boolean;
   };
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: NodeExecutionStatus;
   /** True if this node is the currently executing node in an active workflow */
   isActiveNode?: boolean;
   onEdit?: () => void;
@@ -50,16 +52,34 @@ export interface PhaseNodeData {
 }
 
 export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
+  // Determine effective status - if this is the active node, it's running
+  const effectiveStatus: NodeExecutionStatus = data.isActiveNode ? 'running' : (data.status || 'pending');
+
   const getStatusColor = () => {
-    switch (data.status) {
+    switch (effectiveStatus) {
       case 'completed':
         return '#4ade80'; // green
+      case 'running':
       case 'in_progress':
         return '#60a5fa'; // blue
       case 'failed':
         return '#f87171'; // red
       default:
         return '#9ca3af'; // gray
+    }
+  };
+
+  const getStatusLabel = (): string => {
+    switch (effectiveStatus) {
+      case 'running':
+      case 'in_progress':
+        return 'RUNNING';
+      case 'completed':
+        return 'COMPLETED';
+      case 'failed':
+        return 'FAILED';
+      default:
+        return 'PENDING';
     }
   };
 
@@ -97,7 +117,7 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
     border: `2px solid ${getStatusColor()}`,
     background: 'white',
     minWidth: '180px',
-    boxShadow: data.status === 'in_progress' ? '0 4px 12px rgba(96, 165, 250, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+    boxShadow: (effectiveStatus === 'in_progress' || effectiveStatus === 'running') ? '0 4px 12px rgba(96, 165, 250, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'all 0.3s ease',
     cursor: 'pointer',
     position: 'relative',
@@ -225,7 +245,7 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
         </div>
       )}
 
-      <div style={statusBadgeStyle}>{String(data.status || 'pending').replace('_', ' ')}</div>
+      <div style={statusBadgeStyle}>{getStatusLabel()}</div>
 
       <Handle
         type="source"

@@ -24,6 +24,7 @@ import * as fs from 'fs';
 import type {
   DatabaseWorkflowDefinition,
   DatabaseWorkflowPhase,
+  WorkflowBreadcrumbEntry,
 } from '../../types/workflow';
 
 // Re-export for backward compatibility
@@ -666,13 +667,13 @@ export class PersistentMCPClient {
   async startSubWorkflow(
     parentInstanceId: number,
     parentPhaseNumber: number,
-    subWorkflowDefId: string,
+    subworkflowId: string,
     subWorkflowVersion: string
   ): Promise<any> {
     return await this.callTool('start_sub_workflow', {
       parent_instance_id: parentInstanceId,
       parent_phase_number: parentPhaseNumber,
-      sub_workflow_id: subWorkflowDefId,
+      sub_workflow_id: subworkflowId,
       sub_workflow_version: subWorkflowVersion
     });
   }
@@ -828,20 +829,28 @@ export class PersistentMCPClient {
 
   /**
    * Update workflow progress
+   * @param registryId - The active workflow registry ID
+   * @param nodeId - Current node being executed
+   * @param nodeName - Human-readable node name
+   * @param progressPercent - Progress percentage (0-100)
+   * @param completedNodes - Number of completed nodes
+   * @param breadcrumb - Optional breadcrumb trail for nested workflow tracking
    */
   async updateWorkflowProgress(
     registryId: string,
     nodeId: string,
     nodeName: string,
     progressPercent: number,
-    completedNodes?: number
+    completedNodes?: number,
+    breadcrumb?: WorkflowBreadcrumbEntry[]
   ): Promise<void> {
     await this.callTool('update_workflow_progress', {
       registry_id: registryId,
       current_node_id: nodeId,
       current_node_name: nodeName,
       progress_percent: progressPercent,
-      completed_nodes: completedNodes
+      completed_nodes: completedNodes,
+      breadcrumb: breadcrumb ? JSON.stringify(breadcrumb) : undefined
     });
   }
 

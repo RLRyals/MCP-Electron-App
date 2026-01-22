@@ -32,6 +32,7 @@ import { NodeConfigDialog } from './dialogs/NodeConfigDialog.js';
 import { DocumentEditDialog } from './dialogs/DocumentEditDialog.js';
 import type { WorkflowNode } from '../../types/workflow-nodes.js';
 import type { LLMProviderConfig } from '../../types/llm-providers.js';
+import type { NodeExecutionStatus } from '../../types/workflow.js';
 
 // Simple debounce utility
 function debounce<T extends (...args: any[]) => void>(
@@ -121,7 +122,7 @@ export interface WorkflowCanvasProps {
       position?: { x: number; y: number };
     }>;
   };
-  executionStatus?: Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>;
+  executionStatus?: Map<string, NodeExecutionStatus>;
   /** ID of the currently active/executing node (from active workflow) - will be highlighted */
   activeNodeId?: string | null;
   onNodeClick?: (nodeId: string, phase: any) => void;

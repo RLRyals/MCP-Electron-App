@@ -47,6 +47,23 @@ export type WorkflowStatus = 'draft' | 'ready' | 'in_progress' | 'paused' | 'com
 export type PhaseStatus = 'pending' | 'running' | 'complete' | 'failed' | 'blocked' | 'skipped';
 
 /**
+ * Node execution status for canvas display
+ * Maps to visual states in PhaseNode component
+ */
+export type NodeExecutionStatus = 'pending' | 'running' | 'in_progress' | 'completed' | 'failed';
+
+/**
+ * Display labels for node execution status
+ */
+export const NodeExecutionStatusLabel: Record<NodeExecutionStatus, string> = {
+  pending: 'PENDING',
+  running: 'RUNNING',
+  in_progress: 'RUNNING',  // in_progress and running both display as "RUNNING"
+  completed: 'COMPLETED',
+  failed: 'FAILED',
+};
+
+/**
  * Gate result
  */
 export type GateResult = 'pass' | 'fail' | 'pending';
@@ -266,6 +283,23 @@ export type WorkflowSource = 'fictionlab_ui' | 'claude_code' | 'typingmind';
 export type ActiveWorkflowStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
+ * Breadcrumb entry for tracking nested workflow navigation
+ * Used when executing workflows that contain subworkflows
+ */
+export interface WorkflowBreadcrumbEntry {
+  /** The workflow ID at this level */
+  workflowId: string;
+  /** Human-readable workflow name */
+  workflowName: string;
+  /** The node ID within this workflow that was/is being executed */
+  nodeId: string;
+  /** Human-readable node name */
+  nodeName: string;
+  /** If this is a subworkflow node, the subworkflow's registry ID */
+  subWorkflowRegistryId?: string;
+}
+
+/**
  * Active workflow instance for cross-project tracking
  * Used by the Workflow Manager Panel to display all running workflows
  */
@@ -286,6 +320,16 @@ export interface ActiveWorkflowInstance {
   updatedAt: string;
   availableNodes: { id: string; name: string }[];
   metadata?: Record<string, any>;
+  /**
+   * Breadcrumb trail for nested workflow execution
+   * Shows the path through parent workflows to reach the current execution point
+   * Example: [{ workflowId: "12-phase", nodeName: "Phase 3" }, { workflowId: "series-architect", nodeName: "Step 2" }]
+   */
+  breadcrumb?: WorkflowBreadcrumbEntry[];
+  /**
+   * Parent workflow registry ID if this is a subworkflow
+   */
+  parentWorkflowId?: string;
 }
 
 /**

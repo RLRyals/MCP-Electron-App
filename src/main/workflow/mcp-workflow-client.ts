@@ -276,13 +276,13 @@ export class MCPWorkflowClient {
   async startSubWorkflow(
     parentInstanceId: number,
     parentPhaseNumber: number,
-    subWorkflowDefId: string,
+    subworkflowId: string,
     subWorkflowVersion: string
   ): Promise<any> {
     return await this.callTool('start_sub_workflow', {
       parent_instance_id: parentInstanceId,
       parent_phase_number: parentPhaseNumber,
-      sub_workflow_id: subWorkflowDefId,
+      sub_workflow_id: subworkflowId,
       sub_workflow_version: subWorkflowVersion
     });
   }
