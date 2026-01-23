@@ -908,4 +908,27 @@ export class PersistentMCPClient {
       error
     });
   }
+
+  /**
+   * Mark a node as started (sets it as the current node)
+   */
+  async markNodeStarted(registryId: string, nodeId: string, nodeName: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Marking node started: ${nodeId} in workflow ${registryId}`);
+    await this.callTool('mark_node_started', {
+      registry_id: registryId,
+      node_id: nodeId,
+      node_name: nodeName
+    });
+  }
+
+  /**
+   * Mark a node as completed (adds to completedNodeIds list)
+   */
+  async markNodeCompleted(registryId: string, nodeId: string): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Marking node completed: ${nodeId} in workflow ${registryId}`);
+    await this.callTool('mark_node_completed', {
+      registry_id: registryId,
+      node_id: nodeId
+    });
+  }
 }

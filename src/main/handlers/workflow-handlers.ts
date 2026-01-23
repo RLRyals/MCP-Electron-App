@@ -8,6 +8,23 @@ import { DependencyResolver } from '../workflow/dependency-resolver';
 import type { WorkflowUpdate, ActiveWorkflowInstance } from '../../types/workflow';
 
 /**
+ * Parse completed_node_ids from database (may be JSON string or array)
+ */
+function parseCompletedNodeIds(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
  * Map active workflow data from MCP snake_case to TypeScript camelCase
  */
 function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
@@ -24,6 +41,7 @@ function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
     progressPercent: data.progress_percent ?? 0,
     totalNodes: data.total_nodes ?? 0,
     completedNodes: data.completed_nodes ?? 0,
+    completedNodeIds: parseCompletedNodeIds(data.completed_node_ids),
     startedAt: data.started_at,
     updatedAt: data.updated_at,
     availableNodes: data.available_nodes ?? [],
@@ -591,6 +609,57 @@ export function registerWorkflowHandlers() {
       return { success: true };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Update progress failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Mark a node as started (sets current node)
+  ipcMain.handle('workflow:mark-node-started', async (_event, { registryId, nodeId, nodeName }: {
+    registryId: string;
+    nodeId: string;
+    nodeName: string;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node started ${nodeId} in workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.markNodeStarted(registryId, nodeId, nodeName);
+
+      // Broadcast update
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'node_changed',
+        data: { currentNodeId: nodeId, currentNodeName: nodeName },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Mark node started failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Mark a node as completed (adds to completedNodeIds)
+  ipcMain.handle('workflow:mark-node-completed', async (_event, { registryId, nodeId }: {
+    registryId: string;
+    nodeId: string;
+  }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node completed ${nodeId} in workflow ${registryId}`);
+    try {
+      const client = await getWorkflowClient();
+      await client.markNodeCompleted(registryId, nodeId);
+
+      // Broadcast update - renderer will merge this into existing completedNodeIds
+      broadcastWorkflowUpdate({
+        registryId,
+        type: 'progress',
+        data: { completedNodeIds: [nodeId] },
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Mark node completed failed', { error: error.message });
       throw error;
     }
   });

@@ -213,9 +213,9 @@ const WorkflowsApp: React.FC = () => {
   };
 
   // Handle active workflow selection - load workflow and highlight current node
-  const handleSelectActiveWorkflow = async (workflowId: string, currentNodeId?: string) => {
+  const handleSelectActiveWorkflow = async (workflowId: string, currentNodeId?: string, completedNodeIds?: string[]) => {
     try {
-      console.log('[WorkflowsViewReact] Selecting active workflow:', workflowId, 'currentNode:', currentNodeId);
+      console.log('[WorkflowsViewReact] Selecting active workflow:', workflowId, 'currentNode:', currentNodeId, 'completedNodes:', completedNodeIds);
       const electronAPI = (window as any).electronAPI;
       const workflow = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:get`, { id: workflowId });
 
@@ -223,7 +223,18 @@ const WorkflowsApp: React.FC = () => {
 
       setSelectedWorkflow(workflow);
       setActiveNodeId(currentNodeId || null);
-      // Don't reset execution status - this is an active workflow
+
+      // Populate executionStatus from completedNodeIds
+      if (completedNodeIds && completedNodeIds.length > 0) {
+        const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
+        for (const nodeId of completedNodeIds) {
+          newStatus.set(nodeId, 'completed');
+        }
+        setExecutionStatus(newStatus);
+      } else {
+        // Reset if no completed nodes
+        setExecutionStatus(new Map());
+      }
     } catch (error) {
       console.error('[WorkflowsViewReact] Failed to load active workflow:', error);
     }

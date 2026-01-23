@@ -316,6 +316,11 @@ export interface ActiveWorkflowInstance {
   progressPercent: number;
   totalNodes: number;
   completedNodes: number;
+  /**
+   * List of completed node IDs for accurate status display
+   * Supports parallel workflow execution where node order doesn't determine completion
+   */
+  completedNodeIds?: string[];
   startedAt: string;
   updatedAt: string;
   availableNodes: { id: string; name: string }[];

@@ -22,7 +22,7 @@ export interface WorkflowManagerPanelProps {
   onDeleteWorkflow?: (workflowId: string) => void;
   onReimportWorkflow?: (workflowId: string) => void;
   /** Called when an active workflow is selected - loads it in the canvas with current node highlighted */
-  onSelectActiveWorkflow?: (workflowId: string, currentNodeId?: string) => void;
+  onSelectActiveWorkflow?: (workflowId: string, currentNodeId?: string, completedNodeIds?: string[]) => void;
 }
 
 export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
@@ -221,9 +221,9 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   // Handle active workflow selection - highlight card AND load in canvas
   const handleSelectActiveWorkflow = (workflow: ActiveWorkflowInstance) => {
     setSelectedActiveWorkflow(workflow);
-    // Load the workflow definition in canvas with current node highlighted
+    // Load the workflow definition in canvas with current node highlighted and completed nodes marked
     if (onSelectActiveWorkflow) {
-      onSelectActiveWorkflow(workflow.workflowId, workflow.currentNodeId);
+      onSelectActiveWorkflow(workflow.workflowId, workflow.currentNodeId, workflow.completedNodeIds);
     }
   };
 
