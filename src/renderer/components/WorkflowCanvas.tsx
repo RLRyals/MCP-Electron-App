@@ -28,6 +28,7 @@ import ReactFlow, {
 // Note: reactflow styles are loaded via <link> tag in index.html
 
 import { PhaseNode, PhaseNodeData } from './nodes/PhaseNode.js';
+import { LoopBackEdge } from './edges/LoopBackEdge.js';
 import { NodeConfigDialog } from './dialogs/NodeConfigDialog.js';
 import { DocumentEditDialog } from './dialogs/DocumentEditDialog.js';
 import type { WorkflowNode } from '../../types/workflow-nodes.js';
@@ -67,6 +68,11 @@ const nodeTypes = {
   conditional: PhaseNode,
   loop: PhaseNode,
   subworkflow: PhaseNode,
+};
+
+// Register custom edge types
+const edgeTypes = {
+  'loop-back': LoopBackEdge,
 };
 
 // Edge label dialog state
@@ -230,6 +236,11 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
   // Build React Flow edges from graph data with execution status
   const baseEdges = useMemo(() => {
+    // First pass: identify loop-back edges and assign indices for offset calculation
+    const loopBackEdgeIds = graphData.edges
+      .filter((edge) => ('type' in edge && edge.type === 'loop-back'))
+      .map((edge) => edge.id);
+
     return graphData.edges.map((edge) => {
       const sourceStatus = executionStatus?.get(edge.source) || 'pending';
       const isSelected = selectedEdges.includes(edge.id);
@@ -239,6 +250,10 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       const edgeAnimated = 'animated' in edge ? edge.animated : undefined;
       const edgeCondition = 'condition' in edge ? edge.condition : undefined;
       const edgeType = 'type' in edge ? edge.type : 'default';
+
+      // Check if this is a loop-back edge
+      const isLoopBack = edgeType === 'loop-back';
+      const loopIndex = isLoopBack ? loopBackEdgeIds.indexOf(edge.id) : 0;
 
       // Determine edge color based on status and selection
       let strokeColor = '#d1d5db'; // default gray
@@ -252,7 +267,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         id: edge.id,
         source: String(edge.source),
         target: String(edge.target),
-        type: 'smoothstep',
+        // Use custom loop-back edge type for loop-back edges
+        type: isLoopBack ? 'loop-back' : 'smoothstep',
         label: edgeLabel || undefined,
         animated: edgeAnimated !== undefined ? edgeAnimated : sourceStatus === 'in_progress',
         selectable: true,
@@ -268,6 +284,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         data: {
           condition: edgeCondition || undefined,
           edgeType: edgeType || 'default',
+          loopIndex: loopIndex, // Pass loop index for offset calculation
         },
       };
     });
@@ -843,9 +860,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         // 3. Then save to backend (don't wait for full response before updating UI)
         const result = await electronAPI.invoke('workflow:add-edge', {
           workflowId: workflow.id,
-          source: connection.source,
-          target: connection.target,
-          type: 'default',
+          edge: {
+            id: newEdge.id,
+            source: connection.source,
+            target: connection.target,
+            type: 'default',
+            label: undefined,
+            condition: undefined,
+          },
         });
 
         // 4. Update with actual server data (to sync any server-generated fields)
@@ -1090,6 +1112,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           onEdgeClick={onEdgeClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           attributionPosition="bottom-right"
           minZoom={0.2}
