@@ -547,6 +547,7 @@ export function registerWorkflowHandlers() {
     projectFolder: string;
     projectName: string;
     totalNodes: number;
+    availableNodes?: { id: string; name: string }[];
   }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowId}`);
     try {

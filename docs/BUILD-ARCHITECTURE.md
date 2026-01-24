@@ -9,7 +9,7 @@ FictionLab is built from **three repositories**:
 | Repository | Purpose | GitHub Actions |
 |------------|---------|----------------|
 | **MCP-Electron-App** | Main Electron desktop app | Yes (build + release) |
-| **fictionlab-workflow** | Workflow execution packages | No (local builds only) |
+| **fictionlab-workflow** | Workflow execution packages | Yes (build + release) |
 | **MCP-Writing-Servers** | Database and MCP servers | Docker builds |
 
 ```

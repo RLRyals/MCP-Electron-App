@@ -811,6 +811,7 @@ export class PersistentMCPClient {
     projectFolder: string;
     projectName: string;
     totalNodes: number;
+    availableNodes?: { id: string; name: string }[];
   }): Promise<{ registryId: string }> {
     logWithCategory('info', LogCategory.WORKFLOW,
       `Registering active workflow: ${params.workflowName} from ${params.source}`);
@@ -821,7 +822,8 @@ export class PersistentMCPClient {
       source: params.source,
       project_folder: params.projectFolder,
       project_name: params.projectName,
-      total_nodes: params.totalNodes
+      total_nodes: params.totalNodes,
+      available_nodes: params.availableNodes
     });
 
     return { registryId: result?.registry_id || result?.id };
