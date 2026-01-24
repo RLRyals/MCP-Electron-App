@@ -812,9 +812,10 @@ export class PersistentMCPClient {
     projectName: string;
     totalNodes: number;
     availableNodes?: { id: string; name: string }[];
+    parentWorkflowId?: string;
   }): Promise<{ registryId: string }> {
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Registering active workflow: ${params.workflowName} from ${params.source}`);
+      `Registering active workflow: ${params.workflowName} from ${params.source}${params.parentWorkflowId ? ` (parent: ${params.parentWorkflowId})` : ''}`);
 
     const result = await this.callTool('register_active_workflow', {
       workflow_id: params.workflowId,
@@ -823,7 +824,8 @@ export class PersistentMCPClient {
       project_folder: params.projectFolder,
       project_name: params.projectName,
       total_nodes: params.totalNodes,
-      available_nodes: params.availableNodes
+      available_nodes: params.availableNodes,
+      parent_workflow_id: params.parentWorkflowId
     });
 
     return { registryId: result?.registry_id || result?.id };

@@ -46,6 +46,7 @@ function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
     updatedAt: data.updated_at,
     availableNodes: data.available_nodes ?? [],
     metadata: data.metadata,
+    parentWorkflowId: data.parent_workflow_id,
   };
 }
 
@@ -548,8 +549,9 @@ export function registerWorkflowHandlers() {
     projectName: string;
     totalNodes: number;
     availableNodes?: { id: string; name: string }[];
+    parentWorkflowId?: string;
   }) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowId}`);
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowId}${params.parentWorkflowId ? ` (parent: ${params.parentWorkflowId})` : ''}`);
     try {
       const client = await getWorkflowClient();
       const result = await client.registerActiveWorkflow(params);
