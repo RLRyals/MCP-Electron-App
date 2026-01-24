@@ -243,6 +243,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       .filter((edge) => ('type' in edge && edge.type === 'loop-back'))
       .map((edge) => edge.id);
 
+
     return graphData.edges.map((edge) => {
       const sourceStatus = executionStatus?.get(edge.source) || 'pending';
       const isSelected = selectedEdges.includes(edge.id);
@@ -290,7 +291,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         },
       };
     });
-  }, [graphData.edges, executionStatus, selectedEdges]);
+  }, [graphData.edges, graphData.nodes, executionStatus, selectedEdges]);
 
 
   // Handle edit node (new NodeConfigDialog)

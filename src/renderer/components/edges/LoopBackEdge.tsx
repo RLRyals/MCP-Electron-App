@@ -1,12 +1,14 @@
 /**
  * LoopBackEdge Component - Custom edge for loop-back connections
  *
- * Routes loop-back edges (right-to-left in horizontal layouts) ABOVE the workflow
- * to prevent visual overlap with forward-flowing edges.
+ * Routes loop-back edges around the workflow based on layout orientation:
+ * - Horizontal layout (target left of source): Routes ABOVE the nodes
+ * - Vertical layout (target above source): Routes to the LEFT of the nodes
  *
  * Features:
- * - Detects backward-flowing edges and routes them above the graph
- * - Dashed line styling with distinct colors
+ * - Auto-detects layout orientation based on node positions
+ * - Adapts routing as nodes are rearranged
+ * - Dashed line styling with distinct colors per loop
  * - Supports multiple loop edges with automatic offset calculation
  * - Labels displayed on the edge path
  */
@@ -31,7 +33,6 @@ export interface LoopBackEdgeData extends Record<string, unknown> {
   loopIndex?: number; // Index among loop-back edges (for offset calculation)
   condition?: string;
   edgeType?: string;
-  globalMinY?: number; // Global minimum Y of all nodes (for consistent offset baseline)
 }
 
 export const LoopBackEdge = ({
@@ -48,8 +49,7 @@ export const LoopBackEdge = ({
   data,
   selected,
 }: EdgeProps) => {
-  // Determine if this edge flows backward (right-to-left in horizontal layout)
-  // or downward-to-upward in vertical sections
+  // Determine if this edge flows backward
   const isBackward = sourceX > targetX || (sourceX === targetX && sourceY > targetY);
 
   // Calculate the path and label position
@@ -68,63 +68,79 @@ export const LoopBackEdge = ({
       return { path: edgePath, labelX, labelY };
     }
 
-    // Backward flow - custom path that routes ABOVE the workflow
+    // Backward flow - determine layout orientation
     const edgeData = data as LoopBackEdgeData | undefined;
     const loopIndex = edgeData?.loopIndex ?? 0;
 
-    // Each loop edge gets a consistent offset from its own highest point
-    // baseOffset should be enough to clear a typical node (~80px tall) plus padding
-    const baseOffset = 80;
-    const offsetIncrement = 35;
-    const verticalOffset = baseOffset + (loopIndex * offsetIncrement);
-    const curveRadius = 16;
+    // Calculate based on the connected nodes only (not global)
+    const localMinY = Math.min(sourceY, targetY);
+    const localMinX = Math.min(sourceX, targetX);
 
-    // Use the higher of source/target Y positions as the baseline
-    const minY = Math.min(sourceY, targetY);
-    const loopY = minY - verticalOffset;
+    // Calculate the horizontal and vertical distances
+    const horizontalDist = Math.abs(sourceX - targetX);
+    const verticalDist = Math.abs(sourceY - targetY);
 
-    // Horizontal extension beyond source/target for cleaner curves
-    const horizontalExtension = 25;
+    // Determine if this is more horizontal or vertical layout
+    const isHorizontalLayout = horizontalDist > verticalDist * 0.5;
 
-    // Build the path with proper curved corners:
-    // 1. Exit source horizontally to the right
-    // 2. Curve up
-    // 3. Go horizontally to above target
-    // 4. Curve down
-    // 5. Enter target horizontally from the left
+    // Fixed offset from the connected nodes - same for all loopback edges
+    // This ensures consistent spacing regardless of which nodes are connected
+    const fixedOffset = 80;
+    const curveRadius = 12;
 
-    // Calculate control points for smooth bezier curves
-    const sourceExitX = sourceX + horizontalExtension;
-    const targetEntryX = targetX - horizontalExtension;
+    let pathString: string;
+    let labelPosX: number;
+    let labelPosY: number;
 
-    const path = [
-      // Start at source handle
-      `M ${sourceX} ${sourceY}`,
-      // Go right horizontally
-      `L ${sourceExitX - curveRadius} ${sourceY}`,
-      // Curve up (90 degree turn)
-      `Q ${sourceExitX} ${sourceY} ${sourceExitX} ${sourceY - curveRadius}`,
-      // Go up to loop height
-      `L ${sourceExitX} ${loopY + curveRadius}`,
-      // Curve left at top
-      `Q ${sourceExitX} ${loopY} ${sourceExitX - curveRadius} ${loopY}`,
-      // Go horizontally across the top
-      `L ${targetEntryX + curveRadius} ${loopY}`,
-      // Curve down at target side
-      `Q ${targetEntryX} ${loopY} ${targetEntryX} ${loopY + curveRadius}`,
-      // Go down to target height
-      `L ${targetEntryX} ${targetY - curveRadius}`,
-      // Curve right to enter target
-      `Q ${targetEntryX} ${targetY} ${targetEntryX + curveRadius} ${targetY}`,
-      // Enter target horizontally
-      `L ${targetX} ${targetY}`,
-    ].join(' ');
+    if (isHorizontalLayout) {
+      // HORIZONTAL LAYOUT: Route ABOVE the connected nodes
+      const loopY = localMinY - fixedOffset;
+      const exitExtension = 20;
 
-    // Label position above the loop, centered
-    const labelX = (sourceExitX + targetEntryX) / 2;
-    const labelY = loopY - 12;
+      const sourceExitX = sourceX + exitExtension;
+      const targetEntryX = targetX - exitExtension;
 
-    return { path, labelX, labelY };
+      pathString = [
+        `M ${sourceX} ${sourceY}`,
+        `L ${sourceExitX - curveRadius} ${sourceY}`,
+        `Q ${sourceExitX} ${sourceY} ${sourceExitX} ${sourceY - curveRadius}`,
+        `L ${sourceExitX} ${loopY + curveRadius}`,
+        `Q ${sourceExitX} ${loopY} ${sourceExitX - curveRadius} ${loopY}`,
+        `L ${targetEntryX + curveRadius} ${loopY}`,
+        `Q ${targetEntryX} ${loopY} ${targetEntryX} ${loopY + curveRadius}`,
+        `L ${targetEntryX} ${targetY - curveRadius}`,
+        `Q ${targetEntryX} ${targetY} ${targetEntryX + curveRadius} ${targetY}`,
+        `L ${targetX} ${targetY}`,
+      ].join(' ');
+
+      labelPosX = (sourceExitX + targetEntryX) / 2;
+      labelPosY = loopY - 10;
+    } else {
+      // VERTICAL LAYOUT: Route to the LEFT of the connected nodes
+      const loopX = localMinX - fixedOffset;
+      const exitExtension = 20;
+
+      const sourceExitY = sourceY - exitExtension;
+      const targetEntryY = targetY + exitExtension;
+
+      pathString = [
+        `M ${sourceX} ${sourceY}`,
+        `L ${sourceX} ${sourceExitY + curveRadius}`,
+        `Q ${sourceX} ${sourceExitY} ${sourceX - curveRadius} ${sourceExitY}`,
+        `L ${loopX + curveRadius} ${sourceExitY}`,
+        `Q ${loopX} ${sourceExitY} ${loopX} ${sourceExitY - curveRadius}`,
+        `L ${loopX} ${targetEntryY + curveRadius}`,
+        `Q ${loopX} ${targetEntryY} ${loopX + curveRadius} ${targetEntryY}`,
+        `L ${targetX - curveRadius} ${targetEntryY}`,
+        `Q ${targetX} ${targetEntryY} ${targetX} ${targetEntryY - curveRadius}`,
+        `L ${targetX} ${targetY}`,
+      ].join(' ');
+
+      labelPosX = loopX - 10;
+      labelPosY = (sourceExitY + targetEntryY) / 2;
+    }
+
+    return { path: pathString, labelX: labelPosX, labelY: labelPosY };
   }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, isBackward, data]);
 
   // Get color based on loop index
