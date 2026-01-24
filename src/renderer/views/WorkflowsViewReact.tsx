@@ -471,7 +471,9 @@ const WorkflowsApp: React.FC = () => {
   const canvasContainerStyle: React.CSSProperties = {
     flex: 1,
     padding: '16px',
-    overflow: 'auto',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   };
 
   return (
@@ -526,6 +528,7 @@ const WorkflowsApp: React.FC = () => {
                 padding: '12px',
                 background: '#f3f4f6',
                 borderRadius: '8px',
+                flexShrink: 0,
               }}>
                 <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>
                   {String(selectedWorkflow.name || 'Unnamed Workflow')}
@@ -539,6 +542,7 @@ const WorkflowsApp: React.FC = () => {
                   Version {String(selectedWorkflow.version || '1.0')} • {selectedWorkflow.graph_json?.nodes?.length || 0} nodes
                 </div>
               </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
               {(() => {
                 try {
                   return (
@@ -580,6 +584,7 @@ const WorkflowsApp: React.FC = () => {
                   return <div style={{ padding: '20px', color: 'red' }}>Error rendering workflow: {String(error)}</div>;
                 }
               })()}
+              </div>
             </>
           ) : (
             <div style={{

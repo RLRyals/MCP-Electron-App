@@ -366,6 +366,51 @@
 }
 
 /* ========================================
+   React Flow Controls Visibility
+   ======================================== */
+
+/* Ensure React Flow controls are always visible */
+.react-flow__controls {
+  position: absolute;
+  z-index: 1000 !important;
+  display: flex !important;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  width: 28px !important;
+  height: 28px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: none !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: #374151 !important;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.react-flow__controls-button svg {
+  width: 14px !important;
+  height: 14px !important;
+  fill: currentColor;
+}
+
+/* ========================================
    React Flow Edge Enhancements
    ======================================== */
 

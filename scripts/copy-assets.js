@@ -152,62 +152,61 @@ export const WebLinksAddon = (Plugin.WebLinksAddon || Plugin.default || Plugin);
       console.warn('  ⚠ Failed to copy xterm assets:', err.message);
     }
 
-    // Copy ReactFlow from node_modules
+    // Copy @xyflow/react from node_modules
     try {
-      const reactFlowPath = path.join(__dirname, '..', 'node_modules', 'reactflow', 'dist');
-      if (fs.existsSync(reactFlowPath)) {
+      const xyflowPath = path.join(__dirname, '..', 'node_modules', '@xyflow', 'react', 'dist');
+      if (fs.existsSync(xyflowPath)) {
         ensureDirSync(distVendor);
 
         // Copy UMD build
-        const rfUmdSrc = path.join(reactFlowPath, 'umd', 'index.js');
-        const rfUmdDest = path.join(distVendor, 'reactflow.umd.js');
+        const rfUmdSrc = path.join(xyflowPath, 'umd', 'index.js');
+        const rfUmdDest = path.join(distVendor, 'xyflow-react.umd.js');
         if (fs.existsSync(rfUmdSrc)) {
           fs.copyFileSync(rfUmdSrc, rfUmdDest);
-          console.log('  ✓ Copied reactflow.umd.js from node_modules');
+          console.log('  ✓ Copied xyflow-react.umd.js from node_modules');
         }
 
-        // Copy CSS
-        const rfCssSrc = path.join(reactFlowPath, 'style.css');
+        // Copy CSS (keeping filename as reactflow.css for compatibility with index.html)
+        const rfCssSrc = path.join(xyflowPath, 'style.css');
         const distStyles = path.join(distRenderer, 'styles');
         const rfCssDest = path.join(distStyles, 'reactflow.css');
         if (fs.existsSync(rfCssSrc)) {
           ensureDirSync(distStyles);
           fs.copyFileSync(rfCssSrc, rfCssDest);
-          console.log('  ✓ Copied reactflow.css from node_modules');
+          console.log('  ✓ Copied @xyflow/react style.css as reactflow.css');
         }
 
-        // Generate ESM wrapper for ReactFlow
-        const rfWrapperPath = path.join(distVendor, 'reactflow.js');
+        // Generate ESM wrapper for @xyflow/react
+        const rfWrapperPath = path.join(distVendor, 'xyflow-react.js');
         const rfWrapperContent = `
-// ReactFlow UMD build exports to window.ReactFlow
-const ReactFlowLib = window.ReactFlow;
+// @xyflow/react UMD build exports to window.ReactFlow
+const XYFlowLib = window.ReactFlow;
 
-// The default export should be the main ReactFlow component
-// In UMD build, the main component might be at ReactFlowLib.default or just ReactFlowLib
-export default ReactFlowLib.default || ReactFlowLib;
+// Export named exports from the library (v12 uses named exports, not default)
+export const ReactFlow = XYFlowLib.ReactFlow;
+export const Controls = XYFlowLib.Controls;
+export const Background = XYFlowLib.Background;
+export const Handle = XYFlowLib.Handle;
+export const Position = XYFlowLib.Position;
+export const useNodesState = XYFlowLib.useNodesState;
+export const useEdgesState = XYFlowLib.useEdgesState;
+export const addEdge = XYFlowLib.addEdge;
+export const BackgroundVariant = XYFlowLib.BackgroundVariant;
+export const MarkerType = XYFlowLib.MarkerType;
+export const BaseEdge = XYFlowLib.BaseEdge;
+export const EdgeLabelRenderer = XYFlowLib.EdgeLabelRenderer;
+export const getSmoothStepPath = XYFlowLib.getSmoothStepPath;
 
-// Export named exports from the library
-export const Controls = ReactFlowLib.Controls;
-export const Background = ReactFlowLib.Background;
-export const Handle = ReactFlowLib.Handle;
-export const Position = ReactFlowLib.Position;
-export const useNodesState = ReactFlowLib.useNodesState;
-export const useEdgesState = ReactFlowLib.useEdgesState;
-export const addEdge = ReactFlowLib.addEdge;
-export const BackgroundVariant = ReactFlowLib.BackgroundVariant;
-export const MarkerType = ReactFlowLib.MarkerType;
-export const Node = ReactFlowLib.Node;
-export const Edge = ReactFlowLib.Edge;
-export const Connection = ReactFlowLib.Connection;
-export const NodeProps = ReactFlowLib.NodeProps;
+// Default export for backwards compatibility
+export default XYFlowLib.ReactFlow;
 `;
         fs.writeFileSync(rfWrapperPath, rfWrapperContent);
-        console.log('  ✓ Generated vendor/reactflow.js wrapper');
+        console.log('  ✓ Generated vendor/xyflow-react.js wrapper');
       } else {
-        console.warn('  ⚠ Warning: node_modules/reactflow not found');
+        console.warn('  ⚠ Warning: node_modules/@xyflow/react not found');
       }
     } catch (err) {
-      console.warn('  ⚠ Failed to copy ReactFlow assets:', err.message);
+      console.warn('  ⚠ Failed to copy @xyflow/react assets:', err.message);
     }
 
     // Copy all icon files from resources to dist/resources

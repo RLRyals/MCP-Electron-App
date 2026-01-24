@@ -12,20 +12,22 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import ReactFlow, {
-  Node,
+import {
+  ReactFlow,
+  type Node,
+  type Edge,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
-  Connection,
+  type Connection,
   BackgroundVariant,
   MarkerType,
-  NodeDragHandler,
-  EdgeMouseHandler,
-  OnSelectionChangeParams,
-} from 'reactflow';
-// Note: reactflow styles are loaded via <link> tag in index.html
+  type OnSelectionChangeParams,
+  type EdgeMouseHandler,
+  type OnNodeDrag,
+} from '@xyflow/react';
+// Note: @xyflow/react styles are loaded via <link> tag in index.html
 
 import { PhaseNode, PhaseNodeData } from './nodes/PhaseNode.js';
 import { LoopBackEdge } from './edges/LoopBackEdge.js';
@@ -151,8 +153,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   onOpenSubWorkflow,
   availableWorkflows = [],
 }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
@@ -738,11 +740,12 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   }, [handleDelete]);
 
   // Handle right-click on canvas pane to add new node
-  const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
+  const handlePaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
     event.preventDefault();
 
     // Get the ReactFlow instance's viewport transform to convert screen coords to flow coords
-    const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+    const target = event.currentTarget as HTMLElement;
+    const reactFlowBounds = target.getBoundingClientRect();
     const position = {
       x: event.clientX - reactFlowBounds.left - 50,
       y: event.clientY - reactFlowBounds.top - 50,
@@ -787,17 +790,21 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       try {
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI || !electronAPI.invoke) {
+          console.error('[WorkflowCanvas] Electron API not available for saving positions');
           return;
         }
 
+        console.log('[WorkflowCanvas] Saving positions for workflow:', workflowId, positions);
         setIsSaving(true);
-        await electronAPI.invoke('workflow:update-positions', {
+        const result = await electronAPI.invoke('workflow:update-positions', {
           workflowId,
           positions
         });
-      } catch (error) {
+        console.log('[WorkflowCanvas] Position save result:', result);
+      } catch (error: any) {
+        console.error('[WorkflowCanvas] Failed to save positions:', error);
         if (!isShutdownError(error)) {
-          alert(`Failed to save node positions: ${error}`);
+          alert(`Failed to save node positions: ${error?.message || error}`);
         }
       } finally {
         setIsSaving(false);
@@ -807,8 +814,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   );
 
   // Handle node drag stop - save new positions
-  const onNodeDragStop: NodeDragHandler = useCallback(
-    (_event, _node, currentNodes) => {
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (_event: React.MouseEvent, _node: Node, currentNodes: Node[]) => {
       if (!workflow) return;
 
       // Collect all current node positions from React Flow's current state
@@ -998,7 +1005,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
   return (
     <>
-      <div style={{ width: '100%', height: '600px', background: '#f9fafb', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ width: '100%', height: '100%', minHeight: '400px', background: '#f9fafb', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
         {/* Add Node Button - Accessible alternative to right-click */}
         <button
           style={{
@@ -1114,11 +1121,18 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
           attributionPosition="bottom-right"
           minZoom={0.2}
           maxZoom={2}
         >
-          <Controls />
+          <Controls
+            position="bottom-left"
+            showZoom={true}
+            showFitView={true}
+            showInteractive={true}
+            style={{ marginBottom: '10px', marginLeft: '10px' }}
+          />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         </ReactFlow>
       </div>

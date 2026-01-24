@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 // Add hover styles for edit button
 if (typeof document !== 'undefined' && !document.getElementById('phase-node-styles')) {
@@ -31,7 +31,7 @@ if (typeof document !== 'undefined' && !document.getElementById('phase-node-styl
 
 import type { NodeExecutionStatus } from '../../../types/workflow.js';
 
-export interface PhaseNodeData {
+export interface PhaseNodeData extends Record<string, unknown> {
   label: string;
   phase: {
     id: number;
@@ -51,9 +51,10 @@ export interface PhaseNodeData {
   onOpenSubWorkflow?: () => void;
 }
 
-export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
+export const PhaseNode = ({ data }: NodeProps) => {
+  const nodeData = data as PhaseNodeData;
   // Determine effective status - if this is the active node, it's running
-  const effectiveStatus: NodeExecutionStatus = data.isActiveNode ? 'running' : (data.status || 'pending');
+  const effectiveStatus: NodeExecutionStatus = nodeData.isActiveNode ? 'running' : (nodeData.status || 'pending');
 
   const getStatusColor = () => {
     switch (effectiveStatus) {
@@ -84,7 +85,7 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
   };
 
   const getTypeIcon = () => {
-    switch (data.phase.type) {
+    switch (nodeData.phase.type) {
       case 'planning':
         return '📋';
       case 'writing':
@@ -163,20 +164,20 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (data.onEdit) {
-      data.onEdit();
+    if (nodeData.onEdit) {
+      nodeData.onEdit();
     }
   };
 
   const handleSubWorkflowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (data.onOpenSubWorkflow) {
-      data.onOpenSubWorkflow();
+    if (nodeData.onOpenSubWorkflow) {
+      nodeData.onOpenSubWorkflow();
     }
   };
 
   // Use existing in_progress styling pattern for active node - just override the border color
-  const activeNodeStyle: React.CSSProperties = data.isActiveNode ? {
+  const activeNodeStyle: React.CSSProperties = nodeData.isActiveNode ? {
     border: '3px solid #60a5fa',
     boxShadow: '0 4px 12px rgba(96, 165, 250, 0.3)',
   } : {};
@@ -200,7 +201,7 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
         style={editButtonStyle}
         onClick={(e) => {
           e.stopPropagation();
-          if (data.onEdit) data.onEdit();
+          if (nodeData.onEdit) nodeData.onEdit();
         }}
         title="Edit phase (double-click)"
       >
@@ -209,37 +210,37 @@ export const PhaseNode: React.FC<NodeProps<PhaseNodeData>> = ({ data }) => {
 
       <div style={headerStyle}>
         <span style={{ fontSize: '16px' }}>{getTypeIcon()}</span>
-        <div style={labelStyle}>{String(data.label || 'Unnamed Phase')}</div>
+        <div style={labelStyle}>{String(nodeData.label || 'Unnamed Phase')}</div>
       </div>
 
       {/* Only show agent for nodes that actually use agents */}
-      {data.phase.agent && !['user-input', 'user', 'file', 'http'].includes(data.phase.type) && (
-        <div style={agentStyle}>Agent: {String(data.phase.agent)}</div>
+      {nodeData.phase.agent && !['user-input', 'user', 'file', 'http'].includes(nodeData.phase.type) && (
+        <div style={agentStyle}>Agent: {String(nodeData.phase.agent)}</div>
       )}
 
-      {data.phase.skill && (
-        <div style={skillStyle}>Skill: {String(data.phase.skill)}</div>
+      {nodeData.phase.skill && (
+        <div style={skillStyle}>Skill: {String(nodeData.phase.skill)}</div>
       )}
 
       {/* Sub-workflow indicator with click-to-open */}
-      {data.phase.type === 'subworkflow' && data.phase.subWorkflowId && (
+      {nodeData.phase.type === 'subworkflow' && nodeData.phase.subWorkflowId && (
         <div
           className="sub-workflow-link"
           style={subWorkflowLinkStyle}
           onClick={handleSubWorkflowClick}
           title="Click to open sub-workflow"
         >
-          🔗 {data.phase.subWorkflowId}
+          🔗 {nodeData.phase.subWorkflowId}
         </div>
       )}
 
-      {data.phase.gate && (
+      {nodeData.phase.gate && (
         <div style={{ fontSize: '11px', color: '#f59e0b', marginBottom: '4px' }}>
           🚪 Quality Gate
         </div>
       )}
 
-      {data.phase.requiresApproval && (
+      {nodeData.phase.requiresApproval && (
         <div style={{ fontSize: '11px', color: '#8b5cf6', marginBottom: '4px' }}>
           ✋ Requires Approval
         </div>

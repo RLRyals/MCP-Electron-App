@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-U2vUyQwf9N7vx03hxbA+AO9PFlFUxYmtH3MuSWTiaZk=' 'sha256-NidvM6OllU1Y0FxWxA6h8OJbTo3GFXVxdyk02cfwGRI='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-fzjwpClQ3RoQj1EuGjvB4buv2JE8AeSHKY+zdBymjk8='; style-src 'self' 'unsafe-inline'">
     <title>FictionLab</title>
     <!-- New Dashboard Layout Styles -->
     <link rel="stylesheet" href="styles/layout.css">
@@ -1472,7 +1472,9 @@
     <!-- Load React UMD builds first (sets window.React and window.ReactDOM) -->
     <script src="vendor/react.umd.js"></script>
     <script src="vendor/react-dom.umd.js"></script>
-    <script src="vendor/reactflow.umd.js"></script>
+    <!-- Expose jsxRuntime globally for @xyflow/react UMD build -->
+    <script src="vendor/jsx-runtime-setup.js"></script>
+    <script src="vendor/xyflow-react.umd.js"></script>
     <script src="vendor/xterm.umd.js"></script>
     <script src="vendor/addon-fit.umd.js"></script>
     <script src="vendor/addon-web-links.umd.js"></script>
@@ -1484,7 +1486,7 @@
             "react": "./vendor/react.js",
             "react-dom/client": "./vendor/react-dom-client.js",
             "react/jsx-runtime": "./vendor/react-jsx-runtime.js",
-            "reactflow": "./vendor/reactflow.js",
+            "@xyflow/react": "./vendor/xyflow-react.js",
             "@xterm/xterm": "./vendor/xterm.js",
             "@xterm/addon-fit": "./vendor/addon-fit.js",
             "@xterm/addon-web-links": "./vendor/addon-web-links.js"
