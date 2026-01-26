@@ -6,11 +6,11 @@ This document explains how FictionLab is built from multiple repositories and wh
 
 FictionLab is built from **three repositories**:
 
-| Repository | Purpose | GitHub Actions |
-|------------|---------|----------------|
-| **MCP-Electron-App** | Main Electron desktop app | Yes (build + release) |
-| **fictionlab-workflow** | Workflow execution packages | Yes (build + release) |
-| **MCP-Writing-Servers** | Database and MCP servers | Docker builds |
+| Repository | Purpose | GitHub Actions | Location |
+|------------|---------|----------------|----------|
+| **MCP-Electron-App** | Main Electron desktop app | Yes (build + release) | c:\github\MCP-Electron-App
+| **fictionlab-workflow** | Workflow execution packages | Yes (build + release) | c:\github\fictionlab-workflow
+| **MCP-Writing-Servers** | Database and MCP servers | Docker builds | c:\github\MCP-Writing-Servers
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -27,7 +27,7 @@ FictionLab is built from **three repositories**:
 │             ▼                                                            │
 │   ┌─────────────────────┐                                               │
 │   │ fictionlab-workflow │ ◄─── Workflow execution engine                │
-│   │   (Local builds)    │      - @fictionlab/workflow-plugin            │
+│   │   (GitHub Actions)  │      - @fictionlab/workflow-plugin            │
 │   │                     │      - @fictionlab/workflow-runner            │
 │   │                     │      - resources/ (agents, skills, genres)    │
 │   └─────────┬───────────┘                                               │
