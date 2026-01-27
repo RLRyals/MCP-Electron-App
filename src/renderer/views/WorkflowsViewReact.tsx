@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
@@ -22,6 +22,7 @@ import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
 import { WorkflowManagerPanel } from '../components/WorkflowManagerPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
+import type { WorkflowUpdate } from '../../types/workflow.js';
 import type { Project } from '../../types/project.js';
 
 // Plugin IPC channel prefix for workflow plugin
@@ -50,6 +51,13 @@ const WorkflowsApp: React.FC = () => {
 
   // Active workflow tracking - which node is currently being executed
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+
+  // Track which active workflow instance is displayed on the canvas
+  const [activeRegistryId, setActiveRegistryId] = useState<string | null>(null);
+  const activeRegistryIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state so event handlers always see the latest value
+  useEffect(() => { activeRegistryIdRef.current = activeRegistryId; }, [activeRegistryId]);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -128,70 +136,79 @@ const WorkflowsApp: React.FC = () => {
       });
     }
 
-    // Setup event listeners with stable function references
+    // Setup event listener for real-time workflow canvas updates
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI || !electronAPI.on || !electronAPI.off) return;
 
-    // Node-based workflow handlers (phase-based system removed)
-    const handleNodeStarted = (data: any) => {
-      console.log('[WorkflowsViewReact] Node started:', data);
-      if (!data || !data.nodeId) {
-        console.warn('[WorkflowsViewReact] Invalid node-started data:', data);
-        return;
-      }
-      setExecutionStatus(prev => {
-        const existing = prev.get(data.nodeId);
-        if (existing === 'in_progress') return prev;
-
-        const newMap = new Map(prev);
-        newMap.set(data.nodeId, 'in_progress');
-        return newMap;
-      });
-    };
-
-    const handleNodeCompleted = (data: any) => {
-      console.log('[WorkflowsViewReact] Node completed:', data);
-      if (!data || !data.nodeId) {
-        console.warn('[WorkflowsViewReact] Invalid node-completed data:', data);
+    const handleInstanceUpdated = (update: WorkflowUpdate) => {
+      // Only process updates for the workflow instance currently shown on canvas
+      if (!activeRegistryIdRef.current || update.registryId !== activeRegistryIdRef.current) {
         return;
       }
 
-      setExecutionStatus(prev => {
-        const existing = prev.get(data.nodeId);
-        if (existing === 'completed') return prev;
+      console.log('[WorkflowsViewReact] Instance updated (canvas):', update.type, update.data);
 
-        const newMap = new Map(prev);
-        newMap.set(data.nodeId, 'completed');
-        return newMap;
-      });
-    };
+      switch (update.type) {
+        case 'node_changed': {
+          const newNodeId = update.data.currentNodeId;
+          if (newNodeId) {
+            setActiveNodeId(newNodeId);
+            setExecutionStatus(prev => {
+              const newMap = new Map(prev);
+              newMap.set(newNodeId, 'in_progress');
+              return newMap;
+            });
+          }
+          break;
+        }
 
-    const handleNodeFailed = (data: any) => {
-      console.log('[WorkflowsViewReact] Node failed:', data);
-      if (!data || !data.nodeId) {
-        console.warn('[WorkflowsViewReact] Invalid node-failed data:', data);
-        return;
+        case 'progress': {
+          const { completedNodeIds, currentNodeId } = update.data;
+          if (completedNodeIds && completedNodeIds.length > 0) {
+            setExecutionStatus(prev => {
+              const newMap = new Map(prev);
+              for (const nodeId of completedNodeIds) {
+                newMap.set(nodeId, 'completed');
+              }
+              return newMap;
+            });
+          }
+          if (currentNodeId) {
+            setActiveNodeId(currentNodeId);
+            setExecutionStatus(prev => {
+              const newMap = new Map(prev);
+              newMap.set(currentNodeId, 'in_progress');
+              return newMap;
+            });
+          }
+          break;
+        }
+
+        case 'completed': {
+          setActiveNodeId(null);
+          break;
+        }
+
+        case 'failed': {
+          const failedNodeId = update.data.currentNodeId;
+          if (failedNodeId) {
+            setExecutionStatus(prev => {
+              const newMap = new Map(prev);
+              newMap.set(failedNodeId, 'failed');
+              return newMap;
+            });
+          }
+          setActiveNodeId(null);
+          break;
+        }
       }
-      setExecutionStatus(prev => {
-        const existing = prev.get(data.nodeId);
-        if (existing === 'failed') return prev;
-
-        const newMap = new Map(prev);
-        newMap.set(data.nodeId, 'failed');
-        return newMap;
-      });
     };
 
-    // Register node-based workflow listeners only
-    electronAPI.on('workflow:node-started', handleNodeStarted);
-    electronAPI.on('workflow:node-completed', handleNodeCompleted);
-    electronAPI.on('workflow:node-failed', handleNodeFailed);
+    electronAPI.on('workflow:instance-updated', handleInstanceUpdated);
 
     // Cleanup on unmount
     return () => {
-      electronAPI.off('workflow:node-started', handleNodeStarted);
-      electronAPI.off('workflow:node-completed', handleNodeCompleted);
-      electronAPI.off('workflow:node-failed', handleNodeFailed);
+      electronAPI.off('workflow:instance-updated', handleInstanceUpdated);
     };
   }, []);
 
@@ -207,15 +224,16 @@ const WorkflowsApp: React.FC = () => {
       // Reset execution status and active node when switching workflows
       setExecutionStatus(new Map());
       setActiveNodeId(null);
+      setActiveRegistryId(null);
     } catch (error) {
       console.error('[WorkflowsViewReact] Failed to get workflow:', error);
     }
   };
 
   // Handle active workflow selection - load workflow and highlight current node
-  const handleSelectActiveWorkflow = async (workflowId: string, currentNodeId?: string, completedNodeIds?: string[]) => {
+  const handleSelectActiveWorkflow = async (workflowId: string, currentNodeId?: string, completedNodeIds?: string[], registryId?: string) => {
     try {
-      console.log('[WorkflowsViewReact] Selecting active workflow:', workflowId, 'currentNode:', currentNodeId, 'completedNodes:', completedNodeIds);
+      console.log('[WorkflowsViewReact] Selecting active workflow:', workflowId, 'currentNode:', currentNodeId, 'completedNodes:', completedNodeIds, 'registryId:', registryId);
       const electronAPI = (window as any).electronAPI;
       const workflow = await electronAPI.invoke(`${WORKFLOW_PLUGIN}workflow:get`, { id: workflowId });
 
@@ -223,18 +241,20 @@ const WorkflowsApp: React.FC = () => {
 
       setSelectedWorkflow(workflow);
       setActiveNodeId(currentNodeId || null);
+      setActiveRegistryId(registryId || null);
 
       // Populate executionStatus from completedNodeIds
+      const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
       if (completedNodeIds && completedNodeIds.length > 0) {
-        const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
         for (const nodeId of completedNodeIds) {
           newStatus.set(nodeId, 'completed');
         }
-        setExecutionStatus(newStatus);
-      } else {
-        // Reset if no completed nodes
-        setExecutionStatus(new Map());
       }
+      // Mark current node as in_progress
+      if (currentNodeId) {
+        newStatus.set(currentNodeId, 'in_progress');
+      }
+      setExecutionStatus(newStatus);
     } catch (error) {
       console.error('[WorkflowsViewReact] Failed to load active workflow:', error);
     }
