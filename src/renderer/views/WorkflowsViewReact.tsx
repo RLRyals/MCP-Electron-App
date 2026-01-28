@@ -55,9 +55,15 @@ const WorkflowsApp: React.FC = () => {
   // Track which active workflow instance is displayed on the canvas
   const [activeRegistryId, setActiveRegistryId] = useState<string | null>(null);
   const activeRegistryIdRef = useRef<string | null>(null);
+  // Track child workflow registry IDs so we accept their updates too
+  const trackedRegistryIdsRef = useRef<Set<string>>(new Set());
 
   // Keep ref in sync with state so event handlers always see the latest value
-  useEffect(() => { activeRegistryIdRef.current = activeRegistryId; }, [activeRegistryId]);
+  useEffect(() => {
+    activeRegistryIdRef.current = activeRegistryId;
+    // Reset tracked IDs when parent changes
+    trackedRegistryIdsRef.current = new Set(activeRegistryId ? [activeRegistryId] : []);
+  }, [activeRegistryId]);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -141,64 +147,93 @@ const WorkflowsApp: React.FC = () => {
     if (!electronAPI || !electronAPI.on || !electronAPI.off) return;
 
     const handleInstanceUpdated = (update: WorkflowUpdate) => {
-      // Only process updates for the workflow instance currently shown on canvas
-      if (!activeRegistryIdRef.current || update.registryId !== activeRegistryIdRef.current) {
+      const parentId = activeRegistryIdRef.current;
+      if (!parentId) return;
+
+      // Detect child workflow registrations: a new workflow with our parent as its parentWorkflowId
+      if (update.type === 'status' && update.data.parentWorkflowId === parentId) {
+        console.log('[WorkflowsViewReact] Child workflow registered:', update.registryId);
+        trackedRegistryIdsRef.current.add(update.registryId);
         return;
       }
 
-      console.log('[WorkflowsViewReact] Instance updated (canvas):', update.type, update.data);
+      // Only process updates for tracked workflow instances (parent + children)
+      if (!trackedRegistryIdsRef.current.has(update.registryId)) {
+        return;
+      }
+
+      const isParentUpdate = update.registryId === parentId;
+
+      console.log('[WorkflowsViewReact] Instance updated (canvas):', update.type, update.data, isParentUpdate ? '(parent)' : '(child)');
 
       switch (update.type) {
         case 'node_changed': {
-          const newNodeId = update.data.currentNodeId;
-          if (newNodeId) {
-            setActiveNodeId(newNodeId);
-            setExecutionStatus(prev => {
-              const newMap = new Map(prev);
-              newMap.set(newNodeId, 'in_progress');
-              return newMap;
-            });
+          // Only update activeNodeId for parent workflow events (these are the canvas nodes)
+          if (isParentUpdate) {
+            const newNodeId = update.data.currentNodeId;
+            if (newNodeId) {
+              setActiveNodeId(newNodeId);
+              setExecutionStatus(prev => {
+                const newMap = new Map(prev);
+                newMap.set(newNodeId, 'in_progress');
+                return newMap;
+              });
+            }
           }
           break;
         }
 
         case 'progress': {
-          const { completedNodeIds, currentNodeId } = update.data;
-          if (completedNodeIds && completedNodeIds.length > 0) {
-            setExecutionStatus(prev => {
-              const newMap = new Map(prev);
-              for (const nodeId of completedNodeIds) {
-                newMap.set(nodeId, 'completed');
-              }
-              return newMap;
-            });
+          if (isParentUpdate) {
+            // Parent progress: mark completed nodes and update active node
+            const { completedNodeIds, currentNodeId } = update.data;
+            if (completedNodeIds && completedNodeIds.length > 0) {
+              setExecutionStatus(prev => {
+                const newMap = new Map(prev);
+                for (const nodeId of completedNodeIds) {
+                  newMap.set(nodeId, 'completed');
+                }
+                return newMap;
+              });
+            }
+            if (currentNodeId) {
+              setActiveNodeId(currentNodeId);
+              setExecutionStatus(prev => {
+                const newMap = new Map(prev);
+                newMap.set(currentNodeId, 'in_progress');
+                return newMap;
+              });
+            }
           }
-          if (currentNodeId) {
-            setActiveNodeId(currentNodeId);
-            setExecutionStatus(prev => {
-              const newMap = new Map(prev);
-              newMap.set(currentNodeId, 'in_progress');
-              return newMap;
-            });
-          }
+          // Child progress events are acknowledged (tracked) but don't change parent canvas nodes
           break;
         }
 
         case 'completed': {
-          setActiveNodeId(null);
+          if (isParentUpdate) {
+            setActiveNodeId(null);
+          } else {
+            // Child workflow completed — remove from tracked set
+            trackedRegistryIdsRef.current.delete(update.registryId);
+          }
           break;
         }
 
         case 'failed': {
-          const failedNodeId = update.data.currentNodeId;
-          if (failedNodeId) {
-            setExecutionStatus(prev => {
-              const newMap = new Map(prev);
-              newMap.set(failedNodeId, 'failed');
-              return newMap;
-            });
+          if (isParentUpdate) {
+            const failedNodeId = update.data.currentNodeId;
+            if (failedNodeId) {
+              setExecutionStatus(prev => {
+                const newMap = new Map(prev);
+                newMap.set(failedNodeId, 'failed');
+                return newMap;
+              });
+            }
+            setActiveNodeId(null);
+          } else {
+            // Child workflow failed — remove from tracked set
+            trackedRegistryIdsRef.current.delete(update.registryId);
           }
-          setActiveNodeId(null);
           break;
         }
       }

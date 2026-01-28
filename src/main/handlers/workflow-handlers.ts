@@ -555,6 +555,20 @@ export function registerWorkflowHandlers() {
     try {
       const client = await getWorkflowClient();
       const result = await client.registerActiveWorkflow(params);
+
+      // Broadcast so the canvas can detect new child workflows
+      if (result?.registryId) {
+        broadcastWorkflowUpdate({
+          registryId: result.registryId,
+          type: 'status',
+          data: {
+            status: 'running',
+            parentWorkflowId: params.parentWorkflowId,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       return result;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Register active workflow failed', { error: error.message });
