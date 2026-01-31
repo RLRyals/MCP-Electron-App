@@ -8,7 +8,6 @@ import * as path from 'path';
 import { app } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
-import * as typingMindDownloader from './typingmind-downloader';
 import * as mcpConfigGenerator from './mcp-config-generator';
 
 /**
@@ -246,15 +245,8 @@ export async function autoConfigureTypingMind(): Promise<AutoConfigResult> {
       // Continue anyway - we can still configure TypingMind
     }
 
-    // Check if TypingMind is installed
-    const isInstalled = await typingMindDownloader.isInstalled();
-    if (!isInstalled) {
-      return {
-        success: false,
-        message: 'TypingMind is not installed. Please install TypingMind first.',
-        error: 'TYPING_MIND_NOT_INSTALLED',
-      };
-    }
+    // Note: TypingMind is a web-based service (typingmind.com) that does not require local installation.
+    // Users can configure their MCP connector settings and use them with typingmind.com directly.
 
     // Load current environment configuration
     const config = await envConfig.loadEnvConfig();
