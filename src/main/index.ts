@@ -2666,6 +2666,38 @@ app.whenReady().then(async () => {
   // Docker is a core dependency - MCP servers run in Docker containers
   try {
     logWithCategory('info', LogCategory.SYSTEM, 'Checking Docker status...');
+
+    // First, check if Docker is installed at all
+    const dockerInstalled = await prerequisites.checkDockerInstalled();
+
+    if (!dockerInstalled.installed) {
+      // Docker is NOT installed - show helpful dialog with download link
+      logWithCategory('warn', LogCategory.DOCKER, 'Docker Desktop is not installed');
+
+      const downloadUrl = installationWizard.getDockerDownloadUrl();
+      const response = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Docker Desktop Required',
+        message: 'Docker Desktop is not installed',
+        detail: `This application requires Docker Desktop to run MCP servers.\n\n` +
+          `Please download and install Docker Desktop, then restart this application.\n\n` +
+          `Download URL:\n${downloadUrl}`,
+        buttons: ['Download Docker Desktop', 'Exit'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response.response === 0) {
+        // User clicked "Download Docker Desktop"
+        await installationWizard.openDownloadPage();
+        logWithCategory('info', LogCategory.DOCKER, 'Opened Docker Desktop download page');
+      }
+
+      app.quit();
+      return;
+    }
+
+    // Docker is installed, now check if it's running
     const dockerStatus = await docker.checkDockerHealth();
 
     if (!dockerStatus.running || !dockerStatus.healthy) {
