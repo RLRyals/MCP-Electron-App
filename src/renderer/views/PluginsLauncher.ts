@@ -393,30 +393,214 @@ export class PluginsLauncher implements View {
         console.log('[PluginsLauncher] Wizard.show() called');
         break;
       case 'manage':
-        // Show plugin management info (TODO: create full management view)
-        const manageInfo = `
-Plugin Management
-
-Installed Plugins: ${this.plugins.length}
-Active Plugins: ${this.plugins.filter(p => p.status === 'active').length}
-
-Plugin Location:
-Windows: %APPDATA%\\fictionlab\\plugins\\
-Mac/Linux: ~/.fictionlab/plugins/
-
-To manage plugins:
-1. Install new plugins using "Import Plugin"
-2. View plugin details by clicking on them
-3. Enable/disable plugins by editing plugin.json
-4. Remove plugins by deleting their folder
-
-Full management UI coming soon!
-        `.trim();
-
-        alert(manageInfo);
+        // Show plugin management dialog
+        this.showPluginManagementDialog();
         break;
       default:
         console.warn('[PluginsLauncher] Unknown action:', actionId);
+    }
+  }
+
+  /**
+   * Show plugin management dialog
+   */
+  private async showPluginManagementDialog(): Promise<void> {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'plugin-manage-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'plugin-manage-dialog';
+    dialog.style.cssText = `
+      background: var(--bg-secondary, #1e1e1e);
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 500px;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    dialog.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: var(--text-primary, #fff);">Manage Plugins</h2>
+        <button id="close-manage-dialog" style="background: none; border: none; color: var(--text-secondary, #888); font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+      <div id="plugin-list-container" style="color: var(--text-primary, #fff);">
+        <div style="text-align: center; padding: 20px;">Loading plugins...</div>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Close button handler
+    const closeBtn = dialog.querySelector('#close-manage-dialog');
+    closeBtn?.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Load plugins
+    const container = dialog.querySelector('#plugin-list-container');
+    if (!container) return;
+
+    try {
+      const plugins = await (window as any).electronAPI.plugins.listInstalled();
+
+      if (plugins.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--text-secondary, #888);">
+            <p>No plugins installed</p>
+            <p style="font-size: 14px;">Use "Import Plugin" to install plugins</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      for (const plugin of plugins) {
+        const card = document.createElement('div');
+        card.className = 'plugin-manage-card';
+        card.style.cssText = `
+          background: var(--bg-tertiary, #2a2a2a);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 12px;
+        `;
+
+        card.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h3 style="margin: 0 0 4px 0; color: var(--text-primary, #fff);">${this.escapeHtml(plugin.name)}</h3>
+              <p style="margin: 0 0 8px 0; color: var(--text-secondary, #888); font-size: 13px;">${this.escapeHtml(plugin.description || 'No description')}</p>
+              <div style="font-size: 12px; color: var(--text-tertiary, #666);">
+                <span>Version: ${this.escapeHtml(plugin.version)}</span>
+                ${plugin.githubRepo ? `<span style="margin-left: 12px;">Repo: ${this.escapeHtml(plugin.githubRepo)}</span>` : ''}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+              <button class="plugin-update-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" style="
+                background: var(--accent-color, #0078d4);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Update</button>
+              <button class="plugin-uninstall-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" style="
+                background: var(--danger-color, #d32f2f);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Uninstall</button>
+            </div>
+          </div>
+          <div class="plugin-status" data-plugin-id="${this.escapeHtml(plugin.id)}" style="margin-top: 8px; font-size: 12px; display: none;"></div>
+        `;
+
+        container.appendChild(card);
+      }
+
+      // Add event listeners for update buttons
+      container.querySelectorAll('.plugin-update-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          const statusEl = container.querySelector(`.plugin-status[data-plugin-id="${pluginId}"]`) as HTMLElement;
+          const button = e.target as HTMLButtonElement;
+
+          button.disabled = true;
+          button.textContent = 'Updating...';
+
+          if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--text-secondary, #888)';
+            statusEl.textContent = 'Downloading and installing update from GitHub...';
+          }
+
+          try {
+            const result = await (window as any).electronAPI.plugins.updateFromGitHub(pluginId);
+            if (statusEl) {
+              statusEl.style.color = 'var(--success-color, #4caf50)';
+              statusEl.textContent = result.message || 'Update successful! Restart FictionLab to apply changes.';
+            }
+            button.textContent = 'Updated';
+          } catch (error: any) {
+            if (statusEl) {
+              statusEl.style.color = 'var(--danger-color, #d32f2f)';
+              statusEl.textContent = `Update failed: ${error.message}`;
+            }
+            button.disabled = false;
+            button.textContent = 'Retry Update';
+          }
+        });
+      });
+
+      // Add event listeners for uninstall buttons
+      container.querySelectorAll('.plugin-uninstall-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          if (!confirm(`Are you sure you want to uninstall "${pluginId}"? This cannot be undone.`)) {
+            return;
+          }
+
+          const button = e.target as HTMLButtonElement;
+          const card = button.closest('.plugin-manage-card');
+
+          button.disabled = true;
+          button.textContent = 'Uninstalling...';
+
+          try {
+            await (window as any).electronAPI.plugins.uninstall(pluginId);
+            card?.remove();
+
+            // Refresh if no plugins left
+            const remaining = container.querySelectorAll('.plugin-manage-card');
+            if (remaining.length === 0) {
+              container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary, #888);">
+                  <p>No plugins installed</p>
+                  <p style="font-size: 14px;">Use "Import Plugin" to install plugins</p>
+                </div>
+              `;
+            }
+          } catch (error: any) {
+            alert(`Uninstall failed: ${error.message}`);
+            button.disabled = false;
+            button.textContent = 'Uninstall';
+          }
+        });
+      });
+    } catch (error: any) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--danger-color, #d32f2f);">
+          <p>Failed to load plugins</p>
+          <p style="font-size: 14px;">${this.escapeHtml(error.message)}</p>
+        </div>
+      `;
     }
   }
 

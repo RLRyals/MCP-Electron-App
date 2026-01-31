@@ -2310,6 +2310,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeActionListener: (): void => {
       ipcRenderer.removeAllListeners('plugin-action');
     },
+
+    /**
+     * List all installed plugins with their detailed info
+     */
+    listInstalled: (): Promise<any[]> => {
+      return ipcRenderer.invoke('plugin:list-installed');
+    },
+
+    /**
+     * Check if a plugin has updates available from GitHub
+     */
+    checkUpdate: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:check-update', pluginId);
+    },
+
+    /**
+     * Update/reinstall a plugin from GitHub
+     */
+    updateFromGitHub: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:update-from-github', pluginId);
+    },
+
+    /**
+     * Uninstall a plugin
+     */
+    uninstall: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:uninstall', pluginId);
+    },
+
+    /**
+     * Get the filesystem path to a specific plugin
+     */
+    getPluginPath: (pluginId: string): Promise<string> => {
+      return ipcRenderer.invoke('plugin:get-path', pluginId);
+    },
   },
 
   /**
