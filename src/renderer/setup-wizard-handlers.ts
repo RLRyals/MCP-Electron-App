@@ -342,8 +342,13 @@ async function checkPrerequisites() {
                         <span style="font-size: 1.5rem;">⚠️</span>
                         <div>
                             <strong>Prerequisites Not Met</strong><br>
-                            Please install the required software before continuing.
+                            Please install the required software, then click "Check Again" to verify.
                         </div>
+                    </div>
+                    <div style="margin-top: 15px; text-align: center;">
+                        <button class="wizard-btn primary" id="check-prereqs-again-btn" style="padding: 12px 24px; font-size: 1rem;">
+                            <span style="margin-right: 8px;">↻</span> Check Again
+                        </button>
                     </div>
                 `;
             } else {
@@ -368,25 +373,38 @@ async function checkPrerequisites() {
             }
         }
 
-        // Add event listeners for installation buttons
-        if (!dockerValid && !results.docker.installed) {
-            const installDockerBtn = document.getElementById('install-docker-btn');
-            if (installDockerBtn) {
-                installDockerBtn.addEventListener('click', async () => {
-                    await (window as any).electronAPI.wizard.openDownloadPage();
-                });
+        // Use setTimeout to ensure DOM is fully updated before attaching listeners
+        setTimeout(() => {
+            // Add event listeners for installation buttons
+            if (!dockerValid && !results.docker.installed) {
+                const installDockerBtn = document.getElementById('install-docker-btn');
+                if (installDockerBtn) {
+                    installDockerBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openDownloadPage();
+                    });
+                }
             }
-        }
 
-        // Add Git install button listener
-        if (!gitValid) {
-            const installGitBtn = document.getElementById('install-git-btn');
-            if (installGitBtn) {
-                installGitBtn.addEventListener('click', async () => {
-                    await (window as any).electronAPI.wizard.openGitDownloadPage();
-                });
+            // Add Git install button listener
+            if (!gitValid) {
+                const installGitBtn = document.getElementById('install-git-btn');
+                if (installGitBtn) {
+                    installGitBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openGitDownloadPage();
+                    });
+                }
             }
-        }
+
+            // Add Check Again button listener (if prerequisites not met)
+            if (!allValid) {
+                const checkAgainBtn = document.getElementById('check-prereqs-again-btn');
+                if (checkAgainBtn) {
+                    checkAgainBtn.addEventListener('click', () => {
+                        checkPrerequisites();
+                    });
+                }
+            }
+        }, 0);
 
     } catch (error) {
         console.error('Error checking prerequisites:', error);
