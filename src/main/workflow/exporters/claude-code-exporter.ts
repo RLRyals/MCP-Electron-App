@@ -18,7 +18,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
-import { app } from 'electron';
 import { MCPWorkflowClient, WorkflowDefinition } from '../mcp-workflow-client';
 import { WorkflowParser } from '../../parsers/workflow-parser';
 import { logWithCategory, LogCategory } from '../../logger';
@@ -57,12 +56,9 @@ export class ClaudeCodeExporter {
     this.workflowClient = new MCPWorkflowClient();
     this.parser = new WorkflowParser();
 
-    // Agents are stored in userData/agents
-    const userDataPath = app.getPath('userData');
-    this.agentsPath = path.join(userDataPath, 'agents');
-
-    // Skills are stored in ~/.claude/skills
+    // Both agents and skills are stored in ~/.claude/
     const homeDir = os.homedir();
+    this.agentsPath = path.join(homeDir, '.claude', 'agents');
     this.skillsPath = path.join(homeDir, '.claude', 'skills');
   }
 
