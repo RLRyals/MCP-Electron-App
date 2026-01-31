@@ -764,6 +764,19 @@ function setupIPC(): void {
     return installationWizard.getWhyGitExplanation();
   });
 
+  ipcMain.handle('wizard:open-nodejs-download', async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Node.js download page...');
+    return await installationWizard.openNodeJsDownloadPage();
+  });
+
+  ipcMain.handle('wizard:get-nodejs-download-url', async () => {
+    return installationWizard.getNodeJsDownloadUrl();
+  });
+
+  ipcMain.handle('wizard:get-nodejs-explanation', async () => {
+    return installationWizard.getWhyNodeJsExplanation();
+  });
+
   // Client selection IPC handlers
   ipcMain.handle('client:get-options', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'Getting available client options...');

@@ -1082,6 +1082,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getGitExplanation: (): Promise<string> => {
       return ipcRenderer.invoke('wizard:get-git-explanation');
     },
+
+    /**
+     * Open the Node.js download page in default browser
+     */
+    openNodeJsDownloadPage: (): Promise<void> => {
+      return ipcRenderer.invoke('wizard:open-nodejs-download');
+    },
+
+    /**
+     * Get Node.js download URL for current platform
+     */
+    getNodeJsDownloadUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-nodejs-download-url');
+    },
+
+    /**
+     * Get explanation of why Node.js is needed
+     */
+    getNodeJsExplanation: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-nodejs-explanation');
+    },
   },
 
   /**

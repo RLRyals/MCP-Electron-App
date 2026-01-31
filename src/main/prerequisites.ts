@@ -318,6 +318,43 @@ export async function checkGit(): Promise<PrerequisiteStatus> {
 }
 
 /**
+ * Check if Node.js and npm are installed
+ */
+export async function checkNodeJs(): Promise<PrerequisiteStatus> {
+  log.info('Checking Node.js installation...');
+
+  try {
+    const nodeResult = await executeCommand('node --version');
+    const nodeVersion = parseVersion(nodeResult.stdout);
+
+    // Also check npm
+    try {
+      const npmResult = await executeCommand('npm --version');
+      const npmVersion = parseVersion(npmResult.stdout);
+
+      log.info(`Node.js installed: ${nodeVersion}, npm: ${npmVersion}`);
+      return {
+        installed: true,
+        version: `${nodeVersion} (npm ${npmVersion})`,
+      };
+    } catch (npmError: any) {
+      log.warn('npm not found:', npmError.message);
+      return {
+        installed: false,
+        version: nodeVersion,
+        error: 'Node.js is installed but npm is not found in PATH',
+      };
+    }
+  } catch (error: any) {
+    log.warn('Node.js not installed or not in PATH:', error.message);
+    return {
+      installed: false,
+      error: 'Node.js is not installed or not found in PATH',
+    };
+  }
+}
+
+/**
  * Check WSL status (Windows only)
  */
 export async function checkWSL(): Promise<PrerequisiteStatus> {
@@ -382,6 +419,7 @@ export async function checkWSL(): Promise<PrerequisiteStatus> {
 export async function checkAll(): Promise<{
   docker: PrerequisiteStatus;
   git: PrerequisiteStatus;
+  nodejs: PrerequisiteStatus;
   wsl?: PrerequisiteStatus;
   platform: string;
 }> {
@@ -392,6 +430,7 @@ export async function checkAll(): Promise<{
     platform,
     docker: await checkDockerRunning(),
     git: await checkGit(),
+    nodejs: await checkNodeJs(),
   };
 
   // Only check WSL on Windows

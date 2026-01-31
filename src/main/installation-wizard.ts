@@ -450,6 +450,68 @@ Git is the industry-standard version control system used by developers worldwide
 }
 
 /**
+ * Get Node.js download URL for the current platform
+ */
+export function getNodeJsDownloadUrl(): string {
+  const platform = getPlatform();
+  const arch = process.arch;
+
+  log.info(`Getting Node.js download URL for platform: ${platform}, arch: ${arch}`);
+
+  switch (platform) {
+    case 'windows':
+      // Node.js for Windows - LTS version
+      if (arch === 'arm64') {
+        return 'https://nodejs.org/en/download/';
+      }
+      return 'https://nodejs.org/en/download/';
+
+    case 'macos':
+      // macOS - recommend installer or Homebrew
+      return 'https://nodejs.org/en/download/';
+
+    case 'linux':
+      // Linux - point to package manager instructions
+      return 'https://nodejs.org/en/download/package-manager/';
+
+    default:
+      log.warn(`Unknown platform: ${platform}`);
+      return 'https://nodejs.org/en/download/';
+  }
+}
+
+/**
+ * Open the Node.js download page in the default browser
+ */
+export async function openNodeJsDownloadPage(): Promise<void> {
+  const downloadUrl = getNodeJsDownloadUrl();
+
+  log.info(`Opening Node.js download page: ${downloadUrl}`);
+
+  try {
+    await shell.openExternal(downloadUrl);
+    log.info('Node.js download page opened successfully');
+  } catch (error) {
+    log.error('Error opening Node.js download page:', error);
+    throw new Error('Failed to open Node.js download page');
+  }
+}
+
+/**
+ * Get "Why do I need Node.js?" explanation
+ */
+export function getWhyNodeJsExplanation(): string {
+  return `Node.js is required for this application because:
+
+• Node.js runs the MCP server build process
+• npm (included with Node.js) manages dependencies for MCP servers
+• Many MCP tools and utilities are built with Node.js
+• It provides the JavaScript runtime for server-side operations
+
+Node.js is a widely-used JavaScript runtime that powers modern development tools.`;
+}
+
+/**
  * Export all public functions and interfaces
  */
 export default {
@@ -462,4 +524,7 @@ export default {
   getGitDownloadUrl,
   openGitDownloadPage,
   getWhyGitExplanation,
+  getNodeJsDownloadUrl,
+  openNodeJsDownloadPage,
+  getWhyNodeJsExplanation,
 };

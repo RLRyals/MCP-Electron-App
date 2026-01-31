@@ -317,6 +317,18 @@ async function checkPrerequisites() {
             gitValid ? null : 'Git is required for version control.'
         ));
 
+        // Node.js card
+        const nodeValid = results.nodejs.installed;
+        if (!nodeValid) allValid = false;
+
+        cards.push(createPrerequisiteCard(
+            'Node.js',
+            '🟢',
+            nodeValid,
+            results.nodejs.installed ? `Installed (${results.nodejs.version})` : 'Not installed',
+            nodeValid ? null : 'Node.js is required for building MCP servers.'
+        ));
+
         // WSL card (Windows only)
         if (results.wsl) {
             const wslValid = results.wsl.installed;
@@ -367,6 +379,7 @@ async function checkPrerequisites() {
                     prerequisites: {
                         docker: true,
                         git: true,
+                        nodejs: true,
                         wsl: results.wsl?.installed || undefined
                     }
                 });
@@ -391,6 +404,16 @@ async function checkPrerequisites() {
                 if (installGitBtn) {
                     installGitBtn.addEventListener('click', async () => {
                         await (window as any).electronAPI.wizard.openGitDownloadPage();
+                    });
+                }
+            }
+
+            // Add Node.js install button listener
+            if (!nodeValid) {
+                const installNodeBtn = document.getElementById('install-nodejs-btn');
+                if (installNodeBtn) {
+                    installNodeBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openNodeJsDownloadPage();
                     });
                 }
             }
@@ -444,6 +467,12 @@ function createPrerequisiteCard(
             installButton = `
                 <div class="prereq-actions">
                     <button class="wizard-btn" id="install-git-btn">Install Git</button>
+                </div>
+            `;
+        } else if (title === 'Node.js') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-nodejs-btn">Install Node.js</button>
                 </div>
             `;
         }
