@@ -5,6 +5,7 @@ import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
+import { ClaudeCodeExporter, ExportOptions } from '../workflow/exporters/claude-code-exporter';
 import type { WorkflowUpdate, ActiveWorkflowInstance } from '../../types/workflow';
 
 /**
@@ -677,6 +678,30 @@ export function registerWorkflowHandlers() {
       return { success: true };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Mark node completed failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // ============================================
+  // Workflow Export Handler
+  // ============================================
+
+  // Export workflow to Claude Code format
+  ipcMain.handle('workflow:export-claude-code', async (_event, workflowId: string, options?: ExportOptions) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Export workflow ${workflowId} to Claude Code format`);
+    try {
+      const exporter = new ClaudeCodeExporter();
+      const result = await exporter.export(workflowId, options || {});
+
+      if (result.success) {
+        logWithCategory('info', LogCategory.WORKFLOW, `IPC: Export successful to ${result.outputPath}`);
+      } else {
+        logWithCategory('error', LogCategory.WORKFLOW, `IPC: Export failed: ${result.error}`);
+      }
+
+      return result;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Export workflow failed', { error: error.message, stack: error.stack });
       throw error;
     }
   });
