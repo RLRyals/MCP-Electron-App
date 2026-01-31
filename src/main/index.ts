@@ -738,6 +738,15 @@ function setupIPC(): void {
     return await installationWizard.openDownloadPage();
   });
 
+  ipcMain.handle('wizard:open-git-download', async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Git download page...');
+    return await installationWizard.openGitDownloadPage();
+  });
+
+  ipcMain.handle('wizard:get-git-download-url', async () => {
+    return installationWizard.getGitDownloadUrl();
+  });
+
   ipcMain.handle('wizard:copy-command', async (_, command: string) => {
     logWithCategory('info', LogCategory.PREREQUISITES, `Copying command to clipboard: ${command}`);
     return installationWizard.copyCommandToClipboard(command);
@@ -749,6 +758,10 @@ function setupIPC(): void {
 
   ipcMain.handle('wizard:get-explanation', async () => {
     return installationWizard.getWhyDockerExplanation();
+  });
+
+  ipcMain.handle('wizard:get-git-explanation', async () => {
+    return installationWizard.getWhyGitExplanation();
   });
 
   // Client selection IPC handlers

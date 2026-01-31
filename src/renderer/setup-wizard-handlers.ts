@@ -378,6 +378,16 @@ async function checkPrerequisites() {
             }
         }
 
+        // Add Git install button listener
+        if (!gitValid) {
+            const installGitBtn = document.getElementById('install-git-btn');
+            if (installGitBtn) {
+                installGitBtn.addEventListener('click', async () => {
+                    await (window as any).electronAPI.wizard.openGitDownloadPage();
+                });
+            }
+        }
+
     } catch (error) {
         console.error('Error checking prerequisites:', error);
         grid.innerHTML = `
@@ -403,6 +413,24 @@ function createPrerequisiteCard(
     status: string,
     error: string | null
 ): string {
+    // Determine which install button to show based on title
+    let installButton = '';
+    if (error) {
+        if (title === 'Docker Desktop') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-docker-btn">Install Docker</button>
+                </div>
+            `;
+        } else if (title === 'Git') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-git-btn">Install Git</button>
+                </div>
+            `;
+        }
+    }
+
     return `
         <div class="prereq-card ${success ? 'success' : 'error'}">
             <div class="prereq-header">
@@ -416,11 +444,7 @@ function createPrerequisiteCard(
                 <div class="prereq-status" style="margin-top: 10px; background: rgba(244, 67, 54, 0.1);">
                     ${error}
                 </div>
-                ${title === 'Docker Desktop' ? `
-                    <div class="prereq-actions">
-                        <button class="wizard-btn" id="install-docker-btn">Install Docker</button>
-                    </div>
-                ` : ''}
+                ${installButton}
             ` : ''}
         </div>
     `;

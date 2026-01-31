@@ -386,6 +386,70 @@ Think of Docker as a lightweight virtual machine that provides a safe, isolated 
 }
 
 /**
+ * Get Git download URL for the current platform
+ */
+export function getGitDownloadUrl(): string {
+  const platform = getPlatform();
+  const arch = process.arch;
+
+  log.info(`Getting Git download URL for platform: ${platform}, arch: ${arch}`);
+
+  switch (platform) {
+    case 'windows':
+      // Git for Windows - 64-bit installer
+      if (arch === 'arm64') {
+        // Windows ARM64 - use the portable version or standard installer
+        return 'https://git-scm.com/download/win';
+      }
+      return 'https://git-scm.com/download/win';
+
+    case 'macos':
+      // macOS - recommend Homebrew or direct download
+      return 'https://git-scm.com/download/mac';
+
+    case 'linux':
+      // Linux - point to installation instructions
+      return 'https://git-scm.com/download/linux';
+
+    default:
+      log.warn(`Unknown platform: ${platform}`);
+      return 'https://git-scm.com/downloads';
+  }
+}
+
+/**
+ * Open the Git download page in the default browser
+ */
+export async function openGitDownloadPage(): Promise<void> {
+  const downloadUrl = getGitDownloadUrl();
+
+  log.info(`Opening Git download page: ${downloadUrl}`);
+
+  try {
+    await shell.openExternal(downloadUrl);
+    log.info('Git download page opened successfully');
+  } catch (error) {
+    log.error('Error opening Git download page:', error);
+    throw new Error('Failed to open Git download page');
+  }
+}
+
+/**
+ * Get "Why do I need Git?" explanation
+ */
+export function getWhyGitExplanation(): string {
+  return `Git is required for this application because:
+
+• Git manages version control for MCP server source code
+• It enables downloading and updating MCP servers from GitHub repositories
+• Git tracks changes to your configuration and customizations
+• It allows you to easily roll back to previous versions if needed
+• Many MCP servers are distributed via Git repositories
+
+Git is the industry-standard version control system used by developers worldwide.`;
+}
+
+/**
  * Export all public functions and interfaces
  */
 export default {
@@ -395,4 +459,7 @@ export default {
   copyCommandToClipboard,
   getStep,
   getWhyDockerExplanation,
+  getGitDownloadUrl,
+  openGitDownloadPage,
+  getWhyGitExplanation,
 };

@@ -1042,6 +1042,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Open the Git download page in default browser
+     */
+    openGitDownloadPage: (): Promise<void> => {
+      return ipcRenderer.invoke('wizard:open-git-download');
+    },
+
+    /**
+     * Get Git download URL for current platform
+     */
+    getGitDownloadUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-git-download-url');
+    },
+
+    /**
      * Copy a command to the clipboard
      */
     copyCommand: (command: string): Promise<boolean> => {
@@ -1060,6 +1074,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getExplanation: (): Promise<string> => {
       return ipcRenderer.invoke('wizard:get-explanation');
+    },
+
+    /**
+     * Get explanation of why Git is needed
+     */
+    getGitExplanation: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-git-explanation');
     },
   },
 
