@@ -2743,43 +2743,83 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Initialize database pool AFTER Docker is ready
-  try {
-    logWithCategory('info', LogCategory.SYSTEM, 'Initializing database pool...');
-    await initializeDatabasePool();
-    logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized');
-  } catch (error) {
-    logWithCategory('error', LogCategory.SYSTEM, 'Error initializing database:', error);
-    // Fatal error - show error dialog and quit
-    dialog.showErrorBox('Initialization Error',
-      `Failed to initialize database: ${error}\n\nThe application will now exit.`);
-    app.quit();
-    return;
-  }
-
   setupIPC();
   createMenu();
 
-  // Initialize GitHub credentials from environment
-  try {
-    const config = await envConfig.loadEnvConfig();
-    if (config.GITHUB_TOKEN) {
-      const { getGitHubCredentialManager } = await import('./github-credential-manager');
-      getGitHubCredentialManager(config.GITHUB_TOKEN);
-      logger.info('GitHub credentials initialized from environment');
-    }
-  } catch (error) {
-    logger.warn('Error initializing GitHub credentials from environment:', error);
-  }
-
-  // Check if this is the first run
+  // Check if this is the first run BEFORE trying to connect to database
+  // On first run, the MCP containers (including PostgreSQL) haven't been started yet
   const isFirst = await setupWizard.isFirstRun();
   logger.info(`First run: ${isFirst}`);
 
   if (isFirst) {
-    // Show setup wizard
+    // Show setup wizard - database will be initialized after MCP system starts
     createWizardWindow();
   } else {
+    // Not first run - MCP containers should be running, initialize database
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, 'Initializing database pool...');
+      await initializeDatabasePool();
+      logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized');
+    } catch (error) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error initializing database:', error);
+      // Database connection failed - likely MCP containers not running
+      // Show helpful error with option to start MCP system
+      const response = await dialog.showMessageBox({
+        type: 'error',
+        title: 'Database Connection Failed',
+        message: 'Could not connect to the database',
+        detail: `The application could not connect to the PostgreSQL database.\n\n` +
+          `This usually means the MCP containers are not running.\n\n` +
+          `Error: ${error}\n\n` +
+          `Would you like to start the MCP system now?`,
+        buttons: ['Start MCP System', 'Exit'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response.response === 0) {
+        // User wants to start MCP system
+        try {
+          logWithCategory('info', LogCategory.SYSTEM, 'Starting MCP system...');
+          const startResult = await mcpSystem.startMCPSystem();
+
+          if (startResult.success) {
+            logWithCategory('info', LogCategory.SYSTEM, 'MCP system started, retrying database connection...');
+            // Wait a moment for PostgreSQL to be ready
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Retry database initialization
+            await initializeDatabasePool();
+            logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized after MCP start');
+          } else {
+            throw new Error(startResult.error || 'Failed to start MCP system');
+          }
+        } catch (retryError) {
+          logWithCategory('error', LogCategory.SYSTEM, 'Failed to recover:', retryError);
+          dialog.showErrorBox('Initialization Error',
+            `Failed to start MCP system and connect to database.\n\n` +
+            `Error: ${retryError}\n\n` +
+            `Please try restarting the application.`);
+          app.quit();
+          return;
+        }
+      } else {
+        app.quit();
+        return;
+      }
+    }
+
+    // Initialize GitHub credentials from environment
+    try {
+      const config = await envConfig.loadEnvConfig();
+      if (config.GITHUB_TOKEN) {
+        const { getGitHubCredentialManager } = await import('./github-credential-manager');
+        getGitHubCredentialManager(config.GITHUB_TOKEN);
+        logger.info('GitHub credentials initialized from environment');
+      }
+    } catch (error) {
+      logger.warn('Error initializing GitHub credentials from environment:', error);
+    }
     // Check for pending migrations before showing main window
     try {
       logWithCategory('info', LogCategory.SYSTEM, 'Checking for pending migrations...');
