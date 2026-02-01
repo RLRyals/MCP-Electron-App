@@ -13,6 +13,7 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import { app } from 'electron';
 import { WorkflowParser } from '../parsers/workflow-parser';
 import { DependencyResolver } from './dependency-resolver';
@@ -143,15 +144,26 @@ export class FolderImporter {
       if (!workflowFile) {
         return {
           success: false,
-          message: 'No workflow.yaml or workflow.json found in folder'
+          message: `No workflow file found in folder. Expected one of:\n` +
+            `  - ${folderPath}/workflow.yaml\n` +
+            `  - ${folderPath}/workflow.json\n` +
+            `  - ${folderPath}/workflows/*.yaml (Claude Code export format)\n\n` +
+            `Please check that you selected the correct folder.`
         };
       }
 
       logWithCategory('info', LogCategory.WORKFLOW,
         `Found workflow file: ${workflowFile}`);
 
-      // 2. Read raw workflow file for graph_json
-      const rawWorkflowData = await fs.readJson(workflowFile);
+      // 2. Read raw workflow file for graph_json (supports both JSON and YAML)
+      let rawWorkflowData: any;
+      const ext = path.extname(workflowFile).toLowerCase();
+      if (ext === '.yaml' || ext === '.yml') {
+        const content = await fs.readFile(workflowFile, 'utf-8');
+        rawWorkflowData = yaml.load(content);
+      } else {
+        rawWorkflowData = await fs.readJson(workflowFile);
+      }
 
       // 3. Parse workflow definition (for internal processing)
       const workflow = await this.parser.parseWorkflow(workflowFile);
@@ -250,14 +262,66 @@ export class FolderImporter {
 
   /**
    * Find workflow.yaml or workflow.json in folder
+   *
+   * Checks multiple locations to support both:
+   * 1. Direct format: /folder/workflow.yaml (marketplace format)
+   * 2. Exported format: /folder/workflows/{id}.yaml (Claude Code export format)
    */
   private async findWorkflowFile(folderPath: string): Promise<string | null> {
     const candidates = ['workflow.yaml', 'workflow.yml', 'workflow.json'];
 
+    // 1. Check direct format first (standard marketplace format)
     for (const filename of candidates) {
       const filePath = path.join(folderPath, filename);
       if (await fs.pathExists(filePath)) {
         return filePath;
+      }
+    }
+
+    // 2. Check exported format: /workflows/{id}.yaml or /workflows/{id}.json
+    // This is the format produced by ClaudeCodeExporter
+    const workflowsDir = path.join(folderPath, 'workflows');
+    if (await fs.pathExists(workflowsDir)) {
+      try {
+        const files = await fs.readdir(workflowsDir);
+        for (const file of files) {
+          if (file.endsWith('.yaml') || file.endsWith('.yml') || file.endsWith('.json')) {
+            const filePath = path.join(workflowsDir, file);
+            logWithCategory('info', LogCategory.WORKFLOW,
+              `Found workflow file in workflows/ subdirectory: ${filePath}`);
+            return filePath;
+          }
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Error reading workflows directory: ${error.message}`);
+      }
+    }
+
+    // 3. Check sub-workflows directory (for nested export packages)
+    const subWorkflowsDir = path.join(folderPath, 'sub-workflows');
+    if (await fs.pathExists(subWorkflowsDir)) {
+      // For sub-workflow packages, check each subdirectory for workflow.yaml
+      try {
+        const subdirs = await fs.readdir(subWorkflowsDir);
+        for (const subdir of subdirs) {
+          const subdirPath = path.join(subWorkflowsDir, subdir);
+          const stat = await fs.stat(subdirPath);
+          if (stat.isDirectory()) {
+            for (const filename of candidates) {
+              const filePath = path.join(subdirPath, filename);
+              if (await fs.pathExists(filePath)) {
+                logWithCategory('info', LogCategory.WORKFLOW,
+                  `Found workflow file in sub-workflows/${subdir}/: ${filePath}`);
+                // Return the parent path, not the sub-workflow itself
+                // The user likely meant to import the main workflow
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Error reading sub-workflows directory: ${error.message}`);
       }
     }
 
