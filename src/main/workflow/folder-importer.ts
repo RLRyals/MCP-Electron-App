@@ -62,12 +62,23 @@ export class FolderImporter {
     isDuplicate: boolean
   } | null> {
     try {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Preview workflow from folder: ${folderPath}`);
+
       const workflowFile = await this.findWorkflowFile(folderPath);
       if (!workflowFile) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `No workflow file found in: ${folderPath}`);
         return null;
       }
 
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Preview: Found workflow file: ${workflowFile}`);
+
       const workflow = await this.parser.parseWorkflow(workflowFile);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Preview: Parsed workflow - id: ${workflow.id}, name: ${workflow.name}`);
 
       // Check for existing workflows with same ID
       let suggestedId = workflow.id;
@@ -270,10 +281,17 @@ export class FolderImporter {
   private async findWorkflowFile(folderPath: string): Promise<string | null> {
     const candidates = ['workflow.yaml', 'workflow.yml', 'workflow.json'];
 
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `findWorkflowFile: Searching in ${folderPath}`);
+
     // 1. Check direct format first (standard marketplace format)
     for (const filename of candidates) {
       const filePath = path.join(folderPath, filename);
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `findWorkflowFile: Checking ${filePath}`);
       if (await fs.pathExists(filePath)) {
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `findWorkflowFile: Found direct format: ${filePath}`);
         return filePath;
       }
     }
@@ -281,6 +299,8 @@ export class FolderImporter {
     // 2. Check exported format: /workflows/{id}.yaml or /workflows/{id}.json
     // This is the format produced by ClaudeCodeExporter
     const workflowsDir = path.join(folderPath, 'workflows');
+    logWithCategory('debug', LogCategory.WORKFLOW,
+      `findWorkflowFile: Checking workflows dir: ${workflowsDir}`);
     if (await fs.pathExists(workflowsDir)) {
       try {
         const files = await fs.readdir(workflowsDir);
