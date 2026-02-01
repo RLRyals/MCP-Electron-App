@@ -469,8 +469,10 @@ export class FolderImporter {
   }
 
   /**
-   * Import sub-workflows from sibling folders
-   * Looks for folders with matching workflow IDs in the parent directory
+   * Import sub-workflows from the export package
+   * Checks multiple locations:
+   * 1. sub-workflows/ directory inside the export package (Claude Code export format)
+   * 2. Sibling folders in the parent directory (marketplace format)
    */
   private async importSubWorkflowsFromSiblings(
     folderPath: string,
@@ -481,45 +483,86 @@ export class FolderImporter {
     }
 
     let imported = 0;
-    const parentDir = path.dirname(folderPath);
 
-    logWithCategory('info', LogCategory.WORKFLOW,
-      `Looking for sub-workflows in parent directory: ${parentDir}`);
+    // 1. First check sub-workflows/ directory inside the package (Claude Code export format)
+    const subWorkflowsDir = path.join(folderPath, 'sub-workflows');
+    if (await fs.pathExists(subWorkflowsDir)) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Found sub-workflows directory: ${subWorkflowsDir}`);
 
-    // Check each sibling folder for matching sub-workflow
-    for (const subWorkflowId of missingSubWorkflows) {
-      // Try common naming patterns
-      const candidates = [
-        path.join(parentDir, subWorkflowId),
-        path.join(parentDir, subWorkflowId.replace(/-/g, '_')),
-      ];
+      for (const subWorkflowId of [...missingSubWorkflows]) {
+        const subWorkflowPath = path.join(subWorkflowsDir, subWorkflowId);
 
-      for (const candidatePath of candidates) {
-        if (await fs.pathExists(candidatePath)) {
-          const workflowFile = await this.findWorkflowFile(candidatePath);
+        if (await fs.pathExists(subWorkflowPath)) {
+          const workflowFile = await this.findWorkflowFile(subWorkflowPath);
           if (workflowFile) {
             try {
-              // Verify this is the right workflow
-              const preview = await this.previewWorkflow(candidatePath);
-              if (preview && (preview.id === subWorkflowId || preview.id.includes(subWorkflowId))) {
-                logWithCategory('info', LogCategory.WORKFLOW,
-                  `Found sub-workflow ${subWorkflowId} at ${candidatePath}, importing...`);
+              logWithCategory('info', LogCategory.WORKFLOW,
+                `Found sub-workflow ${subWorkflowId} in sub-workflows/ directory, importing...`);
 
-                // Recursively import (this will handle nested sub-workflows too)
-                const result = await this.importFromFolder(candidatePath);
-                if (result.success) {
-                  imported++;
-                  logWithCategory('info', LogCategory.WORKFLOW,
-                    `Successfully imported sub-workflow: ${subWorkflowId}`);
-                } else {
-                  logWithCategory('warn', LogCategory.WORKFLOW,
-                    `Failed to import sub-workflow ${subWorkflowId}: ${result.message}`);
-                }
-                break; // Found and processed, move to next sub-workflow
+              // Recursively import (this will handle nested sub-workflows too)
+              const result = await this.importFromFolder(subWorkflowPath);
+              if (result.success) {
+                imported++;
+                // Remove from missing list so we don't try sibling search for it
+                const idx = missingSubWorkflows.indexOf(subWorkflowId);
+                if (idx > -1) missingSubWorkflows.splice(idx, 1);
+                logWithCategory('info', LogCategory.WORKFLOW,
+                  `Successfully imported sub-workflow from package: ${subWorkflowId}`);
+              } else {
+                logWithCategory('warn', LogCategory.WORKFLOW,
+                  `Failed to import sub-workflow ${subWorkflowId}: ${result.message}`);
               }
             } catch (error: any) {
               logWithCategory('warn', LogCategory.WORKFLOW,
                 `Error importing sub-workflow ${subWorkflowId}: ${error.message}`);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Check sibling folders in the parent directory for any remaining missing sub-workflows
+    if (missingSubWorkflows.length > 0) {
+      const parentDir = path.dirname(folderPath);
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Looking for remaining ${missingSubWorkflows.length} sub-workflows in parent directory: ${parentDir}`);
+
+      for (const subWorkflowId of missingSubWorkflows) {
+        // Try common naming patterns
+        const candidates = [
+          path.join(parentDir, subWorkflowId),
+          path.join(parentDir, subWorkflowId.replace(/-/g, '_')),
+        ];
+
+        for (const candidatePath of candidates) {
+          if (await fs.pathExists(candidatePath)) {
+            const workflowFile = await this.findWorkflowFile(candidatePath);
+            if (workflowFile) {
+              try {
+                // Verify this is the right workflow
+                const preview = await this.previewWorkflow(candidatePath);
+                if (preview && (preview.id === subWorkflowId || preview.id.includes(subWorkflowId))) {
+                  logWithCategory('info', LogCategory.WORKFLOW,
+                    `Found sub-workflow ${subWorkflowId} at ${candidatePath}, importing...`);
+
+                  // Recursively import (this will handle nested sub-workflows too)
+                  const result = await this.importFromFolder(candidatePath);
+                  if (result.success) {
+                    imported++;
+                    logWithCategory('info', LogCategory.WORKFLOW,
+                      `Successfully imported sub-workflow: ${subWorkflowId}`);
+                  } else {
+                    logWithCategory('warn', LogCategory.WORKFLOW,
+                      `Failed to import sub-workflow ${subWorkflowId}: ${result.message}`);
+                  }
+                  break; // Found and processed, move to next sub-workflow
+                }
+              } catch (error: any) {
+                logWithCategory('warn', LogCategory.WORKFLOW,
+                  `Error importing sub-workflow ${subWorkflowId}: ${error.message}`);
+              }
             }
           }
         }
