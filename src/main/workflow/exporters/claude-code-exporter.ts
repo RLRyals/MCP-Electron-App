@@ -92,13 +92,23 @@ export class ClaudeCodeExporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Export output path: ${outputPath}`);
 
-      // 3. Find all referenced agents, skills, and sub-workflows
-      const agents = await this.findReferencedAgents(workflow);
-      const skills = await this.findReferencedSkills(workflow);
+      // 3. Find all referenced agents, skills, and sub-workflows from main workflow
+      const agents = new Set<string>(await this.findReferencedAgents(workflow));
+      const skills = new Set<string>(await this.findReferencedSkills(workflow));
       const subWorkflowIds = this.findReferencedSubWorkflows(workflow);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Found ${agents.length} agents, ${skills.length} skills, ${subWorkflowIds.length} sub-workflows`);
+        `Found ${agents.size} agents, ${skills.size} skills, ${subWorkflowIds.length} sub-workflows in main workflow`);
+
+      // 3b. Also collect agents and skills from sub-workflows BEFORE copying
+      if (options.includeSubWorkflows !== false && subWorkflowIds.length > 0) {
+        await this.collectSubWorkflowDependencies(subWorkflowIds, agents, skills);
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `After including sub-workflows: ${agents.size} agents, ${skills.size} skills total`);
+      }
+
+      const agentsArray = Array.from(agents);
+      const skillsArray = Array.from(skills);
 
       // 4. Export workflow YAML/JSON
       const workflowFile = await this.exportWorkflowFile(workflow, outputPath, options.format);
@@ -106,13 +116,13 @@ export class ClaudeCodeExporter {
       // 5. Copy agents (if enabled)
       const agentFiles: string[] = [];
       if (options.includeAgents !== false) {
-        agentFiles.push(...await this.copyAgents(agents, outputPath));
+        agentFiles.push(...await this.copyAgents(agentsArray, outputPath));
       }
 
-      // 6. Copy skills (if enabled)
+      // 6. Copy skills (if enabled) - now includes sub-workflow skills
       const skillFiles: string[] = [];
       if (options.includeSkills !== false) {
-        skillFiles.push(...await this.copySkills(skills, outputPath));
+        skillFiles.push(...await this.copySkills(skillsArray, outputPath));
       }
 
       // 7. Export sub-workflows (if enabled)
@@ -121,10 +131,10 @@ export class ClaudeCodeExporter {
         subWorkflowFiles.push(...await this.exportSubWorkflows(subWorkflowIds, outputPath, options.format));
       }
 
-      // 8. Generate README (if enabled)
+      // 8. Generate README (if enabled) - now includes all skills from sub-workflows
       let readmeFile = '';
       if (options.includeReadme !== false) {
-        readmeFile = await this.generateReadme(workflow, agents, skills, subWorkflowIds, outputPath);
+        readmeFile = await this.generateReadme(workflow, agentsArray, skillsArray, subWorkflowIds, outputPath);
       }
 
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -248,6 +258,57 @@ export class ClaudeCodeExporter {
   }
 
   /**
+   * Recursively collect agents and skills from sub-workflows
+   * This ensures all dependencies are gathered before copying files
+   */
+  private async collectSubWorkflowDependencies(
+    subWorkflowIds: string[],
+    agents: Set<string>,
+    skills: Set<string>,
+    visited: Set<string> = new Set()
+  ): Promise<void> {
+    for (const subWorkflowId of subWorkflowIds) {
+      // Prevent infinite loops
+      if (visited.has(subWorkflowId)) {
+        continue;
+      }
+      visited.add(subWorkflowId);
+
+      try {
+        const subWorkflow = await this.getWorkflowDefinition(subWorkflowId);
+        if (subWorkflow) {
+          // Collect agents from sub-workflow
+          const subAgents = await this.findReferencedAgents(subWorkflow);
+          for (const agent of subAgents) {
+            agents.add(agent);
+          }
+
+          // Collect skills from sub-workflow
+          const subSkills = await this.findReferencedSkills(subWorkflow);
+          for (const skill of subSkills) {
+            skills.add(skill);
+          }
+
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Collected from sub-workflow "${subWorkflowId}": ${subAgents.length} agents, ${subSkills.length} skills`);
+
+          // Recursively collect from nested sub-workflows
+          const nestedSubWorkflows = this.findReferencedSubWorkflows(subWorkflow);
+          if (nestedSubWorkflows.length > 0) {
+            await this.collectSubWorkflowDependencies(nestedSubWorkflows, agents, skills, visited);
+          }
+        } else {
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Sub-workflow not found for dependency collection: ${subWorkflowId}`);
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Failed to collect dependencies from sub-workflow ${subWorkflowId}: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * Find all sub-workflows referenced in workflow dependencies
    */
   private findReferencedSubWorkflows(workflow: WorkflowDefinition): string[] {
@@ -322,16 +383,8 @@ export class ClaudeCodeExporter {
             }
           }
 
-          // Also export agents/skills from sub-workflow to the main export directory
-          const subAgents = await this.findReferencedAgents(subWorkflow);
-          const subSkills = await this.findReferencedSkills(subWorkflow);
-
-          if (subAgents.length > 0) {
-            await this.copyAgents(subAgents, outputPath);
-          }
-          if (subSkills.length > 0) {
-            await this.copySkills(subSkills, outputPath);
-          }
+          // Note: Agents and skills from sub-workflows are now collected upfront
+          // via collectSubWorkflowDependencies() and copied before this method runs
 
         } else {
           logWithCategory('warn', LogCategory.WORKFLOW,
