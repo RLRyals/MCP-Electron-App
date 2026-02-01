@@ -139,11 +139,29 @@ export class WorkflowParser {
     }
 
     // Use provided dependencies or create empty
-    const dependencies: WorkflowDependencies = data.dependencies || {
+    const baseDependencies = data.dependencies || {
       agents: [],
       skills: [],
       mcpServers: ['workflow-manager'],
-      subWorkflows: undefined,
+      subWorkflows: [],
+    };
+
+    // Extract subWorkflows from graph_json nodes (authoritative source)
+    // This ensures we catch all subworkflows even if dependencies.subWorkflows is empty
+    const extractedSubWorkflows = new Set<string>(baseDependencies.subWorkflows || []);
+    if (data.graph_json?.nodes && Array.isArray(data.graph_json.nodes)) {
+      for (const node of data.graph_json.nodes) {
+        if (node.type === 'subworkflow' && node.subWorkflowId) {
+          extractedSubWorkflows.add(node.subWorkflowId);
+        }
+      }
+    }
+
+    const dependencies: WorkflowDependencies = {
+      agents: baseDependencies.agents || [],
+      skills: baseDependencies.skills || [],
+      mcpServers: baseDependencies.mcpServers || ['workflow-manager'],
+      subWorkflows: Array.from(extractedSubWorkflows),
     };
 
     return {

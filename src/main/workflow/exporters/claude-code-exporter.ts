@@ -465,8 +465,26 @@ export class ClaudeCodeExporter {
   /**
    * Convert workflow from database format to export format
    * Uses graph_json as the primary source (modern format)
+   * Extracts dependencies from graph_json nodes to ensure completeness
    */
   private convertToExportFormat(workflow: WorkflowDefinition): any {
+    // Extract subWorkflows from graph_json nodes (authoritative source)
+    const extractedSubWorkflows = this.findReferencedSubWorkflows(workflow);
+
+    // Merge with any existing dependencies_json
+    const baseDeps = workflow.dependencies_json || {
+      agents: [],
+      skills: [],
+      mcpServers: [],
+      subWorkflows: []
+    };
+
+    // Ensure subWorkflows includes all from graph_json
+    const mergedSubWorkflows = new Set<string>([
+      ...(baseDeps.subWorkflows || []),
+      ...extractedSubWorkflows
+    ]);
+
     return {
       id: workflow.id,
       name: workflow.name,
@@ -474,11 +492,11 @@ export class ClaudeCodeExporter {
       description: workflow.description || '',
       // Export graph_json directly - this is the primary format
       graph_json: workflow.graph_json,
-      dependencies: workflow.dependencies_json || {
-        agents: [],
-        skills: [],
-        mcpServers: [],
-        subWorkflows: []
+      dependencies: {
+        agents: baseDeps.agents || [],
+        skills: baseDeps.skills || [],
+        mcpServers: baseDeps.mcpServers || [],
+        subWorkflows: Array.from(mergedSubWorkflows)
       },
       metadata: {
         author: workflow.created_by || 'FictionLab',
