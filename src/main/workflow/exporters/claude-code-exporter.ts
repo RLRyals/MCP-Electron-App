@@ -209,23 +209,40 @@ export class ClaudeCodeExporter {
   private async findReferencedSkills(workflow: WorkflowDefinition): Promise<string[]> {
     const skills = new Set<string>();
 
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Finding skills for workflow: ${workflow.id}`);
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `dependencies_json: ${JSON.stringify(workflow.dependencies_json, null, 2)}`);
+
     // Primary: Extract from dependencies_json (authoritative source)
     if (workflow.dependencies_json?.skills) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Found ${workflow.dependencies_json.skills.length} skills in dependencies_json: ${workflow.dependencies_json.skills.join(', ')}`);
       for (const skill of workflow.dependencies_json.skills) {
         skills.add(skill);
       }
+    } else {
+      logWithCategory('warn', LogCategory.WORKFLOW,
+        `No skills found in dependencies_json`);
     }
 
     // Secondary: Extract from graph_json nodes (skill property exists on agent node types)
     if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Checking ${workflow.graph_json.nodes.length} nodes for skill properties`);
       for (const node of workflow.graph_json.nodes) {
         // Check for skill property (exists on planning, writing, gate nodes)
         const nodeSkill = (node as any).skill;
         if (nodeSkill) {
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Found skill "${nodeSkill}" on node "${node.name}" (id: ${node.id})`);
           skills.add(nodeSkill);
         }
       }
     }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Total skills found: ${skills.size} - [${Array.from(skills).join(', ')}]`);
 
     return Array.from(skills);
   }
@@ -437,6 +454,9 @@ export class ClaudeCodeExporter {
     const skillsDir = path.join(outputPath, 'skills');
     await fs.ensureDir(skillsDir);
 
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Copying ${skills.length} skills from ${this.skillsPath} to ${skillsDir}`);
+
     const copiedFiles: string[] = [];
 
     for (const skill of skills) {
@@ -447,13 +467,16 @@ export class ClaudeCodeExporter {
       const sourceFile = path.join(this.skillsPath, `${skill}.md`);
       const sourceDir = path.join(this.skillsPath, skill);
 
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Looking for skill "${skill}" at: ${sourceFile} OR ${sourceDir}`);
+
       if (await fs.pathExists(sourceFile)) {
         // Single file format
         const destFile = path.join(skillsDir, `${skill}.md`);
         await fs.copy(sourceFile, destFile);
         copiedFiles.push(destFile);
 
-        logWithCategory('debug', LogCategory.WORKFLOW,
+        logWithCategory('info', LogCategory.WORKFLOW,
           `Copied skill file: ${skill}.md`);
 
       } else if (await fs.pathExists(sourceDir)) {
@@ -462,12 +485,12 @@ export class ClaudeCodeExporter {
         await fs.copy(sourceDir, destDir);
         copiedFiles.push(destDir);
 
-        logWithCategory('debug', LogCategory.WORKFLOW,
+        logWithCategory('info', LogCategory.WORKFLOW,
           `Copied skill directory: ${skill}/`);
 
       } else {
         logWithCategory('warn', LogCategory.WORKFLOW,
-          `Skill not found: ${skill} (skipping)`);
+          `Skill not found at either path: ${sourceFile} OR ${sourceDir} (skipping)`);
       }
     }
 
