@@ -188,7 +188,7 @@ export class WorkflowEngine {
     triggeredByUser?: string
   ): Promise<string> {
     const result = await this.dbPool.query(
-      `INSERT INTO workflow_runs (workflow_id, total_steps, triggered_by, triggered_by_user, execution_log, context)
+      `INSERT INTO fictionlab.active_workflows (workflow_id, total_steps, triggered_by, triggered_by_user, execution_log, context)
        VALUES ($1, $2, $3, $4, '[]'::jsonb, '{}'::jsonb)
        RETURNING id`,
       [workflowId, totalSteps, triggeredBy, triggeredByUser || null]
@@ -202,7 +202,7 @@ export class WorkflowEngine {
    */
   private async updateWorkflowRunProgress(runId: string, currentStep: number, status: string): Promise<void> {
     await this.dbPool.query(
-      'UPDATE workflow_runs SET current_step = $1, status = $2 WHERE id = $3',
+      'UPDATE fictionlab.active_workflows SET current_step = $1, status = $2 WHERE id = $3',
       [currentStep, status, runId]
     );
   }
@@ -226,8 +226,8 @@ export class WorkflowEngine {
     };
 
     await this.dbPool.query(
-      `UPDATE workflow_runs
-       SET execution_log = execution_log || $1::jsonb
+      `UPDATE fictionlab.active_workflows
+       SET error_message = error_message || $1::jsonb
        WHERE id = $2`,
       [JSON.stringify(logEntry), runId]
     );
@@ -244,12 +244,12 @@ export class WorkflowEngine {
     errorStep?: number
   ): Promise<void> {
     await this.dbPool.query(
-      `UPDATE workflow_runs
+      `UPDATE fictionlab.active_workflows
        SET completed_at = NOW(),
            status = $1,
-           context = $2,
+           --context = $2,
            error_message = $3,
-           error_step = $4
+           current_node_id = $4
        WHERE id = $5`,
       [status, JSON.stringify(context), errorMessage || null, errorStep ?? null, runId]
     );
@@ -390,7 +390,7 @@ export class WorkflowEngine {
    */
   async cancelWorkflow(runId: string): Promise<void> {
     await this.dbPool.query(
-      `UPDATE workflow_runs
+      `UPDATE fictionlab.active_workflows
        SET status = 'cancelled',
            completed_at = NOW(),
            error_message = 'Cancelled by user'
@@ -406,7 +406,7 @@ export class WorkflowEngine {
    */
   async getWorkflowRuns(workflowId: string, limit: number = 50): Promise<any[]> {
     const result = await this.dbPool.query(
-      `SELECT * FROM workflow_runs
+      `SELECT * FROM fictionlab.active_workflows
        WHERE workflow_id = $1
        ORDER BY started_at DESC
        LIMIT $2`,

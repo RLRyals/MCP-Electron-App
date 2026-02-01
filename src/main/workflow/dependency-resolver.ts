@@ -144,11 +144,11 @@ export class DependencyResolver {
 
     try {
       const result = await this.pool.query(`
-        SELECT DISTINCT id FROM workflow_definitions
-        WHERE id = ANY($1::text[])
+        SELECT DISTINCT workflow_id FROM fictionlab.workflow_definitions
+        WHERE workflow_id = ANY($1::text[])
       `, [subWorkflows]);
 
-      const installed = result.rows.map(r => r.id);
+      const installed = result.rows.map(r => r.workflow_id);
       const missing = subWorkflows.filter(sw => !installed.includes(sw));
 
       logWithCategory('debug', LogCategory.WORKFLOW,

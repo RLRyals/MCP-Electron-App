@@ -15,7 +15,7 @@ console.log('Database path:', dbPath);
 try {
   const db = new Database(dbPath, { readonly: true });
 
-  const row = db.prepare('SELECT graph_json FROM workflow_definitions WHERE workflow_def_id = ?').get('idea-to-series');
+  const row = db.prepare('SELECT graph_json FROM fictionlab.workflow_definitionslow WHERE workflow_id = ?').get('idea-to-series');
 
   if (!row) {
     console.log('Workflow not found in database');

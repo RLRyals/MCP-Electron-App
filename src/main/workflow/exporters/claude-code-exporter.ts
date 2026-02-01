@@ -85,6 +85,16 @@ export class ClaudeCodeExporter {
         };
       }
 
+      // Ensure workflow has an ID - use the workflowId parameter as fallback
+      if (!workflow.id) {
+        workflow.id = workflowId;
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Workflow missing 'id' field, using requested workflowId: ${workflow.id}`);
+      }
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Exporting workflow: id=${workflow.id}, name=${workflow.name}`);
+
       // 2. Determine output path
       const outputPath = options.outputPath || this.getDefaultOutputPath(workflow.name);
       await fs.ensureDir(outputPath);
@@ -352,6 +362,11 @@ export class ClaudeCodeExporter {
         const subWorkflow = await this.getWorkflowDefinition(subWorkflowId);
 
         if (subWorkflow) {
+          // Ensure sub-workflow has an ID
+          if (!subWorkflow.id) {
+            subWorkflow.id = subWorkflowId;
+          }
+
           // Create directory for sub-workflow
           const subWorkflowDir = path.join(subWorkflowsDir, subWorkflowId);
           await fs.ensureDir(subWorkflowDir);
@@ -421,6 +436,11 @@ export class ClaudeCodeExporter {
     outputPath: string,
     format: 'yaml' | 'json' = 'yaml'
   ): Promise<string> {
+    // Validate workflow has required fields
+    if (!workflow.id || workflow.id === 'undefined') {
+      throw new Error(`Cannot export workflow: missing or invalid 'id' field. Workflow name: ${workflow.name}`);
+    }
+
     const workflowsDir = path.join(outputPath, 'workflows');
     await fs.ensureDir(workflowsDir);
 
