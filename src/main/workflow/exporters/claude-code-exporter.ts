@@ -10,6 +10,8 @@
  *     {agent-name}.md (all referenced agents)
  *   skills/
  *     {skill-name}.md (all referenced skills)
+ *   output-styles/
+ *     {style-name}.md (all referenced output styles)
  *   workflows/
  *     {workflow-name}.yaml (workflow definition)
  *   README.md (workflow overview)
@@ -30,6 +32,7 @@ export interface ExportResult {
     workflow: string;
     agents: string[];
     skills: string[];
+    outputStyles: string[];
     subWorkflows: string[];
     readme: string;
   };
@@ -40,6 +43,7 @@ export interface ExportOptions {
   version?: string;
   includeAgents?: boolean;
   includeSkills?: boolean;
+  includeOutputStyles?: boolean;
   includeSubWorkflows?: boolean;
   includeReadme?: boolean;
   format?: 'yaml' | 'json';
@@ -51,15 +55,17 @@ export class ClaudeCodeExporter {
   private parser: WorkflowParser;
   private agentsPath: string;
   private skillsPath: string;
+  private outputStylesPath: string;
 
   constructor() {
     this.workflowClient = new MCPWorkflowClient();
     this.parser = new WorkflowParser();
 
-    // Both agents and skills are stored in ~/.claude/
+    // Agents, skills, and output-styles are stored in ~/.claude/
     const homeDir = os.homedir();
     this.agentsPath = path.join(homeDir, '.claude', 'agents');
     this.skillsPath = path.join(homeDir, '.claude', 'skills');
+    this.outputStylesPath = path.join(homeDir, '.claude', 'output-styles');
   }
 
   /**
@@ -80,7 +86,7 @@ export class ClaudeCodeExporter {
           success: false,
           outputPath: '',
           message: `Workflow not found: ${workflowId}`,
-          exportedFiles: { workflow: '', agents: [], skills: [], subWorkflows: [], readme: '' },
+          exportedFiles: { workflow: '', agents: [], skills: [], outputStyles: [], subWorkflows: [], readme: '' },
           error: 'Workflow not found'
         };
       }
@@ -102,23 +108,25 @@ export class ClaudeCodeExporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Export output path: ${outputPath}`);
 
-      // 3. Find all referenced agents, skills, and sub-workflows from main workflow
+      // 3. Find all referenced agents, skills, output-styles, and sub-workflows from main workflow
       const agents = new Set<string>(await this.findReferencedAgents(workflow));
       const skills = new Set<string>(await this.findReferencedSkills(workflow));
+      const outputStyles = new Set<string>(await this.findReferencedOutputStyles(workflow));
       const subWorkflowIds = this.findReferencedSubWorkflows(workflow);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Found ${agents.size} agents, ${skills.size} skills, ${subWorkflowIds.length} sub-workflows in main workflow`);
+        `Found ${agents.size} agents, ${skills.size} skills, ${outputStyles.size} output-styles, ${subWorkflowIds.length} sub-workflows in main workflow`);
 
-      // 3b. Also collect agents and skills from sub-workflows BEFORE copying
+      // 3b. Also collect agents, skills, and output-styles from sub-workflows BEFORE copying
       if (options.includeSubWorkflows !== false && subWorkflowIds.length > 0) {
-        await this.collectSubWorkflowDependencies(subWorkflowIds, agents, skills);
+        await this.collectSubWorkflowDependencies(subWorkflowIds, agents, skills, outputStyles);
         logWithCategory('info', LogCategory.WORKFLOW,
-          `After including sub-workflows: ${agents.size} agents, ${skills.size} skills total`);
+          `After including sub-workflows: ${agents.size} agents, ${skills.size} skills, ${outputStyles.size} output-styles total`);
       }
 
       const agentsArray = Array.from(agents);
       const skillsArray = Array.from(skills);
+      const outputStylesArray = Array.from(outputStyles);
 
       // 4. Export workflow YAML/JSON
       const workflowFile = await this.exportWorkflowFile(workflow, outputPath, options.format);
@@ -135,16 +143,22 @@ export class ClaudeCodeExporter {
         skillFiles.push(...await this.copySkills(skillsArray, outputPath));
       }
 
+      // 6b. Copy output-styles (if enabled)
+      const outputStyleFiles: string[] = [];
+      if (options.includeOutputStyles !== false) {
+        outputStyleFiles.push(...await this.copyOutputStyles(outputStylesArray, outputPath));
+      }
+
       // 7. Export sub-workflows (if enabled)
       const subWorkflowFiles: string[] = [];
       if (options.includeSubWorkflows !== false && subWorkflowIds.length > 0) {
         subWorkflowFiles.push(...await this.exportSubWorkflows(subWorkflowIds, outputPath, options.format));
       }
 
-      // 8. Generate README (if enabled) - now includes all skills from sub-workflows
+      // 8. Generate README (if enabled) - now includes all skills and output-styles from sub-workflows
       let readmeFile = '';
       if (options.includeReadme !== false) {
-        readmeFile = await this.generateReadme(workflow, agentsArray, skillsArray, subWorkflowIds, outputPath);
+        readmeFile = await this.generateReadme(workflow, agentsArray, skillsArray, outputStylesArray, subWorkflowIds, outputPath);
       }
 
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -158,6 +172,7 @@ export class ClaudeCodeExporter {
           workflow: workflowFile,
           agents: agentFiles,
           skills: skillFiles,
+          outputStyles: outputStyleFiles,
           subWorkflows: subWorkflowFiles,
           readme: readmeFile
         }
@@ -171,7 +186,7 @@ export class ClaudeCodeExporter {
         success: false,
         outputPath: options.outputPath || '',
         message: `Export failed: ${error.message}`,
-        exportedFiles: { workflow: '', agents: [], skills: [], subWorkflows: [], readme: '' },
+        exportedFiles: { workflow: '', agents: [], skills: [], outputStyles: [], subWorkflows: [], readme: '' },
         error: error.message
       };
     }
@@ -268,13 +283,53 @@ export class ClaudeCodeExporter {
   }
 
   /**
-   * Recursively collect agents and skills from sub-workflows
+   * Find all output-styles referenced in workflow
+   * Checks dependencies_json and graph_json nodes for outputStyle property
+   */
+  private async findReferencedOutputStyles(workflow: WorkflowDefinition): Promise<string[]> {
+    const outputStyles = new Set<string>();
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Finding output-styles for workflow: ${workflow.id}`);
+
+    // Primary: Extract from dependencies_json (authoritative source)
+    // Note: outputStyles may not be in the type definition yet, so cast to any
+    const deps = workflow.dependencies_json as any;
+    if (deps?.outputStyles && Array.isArray(deps.outputStyles)) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Found ${deps.outputStyles.length} output-styles in dependencies_json`);
+      for (const style of deps.outputStyles) {
+        outputStyles.add(style);
+      }
+    }
+
+    // Secondary: Extract from graph_json nodes (outputStyle property exists on some node types)
+    if (workflow.graph_json?.nodes && Array.isArray(workflow.graph_json.nodes)) {
+      for (const node of workflow.graph_json.nodes) {
+        const nodeOutputStyle = (node as any).outputStyle;
+        if (nodeOutputStyle) {
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Found output-style "${nodeOutputStyle}" on node "${node.name}" (id: ${node.id})`);
+          outputStyles.add(nodeOutputStyle);
+        }
+      }
+    }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Total output-styles found: ${outputStyles.size} - [${Array.from(outputStyles).join(', ')}]`);
+
+    return Array.from(outputStyles);
+  }
+
+  /**
+   * Recursively collect agents, skills, and output-styles from sub-workflows
    * This ensures all dependencies are gathered before copying files
    */
   private async collectSubWorkflowDependencies(
     subWorkflowIds: string[],
     agents: Set<string>,
     skills: Set<string>,
+    outputStyles: Set<string> = new Set(),
     visited: Set<string> = new Set()
   ): Promise<void> {
     for (const subWorkflowId of subWorkflowIds) {
@@ -299,13 +354,19 @@ export class ClaudeCodeExporter {
             skills.add(skill);
           }
 
+          // Collect output-styles from sub-workflow
+          const subOutputStyles = await this.findReferencedOutputStyles(subWorkflow);
+          for (const style of subOutputStyles) {
+            outputStyles.add(style);
+          }
+
           logWithCategory('info', LogCategory.WORKFLOW,
-            `Collected from sub-workflow "${subWorkflowId}": ${subAgents.length} agents, ${subSkills.length} skills`);
+            `Collected from sub-workflow "${subWorkflowId}": ${subAgents.length} agents, ${subSkills.length} skills, ${subOutputStyles.length} output-styles`);
 
           // Recursively collect from nested sub-workflows
           const nestedSubWorkflows = this.findReferencedSubWorkflows(subWorkflow);
           if (nestedSubWorkflows.length > 0) {
-            await this.collectSubWorkflowDependencies(nestedSubWorkflows, agents, skills, visited);
+            await this.collectSubWorkflowDependencies(nestedSubWorkflows, agents, skills, outputStyles, visited);
           }
         } else {
           logWithCategory('warn', LogCategory.WORKFLOW,
@@ -592,12 +653,47 @@ export class ClaudeCodeExporter {
   }
 
   /**
+   * Copy output-style files to export directory
+   */
+  private async copyOutputStyles(outputStyles: string[], outputPath: string): Promise<string[]> {
+    const outputStylesDir = path.join(outputPath, 'output-styles');
+    await fs.ensureDir(outputStylesDir);
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Copying ${outputStyles.length} output-styles from ${this.outputStylesPath} to ${outputStylesDir}`);
+
+    const copiedFiles: string[] = [];
+
+    for (const style of outputStyles) {
+      const sourceFile = path.join(this.outputStylesPath, `${style}.md`);
+
+      if (await fs.pathExists(sourceFile)) {
+        const destFile = path.join(outputStylesDir, `${style}.md`);
+        await fs.copy(sourceFile, destFile);
+        copiedFiles.push(destFile);
+
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Copied output-style: ${style}.md`);
+      } else {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Output-style not found: ${style}.md (skipping)`);
+      }
+    }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Copied ${copiedFiles.length}/${outputStyles.length} output-styles`);
+
+    return copiedFiles;
+  }
+
+  /**
    * Generate README.md for exported workflow
    */
   private async generateReadme(
     workflow: WorkflowDefinition,
     agents: string[],
     skills: string[],
+    outputStyles: string[],
     subWorkflows: string[],
     outputPath: string
   ): Promise<string> {
@@ -618,6 +714,11 @@ export class ClaudeCodeExporter {
     if (skills.length > 0) {
       structureLines.push(`├── skills/                          # Executable skills (${skills.length} total)`);
       skills.forEach(s => structureLines.push(`│   └── ${s}.md`));
+    }
+
+    if (outputStyles.length > 0) {
+      structureLines.push(`├── output-styles/                   # Output style definitions (${outputStyles.length} total)`);
+      outputStyles.forEach(os => structureLines.push(`│   └── ${os}.md`));
     }
 
     if (subWorkflows.length > 0) {
@@ -654,6 +755,9 @@ ${agents.length > 0 ? agents.map(a => `- ${a}`).join('\n') : 'None'}
 ### Skills (${skills.length})
 ${skills.length > 0 ? skills.map(s => `- ${s}`).join('\n') : 'None'}
 
+### Output Styles (${outputStyles.length})
+${outputStyles.length > 0 ? outputStyles.map(os => `- ${os}`).join('\n') : 'None'}
+
 ### Sub-Workflows (${subWorkflows.length})
 ${subWorkflows.length > 0 ? subWorkflows.map(sw => `- ${sw}`).join('\n') : 'None'}
 
@@ -686,12 +790,17 @@ ${index + 1}. **${node.name}** (${node.type})
    cp skills/* ~/.claude/skills/
    \`\`\`
 
-3. Import the workflow:
+3. Copy output-styles to your output-styles directory:
+   \`\`\`bash
+   cp output-styles/* ~/.claude/output-styles/
+   \`\`\`
+
+4. Import the workflow:
    \`\`\`bash
    cp workflows/${workflow.id}.yaml ~/.claude/workflows/
    \`\`\`
 ${subWorkflows.length > 0 ? `
-4. Import sub-workflows:
+5. Import sub-workflows:
    \`\`\`bash
    cp -r sub-workflows/* ~/.claude/workflows/
    \`\`\`

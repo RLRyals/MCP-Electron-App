@@ -14,7 +14,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { app } from 'electron';
 import { WorkflowParser } from '../parsers/workflow-parser';
 import { DependencyResolver } from './dependency-resolver';
 import { MCPWorkflowClient } from './mcp-workflow-client';
@@ -218,16 +217,12 @@ export class FolderImporter {
         depCheck.subWorkflows.missing
       );
 
-      // 4b. Install missing agents and skills
-      const installedCounts = await this.installComponents(
-        folderPath,
-        depCheck.agents.missing,
-        depCheck.skills.missing
-      );
+      // 4b. Install all agents, skills, and output-styles from package
+      const installedCounts = await this.installComponents(folderPath);
       installedCounts.subWorkflows = subWorkflowsInstalled;
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Installed ${installedCounts.agents} agents, ${installedCounts.skills} skills, ${installedCounts.subWorkflows} sub-workflows`);
+        `Installed ${installedCounts.agents} agents, ${installedCounts.skills} skills, ${installedCounts.subWorkflows} sub-workflows, ${installedCounts.outputStyles} output-styles`);
 
       // 5. Convert workflow to database format (use original graph_json from file)
       const workflowDefinition = this.convertToWorkflowDefinition(workflow, rawWorkflowData);
@@ -377,34 +372,41 @@ export class FolderImporter {
   }
 
   /**
-   * Install agents and skills from workflow folder
+   * Install agents, skills, and output-styles from workflow folder
+   * Only installs components that don't already exist in ~/.claude/ directories
    */
   private async installComponents(
-    folderPath: string,
-    missingAgents: string[],
-    missingSkills: string[]
-  ): Promise<{ agents: number; skills: number; subWorkflows: number }> {
+    folderPath: string
+  ): Promise<{ agents: number; skills: number; subWorkflows: number; outputStyles: number }> {
     let agentsInstalled = 0;
     let skillsInstalled = 0;
+    let outputStylesInstalled = 0;
 
-    const userDataPath = app.getPath('userData');
     const homeDir = require('os').homedir();
+    const claudeDir = path.join(homeDir, '.claude');
 
-    // Install agents
+    // Install agents to ~/.claude/agents/ (where Claude Code reads them)
+    // Only install if not already present
     const agentsDir = path.join(folderPath, 'agents');
     if (await fs.pathExists(agentsDir)) {
-      for (const agent of missingAgents) {
-        const sourceFile = path.join(agentsDir, `${agent}.md`);
-        if (await fs.pathExists(sourceFile)) {
-          const destDir = path.join(userDataPath, 'agents');
-          await fs.ensureDir(destDir);
-          await fs.copy(sourceFile, path.join(destDir, `${agent}.md`));
-          agentsInstalled++;
-          logWithCategory('info', LogCategory.WORKFLOW,
-            `Installed agent: ${agent}`);
-        } else {
-          logWithCategory('warn', LogCategory.WORKFLOW,
-            `Agent file not found in workflow folder: ${agent}.md`);
+      const destAgentsDir = path.join(claudeDir, 'agents');
+      await fs.ensureDir(destAgentsDir);
+
+      const agentFiles = await fs.readdir(agentsDir);
+      for (const file of agentFiles) {
+        if (file.endsWith('.md')) {
+          const sourceFile = path.join(agentsDir, file);
+          const destFile = path.join(destAgentsDir, file);
+          // Only install if not already present
+          if (!await fs.pathExists(destFile)) {
+            await fs.copy(sourceFile, destFile);
+            agentsInstalled++;
+            logWithCategory('info', LogCategory.WORKFLOW,
+              `Installed agent: ${file}`);
+          } else {
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Agent already exists, skipping: ${file}`);
+          }
         }
       }
     } else {
@@ -412,21 +414,44 @@ export class FolderImporter {
         `No agents folder found in workflow package`);
     }
 
-    // Install skills
+    // Install skills to ~/.claude/skills/
+    // Supports both single file (.md) and directory format (skill-name/SKILL.md)
+    // Only install if not already present
     const skillsDir = path.join(folderPath, 'skills');
     if (await fs.pathExists(skillsDir)) {
-      for (const skill of missingSkills) {
-        const sourceFile = path.join(skillsDir, `${skill}.md`);
-        if (await fs.pathExists(sourceFile)) {
-          const destDir = path.join(homeDir, '.claude', 'skills');
-          await fs.ensureDir(destDir);
-          await fs.copy(sourceFile, path.join(destDir, `${skill}.md`));
-          skillsInstalled++;
-          logWithCategory('info', LogCategory.WORKFLOW,
-            `Installed skill: ${skill}`);
-        } else {
-          logWithCategory('warn', LogCategory.WORKFLOW,
-            `Skill file not found in workflow folder: ${skill}.md`);
+      const destSkillsDir = path.join(claudeDir, 'skills');
+      await fs.ensureDir(destSkillsDir);
+
+      const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md')) {
+          // Single file skill
+          const sourceFile = path.join(skillsDir, entry.name);
+          const destFile = path.join(destSkillsDir, entry.name);
+          // Only install if not already present
+          if (!await fs.pathExists(destFile)) {
+            await fs.copy(sourceFile, destFile);
+            skillsInstalled++;
+            logWithCategory('info', LogCategory.WORKFLOW,
+              `Installed skill (file): ${entry.name}`);
+          } else {
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Skill already exists, skipping: ${entry.name}`);
+          }
+        } else if (entry.isDirectory()) {
+          // Directory format skill - copy entire directory
+          const sourceDir = path.join(skillsDir, entry.name);
+          const destDir = path.join(destSkillsDir, entry.name);
+          // Only install if not already present
+          if (!await fs.pathExists(destDir)) {
+            await fs.copy(sourceDir, destDir);
+            skillsInstalled++;
+            logWithCategory('info', LogCategory.WORKFLOW,
+              `Installed skill (directory): ${entry.name}/`);
+          } else {
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Skill directory already exists, skipping: ${entry.name}/`);
+          }
         }
       }
     } else {
@@ -434,7 +459,36 @@ export class FolderImporter {
         `No skills folder found in workflow package`);
     }
 
-    return { agents: agentsInstalled, skills: skillsInstalled, subWorkflows: 0 };
+    // Install output-styles to ~/.claude/output-styles/
+    // Only install if not already present
+    const outputStylesDir = path.join(folderPath, 'output-styles');
+    if (await fs.pathExists(outputStylesDir)) {
+      const destOutputStylesDir = path.join(claudeDir, 'output-styles');
+      await fs.ensureDir(destOutputStylesDir);
+
+      const styleFiles = await fs.readdir(outputStylesDir);
+      for (const file of styleFiles) {
+        if (file.endsWith('.md')) {
+          const sourceFile = path.join(outputStylesDir, file);
+          const destFile = path.join(destOutputStylesDir, file);
+          // Only install if not already present
+          if (!await fs.pathExists(destFile)) {
+            await fs.copy(sourceFile, destFile);
+            outputStylesInstalled++;
+            logWithCategory('info', LogCategory.WORKFLOW,
+              `Installed output-style: ${file}`);
+          } else {
+            logWithCategory('debug', LogCategory.WORKFLOW,
+              `Output-style already exists, skipping: ${file}`);
+          }
+        }
+      }
+    } else {
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `No output-styles folder found in workflow package`);
+    }
+
+    return { agents: agentsInstalled, skills: skillsInstalled, subWorkflows: 0, outputStyles: outputStylesInstalled };
   }
 
   /**
