@@ -221,7 +221,22 @@ export class PersistentMCPClient {
         } else {
           pending.resolve(content);
         }
+      } else if (Array.isArray(content) && content.length === 0) {
+        // Empty content array - likely an empty result from database
+        // Return empty array instead of the raw result object
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `MCP tool ${pending.toolName} returned empty content array`);
+        pending.resolve([]);
+      } else if (response.result === null || response.result === undefined) {
+        // Null/undefined result - return empty array for list operations
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `MCP tool ${pending.toolName} returned null/undefined result`);
+        pending.resolve(null);
       } else {
+        // Non-MCP format or unexpected format - return as-is but log for debugging
+        logWithCategory('debug', LogCategory.WORKFLOW,
+          `MCP tool ${pending.toolName} returned non-standard format:`,
+          JSON.stringify(response.result).substring(0, 200));
         pending.resolve(response.result);
       }
     }

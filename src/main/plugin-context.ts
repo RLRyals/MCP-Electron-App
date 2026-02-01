@@ -298,7 +298,8 @@ function createMCPConnectionManager(
           const result = await client.callTool(toolName, fixedArgs);
 
           logWithCategory('info', LogCategory.SYSTEM,
-            `Plugin ${pluginId} workflow-manager result for ${toolName}:`, result);
+            `Plugin ${pluginId} workflow-manager result for ${toolName}:`,
+            `type=${typeof result}, isArray=${Array.isArray(result)}, value=${JSON.stringify(result).substring(0, 300)}`);
 
           return result as T;
         } catch (error: any) {
