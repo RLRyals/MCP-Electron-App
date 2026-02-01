@@ -74,6 +74,18 @@ export class FolderImporter {
 
       try {
         const existingWorkflows = await this.workflowClient.getWorkflowDefinitions();
+        // Defensive check - ensure we have an array before using .map()
+        if (!Array.isArray(existingWorkflows)) {
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `getWorkflowDefinitions returned non-array: ${typeof existingWorkflows}`);
+          return {
+            id: workflow.id,
+            name: workflow.name,
+            version: workflow.version,
+            suggestedId: workflow.id,
+            isDuplicate: false
+          };
+        }
         const existingIds = new Set(existingWorkflows.map(w => w.id));
 
         if (existingIds.has(workflow.id)) {
