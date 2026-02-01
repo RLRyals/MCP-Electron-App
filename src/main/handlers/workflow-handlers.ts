@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, dialog } from 'electron';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
@@ -420,6 +420,230 @@ export function registerWorkflowHandlers() {
       return { success: true };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Delete output-style failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // ============================================
+  // Document Import Handlers (File/Folder Dialogs)
+  // ============================================
+
+  // Import output-style from single file
+  ipcMain.handle('document:import-output-style-file', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style file');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Output Style',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+        properties: ['openFile']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourcePath = result.filePaths[0];
+      const fileName = path.basename(sourcePath);
+      const homeDir = os.homedir();
+      const stylesDir = path.join(homeDir, '.claude', 'output-styles');
+      const destPath = path.join(stylesDir, fileName);
+
+      await fs.ensureDir(stylesDir);
+      await fs.copy(sourcePath, destPath);
+
+      return { success: true, imported: [fileName] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import output-style file failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Import output-styles from folder
+  ipcMain.handle('document:import-output-style-folder', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style folder');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Output Styles from Folder',
+        properties: ['openDirectory']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourceDir = result.filePaths[0];
+      const homeDir = os.homedir();
+      const stylesDir = path.join(homeDir, '.claude', 'output-styles');
+      await fs.ensureDir(stylesDir);
+
+      const files = await fs.readdir(sourceDir);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+      const imported: string[] = [];
+
+      for (const file of mdFiles) {
+        await fs.copy(path.join(sourceDir, file), path.join(stylesDir, file));
+        imported.push(file);
+      }
+
+      return { success: true, imported };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import output-style folder failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Import agent from single file
+  ipcMain.handle('document:import-agent-file', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent file');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Agent',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+        properties: ['openFile']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourcePath = result.filePaths[0];
+      const fileName = path.basename(sourcePath);
+      const homeDir = os.homedir();
+      const agentsDir = path.join(homeDir, '.claude', 'agents');
+      const destPath = path.join(agentsDir, fileName);
+
+      await fs.ensureDir(agentsDir);
+      await fs.copy(sourcePath, destPath);
+
+      return { success: true, imported: [fileName] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import agent file failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Import agents from folder
+  ipcMain.handle('document:import-agent-folder', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent folder');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Agents from Folder',
+        properties: ['openDirectory']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourceDir = result.filePaths[0];
+      const homeDir = os.homedir();
+      const agentsDir = path.join(homeDir, '.claude', 'agents');
+      await fs.ensureDir(agentsDir);
+
+      const files = await fs.readdir(sourceDir);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+      const imported: string[] = [];
+
+      for (const file of mdFiles) {
+        await fs.copy(path.join(sourceDir, file), path.join(agentsDir, file));
+        imported.push(file);
+      }
+
+      return { success: true, imported };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import agent folder failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Import skill from single file
+  ipcMain.handle('document:import-skill-file', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill file');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Skill',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+        properties: ['openFile']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourcePath = result.filePaths[0];
+      const fileName = path.basename(sourcePath);
+      const homeDir = os.homedir();
+      const skillsDir = path.join(homeDir, '.claude', 'skills');
+      const destPath = path.join(skillsDir, fileName);
+
+      await fs.ensureDir(skillsDir);
+      await fs.copy(sourcePath, destPath);
+
+      return { success: true, imported: [fileName] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import skill file failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Import skills from folder (supports both single files and directory format)
+  ipcMain.handle('document:import-skill-folder', async (event) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill folder');
+    try {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) throw new Error('No window found');
+
+      const result = await dialog.showOpenDialog(window, {
+        title: 'Import Skills from Folder',
+        properties: ['openDirectory']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+
+      const sourceDir = result.filePaths[0];
+      const homeDir = os.homedir();
+      const skillsDir = path.join(homeDir, '.claude', 'skills');
+      await fs.ensureDir(skillsDir);
+
+      const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+      const imported: string[] = [];
+
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md')) {
+          // Single file skill
+          await fs.copy(path.join(sourceDir, entry.name), path.join(skillsDir, entry.name));
+          imported.push(entry.name);
+        } else if (entry.isDirectory()) {
+          // Directory format skill - check for SKILL.md
+          const skillMdPath = path.join(sourceDir, entry.name, 'SKILL.md');
+          if (await fs.pathExists(skillMdPath)) {
+            const destDir = path.join(skillsDir, entry.name);
+            await fs.copy(path.join(sourceDir, entry.name), destDir);
+            imported.push(entry.name + '/');
+          }
+        }
+      }
+
+      return { success: true, imported };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import skill folder failed', { error: error.message });
       throw error;
     }
   });
