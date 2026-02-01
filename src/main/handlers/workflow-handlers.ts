@@ -429,6 +429,7 @@ export function registerWorkflowHandlers() {
   // ============================================
 
   // Import output-style from single file
+  // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
   ipcMain.handle('document:import-output-style-file', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style file');
     try {
@@ -442,19 +443,15 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourcePath = result.filePaths[0];
-      const fileName = path.basename(sourcePath);
-      const homeDir = os.homedir();
-      const stylesDir = path.join(homeDir, '.claude', 'output-styles');
-      const destPath = path.join(stylesDir, fileName);
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      // Remove .md extension for fileName
+      const fileName = path.basename(sourcePath, '.md');
 
-      await fs.ensureDir(stylesDir);
-      await fs.copy(sourcePath, destPath);
-
-      return { success: true, imported: [fileName] };
+      return { fileName, content };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import output-style file failed', { error: error.message });
       throw error;
@@ -462,6 +459,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Import output-styles from folder
+  // Returns array of { fileName, content } for renderer to process (allows user confirmation)
   ipcMain.handle('document:import-output-style-folder', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style folder');
     try {
@@ -474,24 +472,22 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourceDir = result.filePaths[0];
-      const homeDir = os.homedir();
-      const stylesDir = path.join(homeDir, '.claude', 'output-styles');
-      await fs.ensureDir(stylesDir);
-
       const files = await fs.readdir(sourceDir);
       const mdFiles = files.filter(f => f.endsWith('.md'));
-      const imported: string[] = [];
+      const outputStyles: { fileName: string; content: string }[] = [];
 
       for (const file of mdFiles) {
-        await fs.copy(path.join(sourceDir, file), path.join(stylesDir, file));
-        imported.push(file);
+        const content = await fs.readFile(path.join(sourceDir, file), 'utf-8');
+        // Remove .md extension for fileName to match expected format
+        const fileName = path.basename(file, '.md');
+        outputStyles.push({ fileName, content });
       }
 
-      return { success: true, imported };
+      return { outputStyles };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import output-style folder failed', { error: error.message });
       throw error;
@@ -499,6 +495,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Import agent from single file
+  // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
   ipcMain.handle('document:import-agent-file', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent file');
     try {
@@ -512,19 +509,15 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourcePath = result.filePaths[0];
-      const fileName = path.basename(sourcePath);
-      const homeDir = os.homedir();
-      const agentsDir = path.join(homeDir, '.claude', 'agents');
-      const destPath = path.join(agentsDir, fileName);
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      // Remove .md extension for fileName
+      const fileName = path.basename(sourcePath, '.md');
 
-      await fs.ensureDir(agentsDir);
-      await fs.copy(sourcePath, destPath);
-
-      return { success: true, imported: [fileName] };
+      return { fileName, content };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import agent file failed', { error: error.message });
       throw error;
@@ -532,6 +525,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Import agents from folder
+  // Returns array of { fileName, content } for renderer to process (allows user confirmation)
   ipcMain.handle('document:import-agent-folder', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent folder');
     try {
@@ -544,24 +538,22 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourceDir = result.filePaths[0];
-      const homeDir = os.homedir();
-      const agentsDir = path.join(homeDir, '.claude', 'agents');
-      await fs.ensureDir(agentsDir);
-
       const files = await fs.readdir(sourceDir);
       const mdFiles = files.filter(f => f.endsWith('.md'));
-      const imported: string[] = [];
+      const agents: { fileName: string; content: string }[] = [];
 
       for (const file of mdFiles) {
-        await fs.copy(path.join(sourceDir, file), path.join(agentsDir, file));
-        imported.push(file);
+        const content = await fs.readFile(path.join(sourceDir, file), 'utf-8');
+        // Remove .md extension for fileName to match expected format
+        const fileName = path.basename(file, '.md');
+        agents.push({ fileName, content });
       }
 
-      return { success: true, imported };
+      return { agents };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import agent folder failed', { error: error.message });
       throw error;
@@ -569,6 +561,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Import skill from single file
+  // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
   ipcMain.handle('document:import-skill-file', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill file');
     try {
@@ -582,19 +575,15 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourcePath = result.filePaths[0];
-      const fileName = path.basename(sourcePath);
-      const homeDir = os.homedir();
-      const skillsDir = path.join(homeDir, '.claude', 'skills');
-      const destPath = path.join(skillsDir, fileName);
+      const content = await fs.readFile(sourcePath, 'utf-8');
+      // Remove .md extension for fileName
+      const fileName = path.basename(sourcePath, '.md');
 
-      await fs.ensureDir(skillsDir);
-      await fs.copy(sourcePath, destPath);
-
-      return { success: true, imported: [fileName] };
+      return { fileName, content };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import skill file failed', { error: error.message });
       throw error;
@@ -602,6 +591,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Import skills from folder (supports both single files and directory format)
+  // Returns array of { fileName, content } for renderer to process (allows user confirmation)
   ipcMain.handle('document:import-skill-folder', async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill folder');
     try {
@@ -614,34 +604,32 @@ export function registerWorkflowHandlers() {
       });
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
+        return { canceled: true };
       }
 
       const sourceDir = result.filePaths[0];
-      const homeDir = os.homedir();
-      const skillsDir = path.join(homeDir, '.claude', 'skills');
-      await fs.ensureDir(skillsDir);
-
       const entries = await fs.readdir(sourceDir, { withFileTypes: true });
-      const imported: string[] = [];
+      const skills: { fileName: string; content: string }[] = [];
 
       for (const entry of entries) {
         if (entry.isFile() && entry.name.endsWith('.md')) {
           // Single file skill
-          await fs.copy(path.join(sourceDir, entry.name), path.join(skillsDir, entry.name));
-          imported.push(entry.name);
+          const content = await fs.readFile(path.join(sourceDir, entry.name), 'utf-8');
+          // Remove .md extension for fileName to match expected format
+          const fileName = path.basename(entry.name, '.md');
+          skills.push({ fileName, content });
         } else if (entry.isDirectory()) {
           // Directory format skill - check for SKILL.md
           const skillMdPath = path.join(sourceDir, entry.name, 'SKILL.md');
           if (await fs.pathExists(skillMdPath)) {
-            const destDir = path.join(skillsDir, entry.name);
-            await fs.copy(path.join(sourceDir, entry.name), destDir);
-            imported.push(entry.name + '/');
+            const content = await fs.readFile(skillMdPath, 'utf-8');
+            // Use directory name as fileName
+            skills.push({ fileName: entry.name, content });
           }
         }
       }
 
-      return { success: true, imported };
+      return { skills };
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Import skill folder failed', { error: error.message });
       throw error;
