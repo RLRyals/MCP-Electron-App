@@ -2319,17 +2319,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
-     * Check if a plugin has updates available from GitHub
+     * Update a plugin from a local folder
      */
-    checkUpdate: (pluginId: string): Promise<any> => {
-      return ipcRenderer.invoke('plugin:check-update', pluginId);
+    updateFromFolder: (pluginId: string, folderPath?: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:update-from-folder', pluginId, folderPath);
     },
 
     /**
-     * Update/reinstall a plugin from GitHub
+     * Open a plugin's folder in file explorer
      */
-    updateFromGitHub: (pluginId: string): Promise<any> => {
-      return ipcRenderer.invoke('plugin:update-from-github', pluginId);
+    openFolder: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:open-folder', pluginId);
     },
 
     /**

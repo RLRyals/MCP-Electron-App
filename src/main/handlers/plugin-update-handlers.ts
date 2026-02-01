@@ -1,13 +1,12 @@
 /**
  * Plugin Update Handlers
  *
- * IPC handlers for checking and updating plugins from GitHub releases.
+ * IPC handlers for managing and updating plugins from local folders.
  */
 
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs-extra';
-import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
 import { pluginManager } from '../plugin-manager';
 
@@ -17,34 +16,63 @@ interface PluginInfo {
   version: string;
   description: string;
   path: string;
-  hasUpdate?: boolean;
-  latestVersion?: string;
-  githubRepo?: string;
 }
-
-interface GitHubRelease {
-  tag_name: string;
-  name: string;
-  published_at: string;
-  assets: Array<{
-    name: string;
-    browser_download_url: string;
-    size: number;
-  }>;
-  zipball_url: string;
-  tarball_url: string;
-}
-
-// Known plugin GitHub repositories
-const PLUGIN_REPOS: Record<string, string> = {
-  'fictionlab-workflow': 'RLRyals/fictionlab-workflow',
-};
 
 /**
  * Get the plugins directory path
  */
 function getPluginsDirectory(): string {
   return path.join(app.getPath('userData'), 'plugins');
+}
+
+/**
+ * Recursively delete a directory, handling Windows long path issues
+ */
+async function safeRemoveDir(dirPath: string): Promise<void> {
+  try {
+    await fs.remove(dirPath);
+  } catch (error: any) {
+    if (error.code === 'ENOTEMPTY' || error.code === 'EPERM') {
+      logWithCategory('warn', LogCategory.SYSTEM, `Standard remove failed, trying shell delete: ${error.message}`);
+      try {
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+
+        if (process.platform === 'win32') {
+          await execAsync(`rmdir /s /q "${dirPath}"`, { timeout: 30000 });
+        } else {
+          await execAsync(`rm -rf "${dirPath}"`, { timeout: 30000 });
+        }
+      } catch (shellError: any) {
+        logWithCategory('warn', LogCategory.SYSTEM, `Shell delete also failed: ${shellError.message}`);
+      }
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Extract a zip file
+ */
+async function extractZip(zipPath: string, destPath: string): Promise<void> {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  await fs.ensureDir(destPath);
+
+  if (process.platform === 'win32') {
+    // Use PowerShell on Windows
+    await execAsync(
+      `powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destPath}' -Force"`,
+      { timeout: 60000 }
+    );
+  } else {
+    // Use unzip on Unix
+    await execAsync(`unzip -o "${zipPath}" -d "${destPath}"`, { timeout: 60000 });
+  }
 }
 
 /**
@@ -66,6 +94,7 @@ export function registerPluginUpdateHandlers() {
 
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
+        if (entry.name.includes('.backup-')) continue;
 
         const pluginPath = path.join(pluginsDir, entry.name);
         const manifestPath = path.join(pluginPath, 'plugin.json');
@@ -79,7 +108,6 @@ export function registerPluginUpdateHandlers() {
               version: manifest.version || 'unknown',
               description: manifest.description || '',
               path: pluginPath,
-              githubRepo: PLUGIN_REPOS[manifest.id] || manifest.repository,
             });
           } catch (error: any) {
             logWithCategory('warn', LogCategory.SYSTEM, `Failed to read plugin manifest: ${entry.name}`, { error: error.message });
@@ -95,223 +123,84 @@ export function registerPluginUpdateHandlers() {
     }
   });
 
-  // Check for plugin updates from GitHub
-  ipcMain.handle('plugin:check-update', async (_event, pluginId: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Check update for plugin ${pluginId}`);
+  // Update plugin from a local folder
+  ipcMain.handle('plugin:update-from-folder', async (_event, pluginId: string, folderPath?: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Update plugin ${pluginId} from folder`);
     try {
-      const repo = PLUGIN_REPOS[pluginId];
-      if (!repo) {
-        return { hasUpdate: false, error: 'No GitHub repository configured for this plugin' };
-      }
-
-      // Get current version
-      const pluginsDir = getPluginsDirectory();
-      const manifestPath = path.join(pluginsDir, pluginId, 'plugin.json');
-
-      let currentVersion = '0.0.0';
-      if (await fs.pathExists(manifestPath)) {
-        const manifest = await fs.readJson(manifestPath);
-        currentVersion = manifest.version || '0.0.0';
-      }
-
-      // Check GitHub for latest release
-      const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'FictionLab-App',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // No releases yet, check commits instead
-          const commitsResponse = await fetch(`https://api.github.com/repos/${repo}/commits?per_page=1`, {
-            headers: {
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'FictionLab-App',
-            },
-          });
-
-          if (commitsResponse.ok) {
-            const commits = await commitsResponse.json();
-            if (commits.length > 0) {
-              return {
-                hasUpdate: true, // Assume update available if no release tracking
-                latestVersion: 'latest',
-                currentVersion,
-                message: 'Updates available from main branch',
-              };
-            }
-          }
-          return { hasUpdate: false, currentVersion };
-        }
-        throw new Error(`GitHub API error: ${response.status}`);
-      }
-
-      const release: GitHubRelease = await response.json();
-      const latestVersion = release.tag_name.replace(/^v/, '');
-
-      // Simple version comparison
-      const hasUpdate = latestVersion !== currentVersion;
-
-      return {
-        hasUpdate,
-        latestVersion,
-        currentVersion,
-        releaseName: release.name,
-        publishedAt: release.published_at,
-      };
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, `Failed to check update for ${pluginId}`, { error: error.message });
-      return { hasUpdate: false, error: error.message };
-    }
-  });
-
-  // Update/reinstall plugin from GitHub
-  ipcMain.handle('plugin:update-from-github', async (_event, pluginId: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Update plugin ${pluginId} from GitHub`);
-    try {
-      const repo = PLUGIN_REPOS[pluginId];
-      if (!repo) {
-        throw new Error('No GitHub repository configured for this plugin');
-      }
-
       const pluginsDir = getPluginsDirectory();
       const pluginPath = path.join(pluginsDir, pluginId);
-      const tempDir = path.join(os.tmpdir(), `fictionlab-plugin-${pluginId}-${Date.now()}`);
 
-      // Step 1: Clone/download from GitHub
-      logWithCategory('info', LogCategory.SYSTEM, `Cloning ${repo} to temp directory...`);
-      await fs.ensureDir(tempDir);
+      let sourcePath = folderPath;
+      if (!sourcePath) {
+        const result = await dialog.showOpenDialog({
+          title: `Select ${pluginId} Plugin Folder`,
+          message: 'Select the plugin folder (containing plugin.json)',
+          properties: ['openDirectory'],
+        });
 
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
-      const execAsync = promisify(exec);
-
-      // Clone the repository
-      await execAsync(`git clone --depth 1 https://github.com/${repo}.git .`, {
-        cwd: tempDir,
-        timeout: 120000,
-      });
-
-      // Step 2: Build the plugin if needed
-      const packageJsonPath = path.join(tempDir, 'package.json');
-      if (await fs.pathExists(packageJsonPath)) {
-        logWithCategory('info', LogCategory.SYSTEM, 'Installing dependencies and building...');
-
-        try {
-          await execAsync('npm install', { cwd: tempDir, timeout: 180000 });
-        } catch (e: any) {
-          logWithCategory('warn', LogCategory.SYSTEM, 'npm install failed, continuing...', { error: e.message });
+        if (result.canceled || result.filePaths.length === 0) {
+          return { success: false, cancelled: true };
         }
-
-        try {
-          await execAsync('npm run build', { cwd: tempDir, timeout: 180000 });
-        } catch (e: any) {
-          logWithCategory('warn', LogCategory.SYSTEM, 'npm run build failed, continuing...', { error: e.message });
-        }
+        sourcePath = result.filePaths[0];
       }
 
-      // Step 3: Find the built plugin directory
-      // For fictionlab-workflow, the plugin is in packages/workflow-plugin/dist
-      let sourcePluginDir = tempDir;
-
-      // Check for monorepo structure
-      const workflowPluginDist = path.join(tempDir, 'packages', 'workflow-plugin', 'dist');
-      const workflowPluginRoot = path.join(tempDir, 'packages', 'workflow-plugin');
-
-      if (await fs.pathExists(path.join(workflowPluginDist, 'plugin.json'))) {
-        sourcePluginDir = workflowPluginDist;
-      } else if (await fs.pathExists(path.join(workflowPluginRoot, 'plugin.json'))) {
-        sourcePluginDir = workflowPluginRoot;
-      } else if (await fs.pathExists(path.join(tempDir, 'dist', 'plugin.json'))) {
-        sourcePluginDir = path.join(tempDir, 'dist');
+      const manifestPath = path.join(sourcePath, 'plugin.json');
+      if (!await fs.pathExists(manifestPath)) {
+        throw new Error('Selected folder does not contain plugin.json');
       }
 
-      // Verify plugin.json exists in source
-      const sourceManifestPath = path.join(sourcePluginDir, 'plugin.json');
-      if (!await fs.pathExists(sourceManifestPath)) {
-        throw new Error(`Plugin manifest not found at ${sourceManifestPath}`);
+      const manifest = await fs.readJson(manifestPath);
+      if (manifest.id !== pluginId) {
+        throw new Error(`Plugin ID mismatch: expected "${pluginId}", found "${manifest.id}"`);
       }
 
-      // Step 4: Deactivate existing plugin if active
       try {
         await pluginManager.deactivatePlugin(pluginId);
       } catch (e) {
         // Plugin might not be active
       }
 
-      // Step 5: Backup existing plugin
       const backupPath = path.join(pluginsDir, `${pluginId}.backup-${Date.now()}`);
       if (await fs.pathExists(pluginPath)) {
-        logWithCategory('info', LogCategory.SYSTEM, `Backing up existing plugin to ${backupPath}`);
         await fs.move(pluginPath, backupPath);
       }
 
-      // Step 6: Copy new plugin
-      logWithCategory('info', LogCategory.SYSTEM, `Installing plugin to ${pluginPath}`);
-      await fs.copy(sourcePluginDir, pluginPath, { overwrite: true });
+      await fs.copy(sourcePath, pluginPath, { overwrite: true });
+      await setupBundledDependencies(pluginPath);
 
-      // Step 7: Setup bundled dependencies (like workflow-runner)
-      const bundledPath = path.join(pluginPath, 'bundled');
-      const nodeModulesPath = path.join(pluginPath, 'node_modules');
-
-      if (await fs.pathExists(bundledPath)) {
-        logWithCategory('info', LogCategory.SYSTEM, 'Setting up bundled dependencies...');
-        const bundledEntries = await fs.readdir(bundledPath, { withFileTypes: true });
-
-        for (const entry of bundledEntries) {
-          if (!entry.isDirectory()) continue;
-
-          const bundledPkgPath = path.join(bundledPath, entry.name, 'package.json');
-          if (await fs.pathExists(bundledPkgPath)) {
-            const bundledPkg = await fs.readJson(bundledPkgPath);
-            const pkgName = bundledPkg.name || entry.name;
-
-            let targetPath: string;
-            if (pkgName.startsWith('@')) {
-              const [scope, name] = pkgName.split('/');
-              await fs.ensureDir(path.join(nodeModulesPath, scope));
-              targetPath = path.join(nodeModulesPath, scope, name);
-            } else {
-              await fs.ensureDir(nodeModulesPath);
-              targetPath = path.join(nodeModulesPath, pkgName);
-            }
-
-            await fs.copy(path.join(bundledPath, entry.name), targetPath, { overwrite: true });
-            logWithCategory('info', LogCategory.SYSTEM, `Linked bundled dependency: ${pkgName}`);
-          }
-        }
+      try {
+        await safeRemoveDir(backupPath);
+      } catch (e) {
+        // Non-fatal
       }
 
-      // Step 8: Clean up
-      await fs.remove(tempDir);
-
-      // Remove backup if update was successful
-      if (await fs.pathExists(backupPath)) {
-        await fs.remove(backupPath);
-      }
-
-      // Step 9: Reload/activate the plugin
       try {
         await pluginManager.reloadPlugin(pluginId);
       } catch (e: any) {
-        logWithCategory('warn', LogCategory.SYSTEM, 'Failed to reload plugin, restart may be required', { error: e.message });
+        logWithCategory('warn', LogCategory.SYSTEM, 'Failed to reload plugin', { error: e.message });
       }
 
-      logWithCategory('info', LogCategory.SYSTEM, `Plugin ${pluginId} updated successfully`);
-      return { success: true, message: 'Plugin updated successfully. Restart FictionLab to apply changes.' };
+      return { success: true, message: 'Plugin updated. Restart FictionLab to apply changes.', version: manifest.version };
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, `Failed to update plugin ${pluginId}`, { error: error.message, stack: error.stack });
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to update plugin ${pluginId} from folder`, { error: error.message });
       throw error;
     }
+  });
+
+  // Open plugin folder in file explorer
+  ipcMain.handle('plugin:open-folder', async (_event, pluginId: string) => {
+    const pluginPath = path.join(getPluginsDirectory(), pluginId);
+    if (await fs.pathExists(pluginPath)) {
+      await shell.openPath(pluginPath);
+      return { success: true };
+    }
+    throw new Error('Plugin folder not found');
   });
 
   // Uninstall a plugin
   ipcMain.handle('plugin:uninstall', async (_event, pluginId: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Uninstall plugin ${pluginId}`);
     try {
-      // Deactivate first
       try {
         await pluginManager.deactivatePlugin(pluginId);
       } catch (e) {
@@ -322,7 +211,7 @@ export function registerPluginUpdateHandlers() {
       const pluginPath = path.join(pluginsDir, pluginId);
 
       if (await fs.pathExists(pluginPath)) {
-        await fs.remove(pluginPath);
+        await safeRemoveDir(pluginPath);
         logWithCategory('info', LogCategory.SYSTEM, `Plugin ${pluginId} uninstalled`);
         return { success: true };
       } else {
@@ -336,9 +225,51 @@ export function registerPluginUpdateHandlers() {
 
   // Get plugin directory path
   ipcMain.handle('plugin:get-path', async (_event, pluginId: string) => {
-    const pluginsDir = getPluginsDirectory();
-    return path.join(pluginsDir, pluginId);
+    return path.join(getPluginsDirectory(), pluginId);
   });
 
   logWithCategory('info', LogCategory.SYSTEM, 'Plugin update handlers registered');
+}
+
+/**
+ * Setup bundled dependencies for a plugin
+ */
+async function setupBundledDependencies(pluginPath: string): Promise<void> {
+  const bundledPath = path.join(pluginPath, 'bundled');
+  const nodeModulesPath = path.join(pluginPath, 'node_modules');
+
+  if (!await fs.pathExists(bundledPath)) {
+    return;
+  }
+
+  logWithCategory('info', LogCategory.SYSTEM, 'Setting up bundled dependencies...');
+
+  try {
+    const bundledEntries = await fs.readdir(bundledPath, { withFileTypes: true });
+
+    for (const entry of bundledEntries) {
+      if (!entry.isDirectory()) continue;
+
+      const bundledPkgPath = path.join(bundledPath, entry.name, 'package.json');
+      if (await fs.pathExists(bundledPkgPath)) {
+        const bundledPkg = await fs.readJson(bundledPkgPath);
+        const pkgName = bundledPkg.name || entry.name;
+
+        let targetPath: string;
+        if (pkgName.startsWith('@')) {
+          const [scope, name] = pkgName.split('/');
+          await fs.ensureDir(path.join(nodeModulesPath, scope));
+          targetPath = path.join(nodeModulesPath, scope, name);
+        } else {
+          await fs.ensureDir(nodeModulesPath);
+          targetPath = path.join(nodeModulesPath, pkgName);
+        }
+
+        await fs.copy(path.join(bundledPath, entry.name), targetPath, { overwrite: true });
+        logWithCategory('info', LogCategory.SYSTEM, `Linked bundled dependency: ${pkgName}`);
+      }
+    }
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to setup bundled dependencies:', error);
+  }
 }

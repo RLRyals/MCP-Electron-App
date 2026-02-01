@@ -491,24 +491,32 @@ export class PluginsLauncher implements View {
               <p style="margin: 0 0 8px 0; color: var(--text-secondary, #888); font-size: 13px;">${this.escapeHtml(plugin.description || 'No description')}</p>
               <div style="font-size: 12px; color: var(--text-tertiary, #666);">
                 <span>Version: ${this.escapeHtml(plugin.version)}</span>
-                ${plugin.githubRepo ? `<span style="margin-left: 12px;">Repo: ${this.escapeHtml(plugin.githubRepo)}</span>` : ''}
               </div>
             </div>
-            <div style="display: flex; gap: 8px; flex-shrink: 0;">
-              <button class="plugin-update-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" style="
-                background: var(--accent-color, #0078d4);
-                color: white;
+            <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap;">
+              <button class="plugin-folder-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Update from a local plugin folder" style="
+                background: var(--bg-quaternary, #3a3a3a);
+                color: var(--text-primary, #fff);
                 border: none;
-                padding: 8px 16px;
+                padding: 8px 12px;
                 border-radius: 6px;
                 cursor: pointer;
                 font-size: 13px;
-              ">Update</button>
+              ">From Folder</button>
+              <button class="plugin-open-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Open plugin folder in file explorer" style="
+                background: var(--bg-quaternary, #3a3a3a);
+                color: var(--text-primary, #fff);
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Open</button>
               <button class="plugin-uninstall-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" style="
                 background: var(--danger-color, #d32f2f);
                 color: white;
                 border: none;
-                padding: 8px 16px;
+                padding: 8px 12px;
                 border-radius: 6px;
                 cursor: pointer;
                 font-size: 13px;
@@ -521,8 +529,8 @@ export class PluginsLauncher implements View {
         container.appendChild(card);
       }
 
-      // Add event listeners for update buttons
-      container.querySelectorAll('.plugin-update-btn').forEach(btn => {
+      // Add event listeners for "Update from Folder" buttons
+      container.querySelectorAll('.plugin-folder-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
           if (!pluginId) return;
@@ -531,16 +539,22 @@ export class PluginsLauncher implements View {
           const button = e.target as HTMLButtonElement;
 
           button.disabled = true;
-          button.textContent = 'Updating...';
+          button.textContent = 'Select Folder...';
 
           if (statusEl) {
             statusEl.style.display = 'block';
             statusEl.style.color = 'var(--text-secondary, #888)';
-            statusEl.textContent = 'Downloading and installing update from GitHub...';
+            statusEl.textContent = 'Select the plugin folder containing plugin.json...';
           }
 
           try {
-            const result = await (window as any).electronAPI.plugins.updateFromGitHub(pluginId);
+            const result = await (window as any).electronAPI.plugins.updateFromFolder(pluginId);
+            if (result.cancelled) {
+              button.disabled = false;
+              button.textContent = 'Update from Folder';
+              if (statusEl) statusEl.style.display = 'none';
+              return;
+            }
             if (statusEl) {
               statusEl.style.color = 'var(--success-color, #4caf50)';
               statusEl.textContent = result.message || 'Update successful! Restart FictionLab to apply changes.';
@@ -552,7 +566,21 @@ export class PluginsLauncher implements View {
               statusEl.textContent = `Update failed: ${error.message}`;
             }
             button.disabled = false;
-            button.textContent = 'Retry Update';
+            button.textContent = 'Update from Folder';
+          }
+        });
+      });
+
+      // Add event listeners for "Open Folder" buttons
+      container.querySelectorAll('.plugin-open-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          try {
+            await (window as any).electronAPI.plugins.openFolder(pluginId);
+          } catch (error: any) {
+            alert(`Could not open folder: ${error.message}`);
           }
         });
       });
