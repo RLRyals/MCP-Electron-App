@@ -148,7 +148,17 @@ const WorkflowsApp: React.FC = () => {
 
     const handleInstanceUpdated = (update: WorkflowUpdate) => {
       const parentId = activeRegistryIdRef.current;
-      if (!parentId) return;
+      console.log('[WorkflowsViewReact] Received update:', {
+        updateRegistryId: update.registryId,
+        updateType: update.type,
+        activeRegistryId: parentId,
+        trackedIds: Array.from(trackedRegistryIdsRef.current),
+      });
+
+      if (!parentId) {
+        console.log('[WorkflowsViewReact] Ignoring update - no active registry ID set');
+        return;
+      }
 
       // Detect child workflow registrations: a new workflow with our parent as its parentWorkflowId
       if (update.type === 'status' && update.data.parentWorkflowId === parentId) {
@@ -159,6 +169,10 @@ const WorkflowsApp: React.FC = () => {
 
       // Only process updates for tracked workflow instances (parent + children)
       if (!trackedRegistryIdsRef.current.has(update.registryId)) {
+        console.log('[WorkflowsViewReact] Ignoring update - registryId not in tracked set:', {
+          updateRegistryId: update.registryId,
+          trackedIds: Array.from(trackedRegistryIdsRef.current),
+        });
         return;
       }
 
