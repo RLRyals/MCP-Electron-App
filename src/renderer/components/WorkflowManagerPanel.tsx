@@ -5,6 +5,7 @@
  */
 
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { CollapsibleSection } from './CollapsibleSection.js';
 import { ActiveWorkflowCard } from './ActiveWorkflowCard.js';
@@ -46,6 +47,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Filter available workflows by search query
@@ -240,7 +242,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     flexDirection: 'column',
     minWidth: '200px',
     maxWidth: '600px',
-    overflow: 'hidden',
+    // Note: overflow is NOT hidden so that dropdown menus can render outside the panel
   };
 
   const resizeHandleStyle: React.CSSProperties = {
@@ -487,7 +489,18 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenMenuId(isMenuOpen ? null : workflow.id);
+                          if (isMenuOpen) {
+                            setOpenMenuId(null);
+                            setMenuPosition(null);
+                          } else {
+                            // Calculate position for fixed dropdown
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setMenuPosition({
+                              top: rect.bottom + 4,
+                              left: rect.right - 140, // 140 is minWidth of dropdown
+                            });
+                            setOpenMenuId(workflow.id);
+                          }
                         }}
                         style={{
                           background: 'transparent',
@@ -511,19 +524,18 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                       >
                         ⋯
                       </button>
-                      {/* Dropdown Menu */}
-                      {isMenuOpen && (
+                      {/* Dropdown Menu - rendered via portal to avoid overflow clipping */}
+                      {isMenuOpen && menuPosition && ReactDOM.createPortal(
                         <div
                           style={{
-                            position: 'absolute',
-                            right: 0,
-                            top: '100%',
-                            marginTop: '4px',
+                            position: 'fixed',
+                            top: menuPosition.top,
+                            left: menuPosition.left,
                             background: 'var(--color-bg-secondary, #0D1F35)',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
                             borderRadius: '6px',
                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                            zIndex: 1000,
+                            zIndex: 10000,
                             minWidth: '140px',
                             overflow: 'hidden',
                           }}
@@ -534,6 +546,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                               onClick={() => {
                                 onReimportWorkflow(workflow.id);
                                 setOpenMenuId(null);
+                                setMenuPosition(null);
                               }}
                               style={{
                                 display: 'block',
@@ -563,6 +576,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                                   onDeleteWorkflow(workflow.id);
                                 }
                                 setOpenMenuId(null);
+                                setMenuPosition(null);
                               }}
                               style={{
                                 display: 'block',
@@ -585,7 +599,8 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                               Delete workflow
                             </button>
                           )}
-                        </div>
+                        </div>,
+                        document.body
                       )}
                     </div>
                   )}
