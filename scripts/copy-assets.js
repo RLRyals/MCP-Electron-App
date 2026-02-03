@@ -5,6 +5,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// Note: CSP hash calculation was removed because Electron/Chromium has issues
+// with import map CSP hashes. Using 'unsafe-inline' instead, which is acceptable
+// for Electron desktop apps that don't load external content.
+
 function ensureDirSync(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
