@@ -5,8 +5,8 @@
  */
 
 import * as React from 'react';
-import * as ReactDOM from 'react-dom';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { CollapsibleSection } from './CollapsibleSection.js';
 import { ActiveWorkflowCard } from './ActiveWorkflowCard.js';
 import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflow.js';
@@ -525,7 +525,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                         ⋯
                       </button>
                       {/* Dropdown Menu - rendered via portal to avoid overflow clipping */}
-                      {isMenuOpen && menuPosition && ReactDOM.createPortal(
+                      {isMenuOpen && menuPosition && createPortal(
                         <div
                           style={{
                             position: 'fixed',
