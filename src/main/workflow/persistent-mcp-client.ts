@@ -204,6 +204,19 @@ export class PersistentMCPClient {
       logWithCategory('error', LogCategory.WORKFLOW,
         `MCP tool ${pending.toolName} error: ${response.error.message}`);
       pending.reject(new Error(response.error.message));
+    } else if (response.result?.isError) {
+      // Handle MCP tool-level errors (returned as result with isError flag)
+      const errorContent = response.result?.content;
+      let errorMessage = `MCP tool ${pending.toolName} failed`;
+      if (Array.isArray(errorContent) && errorContent.length > 0) {
+        const textContent = errorContent.find((c: any) => c.type === 'text')?.text;
+        if (textContent) {
+          errorMessage = textContent;
+        }
+      }
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `MCP tool ${pending.toolName} error (isError): ${errorMessage}`);
+      pending.reject(new Error(errorMessage));
     } else {
       logWithCategory('debug', LogCategory.WORKFLOW,
         `MCP tool ${pending.toolName} completed successfully`);
