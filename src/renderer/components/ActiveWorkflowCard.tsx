@@ -259,7 +259,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
       </div>
 
       {/* Breadcrumb trail for nested workflows */}
-      {workflow.breadcrumb && workflow.breadcrumb.length > 0 && (
+      {Array.isArray(workflow.breadcrumb) && workflow.breadcrumb.length > 0 && (
         <div style={breadcrumbStyle}>
           {workflow.breadcrumb.map((entry, index) => (
             <span key={`${entry.workflowId}-${entry.nodeId}`}>

@@ -26,6 +26,23 @@ function parseCompletedNodeIds(value: any): string[] {
 }
 
 /**
+ * Parse breadcrumb from database (may be JSON string or array)
+ */
+function parseBreadcrumb(value: any): import('../../types/workflow').WorkflowBreadcrumbEntry[] | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Map active workflow data from MCP snake_case to TypeScript camelCase
  */
 function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
@@ -47,6 +64,7 @@ function mapActiveWorkflow(data: any): ActiveWorkflowInstance {
     updatedAt: data.updated_at,
     availableNodes: data.available_nodes ?? [],
     metadata: data.metadata,
+    breadcrumb: parseBreadcrumb(data.breadcrumb),
     parentWorkflowId: data.parent_workflow_id,
   };
 }
