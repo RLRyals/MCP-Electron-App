@@ -787,13 +787,15 @@ export function registerWorkflowHandlers() {
       const client = await getWorkflowClient();
       const result = await client.registerActiveWorkflow(params);
 
-      // Broadcast so the canvas can detect new child workflows
+      // Broadcast so the canvas can detect new workflows and auto-connect
       if (result?.registryId) {
         broadcastWorkflowUpdate({
           registryId: result.registryId,
           type: 'status',
           data: {
             status: 'running',
+            workflowId: params.workflowId,
+            workflowName: params.workflowName,
             parentWorkflowId: params.parentWorkflowId,
           },
           timestamp: new Date().toISOString(),
