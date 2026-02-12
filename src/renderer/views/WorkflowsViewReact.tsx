@@ -57,13 +57,19 @@ const WorkflowsApp: React.FC = () => {
   const activeRegistryIdRef = useRef<string | null>(null);
   // Track child workflow registry IDs so we accept their updates too
   const trackedRegistryIdsRef = useRef<Set<string>>(new Set());
+  // Ref for selectedWorkflow so event handlers can access latest value
+  const selectedWorkflowRef = useRef<WorkflowListItem | null>(null);
 
-  // Keep ref in sync with state so event handlers always see the latest value
+  // Keep refs in sync with state so event handlers always see the latest value
   useEffect(() => {
     activeRegistryIdRef.current = activeRegistryId;
     // Reset tracked IDs when parent changes
     trackedRegistryIdsRef.current = new Set(activeRegistryId ? [activeRegistryId] : []);
   }, [activeRegistryId]);
+
+  useEffect(() => {
+    selectedWorkflowRef.current = selectedWorkflow;
+  }, [selectedWorkflow]);
 
   // Load workflows function (can be reused)
   const loadWorkflows = useCallback(async (skipCache: boolean = false) => {
@@ -155,7 +161,21 @@ const WorkflowsApp: React.FC = () => {
         trackedIds: Array.from(trackedRegistryIdsRef.current),
       });
 
+      // Auto-connect to new workflows that match the selected workflow
       if (!parentId) {
+        // Check if this is a new root workflow (status='running', no parentWorkflowId)
+        // that matches the currently selected workflow
+        if (update.type === 'status' &&
+            update.data.status === 'running' &&
+            !update.data.parentWorkflowId &&
+            selectedWorkflowRef.current &&
+            update.data.workflowId === selectedWorkflowRef.current.id) {
+          console.log('[WorkflowsViewReact] Auto-connecting to new workflow:', update.registryId, update.data.workflowId);
+          setActiveRegistryId(update.registryId);
+          setActiveNodeId(update.data.currentNodeId || null);
+          setExecutionStatus(new Map());
+          return;
+        }
         console.log('[WorkflowsViewReact] Ignoring update - no active registry ID set');
         return;
       }
@@ -393,6 +413,50 @@ const WorkflowsApp: React.FC = () => {
       if (typeof (window as any).showNotification === 'function') {
         (window as any).showNotification('Workflow started successfully', 'success');
       }
+
+      // Auto-connect canvas to the newly started workflow
+      // Query active workflows to find the registryId for the workflow we just started
+      const connectToActiveWorkflow = async (retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            // Wait a short delay for the workflow to be registered
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const activeWorkflows = await electronAPI.invoke('workflow:list-active');
+            console.log('[WorkflowsViewReact] Active workflows after start:', activeWorkflows);
+
+            // Find the workflow we just started (match by workflowId and status 'running')
+            const matchingWorkflow = activeWorkflows?.find(
+              (aw: any) => aw.workflowId === selectedWorkflow.id && aw.status === 'running'
+            );
+
+            if (matchingWorkflow) {
+              console.log('[WorkflowsViewReact] Auto-connecting to active workflow:', matchingWorkflow);
+              setActiveRegistryId(matchingWorkflow.id);
+              setActiveNodeId(matchingWorkflow.currentNodeId || null);
+
+              // Populate initial execution status
+              const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
+              if (matchingWorkflow.completedNodeIds?.length > 0) {
+                for (const nodeId of matchingWorkflow.completedNodeIds) {
+                  newStatus.set(nodeId, 'completed');
+                }
+              }
+              if (matchingWorkflow.currentNodeId) {
+                newStatus.set(matchingWorkflow.currentNodeId, 'in_progress');
+              }
+              setExecutionStatus(newStatus);
+              return; // Success - exit retry loop
+            }
+          } catch (err) {
+            console.warn('[WorkflowsViewReact] Failed to query active workflows:', err);
+          }
+        }
+        console.warn('[WorkflowsViewReact] Could not auto-connect to active workflow after retries');
+      };
+
+      // Run in background - don't block the UI
+      connectToActiveWorkflow();
     } catch (error: any) {
       console.error('[WorkflowsViewReact] Failed to start workflow:', error);
       if (typeof (window as any).showNotification === 'function') {

@@ -178,6 +178,9 @@ export class FolderImporter {
       // 3. Parse workflow definition (for internal processing)
       const workflow = await this.parser.parseWorkflow(workflowFile);
 
+      // Store original ID for suffix detection
+      const originalId = workflow.id;
+
       // Apply custom ID if provided
       if (customId) {
         workflow.id = customId;
@@ -192,6 +195,13 @@ export class FolderImporter {
         rawWorkflowData.name = customName;
         logWithCategory('info', LogCategory.WORKFLOW,
           `Using custom workflow name: ${customName}`);
+      }
+
+      // Detect if we're creating a copy (has a suffix like "-2" or " (2)")
+      const suffix = customId ? this.extractSuffix(customId, originalId) : null;
+      if (suffix) {
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Detected duplicate import with suffix: "${suffix}"`);
       }
 
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -211,11 +221,41 @@ export class FolderImporter {
         `${depCheck.skills.missing.length} skills missing, ` +
         `${depCheck.subWorkflows.missing.length} sub-workflows missing`);
 
-      // 4a. Try to import missing sub-workflows from sibling folders
-      const subWorkflowsInstalled = await this.importSubWorkflowsFromSiblings(
-        folderPath,
-        depCheck.subWorkflows.missing
-      );
+      // 4a. Import sub-workflows
+      // If we have a suffix, always import ALL sub-workflows with the suffix (for independent copies)
+      // Otherwise, only import missing sub-workflows
+      let subWorkflowsInstalled: number;
+      const allSubWorkflows = workflow.dependencies.subWorkflows || [];
+
+      if (suffix && allSubWorkflows.length > 0) {
+        // Import all sub-workflows with the same suffix for a complete independent copy
+        subWorkflowsInstalled = await this.importSubWorkflowsWithSuffix(
+          folderPath,
+          allSubWorkflows,
+          suffix
+        );
+
+        // Update subWorkflowId references in graph_json to point to the new copies
+        if (rawWorkflowData.graph_json?.nodes) {
+          for (const node of rawWorkflowData.graph_json.nodes) {
+            if (node.type === 'subworkflow' && node.subWorkflowId) {
+              const oldId = node.subWorkflowId;
+              node.subWorkflowId = `${oldId}${suffix}`;
+              logWithCategory('debug', LogCategory.WORKFLOW,
+                `Updated subWorkflowId reference: ${oldId} -> ${node.subWorkflowId}`);
+            }
+          }
+        }
+
+        // Update dependencies list
+        workflow.dependencies.subWorkflows = allSubWorkflows.map(sw => `${sw}${suffix}`);
+      } else {
+        // Normal import - only import missing sub-workflows
+        subWorkflowsInstalled = await this.importSubWorkflowsFromSiblings(
+          folderPath,
+          depCheck.subWorkflows.missing
+        );
+      }
 
       // 4b. Install all agents, skills, and output-styles from package
       const installedCounts = await this.installComponents(folderPath);
@@ -620,6 +660,122 @@ export class FolderImporter {
             }
           }
         }
+      }
+    }
+
+    return imported;
+  }
+
+  /**
+   * Extract suffix from customId compared to originalId
+   * Examples:
+   *   extractSuffix("workflow-2", "workflow") => "-2"
+   *   extractSuffix("workflow (2)", "workflow") => " (2)"
+   *   extractSuffix("workflow", "workflow") => null
+   */
+  private extractSuffix(customId: string, originalId: string): string | null {
+    if (customId === originalId) {
+      return null;
+    }
+
+    // Check for "-N" suffix pattern
+    const dashMatch = customId.match(new RegExp(`^${this.escapeRegExp(originalId)}(-\\d+)$`));
+    if (dashMatch) {
+      return dashMatch[1];
+    }
+
+    // Check for " (N)" suffix pattern
+    const parenMatch = customId.match(new RegExp(`^${this.escapeRegExp(originalId)}( \\(\\d+\\))$`));
+    if (parenMatch) {
+      return parenMatch[1];
+    }
+
+    // If customId starts with originalId, extract whatever comes after
+    if (customId.startsWith(originalId)) {
+      return customId.slice(originalId.length);
+    }
+
+    return null;
+  }
+
+  /**
+   * Escape special regex characters in a string
+   */
+  private escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Import sub-workflows with suffix for duplicate handling
+   * When main workflow gets a suffix (e.g., "-2"), sub-workflows also get the same suffix
+   */
+  private async importSubWorkflowsWithSuffix(
+    folderPath: string,
+    subWorkflowIds: string[],
+    suffix: string | null
+  ): Promise<number> {
+    if (subWorkflowIds.length === 0) {
+      return 0;
+    }
+
+    let imported = 0;
+    const subWorkflowsDir = path.join(folderPath, 'sub-workflows');
+
+    if (!await fs.pathExists(subWorkflowsDir)) {
+      logWithCategory('debug', LogCategory.WORKFLOW,
+        `No sub-workflows directory found at: ${subWorkflowsDir}`);
+      return 0;
+    }
+
+    logWithCategory('info', LogCategory.WORKFLOW,
+      `Importing ${subWorkflowIds.length} sub-workflows${suffix ? ` with suffix "${suffix}"` : ''}`);
+
+    for (const subWorkflowId of subWorkflowIds) {
+      const subWorkflowPath = path.join(subWorkflowsDir, subWorkflowId);
+
+      if (!await fs.pathExists(subWorkflowPath)) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `Sub-workflow folder not found: ${subWorkflowPath}`);
+        continue;
+      }
+
+      const workflowFile = await this.findWorkflowFile(subWorkflowPath);
+      if (!workflowFile) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `No workflow file found in sub-workflow folder: ${subWorkflowPath}`);
+        continue;
+      }
+
+      try {
+        // Get preview to find original name
+        const preview = await this.previewWorkflow(subWorkflowPath);
+        if (!preview) {
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Failed to preview sub-workflow: ${subWorkflowId}`);
+          continue;
+        }
+
+        // Generate new ID and name with suffix
+        const newId = suffix ? `${subWorkflowId}${suffix}` : subWorkflowId;
+        const newName = suffix ? `${preview.name}${suffix}` : preview.name;
+
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Importing sub-workflow: ${subWorkflowId} -> ${newId} (${newName})`);
+
+        // Import with new ID and name
+        const result = await this.importFromFolder(subWorkflowPath, newId, newName);
+
+        if (result.success) {
+          imported++;
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Successfully imported sub-workflow: ${newId}`);
+        } else {
+          logWithCategory('warn', LogCategory.WORKFLOW,
+            `Failed to import sub-workflow ${subWorkflowId}: ${result.message}`);
+        }
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.WORKFLOW,
+          `Error importing sub-workflow ${subWorkflowId}: ${error.message}`);
       }
     }
 

@@ -2403,6 +2403,18 @@ function setupIPC(): void {
         createdAt: new Date().toISOString()
       }, { spaces: 2 });
 
+      // Copy CLAUDE.md template for workflow resumption support
+      const templatePath = app.isPackaged
+        ? path.join(process.resourcesPath, 'resources', 'templates', 'project-init', 'CLAUDE.md')
+        : path.join(__dirname, '..', '..', 'resources', 'templates', 'project-init', 'CLAUDE.md');
+
+      if (await fse.pathExists(templatePath)) {
+        await fse.copy(templatePath, path.join(folderPath, '.claude', 'CLAUDE.md'));
+        logWithCategory('info', LogCategory.SYSTEM, 'Copied CLAUDE.md template to project');
+      } else {
+        logWithCategory('warn', LogCategory.SYSTEM, `CLAUDE.md template not found at ${templatePath}`);
+      }
+
       // Genre packs are now copied to the project folder when a workflow runs
       // via the ResourceCopier in fictionlab-workflow/packages/workflow-runner
       // No need to copy them here at project creation time
