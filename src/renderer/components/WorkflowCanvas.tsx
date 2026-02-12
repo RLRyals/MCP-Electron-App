@@ -481,7 +481,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
         // Now save to database
         const result = await electronAPI.invoke('workflow:add-node', {
           workflowId: workflow.id,
-          newNode: updatedNode,
+          node: updatedNode,
         });
 
         // Update with actual server data (to get any server-generated fields)

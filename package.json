@@ -4,7 +4,7 @@
   "description": "AI-powered writing workspace for authors - your creative laboratory",
   "main": "dist/main/index.js",
   "author": "FictionLab",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "dev": "npm run build && electron .",
