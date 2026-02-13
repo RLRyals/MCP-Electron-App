@@ -36,7 +36,7 @@ export interface PhaseNodeData extends Record<string, unknown> {
   phase: {
     id: number;
     name: string;
-    type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow';
+    type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow' | 'parallel' | 'blackboard' | 'swarm';
     agent: string;
     skill?: string;
     subWorkflowId?: string;
@@ -107,6 +107,12 @@ export const PhaseNode = ({ data }: NodeProps) => {
         return '🔄';
       case 'subworkflow':
         return '📦';
+      case 'parallel':
+        return '⚡';
+      case 'blackboard':
+        return '📝';
+      case 'swarm':
+        return '🐝';
       default:
         return '•';
     }
@@ -213,8 +219,8 @@ export const PhaseNode = ({ data }: NodeProps) => {
         <div style={labelStyle}>{String(nodeData.label || 'Unnamed Phase')}</div>
       </div>
 
-      {/* Only show agent for nodes that actually use agents */}
-      {nodeData.phase.agent && !['user-input', 'user', 'file', 'http'].includes(nodeData.phase.type) && (
+      {/* Only show agent for nodes that actually use agents (not compound nodes) */}
+      {nodeData.phase.agent && !['user-input', 'user', 'file', 'http', 'parallel', 'blackboard', 'swarm'].includes(nodeData.phase.type) && (
         <div style={agentStyle}>Agent: {String(nodeData.phase.agent)}</div>
       )}
 
@@ -243,6 +249,25 @@ export const PhaseNode = ({ data }: NodeProps) => {
       {nodeData.phase.requiresApproval && (
         <div style={{ fontSize: '11px', color: '#8b5cf6', marginBottom: '4px' }}>
           ✋ Requires Approval
+        </div>
+      )}
+
+      {/* Compound node indicators */}
+      {nodeData.phase.type === 'parallel' && (
+        <div style={{ fontSize: '11px', color: '#6366f1', marginBottom: '4px' }}>
+          ⚡ Parallel ({(nodeData.phase as any).branchCount || '?'} branches)
+        </div>
+      )}
+
+      {nodeData.phase.type === 'blackboard' && (
+        <div style={{ fontSize: '11px', color: '#0891b2', marginBottom: '4px' }}>
+          📝 Blackboard ({(nodeData.phase as any).contributorCount || '?'} agents, {(nodeData.phase as any).maxRounds || '?'} rounds)
+        </div>
+      )}
+
+      {nodeData.phase.type === 'swarm' && (
+        <div style={{ fontSize: '11px', color: '#d97706', marginBottom: '4px' }}>
+          🐝 Swarm ({(nodeData.phase as any).agentCount || '?'} explorers)
         </div>
       )}
 

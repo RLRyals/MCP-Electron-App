@@ -18,8 +18,6 @@ export interface WorkflowListItem {
   description?: string;
   tags?: string[];
   is_system?: boolean;
-  /** @deprecated Use graph_json.nodes instead */
-  phases_json?: any[];
   graph_json?: {
     nodes?: any[];
     edges?: any[];

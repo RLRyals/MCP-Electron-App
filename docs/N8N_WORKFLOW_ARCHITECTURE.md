@@ -364,14 +364,7 @@ onConnect={(connection) => createEdge(connection)}
 
 ## Execution Engine Changes
 
-### Current (Sequential)
-```typescript
-for (const phase of workflow.phases_json) {
-  await executePhase(phase);
-}
-```
-
-### New (Graph Traversal)
+### Graph Traversal
 ```typescript
 // Find start nodes (nodes with no incoming edges)
 const startNodes = findStartNodes(workflow.nodes, workflow.edges);

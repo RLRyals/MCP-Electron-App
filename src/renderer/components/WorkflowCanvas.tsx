@@ -57,7 +57,7 @@ function isShutdownError(error: any): boolean {
          message.includes('process exited');
 }
 
-// Register custom node types - all 10 types use PhaseNode
+// Register custom node types - all types use PhaseNode
 const nodeTypes = {
   planning: PhaseNode,
   writing: PhaseNode,
@@ -70,6 +70,9 @@ const nodeTypes = {
   conditional: PhaseNode,
   loop: PhaseNode,
   subworkflow: PhaseNode,
+  parallel: PhaseNode,
+  blackboard: PhaseNode,
+  swarm: PhaseNode,
 };
 
 // Register custom edge types
@@ -93,7 +96,7 @@ export interface WorkflowCanvasProps {
     graph_json?: {
       nodes: Array<{
         id: string;
-        type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow';
+        type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow' | 'parallel' | 'blackboard' | 'swarm';
         name: string;
         agent: string;
         skill?: string;
@@ -115,20 +118,6 @@ export interface WorkflowCanvasProps {
         animated?: boolean;
       }>;
     };
-    // Legacy support for phases_json (will be migrated to graph_json)
-    phases_json?: Array<{
-      id: number;
-      name: string;
-      type: 'planning' | 'writing' | 'gate' | 'user-input' | 'user' | 'code' | 'http' | 'file' | 'conditional' | 'loop' | 'subworkflow';
-      agent: string;
-      skill?: string;
-      subWorkflowId?: string;
-      description: string;
-      gate: boolean;
-      gateCondition?: string;
-      requiresApproval: boolean;
-      position?: { x: number; y: number };
-    }>;
   };
   executionStatus?: Map<string, NodeExecutionStatus>;
   /** ID of the currently active/executing node (from active workflow) - will be highlighted */
@@ -248,7 +237,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       const sourceStatus = executionStatus?.get(edge.source) || 'pending';
       const isSelected = selectedEdges.includes(edge.id);
 
-      // Extract edge properties with fallbacks for both graph_json and phases_json sources
+      // Extract edge properties from graph_json
       const edgeLabel = 'label' in edge ? edge.label : undefined;
       const edgeAnimated = 'animated' in edge ? edge.animated : undefined;
       const edgeCondition = 'condition' in edge ? edge.condition : undefined;

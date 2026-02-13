@@ -56,6 +56,54 @@ export interface WorkflowExecutionContext {
   startedAt: Date;
   userId: number;
   seriesId?: number;
+
+  // Shared workspaces for blackboard nodes
+  workspaces: Map<string, WorkspaceState>;
+
+  // Parallel/swarm execution tracking
+  parallelResults: Map<string, ParallelExecutionResult>;
+}
+
+/**
+ * Shared workspace state for blackboard pattern
+ */
+export interface WorkspaceState {
+  id: string;
+  nodeId: string;
+  content: any;
+  history: WorkspaceRevision[];
+  currentRound: number;
+  converged: boolean;
+  contributors: string[];
+}
+
+/**
+ * Single revision in a workspace's history
+ */
+export interface WorkspaceRevision {
+  round: number;
+  contributorId: string;
+  contributorName: string;
+  timestamp: Date;
+  previousContent: any;
+  changes: string;
+}
+
+/**
+ * Tracking state for parallel/swarm execution
+ */
+export interface ParallelExecutionResult {
+  nodeId: string;
+  branches: Array<{
+    branchId: string;
+    branchName: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    output?: any;
+    error?: string;
+    startedAt?: Date;
+    completedAt?: Date;
+  }>;
+  consolidatedOutput?: any;
 }
 
 /**

@@ -385,7 +385,6 @@ export class FolderImporter {
 
   /**
    * Convert WorkflowDefinition to database format
-   * Uses graph_json as the primary format (phases_json is deprecated)
    */
   private convertToWorkflowDefinition(workflow: any, rawData: any): any {
     return {
@@ -401,9 +400,6 @@ export class FolderImporter {
         mcpServers: workflow.dependencies.mcpServers,
         subWorkflows: workflow.dependencies.subWorkflows
       },
-      // Deprecated: phases_json only included for MCP backward compatibility
-      // Will be removed when MCP server is updated
-      phases_json: rawData.phases_json || [],
       tags: rawData.tags || workflow.metadata?.tags || [],
       marketplace_metadata: workflow.metadata || {},
       created_by: workflow.metadata?.author || 'FictionLab',

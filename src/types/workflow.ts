@@ -34,7 +34,10 @@ export type PhaseType =
   | 'file'
   | 'conditional'
   | 'loop'
-  | 'subworkflow';
+  | 'subworkflow'
+  | 'parallel'
+  | 'blackboard'
+  | 'swarm';
 
 /**
  * Workflow execution status
@@ -134,7 +137,7 @@ export interface WorkflowEdge {
   id: string;
   source: string;
   target: string;
-  type: 'sequential' | 'conditional' | 'loop';
+  type: 'sequential' | 'conditional' | 'loop' | 'parallel-fan' | 'consolidation';
   condition?: string;
   label?: string;
   style?: Record<string, any>;
@@ -386,13 +389,6 @@ export interface DatabaseWorkflowDefinition {
    */
   dependencies_json?: WorkflowDependencies;
 
-  /**
-   * Legacy phase array format (DEPRECATED - use graph_json)
-   * Kept for backward compatibility with older workflows
-   * @deprecated Use graph_json instead
-   */
-  phases_json?: DatabaseWorkflowPhase[];
-
   /** Tags for categorization and filtering */
   tags?: string[];
 
@@ -404,27 +400,6 @@ export interface DatabaseWorkflowDefinition {
 
   /** Who created this workflow */
   created_by?: string;
-}
-
-/**
- * Phase as stored in database (legacy format)
- * Used in phases_json for backward compatibility
- * New workflows should use graph_json with WorkflowNode instead
- * @deprecated Use graph_json with EnhancedWorkflowNode instead
- */
-export interface DatabaseWorkflowPhase {
-  id: number | string;
-  name: string;
-  type: PhaseType;
-  agent?: string;
-  skill?: string;
-  prompt?: string;
-  subWorkflowId?: string;
-  description?: string;
-  gate?: boolean;
-  gateCondition?: string;
-  requiresApproval?: boolean;
-  position?: { x: number; y: number };
 }
 
 /**

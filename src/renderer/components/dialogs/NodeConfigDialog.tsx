@@ -77,6 +77,9 @@ const NODE_TYPE_CONFIGS = [
   { value: 'conditional', label: 'Conditional', icon: '🔀' },
   { value: 'loop', label: 'Loop', icon: '🔄' },
   { value: 'subworkflow', label: 'Sub-Workflow', icon: '📦' },
+  { value: 'parallel', label: 'Parallel Execution', icon: '⚡' },
+  { value: 'blackboard', label: 'Blackboard (Shared Workspace)', icon: '📝' },
+  { value: 'swarm', label: 'Swarm Exploration', icon: '🐝' },
 ] as const;
 
 // ============================================================================

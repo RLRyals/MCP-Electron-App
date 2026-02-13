@@ -14,12 +14,10 @@ import { getDatabaseUrl } from '../database-connection';
 // Import canonical types from shared types directory
 import type {
   DatabaseWorkflowDefinition,
-  DatabaseWorkflowPhase,
 } from '../../types/workflow';
 
 // Re-export for backward compatibility
 export type WorkflowDefinition = DatabaseWorkflowDefinition;
-export type WorkflowPhase = DatabaseWorkflowPhase;
 
 export class MCPWorkflowClient {
   private mcpServerPath: string;
@@ -181,7 +179,6 @@ export class MCPWorkflowClient {
       description: workflow.description,
       graph_json: JSON.stringify(workflow.graph_json),
       dependencies_json: JSON.stringify(workflow.dependencies_json),
-      phases_json: JSON.stringify(workflow.phases_json),
       tags: workflow.tags || [],
       marketplace_metadata: JSON.stringify(workflow.marketplace_metadata || {}),
       created_by: workflow.created_by

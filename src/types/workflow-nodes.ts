@@ -10,6 +10,9 @@
  * - Conditional nodes (if/else branching)
  * - Loop nodes (forEach/while/count iterations)
  * - Subworkflow nodes (nested workflows)
+ * - Parallel nodes (concurrent branch execution with consolidation)
+ * - Blackboard nodes (shared workspace with iterative refinement)
+ * - Swarm nodes (parallel exploration with consolidation)
  */
 
 import { LLMProviderConfig } from './llm-providers';
@@ -229,6 +232,111 @@ export interface SubWorkflowNode extends BaseWorkflowNode {
   subWorkflowVersion?: string;  // 'latest' or specific version
 }
 
+// ============================================================================
+// COMPOUND NODE TYPES (Multi-Agent Patterns)
+// These nodes internally manage multiple concurrent agent executions,
+// similar to how LoopNode manages iterations.
+// ============================================================================
+
+/**
+ * Consolidation configuration for combining outputs from multiple agents
+ */
+export interface ConsolidationConfig {
+  strategy: 'concatenate' | 'merge' | 'select-best' | 'agent-consolidate';
+  consolidationAgent?: {
+    agent: string;
+    prompt: string;
+    provider: LLMProviderConfig;
+  };
+  outputVariable?: string;
+}
+
+/**
+ * Branch configuration for parallel execution
+ */
+export interface ParallelBranch {
+  id: string;
+  name: string;
+  agent: string;
+  skill?: string;
+  prompt: string;
+  systemPrompt?: string;
+  provider: LLMProviderConfig;
+  weight?: number;
+}
+
+/**
+ * Parallel Execution Node
+ * Runs multiple agents simultaneously, then consolidates results.
+ */
+export interface ParallelNode extends BaseWorkflowNode {
+  type: 'parallel';
+  branches: ParallelBranch[];
+  consolidation: ConsolidationConfig;
+  maxConcurrency?: number;
+  failureStrategy: 'fail-fast' | 'fail-tolerant' | 'require-all';
+}
+
+/**
+ * Contributor configuration for blackboard pattern
+ */
+export interface BlackboardContributor {
+  id: string;
+  name: string;
+  role: string;
+  agent: string;
+  skill?: string;
+  prompt: string;
+  systemPrompt?: string;
+  provider: LLMProviderConfig;
+  accessScope?: string;
+  order?: number;
+}
+
+/**
+ * Blackboard Node
+ * Shared workspace where specialists iteratively contribute and refine.
+ */
+export interface BlackboardNode extends BaseWorkflowNode {
+  type: 'blackboard';
+  initialContent: string;
+  contributors: BlackboardContributor[];
+  maxRounds: number;
+  convergenceCondition?: string;
+  workspaceFormat: 'document' | 'structured';
+}
+
+/**
+ * Agent configuration for swarm exploration
+ */
+export interface SwarmAgent {
+  id: string;
+  name: string;
+  agent: string;
+  skill?: string;
+  systemPrompt?: string;
+  provider: LLMProviderConfig;
+  weight?: number;
+}
+
+/**
+ * Swarm Node
+ * Multiple agents independently explore the same problem in parallel,
+ * then results are consolidated.
+ */
+export interface SwarmNode extends BaseWorkflowNode {
+  type: 'swarm';
+  agents: SwarmAgent[];
+  explorationPrompt: string;
+  consolidationStrategy: 'vote' | 'rank' | 'merge' | 'best-score' | 'agent';
+  consolidationAgent?: {
+    agent: string;
+    prompt: string;
+    provider: LLMProviderConfig;
+  };
+  minimumResponses?: number;
+}
+
 /**
  * Union type for all workflow nodes
  */
@@ -240,7 +348,10 @@ export type WorkflowNode =
   | FileOperationNode
   | ConditionalNode
   | LoopNode
-  | SubWorkflowNode;
+  | SubWorkflowNode
+  | ParallelNode
+  | BlackboardNode
+  | SwarmNode;
 
 /**
  * Type guard functions for runtime type checking
@@ -275,6 +386,18 @@ export function isLoopNode(node: WorkflowNode): node is LoopNode {
 
 export function isSubWorkflowNode(node: WorkflowNode): node is SubWorkflowNode {
   return node.type === 'subworkflow';
+}
+
+export function isParallelNode(node: WorkflowNode): node is ParallelNode {
+  return node.type === 'parallel';
+}
+
+export function isBlackboardNode(node: WorkflowNode): node is BlackboardNode {
+  return node.type === 'blackboard';
+}
+
+export function isSwarmNode(node: WorkflowNode): node is SwarmNode {
+  return node.type === 'swarm';
 }
 
 /**
