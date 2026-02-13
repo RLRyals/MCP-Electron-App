@@ -153,7 +153,7 @@ const WorkflowsApp: React.FC = () => {
     if (!electronAPI || !electronAPI.on || !electronAPI.off) return;
 
     const handleInstanceUpdated = (update: WorkflowUpdate) => {
-      const parentId = activeRegistryIdRef.current;
+      let parentId = activeRegistryIdRef.current;
       console.log('[WorkflowsViewReact] Received update:', {
         updateRegistryId: update.registryId,
         updateType: update.type,
@@ -164,20 +164,49 @@ const WorkflowsApp: React.FC = () => {
       // Auto-connect to new workflows that match the selected workflow
       if (!parentId) {
         // Check if this is a new root workflow (status='running', no parentWorkflowId)
-        // that matches the currently selected workflow
         if (update.type === 'status' &&
             update.data.status === 'running' &&
             !update.data.parentWorkflowId &&
-            selectedWorkflowRef.current &&
-            update.data.workflowId === selectedWorkflowRef.current.id) {
-          console.log('[WorkflowsViewReact] Auto-connecting to new workflow:', update.registryId, update.data.workflowId);
+            selectedWorkflowRef.current) {
+
+          // Check for exact workflowId match first
+          const selectedId = selectedWorkflowRef.current.id;
+          const broadcastId = update.data.workflowId;
+          const isMatch = broadcastId === selectedId;
+
+          if (isMatch) {
+            console.log('[WorkflowsViewReact] Auto-connecting to new workflow:', update.registryId, broadcastId);
+          } else {
+            // Fallback: auto-connect to any running workflow when one is selected
+            // This handles ID format mismatches (e.g., slug vs UUID)
+            console.log('[WorkflowsViewReact] Auto-connecting (fallback) to workflow:', update.registryId, broadcastId, '(selected:', selectedId, ')');
+          }
+
+          // Update ref IMMEDIATELY to prevent race condition with subsequent broadcasts
+          // (React's setActiveRegistryId + useEffect ref sync is too slow)
+          activeRegistryIdRef.current = update.registryId;
+          trackedRegistryIdsRef.current = new Set([update.registryId]);
+
           setActiveRegistryId(update.registryId);
           setActiveNodeId(update.data.currentNodeId || null);
           setExecutionStatus(new Map());
           return;
         }
-        console.log('[WorkflowsViewReact] Ignoring update - no active registry ID set');
-        return;
+
+        // For non-status updates (node_changed, progress) when no registry is set,
+        // auto-connect as a last resort so updates aren't lost
+        if (update.type === 'node_changed' || update.type === 'progress') {
+          console.log('[WorkflowsViewReact] Late auto-connect to workflow:', update.registryId);
+          activeRegistryIdRef.current = update.registryId;
+          trackedRegistryIdsRef.current = new Set([update.registryId]);
+          setActiveRegistryId(update.registryId);
+          // Re-read parentId since we just set the ref
+          parentId = update.registryId;
+          // Fall through to process this update below
+        } else {
+          console.log('[WorkflowsViewReact] Ignoring update - no active registry ID and no selected workflow');
+          return;
+        }
       }
 
       // Detect child workflow registrations: a new workflow with our parent as its parentWorkflowId
