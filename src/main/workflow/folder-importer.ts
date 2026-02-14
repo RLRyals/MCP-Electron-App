@@ -222,8 +222,8 @@ export class FolderImporter {
         `${depCheck.subWorkflows.missing.length} sub-workflows missing`);
 
       // 4a. Import sub-workflows
-      // If we have a suffix, always import ALL sub-workflows with the suffix (for independent copies)
-      // Otherwise, only import missing sub-workflows
+      // If we have a suffix, import ALL sub-workflows with the suffix (for independent copies)
+      // Otherwise, import ALL sub-workflows from the package to ensure updated versions are picked up
       let subWorkflowsInstalled: number;
       const allSubWorkflows = workflow.dependencies.subWorkflows || [];
 
@@ -250,10 +250,13 @@ export class FolderImporter {
         // Update dependencies list
         workflow.dependencies.subWorkflows = allSubWorkflows.map(sw => `${sw}${suffix}`);
       } else {
-        // Normal import - only import missing sub-workflows
+        // Normal import - import ALL sub-workflows from package (not just missing ones)
+        // This ensures updated sub-workflow versions are re-imported.
+        // The MCP import_workflow_definition uses ON CONFLICT ... DO UPDATE,
+        // so re-importing existing sub-workflows is safe and will update them in place.
         subWorkflowsInstalled = await this.importSubWorkflowsFromSiblings(
           folderPath,
-          depCheck.subWorkflows.missing
+          allSubWorkflows
         );
       }
 
@@ -563,16 +566,22 @@ export class FolderImporter {
    * Checks multiple locations:
    * 1. sub-workflows/ directory inside the export package (Claude Code export format)
    * 2. Sibling folders in the parent directory (marketplace format)
+   *
+   * Re-imports all specified sub-workflows (not just missing ones) to ensure
+   * updated versions are picked up. The MCP import uses ON CONFLICT ... DO UPDATE
+   * so re-importing existing sub-workflows is safe.
    */
   private async importSubWorkflowsFromSiblings(
     folderPath: string,
-    missingSubWorkflows: string[]
+    subWorkflowIds: string[]
   ): Promise<number> {
-    if (missingSubWorkflows.length === 0) {
+    if (subWorkflowIds.length === 0) {
       return 0;
     }
 
     let imported = 0;
+    // Track which sub-workflows still need to be found via sibling search
+    const remaining = [...subWorkflowIds];
 
     // 1. First check sub-workflows/ directory inside the package (Claude Code export format)
     const subWorkflowsDir = path.join(folderPath, 'sub-workflows');
@@ -580,7 +589,7 @@ export class FolderImporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Found sub-workflows directory: ${subWorkflowsDir}`);
 
-      for (const subWorkflowId of [...missingSubWorkflows]) {
+      for (const subWorkflowId of [...remaining]) {
         const subWorkflowPath = path.join(subWorkflowsDir, subWorkflowId);
 
         if (await fs.pathExists(subWorkflowPath)) {
@@ -594,9 +603,9 @@ export class FolderImporter {
               const result = await this.importFromFolder(subWorkflowPath);
               if (result.success) {
                 imported++;
-                // Remove from missing list so we don't try sibling search for it
-                const idx = missingSubWorkflows.indexOf(subWorkflowId);
-                if (idx > -1) missingSubWorkflows.splice(idx, 1);
+                // Remove from remaining list so we don't try sibling search for it
+                const idx = remaining.indexOf(subWorkflowId);
+                if (idx > -1) remaining.splice(idx, 1);
                 logWithCategory('info', LogCategory.WORKFLOW,
                   `Successfully imported sub-workflow from package: ${subWorkflowId}`);
               } else {
@@ -612,14 +621,14 @@ export class FolderImporter {
       }
     }
 
-    // 2. Check sibling folders in the parent directory for any remaining missing sub-workflows
-    if (missingSubWorkflows.length > 0) {
+    // 2. Check sibling folders in the parent directory for any remaining sub-workflows
+    if (remaining.length > 0) {
       const parentDir = path.dirname(folderPath);
 
       logWithCategory('info', LogCategory.WORKFLOW,
-        `Looking for remaining ${missingSubWorkflows.length} sub-workflows in parent directory: ${parentDir}`);
+        `Looking for remaining ${remaining.length} sub-workflows in parent directory: ${parentDir}`);
 
-      for (const subWorkflowId of missingSubWorkflows) {
+      for (const subWorkflowId of remaining) {
         // Try common naming patterns
         const candidates = [
           path.join(parentDir, subWorkflowId),
