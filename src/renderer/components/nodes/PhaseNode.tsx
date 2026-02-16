@@ -45,6 +45,8 @@ export interface PhaseNodeData extends Record<string, unknown> {
     requiresApproval: boolean;
   };
   status: NodeExecutionStatus;
+  /** Current loop iteration (1-based) if this node is executing inside a loop */
+  loopIteration?: number;
   /** True if this node is the currently executing node in an active workflow */
   isActiveNode?: boolean;
   onEdit?: () => void;
@@ -71,14 +73,17 @@ export const PhaseNode = ({ data }: NodeProps) => {
   };
 
   const getStatusLabel = (): string => {
+    const iteration = nodeData.loopIteration;
+    const suffix = iteration !== undefined ? ` ${iteration}` : '';
+
     switch (effectiveStatus) {
       case 'running':
       case 'in_progress':
-        return 'RUNNING';
+        return `RUNNING${suffix}`;
       case 'completed':
-        return 'COMPLETED';
+        return `COMPLETED${suffix}`;
       case 'failed':
-        return 'FAILED';
+        return `FAILED${suffix}`;
       default:
         return 'PENDING';
     }

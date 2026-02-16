@@ -939,24 +939,28 @@ export class PersistentMCPClient {
 
   /**
    * Mark a node as started (sets it as the current node)
+   * @param loopIteration Optional 1-based loop iteration if node is inside a loop
    */
-  async markNodeStarted(registryId: string, nodeId: string, nodeName: string): Promise<void> {
-    logWithCategory('info', LogCategory.WORKFLOW, `Marking node started: ${nodeId} in workflow ${registryId}`);
+  async markNodeStarted(registryId: string, nodeId: string, nodeName: string, loopIteration?: number): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Marking node started: ${nodeId} in workflow ${registryId}${loopIteration !== undefined ? ` (loop iteration ${loopIteration})` : ''}`);
     await this.callTool('mark_node_started', {
       registry_id: registryId,
       node_id: nodeId,
       node_name: nodeName
     });
+    // loopIteration is forwarded via IPC broadcast, not stored in MCP registry
   }
 
   /**
    * Mark a node as completed (adds to completedNodeIds list)
+   * @param loopIteration Optional 1-based loop iteration if node is inside a loop
    */
-  async markNodeCompleted(registryId: string, nodeId: string): Promise<void> {
-    logWithCategory('info', LogCategory.WORKFLOW, `Marking node completed: ${nodeId} in workflow ${registryId}`);
+  async markNodeCompleted(registryId: string, nodeId: string, loopIteration?: number): Promise<void> {
+    logWithCategory('info', LogCategory.WORKFLOW, `Marking node completed: ${nodeId} in workflow ${registryId}${loopIteration !== undefined ? ` (loop iteration ${loopIteration})` : ''}`);
     await this.callTool('mark_node_completed', {
       registry_id: registryId,
       node_id: nodeId
     });
+    // loopIteration is forwarded via IPC broadcast, not stored in MCP registry
   }
 }

@@ -22,7 +22,7 @@ import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
 import { WorkflowManagerPanel } from '../components/WorkflowManagerPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
-import type { WorkflowUpdate } from '../../types/workflow.js';
+import type { WorkflowUpdate, NodeStatusInfo } from '../../types/workflow.js';
 import type { Project } from '../../types/project.js';
 
 // Plugin IPC channel prefix for workflow plugin
@@ -43,7 +43,7 @@ const WorkflowsApp: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
-  const [executionStatus, setExecutionStatus] = useState<Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>>(new Map());
+  const [executionStatus, setExecutionStatus] = useState<Map<string, NodeStatusInfo>>(new Map());
 
   // Workflow Manager Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(true);
@@ -229,6 +229,9 @@ const WorkflowsApp: React.FC = () => {
 
       console.log('[WorkflowsViewReact] Instance updated (canvas):', update.type, update.data, isParentUpdate ? '(parent)' : '(child)');
 
+      // Extract loop iteration from metadata (if present in broadcast)
+      const loopIteration: number | undefined = (update.data as any).metadata?.loopIteration;
+
       switch (update.type) {
         case 'node_changed': {
           // Only update activeNodeId for parent workflow events (these are the canvas nodes)
@@ -238,7 +241,17 @@ const WorkflowsApp: React.FC = () => {
               setActiveNodeId(newNodeId);
               setExecutionStatus(prev => {
                 const newMap = new Map(prev);
-                newMap.set(newNodeId, 'in_progress');
+
+                // If loop iteration increased, reset previously-iterated nodes to pending
+                if (loopIteration !== undefined) {
+                  for (const [nodeId, info] of newMap) {
+                    if (info.loopIteration !== undefined && info.loopIteration < loopIteration) {
+                      newMap.set(nodeId, { status: 'pending' });
+                    }
+                  }
+                }
+
+                newMap.set(newNodeId, { status: 'in_progress', loopIteration });
                 return newMap;
               });
             }
@@ -254,7 +267,7 @@ const WorkflowsApp: React.FC = () => {
               setExecutionStatus(prev => {
                 const newMap = new Map(prev);
                 for (const nodeId of completedNodeIds) {
-                  newMap.set(nodeId, 'completed');
+                  newMap.set(nodeId, { status: 'completed', loopIteration });
                 }
                 return newMap;
               });
@@ -263,7 +276,7 @@ const WorkflowsApp: React.FC = () => {
               setActiveNodeId(currentNodeId);
               setExecutionStatus(prev => {
                 const newMap = new Map(prev);
-                newMap.set(currentNodeId, 'in_progress');
+                newMap.set(currentNodeId, { status: 'in_progress', loopIteration });
                 return newMap;
               });
             }
@@ -288,7 +301,7 @@ const WorkflowsApp: React.FC = () => {
             if (failedNodeId) {
               setExecutionStatus(prev => {
                 const newMap = new Map(prev);
-                newMap.set(failedNodeId, 'failed');
+                newMap.set(failedNodeId, { status: 'failed', loopIteration });
                 return newMap;
               });
             }
@@ -342,15 +355,15 @@ const WorkflowsApp: React.FC = () => {
       setActiveRegistryId(registryId || null);
 
       // Populate executionStatus from completedNodeIds
-      const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
+      const newStatus = new Map<string, NodeStatusInfo>();
       if (completedNodeIds && completedNodeIds.length > 0) {
         for (const nodeId of completedNodeIds) {
-          newStatus.set(nodeId, 'completed');
+          newStatus.set(nodeId, { status: 'completed' });
         }
       }
       // Mark current node as in_progress
       if (currentNodeId) {
-        newStatus.set(currentNodeId, 'in_progress');
+        newStatus.set(currentNodeId, { status: 'in_progress' });
       }
       setExecutionStatus(newStatus);
     } catch (error) {
@@ -465,14 +478,14 @@ const WorkflowsApp: React.FC = () => {
               setActiveNodeId(matchingWorkflow.currentNodeId || null);
 
               // Populate initial execution status
-              const newStatus = new Map<string, 'pending' | 'in_progress' | 'completed' | 'failed'>();
+              const newStatus = new Map<string, NodeStatusInfo>();
               if (matchingWorkflow.completedNodeIds?.length > 0) {
                 for (const nodeId of matchingWorkflow.completedNodeIds) {
-                  newStatus.set(nodeId, 'completed');
+                  newStatus.set(nodeId, { status: 'completed' });
                 }
               }
               if (matchingWorkflow.currentNodeId) {
-                newStatus.set(matchingWorkflow.currentNodeId, 'in_progress');
+                newStatus.set(matchingWorkflow.currentNodeId, { status: 'in_progress' });
               }
               setExecutionStatus(newStatus);
               return; // Success - exit retry loop

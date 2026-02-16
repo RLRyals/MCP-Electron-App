@@ -35,7 +35,7 @@ import { NodeConfigDialog } from './dialogs/NodeConfigDialog.js';
 import { DocumentEditDialog } from './dialogs/DocumentEditDialog.js';
 import type { WorkflowNode } from '../../types/workflow-nodes.js';
 import type { LLMProviderConfig } from '../../types/llm-providers.js';
-import type { NodeExecutionStatus } from '../../types/workflow.js';
+import type { NodeStatusInfo } from '../../types/workflow.js';
 
 // Simple debounce utility
 function debounce<T extends (...args: any[]) => void>(
@@ -119,7 +119,7 @@ export interface WorkflowCanvasProps {
       }>;
     };
   };
-  executionStatus?: Map<string, NodeExecutionStatus>;
+  executionStatus?: Map<string, NodeStatusInfo>;
   /** ID of the currently active/executing node (from active workflow) - will be highlighted */
   activeNodeId?: string | null;
   onNodeClick?: (nodeId: string, phase: any) => void;
@@ -234,7 +234,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
 
     return graphData.edges.map((edge) => {
-      const sourceStatus = executionStatus?.get(edge.source) || 'pending';
+      const sourceStatusInfo = executionStatus?.get(edge.source);
+      const sourceStatus = sourceStatusInfo?.status || 'pending';
       const isSelected = selectedEdges.includes(edge.id);
 
       // Extract edge properties from graph_json
@@ -746,18 +747,22 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
 
   // Update nodes with current execution status (this is fast - only updates data prop)
   const nodesWithStatus = useMemo(() => {
-    return baseNodes.map(node => ({
-      ...node,
-      data: {
-        ...node.baseData,
-        status: executionStatus?.get(node.id) || 'pending',
-        isActiveNode: activeNodeId === node.id, // Highlight the currently executing node
-        onEdit: () => handleEditNode(node.id), // Use new NodeConfigDialog
-        onOpenSubWorkflow: node.baseData.phase.subWorkflowId
-          ? () => handleOpenSubWorkflow(node.baseData.phase.subWorkflowId!)
-          : undefined,
-      },
-    }));
+    return baseNodes.map(node => {
+      const statusInfo = executionStatus?.get(node.id);
+      return {
+        ...node,
+        data: {
+          ...node.baseData,
+          status: statusInfo?.status || 'pending',
+          loopIteration: statusInfo?.loopIteration,
+          isActiveNode: activeNodeId === node.id, // Highlight the currently executing node
+          onEdit: () => handleEditNode(node.id), // Use new NodeConfigDialog
+          onOpenSubWorkflow: node.baseData.phase.subWorkflowId
+            ? () => handleOpenSubWorkflow(node.baseData.phase.subWorkflowId!)
+            : undefined,
+        },
+      };
+    });
   }, [baseNodes, executionStatus, activeNodeId, handleEditNode, handleOpenSubWorkflow]);
 
   // Update React Flow state when memoized values change

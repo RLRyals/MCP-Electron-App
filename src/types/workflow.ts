@@ -56,6 +56,16 @@ export type PhaseStatus = 'pending' | 'running' | 'complete' | 'failed' | 'block
 export type NodeExecutionStatus = 'pending' | 'running' | 'in_progress' | 'completed' | 'failed';
 
 /**
+ * Extended node status info for canvas display
+ * Includes loop iteration tracking for nodes executing inside loops
+ */
+export interface NodeStatusInfo {
+  status: NodeExecutionStatus;
+  /** Current loop iteration (1-based) if executing inside a loop */
+  loopIteration?: number;
+}
+
+/**
  * Display labels for node execution status
  */
 export const NodeExecutionStatusLabel: Record<NodeExecutionStatus, string> = {

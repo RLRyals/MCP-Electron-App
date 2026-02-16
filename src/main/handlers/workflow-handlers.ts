@@ -864,21 +864,26 @@ export function registerWorkflowHandlers() {
   });
 
   // Mark a node as started (sets current node)
-  ipcMain.handle('workflow:mark-node-started', async (_event, { registryId, nodeId, nodeName }: {
+  ipcMain.handle('workflow:mark-node-started', async (_event, { registryId, nodeId, nodeName, loopIteration }: {
     registryId: string;
     nodeId: string;
     nodeName: string;
+    loopIteration?: number;
   }) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node started ${nodeId} in workflow ${registryId}`);
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node started ${nodeId} in workflow ${registryId}${loopIteration !== undefined ? ` (loop iteration ${loopIteration})` : ''}`);
     try {
       const client = await getWorkflowClient();
       await client.markNodeStarted(registryId, nodeId, nodeName);
 
-      // Broadcast update
+      // Broadcast update (include loop iteration metadata if present)
       broadcastWorkflowUpdate({
         registryId,
         type: 'node_changed',
-        data: { currentNodeId: nodeId, currentNodeName: nodeName },
+        data: {
+          currentNodeId: nodeId,
+          currentNodeName: nodeName,
+          ...(loopIteration !== undefined ? { metadata: { loopIteration } } : {}),
+        },
         timestamp: new Date().toISOString(),
       });
 
@@ -890,11 +895,12 @@ export function registerWorkflowHandlers() {
   });
 
   // Mark a node as completed (adds to completedNodeIds)
-  ipcMain.handle('workflow:mark-node-completed', async (_event, { registryId, nodeId }: {
+  ipcMain.handle('workflow:mark-node-completed', async (_event, { registryId, nodeId, loopIteration }: {
     registryId: string;
     nodeId: string;
+    loopIteration?: number;
   }) => {
-    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node completed ${nodeId} in workflow ${registryId}`);
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Mark node completed ${nodeId} in workflow ${registryId}${loopIteration !== undefined ? ` (loop iteration ${loopIteration})` : ''}`);
     try {
       const client = await getWorkflowClient();
       await client.markNodeCompleted(registryId, nodeId);
@@ -903,7 +909,10 @@ export function registerWorkflowHandlers() {
       broadcastWorkflowUpdate({
         registryId,
         type: 'progress',
-        data: { completedNodeIds: [nodeId] },
+        data: {
+          completedNodeIds: [nodeId],
+          ...(loopIteration !== undefined ? { metadata: { loopIteration } } : {}),
+        },
         timestamp: new Date().toISOString(),
       });
 
