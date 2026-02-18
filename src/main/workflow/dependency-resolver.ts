@@ -7,7 +7,6 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { app } from 'electron';
 import { Pool } from 'pg';
 import { getDatabasePool } from '../database-connection';
 import { logWithCategory, LogCategory } from '../logger';
@@ -61,11 +60,11 @@ export class DependencyResolver {
   }
 
   /**
-   * Check agents (look in userData/agents)
+   * Check agents (look in ~/.claude/agents/)
    */
   private async checkAgents(agents: string[]): Promise<DependencyCheckResult> {
-    const userDataPath = app.getPath('userData');
-    const agentsDir = path.join(userDataPath, 'agents');
+    const homeDir = require('os').homedir();
+    const agentsDir = path.join(homeDir, '.claude', 'agents');
 
     // Ensure agents directory exists
     await fs.ensureDir(agentsDir);
@@ -103,8 +102,9 @@ export class DependencyResolver {
     const missing: string[] = [];
 
     for (const skill of skills) {
-      const skillPath = path.join(skillsDir, `${skill}.md`);
-      if (await fs.pathExists(skillPath)) {
+      const flatPath = path.join(skillsDir, `${skill}.md`);
+      const dirPath = path.join(skillsDir, skill, 'SKILL.md');
+      if (await fs.pathExists(flatPath) || await fs.pathExists(dirPath)) {
         installed.push(skill);
         logWithCategory('debug', LogCategory.WORKFLOW,
           `Skill found: ${skill}`);
@@ -196,10 +196,21 @@ export class DependencyResolver {
       return [];
     }
 
-    const files = await fs.readdir(skillsDir);
-    return files
-      .filter(file => file.endsWith('.md'))
-      .map(file => path.basename(file, '.md'));
+    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+    const skills: string[] = [];
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        // Legacy flat file format: skill-name.md
+        skills.push(path.basename(entry.name, '.md'));
+      } else if (entry.isDirectory()) {
+        // Directory format: skill-name/SKILL.md
+        const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+        if (await fs.pathExists(skillMdPath)) {
+          skills.push(entry.name);
+        }
+      }
+    }
+    return skills;
   }
 
   /**

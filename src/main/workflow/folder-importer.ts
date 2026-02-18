@@ -464,18 +464,22 @@ export class FolderImporter {
       const entries = await fs.readdir(skillsDir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isFile() && entry.name.endsWith('.md')) {
-          // Single file skill
+          // Single file skill -> convert to directory format for Claude Code
+          const skillName = path.basename(entry.name, '.md');
           const sourceFile = path.join(skillsDir, entry.name);
-          const destFile = path.join(destSkillsDir, entry.name);
-          // Only install if not already present
-          if (!await fs.pathExists(destFile)) {
+          const destDir = path.join(destSkillsDir, skillName);
+          const destFile = path.join(destDir, 'SKILL.md');
+          const legacyDestFile = path.join(destSkillsDir, entry.name);
+          // Only install if not already present (check both formats)
+          if (!await fs.pathExists(destDir) && !await fs.pathExists(legacyDestFile)) {
+            await fs.ensureDir(destDir);
             await fs.copy(sourceFile, destFile);
             skillsInstalled++;
             logWithCategory('info', LogCategory.WORKFLOW,
-              `Installed skill (file): ${entry.name}`);
+              `Installed skill: ${skillName}/SKILL.md`);
           } else {
             logWithCategory('debug', LogCategory.WORKFLOW,
-              `Skill already exists, skipping: ${entry.name}`);
+              `Skill already exists, skipping: ${skillName}`);
           }
         } else if (entry.isDirectory()) {
           // Directory format skill - copy entire directory
@@ -811,9 +815,20 @@ export class FolderImporter {
       return [];
     }
 
-    const files = await fs.readdir(skillsDir);
-    return files
-      .filter(file => file.endsWith('.md'))
-      .map(file => path.basename(file, '.md'));
+    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+    const skills: string[] = [];
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        // Flat file format: skill-name.md
+        skills.push(path.basename(entry.name, '.md'));
+      } else if (entry.isDirectory()) {
+        // Directory format: skill-name/SKILL.md
+        const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+        if (await fs.pathExists(skillMdPath)) {
+          skills.push(entry.name);
+        }
+      }
+    }
+    return skills;
   }
 }
