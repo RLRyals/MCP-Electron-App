@@ -2744,7 +2744,7 @@ app.whenReady().then(async () => {
 
     if (!dockerStatus.running || !dockerStatus.healthy) {
       logWithCategory('warn', LogCategory.DOCKER,
-        `Docker is not running: ${dockerStatus.message}`);
+        `Docker daemon is not ready (running: ${dockerStatus.running}, healthy: ${dockerStatus.healthy}): ${dockerStatus.message}`);
 
       // Attempt to start Docker Desktop
       logWithCategory('info', LogCategory.DOCKER, 'Attempting to start Docker Desktop...');

@@ -16,6 +16,7 @@ import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
 import * as pgbouncerConfig from './pgbouncer-config';
 import { checkDockerRunning, getFixedEnv } from './prerequisites';
+import { startAndWaitForDocker as dockerStartAndWait } from './docker';
 
 const execAsync = promisify(exec);
 
@@ -406,61 +407,6 @@ async function killProcessOnPort(port: number): Promise<boolean> {
   
   return false;
 }
-
-/**
- * Attempt to start Docker Desktop
- * Returns true if Docker was started successfully or is already running
- */
-async function startDockerDesktop(): Promise<boolean> {
-  try {
-    let command: string;
-    
-    switch (process.platform) {
-      case 'win32':
-        // Windows: Start Docker Desktop
-        command = 'powershell -Command "Start-Process \\"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\\""';
-        break;
-      case 'darwin':
-        // macOS: Open Docker.app
-        command = 'open -a Docker';
-        break;
-      case 'linux':
-        // Linux: Try to start docker service
-        command = 'sudo systemctl start docker';
-        break;
-      default:
-        logWithCategory('warn', LogCategory.DOCKER, `Unsupported platform for auto-start: ${process.platform}`);
-        return false;
-    }
-    
-    logWithCategory('info', LogCategory.DOCKER, `Attempting to start Docker Desktop: ${command}`);
-    await execAsync(command, { timeout: 10000 });
-    
-    // Wait for Docker to actually start (up to 30 seconds)
-    const maxWaitTime = 30000;
-    const checkInterval = 2000;
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < maxWaitTime) {
-      const dockerStatus = await checkDockerRunning();
-      if (dockerStatus.running) {
-        logWithCategory('info', LogCategory.DOCKER, 'Docker Desktop started successfully');
-        return true;
-      }
-      
-      logWithCategory('info', LogCategory.DOCKER, 'Waiting for Docker to be ready...');
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
-    }
-    
-    logWithCategory('warn', LogCategory.DOCKER, 'Docker Desktop did not become ready within 30 seconds');
-    return false;
-    
-  } catch (error: any) {
-    logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker Desktop', error);
-    return false;
-  }
-}
-
 
 /**
  * Stop existing containers to release ports - AGGRESSIVE cleanup
@@ -935,7 +881,7 @@ export async function startMCPSystem(
     const dockerStatus = await checkDockerRunning();
     if (!dockerStatus.running) {
       logWithCategory('warn', LogCategory.DOCKER, 'Docker is not running, attempting to start...');
-      
+
       if (progressCallback) {
         progressCallback({
           message: 'Starting Docker Desktop...',
@@ -945,10 +891,10 @@ export async function startMCPSystem(
         });
       }
 
-      // Attempt to start Docker
-      const dockerStarted = await startDockerDesktop();
-      
-      if (!dockerStarted) {
+      // Attempt to start Docker (checks if process is already running before launching)
+      const dockerResult = await dockerStartAndWait();
+
+      if (!dockerResult.success) {
         logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker');
         return {
           success: false,
@@ -956,7 +902,7 @@ export async function startMCPSystem(
           error: 'DOCKER_NOT_RUNNING',
         };
       }
-      
+
       logWithCategory('info', LogCategory.DOCKER, 'Docker started successfully');
     }
 

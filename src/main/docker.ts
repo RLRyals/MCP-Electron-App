@@ -47,6 +47,79 @@ export interface DockerOperationResult {
 }
 
 /**
+ * Check if Docker Desktop process is running at the OS level,
+ * independent of whether the Docker daemon is ready.
+ * This detects Docker Desktop that is still initializing.
+ */
+export async function isDockerDesktopProcessRunning(): Promise<boolean> {
+  const platform = getPlatform();
+  logWithCategory('info', LogCategory.DOCKER,
+    `Checking if Docker Desktop process is running on ${platform}...`);
+
+  try {
+    if (platform === 'windows') {
+      const { stdout } = await execAsync(
+        'tasklist /FI "IMAGENAME eq Docker Desktop.exe" /NH',
+        { timeout: 5000, windowsHide: true }
+      );
+      const isRunning = stdout.toLowerCase().includes('docker desktop.exe');
+      logWithCategory('info', LogCategory.DOCKER,
+        `Docker Desktop process running (Windows): ${isRunning}`);
+      return isRunning;
+
+    } else if (platform === 'macos') {
+      try {
+        const { stdout } = await execAsync(
+          'pgrep -f "Docker Desktop"',
+          { timeout: 5000 }
+        );
+        const isRunning = stdout.trim().length > 0;
+        logWithCategory('info', LogCategory.DOCKER,
+          `Docker Desktop process running (macOS): ${isRunning}`);
+        return isRunning;
+      } catch {
+        // pgrep returns exit code 1 when no process found
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process not running (macOS)');
+        return false;
+      }
+
+    } else if (platform === 'linux') {
+      try {
+        const { stdout } = await execAsync(
+          'systemctl is-active docker',
+          { timeout: 5000 }
+        );
+        const status = stdout.trim();
+        const isRunning = status === 'active' || status === 'activating';
+        logWithCategory('info', LogCategory.DOCKER,
+          `Docker service status (Linux): ${status}, running: ${isRunning}`);
+        return isRunning;
+      } catch {
+        // Fallback: check for dockerd process
+        try {
+          const { stdout } = await execAsync('pgrep dockerd', { timeout: 5000 });
+          const isRunning = stdout.trim().length > 0;
+          logWithCategory('info', LogCategory.DOCKER,
+            `dockerd process running (Linux fallback): ${isRunning}`);
+          return isRunning;
+        } catch {
+          logWithCategory('info', LogCategory.DOCKER,
+            'Docker process not running (Linux)');
+          return false;
+        }
+      }
+    }
+
+    return false;
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.DOCKER,
+      'Error checking Docker Desktop process', { error: error.message });
+    return false;
+  }
+}
+
+/**
  * Start Docker Desktop programmatically
  * Platform-specific implementation
  */
@@ -479,21 +552,37 @@ export async function startAndWaitForDocker(
 ): Promise<DockerOperationResult> {
   logWithCategory('info', LogCategory.DOCKER, 'Starting Docker and waiting for it to be ready...');
 
-  // First, start Docker Desktop
-  const startResult = await startDockerDesktop((progress) => {
+  // Check if Docker Desktop process is already running (but daemon not ready yet)
+  const processAlreadyRunning = await isDockerDesktopProcessRunning();
+
+  if (processAlreadyRunning) {
+    logWithCategory('info', LogCategory.DOCKER,
+      'Docker Desktop process is already running. Waiting for daemon to become ready...');
+
     if (progressCallback) {
       progressCallback({
-        ...progress,
-        percent: Math.min(progress.percent, 10), // Cap at 10% for start phase
+        message: 'Docker Desktop is starting up, waiting for daemon...',
+        percent: 10,
+        step: 'waiting-for-existing',
       });
     }
-  });
+  } else {
+    // Docker Desktop is NOT running - start it
+    const startResult = await startDockerDesktop((progress) => {
+      if (progressCallback) {
+        progressCallback({
+          ...progress,
+          percent: Math.min(progress.percent, 10), // Cap at 10% for start phase
+        });
+      }
+    });
 
-  if (!startResult.success) {
-    return startResult;
+    if (!startResult.success) {
+      return startResult;
+    }
   }
 
-  // Then wait for it to be ready
+  // Wait for the daemon to be ready (same regardless of whether we started it or not)
   const readyResult = await waitForDockerReady((progress) => {
     if (progressCallback) {
       progressCallback({
