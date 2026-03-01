@@ -6,6 +6,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
 import * as log from 'electron-log';
 
 const execAsync = promisify(exec);
@@ -120,6 +121,41 @@ function parseVersion(output: string, regex?: RegExp): string | undefined {
 }
 
 /**
+ * Check if Docker Desktop executable exists on disk.
+ * This is a fallback for when `docker --version` fails (e.g., Docker Desktop
+ * is installed but not running, and the CLI depends on the backend).
+ */
+function isDockerDesktopInstalledOnDisk(): boolean {
+  const platform = getPlatform();
+
+  const paths: string[] = [];
+  if (platform === 'windows') {
+    paths.push('C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe');
+    paths.push('C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe');
+  } else if (platform === 'macos') {
+    paths.push('/Applications/Docker.app');
+    paths.push('/usr/local/bin/docker');
+  } else {
+    // Linux: check common docker binary locations
+    paths.push('/usr/bin/docker');
+    paths.push('/usr/local/bin/docker');
+  }
+
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        log.info(`Docker found on disk at: ${p}`);
+        return true;
+      }
+    } catch {
+      // ignore access errors
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check if Docker is installed
  */
 export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
@@ -135,7 +171,21 @@ export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
       version: version || 'unknown',
     };
   } catch (error: any) {
-    log.warn('Docker not installed or not in PATH:', error.message);
+    log.warn('Docker CLI check failed:', error.message);
+
+    // Fallback: check if Docker Desktop exists on disk.
+    // On Windows, `docker --version` can fail when Docker Desktop is installed
+    // but not running, because the CLI depends on the backend service.
+    if (isDockerDesktopInstalledOnDisk()) {
+      log.info('Docker Desktop found on disk (CLI not responding - likely not running)');
+      return {
+        installed: true,
+        version: 'unknown',
+        error: 'Docker is installed but the CLI is not responding. Docker Desktop may not be running.',
+      };
+    }
+
+    log.warn('Docker not installed (not found on disk either)');
     return {
       installed: false,
       error: 'Docker is not installed or not found in PATH',
