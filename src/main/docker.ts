@@ -142,7 +142,8 @@ export async function startDockerDesktop(
 
     // Platform-specific Docker Desktop startup
     if (platform === 'windows') {
-      const dockerPath = 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe';
+      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+      const dockerPath = `${programFiles}\\Docker\\Docker\\Docker Desktop.exe`;
       logWithCategory('info', LogCategory.DOCKER, `Starting Docker Desktop on Windows: ${dockerPath}`);
 
       // Start Docker Desktop without waiting for it to complete

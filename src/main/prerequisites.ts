@@ -57,13 +57,29 @@ async function executeCommand(
 }
 
 /**
- * Get environment variables with fixed PATH for macOS
- * Adds common locations for Docker and other tools
+ * Get environment variables with fixed PATH
+ * Adds common locations for Docker and other tools on all platforms
  */
 export function getFixedEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  
-  if (process.platform === 'darwin') {
+  const currentPath = env.PATH || '';
+
+  if (process.platform === 'win32') {
+    // Use %ProgramFiles% so this works regardless of install drive/locale
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programData = process.env.ProgramData || 'C:\\ProgramData';
+    const commonPaths = [
+      `${programFiles}\\Docker\\Docker\\resources\\bin`,
+      `${programFiles}\\Docker\\Docker`,
+      `${programData}\\DockerDesktop\\version-bin`,
+    ];
+
+    // Append Docker paths that aren't already in PATH
+    const missingPaths = commonPaths.filter(p => !currentPath.includes(p));
+    if (missingPaths.length > 0) {
+      env.PATH = currentPath + ';' + missingPaths.join(';');
+    }
+  } else if (process.platform === 'darwin') {
     const commonPaths = [
       '/opt/homebrew/bin',
       '/usr/local/bin',
@@ -72,22 +88,16 @@ export function getFixedEnv(): NodeJS.ProcessEnv {
       '/usr/sbin',
       '/sbin'
     ];
-    
-    // Safety check for existing PATH
-    const currentPath = env.PATH || '';
-    
+
     // Add paths if missing, prioritizing them
     // We rebuild the PATH to ensure our paths come first
     const newPath = commonPaths.reduce((acc, p) => {
-      // If path is already there, we don't strictly need to add it, 
-      // but prepending ensures we find our tools first.
-      // Simple strategy: Prepend common paths that aren't at the start.
       return `${p}:${acc}`;
     }, currentPath);
-    
+
     env.PATH = newPath;
   }
-  
+
   return env;
 }
 
@@ -130,8 +140,9 @@ function isDockerDesktopInstalledOnDisk(): boolean {
 
   const paths: string[] = [];
   if (platform === 'windows') {
-    paths.push('C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe');
-    paths.push('C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe');
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    paths.push(`${programFiles}\\Docker\\Docker\\Docker Desktop.exe`);
+    paths.push(`${programFiles}\\Docker\\Docker\\resources\\bin\\docker.exe`);
   } else if (platform === 'macos') {
     paths.push('/Applications/Docker.app');
     paths.push('/usr/local/bin/docker');
