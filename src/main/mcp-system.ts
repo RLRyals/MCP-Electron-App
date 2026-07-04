@@ -558,7 +558,7 @@ async function identifyPortUser(port: number): Promise<string | null> {
 /**
  * Check if ports are available before starting
  */
-export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[]; details?: any }> {
+export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[]; details?: any; suggestedConfig?: envConfig.EnvConfig }> {
   logWithCategory('info', LogCategory.DOCKER, 'Checking for port conflicts...');
 
   const config = await envConfig.loadEnvConfig();
@@ -567,22 +567,23 @@ export async function checkPortConflicts(): Promise<{ success: boolean; conflict
   if (result.hasConflicts) {
     const conflictPorts = result.conflicts.map(c => c.port);
     logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${conflictPorts.join(', ')}`);
-    
+
     // On Linux, try to identify what's using the ports
     if (process.platform === 'linux') {
       for (const conflict of result.conflicts) {
         const portUser = await identifyPortUser(conflict.port);
         if (portUser) {
-          logWithCategory('info', LogCategory.DOCKER, 
+          logWithCategory('info', LogCategory.DOCKER,
             `Port ${conflict.port} is being used by:\n${portUser}`);
         }
       }
     }
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       conflicts: conflictPorts,
-      details: result.conflicts
+      details: result.conflicts,
+      suggestedConfig: result.suggestedConfig,
     };
   }
 
@@ -673,6 +674,8 @@ async function execDockerCompose(
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
         HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
         DB_ADMIN_PORT: String(config.DB_ADMIN_PORT),
+        NPE_PORT: String(config.NPE_PORT),
+        WORKFLOW_MANAGER_PORT: String(config.WORKFLOW_MANAGER_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         // Path to MCP config file for Docker volume mounting
         MCP_CONFIG_FILE_PATH: mcpConfigPath,
@@ -1020,9 +1023,59 @@ export async function startMCPSystem(
       }
 
       await stopExistingContainers();
-      
+
       // Re-check ports
       portCheck = await checkPortConflicts();
+
+      if (!portCheck.success) {
+        // Conflicts persist even after stopping our own containers - something else
+        // (or another process) still holds these ports. Attempt automatic remediation:
+        // apply the suggested (available) ports, persist them, and retry once before
+        // giving up. This runs on every platform (not just Linux) - when there are no
+        // conflicts, this branch never executes, so Windows behavior is unchanged.
+        logWithCategory('warn', LogCategory.DOCKER,
+          `Port conflicts persist after cleanup on ports: ${portCheck.conflicts.join(', ')}. Attempting automatic port remediation...`);
+
+        if (progressCallback) {
+          progressCallback({
+            message: 'Port conflicts persist. Remapping to available ports...',
+            percent: 16,
+            step: 'port-remediation',
+            status: 'checking',
+          });
+        }
+
+        if (portCheck.suggestedConfig && Array.isArray(portCheck.details) && portCheck.details.length > 0) {
+          // Log prominently which ports are moving before we apply the change
+          for (const detail of portCheck.details) {
+            logWithCategory('warn', LogCategory.DOCKER,
+              `PORT REMAP: ${detail.name} port ${detail.port} is in use - moving to ${detail.suggested}`);
+          }
+
+          const saveResult = await envConfig.saveEnvConfig(portCheck.suggestedConfig);
+
+          if (saveResult.success) {
+            logWithCategory('info', LogCategory.DOCKER,
+              `Auto-remediated port configuration saved to ${saveResult.path}. Retrying startup with new ports...`);
+
+            // Retry the conflict check once with the remediated configuration
+            portCheck = await checkPortConflicts();
+
+            if (portCheck.success) {
+              logWithCategory('info', LogCategory.DOCKER, 'Port remediation succeeded - all ports now available.');
+            } else {
+              logWithCategory('error', LogCategory.DOCKER,
+                `Port remediation retry failed - conflicts remain on ports: ${portCheck.conflicts.join(', ')}`);
+            }
+          } else {
+            logWithCategory('error', LogCategory.DOCKER,
+              `Failed to persist auto-remediated port configuration: ${saveResult.error}`);
+          }
+        } else {
+          logWithCategory('warn', LogCategory.DOCKER,
+            'No suggested port configuration available - cannot auto-remediate port conflicts.');
+        }
+      }
 
       if (!portCheck.success) {
         // Build a detailed error message with process info if available
@@ -1033,21 +1086,16 @@ export async function startMCPSystem(
             if (detail.processInfo) {
               conflictDetails += `:\n  ${detail.processInfo.split('\n').join('\n  ')}`;
             }
-            // Special note for PgBouncer port which cannot be changed
-            if (detail.port === 6432) {
-              conflictDetails += '\n  ⚠️ This port is required by PgBouncer and cannot be changed.';
-              conflictDetails += '\n  You must stop whatever is using port 6432 before starting.';
-            }
           }
         }
 
         const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}.\n` +
           (conflictDetails ? `\nConflict details:${conflictDetails}\n` : '') +
-          `\nThe application attempted to free these ports automatically but was unable to do so.\n\n` +
+          `\nThe application attempted to free these ports automatically (including remapping to suggested alternatives) but was unable to do so.\n\n` +
           `Please try one of the following:\n` +
           `1. Stop any other applications using these ports (check details above)\n` +
           `2. On Linux, run: sudo lsof -i :<port> to see what's using a port\n` +
-          `3. For configurable ports, change them in the Setup Wizard (Environment Configuration step)\n` +
+          `3. For configurable ports, change them in the Setup Wizard (Environment Configuration step) or the Ports settings panel\n` +
           `4. Restart your computer to clear all port locks\n` +
           `5. Check the logs for more details`;
 

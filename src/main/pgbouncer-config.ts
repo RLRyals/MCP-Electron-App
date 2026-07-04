@@ -61,12 +61,19 @@ export async function generatePgBouncerConfig(config: EnvConfig): Promise<{
 
     // Generate pgbouncer.ini content
     // Use container hostname for cross-platform compatibility
+    //
+    // NOTE: listen_port is intentionally hardcoded to 6432, NOT config.PGBOUNCER_PORT.
+    // The container-internal port must stay fixed at 6432 because docker-compose.yml
+    // maps "${PGBOUNCER_PORT}:6432" (host:container) and MCP servers hardwire
+    // fictionlab-pgbouncer:6432 for internal networking. Only the HOST-side publish
+    // port (config.PGBOUNCER_PORT) is allowed to move; PgBouncer inside the container
+    // must always listen on 6432 or the compose port mapping breaks.
     const iniContent = `[databases]
 * = host=postgres port=5432 dbname=${config.POSTGRES_DB}
 
 [pgbouncer]
 listen_addr = *
-listen_port = ${config.PGBOUNCER_PORT}
+listen_port = 6432
 auth_type = scram-sha-256
 auth_file = /etc/pgbouncer/userlist.txt
 admin_users = ${config.POSTGRES_USER}

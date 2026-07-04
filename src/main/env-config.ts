@@ -29,6 +29,8 @@ export interface EnvConfig {
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
   PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
   TYPING_MIND_PORT: number;
   GITHUB_TOKEN?: string;
 }
@@ -46,6 +48,8 @@ export const DEFAULT_CONFIG: EnvConfig = {
   DB_ADMIN_PORT: 3010,
   MCP_AUTH_TOKEN: '',
   PGBOUNCER_PORT: 6432,
+  NPE_PORT: 3011,
+  WORKFLOW_MANAGER_PORT: 3012,
   TYPING_MIND_PORT: 8080,
   GITHUB_TOKEN: '',
 };
@@ -453,6 +457,8 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.HTTP_SSE_PORT, name: 'HTTP/SSE', key: 'HTTP_SSE_PORT' as const },
     { port: config.DB_ADMIN_PORT, name: 'DB Admin', key: 'DB_ADMIN_PORT' as const },
     { port: config.PGBOUNCER_PORT, name: 'PgBouncer', key: 'PGBOUNCER_PORT' as const },
+    { port: config.NPE_PORT, name: 'NPE Server', key: 'NPE_PORT' as const },
+    { port: config.WORKFLOW_MANAGER_PORT, name: 'Workflow Manager', key: 'WORKFLOW_MANAGER_PORT' as const },
   ];
 
   // Check configurable ports
@@ -620,6 +626,12 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'PGBOUNCER_PORT':
           config.PGBOUNCER_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'NPE_PORT':
+          config.NPE_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'WORKFLOW_MANAGER_PORT':
+          config.WORKFLOW_MANAGER_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -720,6 +732,8 @@ export function formatEnvFile(config: EnvConfig): string {
     `DB_ADMIN_PORT=${config.DB_ADMIN_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
     `PGBOUNCER_PORT=${config.PGBOUNCER_PORT}`,
+    `NPE_PORT=${config.NPE_PORT}`,
+    `WORKFLOW_MANAGER_PORT=${config.WORKFLOW_MANAGER_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -809,6 +823,16 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const pgBouncerPortValidation = validatePort(config.PGBOUNCER_PORT);
   if (!pgBouncerPortValidation.valid) {
     errors.push(`PgBouncer port: ${pgBouncerPortValidation.error}`);
+  }
+
+  const npePortValidation = validatePort(config.NPE_PORT);
+  if (!npePortValidation.valid) {
+    errors.push(`NPE port: ${npePortValidation.error}`);
+  }
+
+  const workflowManagerPortValidation = validatePort(config.WORKFLOW_MANAGER_PORT);
+  if (!workflowManagerPortValidation.valid) {
+    errors.push(`Workflow Manager port: ${workflowManagerPortValidation.error}`);
   }
 
   // Validate auth token
