@@ -232,6 +232,9 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       PGBOUNCER_PORT: currentEnvConfig?.PGBOUNCER_PORT || 6432,
       NPE_PORT: currentEnvConfig?.NPE_PORT || 3011,
       WORKFLOW_MANAGER_PORT: currentEnvConfig?.WORKFLOW_MANAGER_PORT || 3012,
+      // Not exposed as a form field on this form - preserve existing value so a
+      // re-save doesn't silently erase a stored GitHub token
+      GITHUB_TOKEN: currentEnvConfig?.GITHUB_TOKEN,
     };
 
     const validation = await (window as any).electronAPI.envConfig.validateConfig(config);

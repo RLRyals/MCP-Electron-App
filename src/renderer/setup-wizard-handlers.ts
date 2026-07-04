@@ -736,6 +736,9 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             // Not exposed in this wizard step - preserve existing value, default otherwise
             NPE_PORT: currentConfig?.NPE_PORT || 3011,
             WORKFLOW_MANAGER_PORT: currentConfig?.WORKFLOW_MANAGER_PORT || 3012,
+            // Not exposed in this wizard step - preserve existing value so a re-save
+            // doesn't silently erase a stored GitHub token
+            GITHUB_TOKEN: currentConfig?.GITHUB_TOKEN,
         };
 
         // Check if .env file actually exists on disk
