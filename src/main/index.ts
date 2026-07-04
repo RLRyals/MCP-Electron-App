@@ -2529,7 +2529,7 @@ function setupIPC(): void {
           name: 'Claude Code (Default)',
           enabled: true,
           config: {
-            model: 'claude-sonnet-4-5',
+            model: 'default',
             headless: true,
             outputFormat: 'text'
           }
