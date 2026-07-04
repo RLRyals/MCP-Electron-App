@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { logWithCategory, LogCategory } from './logger';
 import { PluginLoader } from './plugin-loader';
 import { createPluginContext } from './plugin-context';
+import { unrecordHandler } from './ipc-registry';
 import {
   PluginState,
   PluginManifest,
@@ -297,6 +298,7 @@ export class PluginRegistry extends EventEmitter {
       for (const channel of state.ipcChannels) {
         const { ipcMain } = require('electron');
         ipcMain.removeHandler(channel);
+        unrecordHandler(channel);
       }
       state.ipcChannels = [];
 
