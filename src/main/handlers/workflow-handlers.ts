@@ -7,6 +7,12 @@ import { logWithCategory, LogCategory } from '../logger';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
 import { ClaudeCodeExporter, ExportOptions } from '../workflow/exporters/claude-code-exporter';
+import {
+  slugifyWorkflowName,
+  resolveUniqueWorkflowId,
+  buildNewWorkflowDefinition,
+  DEFAULT_NEW_WORKFLOW_VERSION,
+} from '../workflow/create-workflow';
 import type { WorkflowUpdate, ActiveWorkflowInstance } from '../../types/workflow';
 
 /**
@@ -130,6 +136,69 @@ export function registerWorkflowHandlers() {
       return definition;
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Get definition failed', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  });
+
+  // Create a brand-new (empty) workflow the canvas editor can immediately edit.
+  // Lives alongside the graph editing verbs (add-node/add-edge/...) because it
+  // must cooperate with them. Persists through the SAME upsert path the importer
+  // uses (import_workflow_definition), so the plugin's workflow:list/get — which
+  // read the same DB via the workflow-manager MCP — pick up the new row.
+  registerHandler('workflow:create', "Create a new empty workflow definition", async (_event: Electron.IpcMainInvokeEvent, { name, description }: { name?: string; description?: string }) => {
+    const trimmedName = (name || '').trim();
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Create workflow "${trimmedName}"`);
+    try {
+      if (!trimmedName) {
+        throw new Error('Workflow name is required');
+      }
+
+      const client = await getWorkflowClient();
+
+      // Collect existing workflow_ids so we can auto-suffix duplicates instead of
+      // silently overwriting via ON CONFLICT (workflow_id, version) DO UPDATE.
+      // If the lookup itself fails, we CANNOT proceed: import_workflow_definition
+      // upserts on (workflow_id, version), so creating with an unverified slug
+      // could silently replace an existing workflow's graph with an empty one.
+      let existingIds: Set<string>;
+      try {
+        const defs = await client.getWorkflowDefinitions();
+        existingIds = new Set(
+          (defs || [])
+            .map((d: any) => d.workflow_id || d.id)
+            .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+        );
+      } catch (lookupError: any) {
+        logWithCategory('error', LogCategory.WORKFLOW,
+          `Could not load existing workflows for uniqueness check: ${lookupError.message}`);
+        throw new Error(
+          'Could not verify workflow name uniqueness (workflow service unavailable) — please try again.'
+        );
+      }
+
+      const baseSlug = slugifyWorkflowName(trimmedName);
+      const workflowId = resolveUniqueWorkflowId(baseSlug, existingIds);
+
+      const definition = buildNewWorkflowDefinition({
+        id: workflowId,
+        name: trimmedName,
+        description,
+      });
+
+      // Same upsert path as the folder importer.
+      await client.importWorkflowDefinition(definition);
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `IPC: Created workflow ${workflowId} v${DEFAULT_NEW_WORKFLOW_VERSION}`);
+
+      // Return the same shape workflow:get returns: the raw DB row with id mapped
+      // from workflow_id (the plugin's runner does the same mapping for UI use).
+      const created = await client.getWorkflowDefinition(workflowId, DEFAULT_NEW_WORKFLOW_VERSION);
+      return {
+        ...(created as any),
+        id: (created as any)?.workflow_id || workflowId,
+      };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Create workflow failed', { error: error.message, stack: error.stack });
       throw error;
     }
   });
