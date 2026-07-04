@@ -314,7 +314,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
               </span>
             </label>
             <div style={{ fontSize: '12px', color: '#6b7280', marginLeft: '24px', marginTop: '4px' }}>
-              Creates .claude/, planning/, books/, and exports/ directories
+              Creates .claude/, outputs/, and series-planning/ directories
             </div>
           </div>
 
