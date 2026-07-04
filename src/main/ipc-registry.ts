@@ -69,7 +69,8 @@ export function unrecordHandler(channel: string): void {
  * channels whose name starts with `prefix`.
  */
 export function getRegisteredHandlers(prefix?: string): IpcHandlerInfo[] {
-  const entries = prefix ? registry.filter((entry) => entry.channel.startsWith(prefix)) : registry.slice();
+  const entries =
+    typeof prefix === 'string' ? registry.filter((entry) => entry.channel.startsWith(prefix)) : registry.slice();
   return entries.slice().sort((a, b) => a.channel.localeCompare(b.channel));
 }
 
