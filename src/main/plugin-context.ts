@@ -11,6 +11,7 @@ import * as fs from 'fs-extra';
 import { Pool, PoolClient } from 'pg';
 import axios from 'axios';
 import { PersistentMCPClient } from './workflow/persistent-mcp-client';
+import { recordHandler, unrecordHandler } from './ipc-registry';
 
 // Singleton instance of PersistentMCPClient for workflow-manager stdio communication
 let workflowMCPClient: PersistentMCPClient | null = null;
@@ -742,6 +743,7 @@ function createPluginIPC(pluginId: string): PluginIPC {
       const fullChannel = `plugin:${pluginId}:${channel}`;
       ipcMain.handle(fullChannel, handler);
       registeredChannels.push(fullChannel);
+      recordHandler(fullChannel, '', `plugin:${pluginId}`);
       logWithCategory('debug', LogCategory.SYSTEM, `Plugin ${pluginId} registered IPC handler: ${fullChannel}`);
     },
 
@@ -755,6 +757,7 @@ function createPluginIPC(pluginId: string): PluginIPC {
     removeHandler(channel: string): void {
       const fullChannel = `plugin:${pluginId}:${channel}`;
       ipcMain.removeHandler(fullChannel);
+      unrecordHandler(fullChannel);
       const index = registeredChannels.indexOf(fullChannel);
       if (index > -1) {
         registeredChannels.splice(index, 1);

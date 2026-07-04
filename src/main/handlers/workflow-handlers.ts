@@ -1,4 +1,5 @@
-import { ipcMain, BrowserWindow, dialog } from 'electron';
+import { BrowserWindow, dialog } from 'electron';
+import { registerHandler } from '../ipc-registry';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
@@ -107,7 +108,7 @@ async function getWorkflowClient(): Promise<PersistentMCPClient> {
  */
 export function registerWorkflowHandlers() {
   // Update node positions in workflow canvas
-  ipcMain.handle('workflow:update-positions', async (_event, { workflowId, positions }) => {
+  registerHandler('workflow:update-positions', "Update node positions in a workflow canvas", async (_event, { workflowId, positions }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update positions for workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -121,7 +122,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Get workflow definition
-  ipcMain.handle('workflow:get-definition', async (_event, workflowId, version?) => {
+  registerHandler('workflow:get-definition', "Get a workflow definition by id (and optional version)", async (_event, workflowId, version?) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Get definition for workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -134,7 +135,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Add node to workflow (graph-based)
-  ipcMain.handle('workflow:add-node', async (_event, { workflowId, node }) => {
+  registerHandler('workflow:add-node', "Add a node to a workflow", async (_event, { workflowId, node }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Add node to workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -151,7 +152,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Update node in workflow (graph-based)
-  ipcMain.handle('workflow:update-node', async (_event, { workflowId, nodeId, updates }) => {
+  registerHandler('workflow:update-node', "Update a workflow node", async (_event, { workflowId, nodeId, updates }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update node ${nodeId} in workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -164,7 +165,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Delete node from workflow (graph-based)
-  ipcMain.handle('workflow:delete-node', async (_event, { workflowId, nodeId }) => {
+  registerHandler('workflow:delete-node', "Delete a workflow node", async (_event, { workflowId, nodeId }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Delete node ${nodeId} from workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -177,7 +178,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Add edge to workflow (graph-based)
-  ipcMain.handle('workflow:add-edge', async (_event, { workflowId, edge }) => {
+  registerHandler('workflow:add-edge', "Add an edge to a workflow", async (_event, { workflowId, edge }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Add edge to workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -198,7 +199,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Update edge in workflow (graph-based)
-  ipcMain.handle('workflow:update-edge', async (_event, { workflowId, edgeId, updates }) => {
+  registerHandler('workflow:update-edge', "Update a workflow edge", async (_event, { workflowId, edgeId, updates }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Update edge ${edgeId} in workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -211,7 +212,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Delete edge from workflow (graph-based)
-  ipcMain.handle('workflow:delete-edge', async (_event, { workflowId, edgeId }) => {
+  registerHandler('workflow:delete-edge', "Delete a workflow edge", async (_event, { workflowId, edgeId }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Delete edge ${edgeId} from workflow ${workflowId}`);
     try {
       const client = await getWorkflowClient();
@@ -224,7 +225,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Preview workflow from folder
-  ipcMain.handle('workflow:preview', async (_event, folderPath: string) => {
+  registerHandler('workflow:preview', "Preview a workflow from a folder path", async (_event, folderPath: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Preview workflow from ${folderPath}`);
     try {
       const { FolderImporter } = await import('../workflow/folder-importer');
@@ -238,7 +239,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Get installed agents from ~/.claude/agents/
-  ipcMain.handle('workflow:get-installed-agents', async () => {
+  registerHandler('workflow:get-installed-agents', "List installed Claude Code agents", async () => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Get installed agents');
     try {
       const resolver = new DependencyResolver();
@@ -252,7 +253,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Get installed skills from ~/.claude/skills/
-  ipcMain.handle('workflow:get-installed-skills', async () => {
+  registerHandler('workflow:get-installed-skills', "List installed Claude Code skills", async () => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Get installed skills');
     try {
       const resolver = new DependencyResolver();
@@ -266,7 +267,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Get installed output-styles from ~/.claude/output-styles/
-  ipcMain.handle('workflow:get-installed-output-styles', async () => {
+  registerHandler('workflow:get-installed-output-styles', "List installed Claude Code output styles", async () => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Get installed output-styles');
     try {
       const resolver = new DependencyResolver();
@@ -284,7 +285,7 @@ export function registerWorkflowHandlers() {
   // ============================================
 
   // Read agent file from ~/.claude/agents/
-  ipcMain.handle('document:read-agent', async (_event, agentName: string) => {
+  registerHandler('document:read-agent', "", async (_event, agentName: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read agent file: ${agentName}`);
     try {
       const homeDir = os.homedir();
@@ -303,7 +304,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Write agent file to ~/.claude/agents/
-  ipcMain.handle('document:write-agent', async (_event, agentName: string, content: string) => {
+  registerHandler('document:write-agent', "", async (_event, agentName: string, content: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write agent file: ${agentName}`);
     try {
       const homeDir = os.homedir();
@@ -323,7 +324,7 @@ export function registerWorkflowHandlers() {
 
   // Read skill file from ~/.claude/skills/
   // Supports both single file (.md) and directory format (SKILL.md)
-  ipcMain.handle('document:read-skill', async (_event, skillName: string) => {
+  registerHandler('document:read-skill', "", async (_event, skillName: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read skill file: ${skillName}`);
     try {
       const homeDir = os.homedir();
@@ -352,7 +353,7 @@ export function registerWorkflowHandlers() {
 
   // Write skill file to ~/.claude/skills/
   // Uses provided filePath or auto-detects format
-  ipcMain.handle('document:write-skill', async (_event, skillName: string, content: string, filePath?: string) => {
+  registerHandler('document:write-skill', "", async (_event, skillName: string, content: string, filePath?: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write skill file: ${skillName}`);
     try {
       const homeDir = os.homedir();
@@ -386,7 +387,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Read output-style file from ~/.claude/output-styles/
-  ipcMain.handle('document:read-output-style', async (_event, styleName: string) => {
+  registerHandler('document:read-output-style', "", async (_event, styleName: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Read output-style file: ${styleName}`);
     try {
       const homeDir = os.homedir();
@@ -405,7 +406,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Write output-style file to ~/.claude/output-styles/
-  ipcMain.handle('document:write-output-style', async (_event, styleName: string, content: string) => {
+  registerHandler('document:write-output-style', "", async (_event, styleName: string, content: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Write output-style file: ${styleName}`);
     try {
       const homeDir = os.homedir();
@@ -424,7 +425,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Delete output-style file
-  ipcMain.handle('document:delete-output-style', async (_event, styleName: string) => {
+  registerHandler('document:delete-output-style', "", async (_event, styleName: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Delete output-style file: ${styleName}`);
     try {
       const homeDir = os.homedir();
@@ -448,7 +449,7 @@ export function registerWorkflowHandlers() {
 
   // Import output-style from single file
   // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
-  ipcMain.handle('document:import-output-style-file', async (event) => {
+  registerHandler('document:import-output-style-file', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style file');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -478,7 +479,7 @@ export function registerWorkflowHandlers() {
 
   // Import output-styles from folder
   // Returns array of { fileName, content } for renderer to process (allows user confirmation)
-  ipcMain.handle('document:import-output-style-folder', async (event) => {
+  registerHandler('document:import-output-style-folder', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import output-style folder');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -514,7 +515,7 @@ export function registerWorkflowHandlers() {
 
   // Import agent from single file
   // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
-  ipcMain.handle('document:import-agent-file', async (event) => {
+  registerHandler('document:import-agent-file', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent file');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -544,7 +545,7 @@ export function registerWorkflowHandlers() {
 
   // Import agents from folder
   // Returns array of { fileName, content } for renderer to process (allows user confirmation)
-  ipcMain.handle('document:import-agent-folder', async (event) => {
+  registerHandler('document:import-agent-folder', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import agent folder');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -580,7 +581,7 @@ export function registerWorkflowHandlers() {
 
   // Import skill from single file
   // Returns { fileName, content } for renderer to process (allows user rename and confirmation)
-  ipcMain.handle('document:import-skill-file', async (event) => {
+  registerHandler('document:import-skill-file', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill file');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -610,7 +611,7 @@ export function registerWorkflowHandlers() {
 
   // Import skills from folder (supports both single files and directory format)
   // Returns array of { fileName, content } for renderer to process (allows user confirmation)
-  ipcMain.handle('document:import-skill-folder', async (event) => {
+  registerHandler('document:import-skill-folder', "", async (event) => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Import skill folder');
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -668,7 +669,7 @@ export function registerWorkflowHandlers() {
   }
 
   // List all active workflows
-  ipcMain.handle('workflow:list-active', async () => {
+  registerHandler('workflow:list-active', "List active workflow instances", async () => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: List active workflows');
     try {
       const client = await getWorkflowClient();
@@ -684,7 +685,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Pause a workflow
-  ipcMain.handle('workflow:pause', async (_event, registryId: string) => {
+  registerHandler('workflow:pause', "Pause an active workflow", async (_event, registryId: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Pause workflow ${registryId}`);
     try {
       const client = await getWorkflowClient();
@@ -706,7 +707,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Resume a workflow
-  ipcMain.handle('workflow:resume', async (_event, registryId: string) => {
+  registerHandler('workflow:resume', "Resume a paused workflow", async (_event, registryId: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Resume workflow ${registryId}`);
     try {
       const client = await getWorkflowClient();
@@ -728,7 +729,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Cancel a workflow
-  ipcMain.handle('workflow:cancel', async (_event, registryId: string) => {
+  registerHandler('workflow:cancel', "Cancel an active workflow", async (_event, registryId: string) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Cancel workflow ${registryId}`);
     try {
       const client = await getWorkflowClient();
@@ -750,7 +751,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Jump to a specific node in a workflow
-  ipcMain.handle('workflow:jump-to-node', async (_event, { registryId, nodeId }: { registryId: string; nodeId: string }) => {
+  registerHandler('workflow:jump-to-node', "Jump an active workflow to a specific node", async (_event, { registryId, nodeId }: { registryId: string; nodeId: string }) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Jump to node ${nodeId} in workflow ${registryId}`);
     try {
       const client = await getWorkflowClient();
@@ -772,7 +773,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Register an active workflow (called when starting a workflow)
-  ipcMain.handle('workflow:register-active', async (_event, params: {
+  registerHandler('workflow:register-active', "Register a new active workflow instance", async (_event, params: {
     workflowId: string;
     workflowName: string;
     source: 'fictionlab_ui' | 'claude_code' | 'typingmind';
@@ -811,7 +812,7 @@ export function registerWorkflowHandlers() {
 
   // Update workflow progress (called during execution)
   // Accepts both naming conventions: nodeId/nodeName OR currentNodeId/currentNodeName
-  ipcMain.handle('workflow:update-progress', async (_event, params: {
+  registerHandler('workflow:update-progress', "Update progress for an active workflow instance", async (_event, params: {
     registryId: string;
     nodeId?: string;
     nodeName?: string;
@@ -864,7 +865,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Mark a node as started (sets current node)
-  ipcMain.handle('workflow:mark-node-started', async (_event, { registryId, nodeId, nodeName, loopIteration }: {
+  registerHandler('workflow:mark-node-started', "Mark a workflow node as started", async (_event, { registryId, nodeId, nodeName, loopIteration }: {
     registryId: string;
     nodeId: string;
     nodeName: string;
@@ -895,7 +896,7 @@ export function registerWorkflowHandlers() {
   });
 
   // Mark a node as completed (adds to completedNodeIds)
-  ipcMain.handle('workflow:mark-node-completed', async (_event, { registryId, nodeId, loopIteration }: {
+  registerHandler('workflow:mark-node-completed', "Mark a workflow node as completed", async (_event, { registryId, nodeId, loopIteration }: {
     registryId: string;
     nodeId: string;
     loopIteration?: number;
@@ -928,7 +929,7 @@ export function registerWorkflowHandlers() {
   // ============================================
 
   // Export workflow to Claude Code format
-  ipcMain.handle('workflow:export-claude-code', async (_event, workflowId: string, options?: ExportOptions) => {
+  registerHandler('workflow:export-claude-code', "Export a workflow to Claude Code format", async (_event, workflowId: string, options?: ExportOptions) => {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Export workflow ${workflowId} to Claude Code format`);
     try {
       const exporter = new ClaudeCodeExporter();
