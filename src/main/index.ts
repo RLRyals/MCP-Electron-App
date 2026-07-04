@@ -2918,13 +2918,29 @@ app.whenReady().then(async () => {
       app.quit();
       return;
     }
-    if (choice.response === 1) {
-      await docker.startDockerDesktop();
-    }
+    // Give the gate one more shot (Retry, or after opening Docker Desktop).
+    // Bounded: if this second attempt itself throws, don't let the rejection
+    // escape the promise chain and leave the app with no window and no
+    // dialog - show a final error and quit instead.
+    try {
+      if (choice.response === 1) {
+        await docker.startDockerDesktop();
+      }
 
-    // Give the gate one more shot (Retry, or after opening Docker Desktop)
-    const retryReady = await ensureDockerReadyForLaunch();
-    if (!retryReady) {
+      const retryReady = await ensureDockerReadyForLaunch();
+      if (!retryReady) {
+        app.quit();
+        return;
+      }
+    } catch (retryError: any) {
+      const retryErrorMessage = retryError.message || String(retryError);
+      logWithCategory('error', LogCategory.DOCKER, `Docker readiness retry failed: ${retryErrorMessage}`);
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Docker Required',
+        message: 'Docker Desktop could not be verified',
+        detail: `Error: ${retryErrorMessage}\n\nThe application will now close.`,
+      });
       app.quit();
       return;
     }
