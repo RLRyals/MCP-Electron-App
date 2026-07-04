@@ -145,7 +145,7 @@ export function registerWorkflowHandlers() {
   // must cooperate with them. Persists through the SAME upsert path the importer
   // uses (import_workflow_definition), so the plugin's workflow:list/get — which
   // read the same DB via the workflow-manager MCP — pick up the new row.
-  ipcMain.handle('workflow:create', async (_event, { name, description }: { name?: string; description?: string }) => {
+  registerHandler('workflow:create', "Create a new empty workflow definition", async (_event: Electron.IpcMainInvokeEvent, { name, description }: { name?: string; description?: string }) => {
     const trimmedName = (name || '').trim();
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Create workflow "${trimmedName}"`);
     try {
