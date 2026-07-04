@@ -2693,6 +2693,153 @@ function setupIPC(): void {
   logger.info('IPC handlers registered');
 }
 
+/**
+ * Launch-time Docker readiness gate.
+ *
+ * Replaces the old single-shot `docker info` (CLI-only, no retry, no process
+ * awareness) with:
+ *   1. A direct dockerode daemon ping (authoritative - independent of the
+ *      `docker` CLI being slow/missing on PATH).
+ *   2. If unreachable, check whether Docker Desktop's process is already
+ *      running - if so, this is the "still initializing" case: poll the ping
+ *      for up to ~90s and do NOT relaunch it.
+ *   3. If the process isn't running, start Docker Desktop (tray-only - the
+ *      dashboard window is controlled by Docker Desktop's own startup
+ *      setting) and poll the ping for up to ~120s.
+ *   4. Once the daemon is reachable, ensure the core containers
+ *      (postgres/pgbouncer) are up via mcpSystem.ensureCoreContainers()
+ *      before returning, so the DB pool init that follows doesn't hit a cold
+ *      database.
+ *
+ * Returns true when it's safe to proceed, false when the user chose to quit.
+ * Never calls app.quit() itself - caller owns that decision.
+ */
+async function ensureDockerReadyForLaunch(): Promise<boolean> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    logWithCategory('info', LogCategory.DOCKER, 'Pinging Docker daemon (dockerode)...');
+    const pingResult = await docker.pingDockerDaemon();
+    let daemonReady = pingResult.reachable;
+
+    if (!daemonReady) {
+      const processRunning = await docker.isDockerDesktopProcessRunning();
+
+      if (processRunning) {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process is running but daemon is not responding yet - ' +
+          'treating as still-initializing and polling (no relaunch)...');
+
+        const waitResult = await docker.waitForDockerPingReady(90, (progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker init wait: ${progress.message} (${progress.percent}%)`);
+        });
+        daemonReady = waitResult.success;
+      } else {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process is not running - starting it...');
+
+        const startResult = await docker.startDockerDesktop((progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker start: ${progress.message} (${progress.percent}%)`);
+        });
+
+        if (!startResult.success) {
+          logWithCategory('warn', LogCategory.DOCKER,
+            `startDockerDesktop reported failure (continuing to poll anyway): ${startResult.error}`);
+        }
+
+        const waitResult = await docker.waitForDockerPingReady(120, (progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker start wait: ${progress.message} (${progress.percent}%)`);
+        });
+        daemonReady = waitResult.success;
+      }
+    }
+
+    if (!daemonReady) {
+      // Secondary confirmation via the CLI before giving up entirely - the ping
+      // is authoritative, but this catches the unlikely case of a socket/pipe
+      // probe issue where the CLI path would still work.
+      const cliStatus = await docker.checkDockerHealth();
+      daemonReady = cliStatus.running && cliStatus.healthy;
+
+      if (daemonReady) {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Daemon ping failed but CLI confirms Docker is healthy - proceeding');
+      }
+    }
+
+    if (daemonReady) {
+      logWithCategory('info', LogCategory.DOCKER, 'Docker daemon is reachable - ensuring core containers...');
+
+      const containerResult = await mcpSystem.ensureCoreContainers((progress) => {
+        logWithCategory('debug', LogCategory.DOCKER,
+          `Core container startup: ${progress.message} (${progress.percent}%)`);
+      });
+
+      if (containerResult.success) {
+        return true;
+      }
+
+      if (containerResult.error === 'INVALID_CONFIG') {
+        // First-run case: env config (MCP_AUTH_TOKEN/POSTGRES_PASSWORD) isn't
+        // written yet. That's the setup wizard's job, not this gate's - let
+        // launch proceed so isFirstRun()/createWizardWindow() can run.
+        logWithCategory('info', LogCategory.DOCKER,
+          'Core containers not started - environment not configured yet (first run). Deferring to setup wizard.');
+        return true;
+      }
+
+      // Surface the result (including PORT_CONFLICT) - never swallow it.
+      logWithCategory('error', LogCategory.DOCKER,
+        `Failed to ensure core containers (${containerResult.error}): ${containerResult.message}`);
+
+      const isPortConflict = containerResult.error === 'PORT_CONFLICT';
+      const choice = await dialog.showMessageBox({
+        type: 'error',
+        title: isPortConflict ? 'Port Conflict' : 'Container Startup Failed',
+        message: isPortConflict
+          ? 'A required port is already in use'
+          : 'Could not start required Docker containers',
+        detail: `${containerResult.message}\n\nWould you like to retry, open Docker Desktop to investigate, or quit?`,
+        buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+        defaultId: 0,
+        cancelId: 2,
+      });
+
+      if (choice.response === 0) continue; // Retry the whole gate
+      if (choice.response === 1) {
+        await docker.startDockerDesktop();
+        continue; // Loop back and re-check after giving the user a look
+      }
+      return false; // Quit
+    }
+
+    // Daemon genuinely unreachable - offer Retry / Open Docker Desktop / Quit
+    // instead of exiting immediately.
+    const choice = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Docker Desktop Required',
+      message: 'Docker daemon is not responding',
+      detail:
+        `FictionLab could not reach the Docker daemon.\n\n` +
+        (pingResult.error ? `Last error: ${pingResult.error}\n\n` : '') +
+        `Make sure Docker Desktop is installed and running, then click Retry. ` +
+        `If it's still starting up, give it a few more seconds first.`,
+      buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+    });
+
+    if (choice.response === 0) continue;
+    if (choice.response === 1) {
+      await docker.startDockerDesktop();
+      continue;
+    }
+    return false;
+  }
+}
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   // Initialize logging system after app is ready
@@ -2739,50 +2886,48 @@ app.whenReady().then(async () => {
       return;
     }
 
-    // Docker is installed, now check if it's running
-    const dockerStatus = await docker.checkDockerHealth();
-
-    if (!dockerStatus.running || !dockerStatus.healthy) {
-      logWithCategory('warn', LogCategory.DOCKER,
-        `Docker daemon is not ready (running: ${dockerStatus.running}, healthy: ${dockerStatus.healthy}): ${dockerStatus.message}`);
-
-      // Attempt to start Docker Desktop
-      logWithCategory('info', LogCategory.DOCKER, 'Attempting to start Docker Desktop...');
-      const startResult = await docker.startAndWaitForDocker((progress) => {
-        logWithCategory('debug', LogCategory.DOCKER,
-          `Docker startup progress: ${progress.message} (${progress.percent}%)`);
-      });
-
-      if (!startResult.success) {
-        // Failed to start Docker - show error and quit
-        const errorMessage =
-          `Docker Desktop is required to run this application but failed to start.\n\n` +
-          `Error: ${startResult.error || startResult.message}\n\n` +
-          `Please start Docker Desktop manually and try again.\n\n` +
-          `The application will now exit.`;
-
-        logWithCategory('error', LogCategory.DOCKER, errorMessage);
-        dialog.showErrorBox('Docker Required', errorMessage);
-        app.quit();
-        return;
-      }
-
-      logWithCategory('info', LogCategory.DOCKER, 'Docker Desktop started successfully');
-    } else {
-      logWithCategory('info', LogCategory.DOCKER, 'Docker is already running and healthy');
+    // Docker is installed - run the daemon-ping-first readiness gate (with
+    // process-awareness, retries, and container startup). Offers Retry/Open/Quit
+    // on failure instead of exiting immediately.
+    const dockerReady = await ensureDockerReadyForLaunch();
+    if (!dockerReady) {
+      logWithCategory('warn', LogCategory.DOCKER, 'User chose to quit from the Docker readiness gate');
+      app.quit();
+      return;
     }
-  } catch (error: any) {
-    const errorMessage =
-      `Failed to check or start Docker Desktop.\n\n` +
-      `Error: ${error.message}\n\n` +
-      `Docker Desktop is required to run this application.\n` +
-      `Please ensure Docker Desktop is installed and start it manually.\n\n` +
-      `The application will now exit.`;
 
-    logWithCategory('error', LogCategory.DOCKER, errorMessage);
-    dialog.showErrorBox('Docker Required', errorMessage);
-    app.quit();
-    return;
+    logWithCategory('info', LogCategory.DOCKER, 'Docker daemon and core containers are ready');
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.DOCKER, `Unexpected error in Docker readiness gate: ${errorMessage}`);
+
+    const choice = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Docker Required',
+      message: 'Unexpected error while checking Docker Desktop',
+      detail:
+        `Error: ${errorMessage}\n\n` +
+        `Docker Desktop is required to run this application.\n\n` +
+        `Would you like to retry, open Docker Desktop, or quit?`,
+      buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+    });
+
+    if (choice.response === 2) {
+      app.quit();
+      return;
+    }
+    if (choice.response === 1) {
+      await docker.startDockerDesktop();
+    }
+
+    // Give the gate one more shot (Retry, or after opening Docker Desktop)
+    const retryReady = await ensureDockerReadyForLaunch();
+    if (!retryReady) {
+      app.quit();
+      return;
+    }
   }
 
   setupIPC();
