@@ -81,10 +81,17 @@ function getIconPath(): string {
 }
 
 /**
- * Create the application menu
+ * Build the base application menu template.
+ *
+ * Returns a fresh `MenuItemConstructorOptions[]` array (plain options, not live
+ * `MenuItem` instances) every time it's called. Other modules (e.g.
+ * plugin-manager's `updatePluginMenu()`) should build the full menu by
+ * splicing into a fresh copy of this template rather than reading back
+ * `Menu.getApplicationMenu().items` — round-tripping live MenuItem instances
+ * through `Menu.buildFromTemplate()` silently drops their `click` handlers.
  */
-function createMenu(): void {
-  const template: Electron.MenuItemConstructorOptions[] = [
+export function getBaseMenuTemplate(): Electron.MenuItemConstructorOptions[] {
+  return [
     {
       label: 'File',
       submenu: [
@@ -245,8 +252,13 @@ function createMenu(): void {
       ],
     },
   ];
+}
 
-  const menu = Menu.buildFromTemplate(template);
+/**
+ * Create the application menu
+ */
+function createMenu(): void {
+  const menu = Menu.buildFromTemplate(getBaseMenuTemplate());
   Menu.setApplicationMenu(menu);
 }
 

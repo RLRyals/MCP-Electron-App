@@ -9,6 +9,7 @@ import { app, BrowserWindow, Menu, MenuItem as ElectronMenuItem, dialog } from '
 import { logWithCategory, LogCategory } from './logger';
 import { PluginRegistry } from './plugin-registry';
 import { getDatabasePool, initializeDatabasePool } from './database-connection';
+import { getBaseMenuTemplate } from './index';
 import {
   PluginState,
   PluginNotification,
@@ -181,15 +182,6 @@ class PluginManager {
       return;
     }
 
-    // Get menu template
-    const menu = Menu.getApplicationMenu();
-    if (!menu) {
-      return;
-    }
-
-    // Find or create Plugins menu
-    let pluginMenuIndex = menu.items.findIndex(item => item.label === 'Plugins');
-
     const activePlugins = this.registry.getPluginsByStatus('active');
 
     // Build plugin menu items
@@ -248,38 +240,26 @@ class PluginManager {
       });
     }
 
-    // Create/update Plugins menu
-    if (pluginMenuIndex === -1) {
-      // Add new Plugins menu after View menu
-      const viewMenuIndex = menu.items.findIndex(item => item.label === 'View');
-      const insertIndex = viewMenuIndex !== -1 ? viewMenuIndex + 1 : menu.items.length;
+    // Rebuild the full menu from the base template every time rather than
+    // reading back Menu.getApplicationMenu().items. That base template is
+    // plain MenuItemConstructorOptions (never live MenuItem instances), so
+    // click handlers on every submenu survive the rebuild, and rebuilding
+    // from source each time makes repeated calls idempotent — no
+    // accumulation of stale/duplicate Plugins menus.
+    const baseTemplate = getBaseMenuTemplate();
+    const viewMenuIndex = baseTemplate.findIndex(item => item.label === 'View');
+    const insertIndex = viewMenuIndex !== -1 ? viewMenuIndex + 1 : baseTemplate.length;
 
-      const newMenu = Menu.buildFromTemplate([
-        ...menu.items.slice(0, insertIndex),
-        {
-          label: 'Plugins',
-          submenu: pluginMenuItems,
-        },
-        ...menu.items.slice(insertIndex),
-      ]);
+    const fullTemplate: Electron.MenuItemConstructorOptions[] = [
+      ...baseTemplate.slice(0, insertIndex),
+      {
+        label: 'Plugins',
+        submenu: pluginMenuItems,
+      },
+      ...baseTemplate.slice(insertIndex),
+    ];
 
-      Menu.setApplicationMenu(newMenu);
-    } else {
-      // Update existing Plugins menu
-      const newMenu = Menu.buildFromTemplate(
-        menu.items.map((item, index) => {
-          if (index === pluginMenuIndex) {
-            return {
-              label: 'Plugins',
-              submenu: pluginMenuItems,
-            };
-          }
-          return item;
-        })
-      );
-
-      Menu.setApplicationMenu(newMenu);
-    }
+    Menu.setApplicationMenu(Menu.buildFromTemplate(fullTemplate));
 
     logWithCategory('debug', LogCategory.SYSTEM, 'Plugin menu updated');
   }
