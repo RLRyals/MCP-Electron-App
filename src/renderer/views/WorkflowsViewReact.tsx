@@ -28,6 +28,13 @@ import type { Project } from '../../types/project.js';
 // Plugin IPC channel prefix for workflow plugin
 const WORKFLOW_PLUGIN = 'plugin:fictionlab-workflow:';
 
+// Bridge between the class-based View.handleAction() (called from the TopBar's
+// 'action-clicked' event via ViewRouter, see renderer.ts) and the WorkflowsApp
+// function component's internal state/handlers. Only one WorkflowsApp instance
+// is ever mounted at a time (ViewRouter is a singleton view host), so a module
+// level ref is sufficient.
+let activeAppActions: { openImportDialog: () => void; refresh: () => void } | null = null;
+
 // Temporary stub - series management is now in MCP-Writing-Servers
 interface Series {
   id: number;
@@ -94,6 +101,19 @@ const WorkflowsApp: React.FC = () => {
       setWorkflows([]);
     }
   }, []);
+
+  // Register this instance's actions so the TopBar (handled by the class-based
+  // View.handleAction()) can drive the same Import/Refresh behavior as the
+  // in-view toolbar buttons.
+  useEffect(() => {
+    activeAppActions = {
+      openImportDialog: () => setShowImportDialog(true),
+      refresh: () => loadWorkflows(true),
+    };
+    return () => {
+      activeAppActions = null;
+    };
+  }, [loadWorkflows]);
 
   // Load workflows on mount and setup event listeners with proper cleanup
   useEffect(() => {
@@ -859,7 +879,19 @@ export class WorkflowsViewReact implements View {
 
   handleAction(actionId: string): void {
     console.log('[WorkflowsViewReact] Action:', actionId);
-    // Actions are handled by the React component directly via toolbar buttons
-    // This is for top bar integration if needed
+    if (!activeAppActions) {
+      console.warn('[WorkflowsViewReact] Action dispatched but no mounted app instance to handle it:', actionId);
+      return;
+    }
+    switch (actionId) {
+      case 'import':
+        activeAppActions.openImportDialog();
+        break;
+      case 'refresh':
+        activeAppActions.refresh();
+        break;
+      default:
+        console.warn('[WorkflowsViewReact] Unknown action:', actionId);
+    }
   }
 }
