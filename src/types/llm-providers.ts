@@ -27,7 +27,20 @@ export interface ClaudeCodeCLIProvider extends BaseLLMProviderConfig {
   type: 'claude-code-cli';
 
   config: {
-    model?: 'claude-sonnet-4-5' | 'claude-opus-4-5';
+    /**
+     * PREFER 'default' (or omit) so the node tracks the Claude Code CLI's CURRENT model and never
+     * pins a foundation version that ages out. Explicit ids accepted; `(string & {})` keeps any
+     * future id valid without a type break. Adapter treats 'default'/undefined as "CLI decides".
+     */
+    model?:
+      | 'default'
+      | 'claude-opus-4-8'
+      | 'claude-sonnet-4-6'
+      | 'claude-haiku-4-5'
+      | 'claude-fable-5'
+      | 'claude-sonnet-4-5'   // back-compat
+      | 'claude-opus-4-5'     // back-compat
+      | (string & {});
     outputFormat: 'json' | 'text';
     headless?: boolean;  // true = automatic, false = interactive
   };
@@ -41,7 +54,14 @@ export interface ClaudeAPIProvider extends BaseLLMProviderConfig {
 
   config: {
     apiKey: string;  // Will be encrypted in storage
-    model: 'claude-sonnet-4-5' | 'claude-opus-4' | 'claude-3-5-sonnet-20241022';
+    model:
+      | 'claude-opus-4-8'
+      | 'claude-sonnet-4-6'
+      | 'claude-haiku-4-5'
+      | 'claude-sonnet-4-5'
+      | 'claude-opus-4'
+      | 'claude-3-5-sonnet-20241022'
+      | (string & {});
     maxTokens?: number;
     temperature?: number;
   };

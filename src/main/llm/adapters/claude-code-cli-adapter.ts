@@ -63,7 +63,12 @@ export class ClaudeCodeCLIAdapter implements LLMProviderAdapter {
       return {
         success: true,
         output: result.output,
-        model: provider.config?.model || 'claude-sonnet-4-5',
+        // The actual model is chosen by the Claude Code CLI session (executeSkill passes no --model).
+        // config.model is a label/hint only — don't fabricate a specific retired id when unset.
+        model:
+          provider.config?.model && provider.config.model !== 'default'
+            ? provider.config.model
+            : 'claude-code-cli (session default)',
       };
 
     } catch (error: any) {

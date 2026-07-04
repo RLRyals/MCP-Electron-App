@@ -1806,7 +1806,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
               <select
                 id="config-model"
                 style={styles.select}
-                value={provider.config?.model || 'claude-sonnet-4-5'}
+                value={provider.config?.model || 'default'}
                 onChange={(e) => {
                   setFormData({
                     ...formData,
@@ -1818,8 +1818,13 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                   setIsDirty(true);
                 }}
               >
-                <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                <option value="claude-opus-4-5">Claude Opus 4.5</option>
+                <option value="default">Default (CLI-selected — recommended, never ages)</option>
+                <option value="claude-opus-4-8">Claude Opus 4.8</option>
+                <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                <option value="claude-fable-5">Claude Fable 5</option>
+                <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (legacy)</option>
+                <option value="claude-opus-4-5">Claude Opus 4.5 (legacy)</option>
               </select>
             </div>
 
@@ -1931,9 +1936,11 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
               >
                 {provider.type === 'claude-api' && (
                   <>
-                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                    <option value="claude-opus-4">Claude Opus 4</option>
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-opus-4-8">Claude Opus 4.8</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+                    <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (legacy)</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (legacy)</option>
                   </>
                 )}
                 {provider.type === 'openai' && (

@@ -20,13 +20,20 @@ export interface ProviderSelectorProps {
  */
 const MODEL_OPTIONS = {
   'claude-code-cli': [
-    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-    { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
+    { value: 'default', label: 'Default (CLI-selected — recommended, never ages)' },
+    { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+    { value: 'claude-fable-5', label: 'Claude Fable 5' },
+    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (legacy)' },
+    { value: 'claude-opus-4-5', label: 'Claude Opus 4.5 (legacy)' },
   ],
   'claude-api': [
-    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-    { value: 'claude-opus-4', label: 'Claude Opus 4' },
-    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Oct 2024)' },
+    { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (legacy)' },
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Oct 2024, legacy)' },
   ],
   'openai': [
     { value: 'gpt-4o', label: 'GPT-4o' },
