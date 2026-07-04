@@ -14,6 +14,8 @@ interface EnvConfig {
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
   PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -225,7 +227,11 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       HTTP_SSE_PORT: parseInt((form.elements.namedItem('HTTP_SSE_PORT') as HTMLInputElement).value, 10),
       DB_ADMIN_PORT: parseInt((form.elements.namedItem('DB_ADMIN_PORT') as HTMLInputElement).value, 10),
       MCP_AUTH_TOKEN: (form.elements.namedItem('MCP_AUTH_TOKEN') as HTMLInputElement).value,
-      PGBOUNCER_PORT: 6432, // Fixed port for PgBouncer
+      // Not exposed as form fields on this basic config form - preserve existing
+      // values (editable from the Ports settings panel instead), default otherwise
+      PGBOUNCER_PORT: currentEnvConfig?.PGBOUNCER_PORT || 6432,
+      NPE_PORT: currentEnvConfig?.NPE_PORT || 3011,
+      WORKFLOW_MANAGER_PORT: currentEnvConfig?.WORKFLOW_MANAGER_PORT || 3012,
     };
 
     const validation = await (window as any).electronAPI.envConfig.validateConfig(config);

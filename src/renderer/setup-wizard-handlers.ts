@@ -716,6 +716,11 @@ async function saveEnvironmentConfig(): Promise<boolean> {
     const statusEl = document.getElementById('env-config-status');
 
     try {
+        // Get current config first so we can preserve fields the wizard form doesn't
+        // expose (credentials, and ports like NPE_PORT/WORKFLOW_MANAGER_PORT that are
+        // only editable from the Ports settings panel, not this wizard step)
+        const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
+
         // Get form values
         const config = {
             POSTGRES_DB: (document.getElementById('postgres-db') as HTMLInputElement).value,
@@ -727,12 +732,12 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             DB_ADMIN_PORT: parseInt((document.getElementById('db-admin-port') as HTMLInputElement).value),
             MCP_AUTH_TOKEN: '', // Will be auto-generated
             TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value),
-            PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value)
+            PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value),
+            // Not exposed in this wizard step - preserve existing value, default otherwise
+            NPE_PORT: currentConfig?.NPE_PORT || 3011,
+            WORKFLOW_MANAGER_PORT: currentConfig?.WORKFLOW_MANAGER_PORT || 3012,
         };
 
-        // Get current config to check if credentials already exist
-        const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
-        
         // Check if .env file actually exists on disk
         // This is critical to prevent password regeneration
         const envFileExists = await (window as any).electronAPI.envConfig.fileExists();

@@ -69,7 +69,22 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
+  PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
   TYPING_MIND_PORT: number;
+}
+
+interface PortConflictDetail {
+  port: number;
+  name: string;
+  suggested: number;
+}
+
+interface PortConflictCheckResult {
+  hasConflicts: boolean;
+  conflicts: PortConflictDetail[];
+  suggestedConfig?: EnvConfig;
 }
 
 interface ConfigValidationResult {
@@ -284,6 +299,7 @@ interface ElectronAPI {
     generatePassword: (length?: number) => Promise<string>;
     generateToken: () => Promise<string>;
     checkPort: (port: number) => Promise<boolean>;
+    checkAllPorts: (config: EnvConfig) => Promise<PortConflictCheckResult>;
     resetDefaults: () => Promise<EnvConfig>;
     validateConfig: (config: EnvConfig) => Promise<ConfigValidationResult>;
     calculatePasswordStrength: (password: string) => Promise<'weak' | 'medium' | 'strong'>;

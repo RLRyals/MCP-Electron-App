@@ -60,6 +60,49 @@ export class ServicesView implements View {
             <span id="services-last-updated" class="last-updated">Last updated: --:--:--</span>
           </div>
         </div>
+
+        ${this.renderPortsSection()}
+      </div>
+    `;
+  }
+
+  /**
+   * Render the Ports settings section: lists every configurable service port
+   * with a live in-use indicator, an editable field, and controls to check for
+   * conflicts, apply suggested alternatives, and save + restart.
+   */
+  private renderPortsSection(): string {
+    return `
+      <div class="dashboard-card" style="margin-top: 20px;">
+        <div class="dashboard-header">
+          <h2>Ports</h2>
+          <div class="dashboard-actions" style="gap: 10px;">
+            <button id="ports-check-all" class="action-button" title="Check all ports for conflicts">Check All</button>
+            <button id="ports-use-suggested" class="action-button" title="Apply suggested available ports" style="display: none;">Use Suggested</button>
+            <button id="ports-save" class="action-button primary" title="Save port configuration">Save</button>
+          </div>
+        </div>
+
+        <div id="ports-status-message" style="margin-bottom: 10px;"></div>
+
+        <div style="overflow-x: auto;">
+          <table class="ports-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <th style="padding: 8px;">Service</th>
+                <th style="padding: 8px;">Port</th>
+                <th style="padding: 8px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="ports-table-body">
+              <!-- Rows are injected by ServicesTab.ts -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="dashboard-footer" style="margin-top: 15px;">
+          <span id="ports-last-checked" class="last-updated">Not checked yet</span>
+        </div>
       </div>
     `;
   }
