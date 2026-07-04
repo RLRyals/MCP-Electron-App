@@ -47,7 +47,6 @@ export interface WizardStepData {
     verifiedArtifacts?: string[];
   };
   downloads?: {
-    typingMindCompleted: boolean;
     dockerImagesCompleted: boolean;
   };
 

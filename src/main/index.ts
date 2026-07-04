@@ -17,7 +17,6 @@ import * as dockerImages from './docker-images';
 import * as envConfig from './env-config';
 import * as installationWizard from './installation-wizard';
 import * as clientSelection from './client-selection';
-import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
 import * as databaseBackup from './database-backup';
@@ -852,50 +851,6 @@ function setupIPC(): void {
     return await clientSelection.launchElectronApp(clientId);
   });
 
-  // Typing Mind downloader IPC handlers
-  ipcMain.handle('typingmind:download', async (_event) => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Starting Typing Mind download...');
-
-    // Send progress updates to renderer
-    const progressCallback: typingMindDownloader.ProgressCallback = (progress) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('typingmind:progress', progress);
-      }
-    };
-
-    const result = await typingMindDownloader.downloadTypingMind(progressCallback);
-    return result;
-  });
-
-  ipcMain.handle('typingmind:cancel-download', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Cancelling Typing Mind download...');
-    return await typingMindDownloader.cancelDownload();
-  });
-
-  ipcMain.handle('typingmind:is-installed', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking if Typing Mind is installed...');
-    return await typingMindDownloader.isInstalled();
-  });
-
-  ipcMain.handle('typingmind:get-version', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Getting Typing Mind version...');
-    return await typingMindDownloader.getVersion();
-  });
-
-  ipcMain.handle('typingmind:uninstall', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Uninstalling Typing Mind...');
-    return await typingMindDownloader.uninstall();
-  });
-
-  ipcMain.handle('typingmind:check-updates', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking for Typing Mind updates...');
-    return await typingMindDownloader.checkForUpdates();
-  });
-
-  ipcMain.handle('typingmind:get-install-path', async () => {
-    return typingMindDownloader.getTypingMindDirectory();
-  });
-
   // TypingMind Auto-Configuration IPC handlers
   ipcMain.handle('typingmind:auto-configure', async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring TypingMind with MCP Connector...');
@@ -1102,7 +1057,7 @@ function setupIPC(): void {
     return await mcpSystem.getServiceUrls();
   });
 
-  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => {
+  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', tail?: number) => {
     logWithCategory('info', LogCategory.DOCKER, `IPC: Getting logs for ${serviceName}...`);
     return await mcpSystem.viewServiceLogs(serviceName, tail);
   });
@@ -1247,11 +1202,6 @@ function setupIPC(): void {
     return await updater.checkForMCPServersUpdate();
   });
 
-  ipcMain.handle('updater:check-typing-mind', async () => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for Typing Mind updates...');
-    return await updater.checkForTypingMindUpdate();
-  });
-
   ipcMain.handle('updater:update-all', async (_event) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating all components...');
 
@@ -1276,19 +1226,6 @@ function setupIPC(): void {
     };
 
     return await updater.updateMCPServers(progressCallback);
-  });
-
-  ipcMain.handle('updater:update-typing-mind', async (_event) => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating Typing Mind...');
-
-    // Send progress updates to renderer
-    const progressCallback: updater.ProgressCallback = (progress) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('updater:progress', progress);
-      }
-    };
-
-    return await updater.updateTypingMind(progressCallback);
   });
 
   ipcMain.handle('updater:get-preferences', async () => {

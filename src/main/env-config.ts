@@ -31,7 +31,6 @@ export interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
-  TYPING_MIND_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -50,7 +49,6 @@ export const DEFAULT_CONFIG: EnvConfig = {
   PGBOUNCER_PORT: 6432,
   NPE_PORT: 3011,
   WORKFLOW_MANAGER_PORT: 3012,
-  TYPING_MIND_PORT: 8080,
   GITHUB_TOKEN: '',
 };
 

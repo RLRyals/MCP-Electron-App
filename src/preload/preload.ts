@@ -78,7 +78,6 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
-  TYPING_MIND_PORT: number;
 }
 
 /**
@@ -287,50 +286,6 @@ interface SaveSelectionResult {
 }
 
 /**
- * Typing Mind progress update
- */
-interface TypingMindProgress {
-  message: string;
-  percent: number;
-  step: string;
-  status: 'downloading' | 'verifying' | 'complete' | 'error';
-}
-
-/**
- * Typing Mind download result
- */
-interface TypingMindDownloadResult {
-  success: boolean;
-  message: string;
-  path?: string;
-  version?: string;
-  error?: string;
-}
-
-/**
- * Typing Mind metadata
- */
-interface TypingMindMetadata {
-  installed: boolean;
-  version?: string;
-  installedAt?: string;
-  lastUpdated?: string;
-  path?: string;
-  repositoryUrl?: string;
-  commitHash?: string;
-}
-
-/**
- * Typing Mind update check result
- */
-interface TypingMindUpdateCheck {
-  hasUpdate: boolean;
-  currentVersion?: string;
-  latestVersion?: string;
-  error?: string;
-}
-
-/**
  * MCP System progress update
  */
 interface MCPSystemProgress {
@@ -474,7 +429,6 @@ interface UpdateInfo {
 interface UpdateCheckResult {
   hasUpdates: boolean;
   mcpServers: UpdateInfo;
-  typingMind: UpdateInfo;
   checkedAt: string;
 }
 
@@ -498,7 +452,6 @@ interface UpdatePreferences {
   notifyOnlyIfUpdatesAvailable: boolean;
   skippedVersions?: {
     mcpServers?: string;
-    typingMind?: string;
   };
 }
 
@@ -542,7 +495,6 @@ interface WizardStepData {
     workflow: boolean;
   };
   downloads?: {
-    typingMindCompleted: boolean;
     dockerImagesCompleted: boolean;
   };
   systemStartup?: {
@@ -1194,58 +1146,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Typing Mind Downloader API
+   * Typing Mind Auto-Configuration API (cloud connector)
    */
   typingMind: {
-    /**
-     * Download Typing Mind UI files from GitHub
-     */
-    download: (): Promise<TypingMindDownloadResult> => {
-      return ipcRenderer.invoke('typingmind:download');
-    },
-
-    /**
-     * Cancel ongoing download
-     */
-    cancelDownload: (): Promise<boolean> => {
-      return ipcRenderer.invoke('typingmind:cancel-download');
-    },
-
-    /**
-     * Check if Typing Mind is installed
-     */
-    isInstalled: (): Promise<boolean> => {
-      return ipcRenderer.invoke('typingmind:is-installed');
-    },
-
-    /**
-     * Get Typing Mind version information
-     */
-    getVersion: (): Promise<TypingMindMetadata> => {
-      return ipcRenderer.invoke('typingmind:get-version');
-    },
-
-    /**
-     * Uninstall Typing Mind
-     */
-    uninstall: (): Promise<TypingMindDownloadResult> => {
-      return ipcRenderer.invoke('typingmind:uninstall');
-    },
-
-    /**
-     * Check for Typing Mind updates
-     */
-    checkForUpdates: (): Promise<TypingMindUpdateCheck> => {
-      return ipcRenderer.invoke('typingmind:check-updates');
-    },
-
-    /**
-     * Get the installation path
-     */
-    getInstallPath: (): Promise<string> => {
-      return ipcRenderer.invoke('typingmind:get-install-path');
-    },
-
     /**
      * Auto-configure Typing Mind with MCP Connector settings
      */
@@ -1300,20 +1203,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openWindow: (url: string): Promise<{ success: boolean; error?: string }> => {
       return ipcRenderer.invoke('typingmind:open-window', url);
-    },
-
-    /**
-     * Listen for Typing Mind download progress updates
-     */
-    onProgress: (callback: (progress: TypingMindProgress) => void): void => {
-      ipcRenderer.on('typingmind:progress', (_, progress) => callback(progress));
-    },
-
-    /**
-     * Remove Typing Mind progress listener
-     */
-    removeProgressListener: (): void => {
-      ipcRenderer.removeAllListeners('typingmind:progress');
     },
   },
 
@@ -1507,7 +1396,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * Get service logs
      */
     getLogs: (
-      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind',
+      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector',
       tail?: number
     ): Promise<ServiceLogsResult> => {
       return ipcRenderer.invoke('mcp-system:logs', serviceName, tail);
@@ -1816,13 +1705,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
-     * Check for Typing Mind updates
-     */
-    checkTypingMind: (): Promise<UpdateInfo> => {
-      return ipcRenderer.invoke('updater:check-typing-mind');
-    },
-
-    /**
      * Update all components
      */
     updateAll: (): Promise<UpdateResult> => {
@@ -1834,13 +1716,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateMCPServers: (): Promise<UpdateResult> => {
       return ipcRenderer.invoke('updater:update-mcp-servers');
-    },
-
-    /**
-     * Update Typing Mind
-     */
-    updateTypingMind: (): Promise<UpdateResult> => {
-      return ipcRenderer.invoke('updater:update-typing-mind');
     },
 
     /**

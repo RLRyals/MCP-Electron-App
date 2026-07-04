@@ -392,7 +392,7 @@ export async function getConfigurationInstructions(): Promise<string> {
 TypingMind MCP Connector Setup Instructions
 ===========================================
 
-1. Open TypingMind in your browser at: http://localhost:${config.TYPING_MIND_PORT}
+1. Open TypingMind in your browser at: https://www.typingmind.com
 
 2. Navigate to Settings → MCP Integration (or similar)
 

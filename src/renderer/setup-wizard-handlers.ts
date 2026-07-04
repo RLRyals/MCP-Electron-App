@@ -593,7 +593,6 @@ function applySuggestedConfig(config: any) {
         { id: 'mcp-port', key: 'MCP_CONNECTOR_PORT' },
         { id: 'http-port', key: 'HTTP_SSE_PORT' },
         { id: 'db-admin-port', key: 'DB_ADMIN_PORT' },
-        { id: 'typing-mind-port', key: 'TYPING_MIND_PORT' },
         { id: 'pgbouncer-port', key: 'PGBOUNCER_PORT' }
     ];
 
@@ -670,11 +669,6 @@ function createEnvironmentConfigForm(config: any): string {
 
 
                 <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Typing Mind Port</label>
-                    <input type="number" id="typing-mind-port" value="${config.TYPING_MIND_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
-                </div>
-
-                <div>
                     <label style="display: block; margin-bottom: 8px; font-weight: 500;">PgBouncer Port</label>
                     <input type="number" id="pgbouncer-port" value="${config.PGBOUNCER_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
                 </div>
@@ -731,7 +725,6 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             HTTP_SSE_PORT: parseInt((document.getElementById('http-sse-port') as HTMLInputElement).value),
             DB_ADMIN_PORT: parseInt((document.getElementById('db-admin-port') as HTMLInputElement).value),
             MCP_AUTH_TOKEN: '', // Will be auto-generated
-            TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value),
             PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value),
             // Not exposed in this wizard step - preserve existing value, default otherwise
             NPE_PORT: currentConfig?.NPE_PORT || 3011,
@@ -901,36 +894,13 @@ async function initializeDownloadStep() {
         return;
     }
 
-    // If Typing Mind downloads are complete but build pipeline is not marked complete, show warning
-    // This indicates a potential inconsistency in the state
-    // Note: We only check typingMindCompleted since Docker images aren't used yet
-    const needsTypingMind = wizardState.data.clients?.includes('typingmind');
-    if (needsTypingMind &&
-        wizardState.data.downloads?.typingMindCompleted &&
-        !wizardState.data.buildPipeline?.completed) {
-        console.log('WARNING: Typing Mind complete but build pipeline not marked complete - inconsistent state');
-        statusContainer.innerHTML = `
-            <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
-                <span style="font-size: 1.5rem;">⚠️</span>
-                <div>
-                    <strong>Build Status Inconsistent</strong><br>
-                    Downloads appear complete but build pipeline is not marked finished. Click Retry to verify and complete the build.
-                </div>
-            </div>
-            ${createRetryButton('retry-build-status-btn', initializeDownloadStep, 'Retry')}
-        `;
-        return;
-    }
-
     // Initialize the downloads object at the start of the build process if it doesn't exist
     // This allows the validation to pass while the build is in progress
-    // Note: typingMindCompleted is set to true since we use typingmind.com directly (no download needed)
     // Note: dockerImagesCompleted is set to true since Docker images aren't used yet
     if (!wizardState.data.downloads) {
         console.log('Initializing downloads state object...');
         const initResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             downloads: {
-                typingMindCompleted: true,  // Set to true since we use typingmind.com directly
                 dockerImagesCompleted: true  // Set to true since Docker images aren't used yet
             }
         });
@@ -1224,7 +1194,6 @@ async function initializeDownloadStep() {
                 verifiedArtifacts: result.result?.verifiedArtifacts || []
             },
             downloads: {
-                typingMindCompleted: true,
                 dockerImagesCompleted: true
             }
         });

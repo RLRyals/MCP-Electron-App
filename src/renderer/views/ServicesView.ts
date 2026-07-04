@@ -178,24 +178,12 @@ export class ServicesView implements View {
           <div class="service-name">
             <h4>Typing Mind</h4>
           </div>
-          <span id="typing-mind-status-badge" class="service-status-badge status-offline">Offline</span>
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
-            <div class="service-detail" id="typing-mind-url-info">Port: 8080</div>
-            <div class="service-detail" id="typing-mind-version-info">Version: Latest</div>
-          </div>
-          <div class="service-info" style="margin-bottom: 15px;">
-            <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
-            <div id="typing-mind-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
-              <div class="resource-item">Not running</div>
-            </div>
+            <div class="service-detail" id="typing-mind-url-info">https://www.typingmind.com</div>
           </div>
           <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <button id="typing-mind-start" class="service-action-btn" title="Start Typing Mind">Start</button>
-            <button id="typing-mind-stop" class="service-action-btn" title="Stop Typing Mind">Stop</button>
-            <button id="typing-mind-restart" class="service-action-btn" title="Restart Typing Mind">Restart</button>
-            <button id="typing-mind-view-logs" class="service-action-btn" title="View Typing Mind logs">View Logs</button>
             <button id="typing-mind-open-browser" class="service-action-btn" title="Open in browser">Open Browser</button>
             <button id="typing-mind-configure" class="service-action-btn" title="Configure Typing Mind">Configure</button>
           </div>
