@@ -119,15 +119,6 @@ export class SetupView implements View {
 
           <div class="form-group">
             <label>
-              Typing Mind
-              <span class="tooltip" title="Check for and install Typing Mind updates">ⓘ</span>
-            </label>
-            <button type="button" class="test-button" id="update-typing-mind" title="Check for Typing Mind updates">Check for Updates</button>
-            <div id="typing-mind-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
-          </div>
-
-          <div class="form-group">
-            <label>
               FictionLab
               <span class="tooltip" title="Check for FictionLab application updates">ⓘ</span>
             </label>

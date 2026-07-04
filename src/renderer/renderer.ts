@@ -72,7 +72,6 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
-  TYPING_MIND_PORT: number;
 }
 
 interface PortConflictDetail {
@@ -339,7 +338,7 @@ interface ElectronAPI {
     restart: () => Promise<MCPSystemOperationResult>;
     getStatus: () => Promise<MCPSystemStatus>;
     getUrls: () => Promise<ServiceUrls>;
-    getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => Promise<ServiceLogsResult>;
+    getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', tail?: number) => Promise<ServiceLogsResult>;
     checkPorts: () => Promise<PortConflictResult>;
     getWorkingDirectory: () => Promise<string>;
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
@@ -394,10 +393,8 @@ interface ElectronAPI {
   updater: {
     checkAll: () => Promise<any>;
     checkMCPServers: () => Promise<any>;
-    checkTypingMind: () => Promise<any>;
     updateAll: () => Promise<any>;
     updateMCPServers: () => Promise<any>;
-    updateTypingMind: () => Promise<any>;
     getPreferences: () => Promise<any>;
     setPreferences: (prefs: any) => Promise<void>;
     onProgress: (callback: (progress: any) => void) => void;

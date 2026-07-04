@@ -31,7 +31,7 @@ export class LogsTab {
   private autoRefresh: boolean;
   private refreshInterval: number;
   private refreshTimer: NodeJS.Timeout | null = null;
-  private currentService: 'application' | 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind' = 'application';
+  private currentService: 'application' | 'postgres' | 'mcp-servers' | 'mcp-connector' = 'application';
   private currentFilter: 'all' | 'error' | 'warn' | 'info' | 'debug' = 'all';
   private searchQuery: string = '';
   private logs: LogEntry[] = [];
@@ -117,7 +117,6 @@ export class LogsTab {
               <option value="postgres">PostgreSQL</option>
               <option value="mcp-servers">MCP Servers</option>
               <option value="mcp-connector">MCP Connector</option>
-              <option value="typing-mind">Typing Mind</option>
             </select>
           </div>
 
@@ -1101,11 +1100,10 @@ export class LogsTab {
    */
   private async loadServiceLogs(service: string): Promise<void> {
     try {
-      const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind' } = {
+      const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' } = {
         'postgres': 'postgres',
         'mcp-servers': 'mcp-writing-servers',
         'mcp-connector': 'mcp-connector',
-        'typing-mind': 'typing-mind',
       };
 
       const serviceName = serviceMap[service];
@@ -1279,8 +1277,7 @@ export class LogsTab {
         'application': 'Application',
         'postgres': 'PostgreSQL',
         'mcp-servers': 'MCP Servers',
-        'mcp-connector': 'MCP Connector',
-        'typing-mind': 'Typing Mind'
+        'mcp-connector': 'MCP Connector'
       };
       logSource.textContent = sourceNames[this.currentService] || this.currentService;
     }

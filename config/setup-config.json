@@ -21,25 +21,14 @@
       "branch": "main",
       "optional": true,
       "description": "MCP connector for Typing Mind integration (deprecated - using npm package instead)"
-    },
-    {
-      "id": "typing-mind",
-      "name": "Typing Mind UI",
-      "url": "https://github.com/TypingMind/typingmind.git",
-      "clonePath": "typing-mind",
-      "branch": "main",
-      "optional": true,
-      "description": "Typing Mind web-based UI component"
     }
   ],
   "buildOrder": {
     "order": [
-      "mcp-writing-servers",
-      "typing-mind"
+      "mcp-writing-servers"
     ],
     "dependencies": {
-      "mcp-writing-servers": [],
-      "typing-mind": []
+      "mcp-writing-servers": []
     },
     "allowParallel": false
   },
@@ -61,15 +50,6 @@
       "workingDir": ".",
       "continueOnError": false,
       "timeout": 600
-    },
-    {
-      "id": "typing-mind-install",
-      "name": "Typing Mind UI - Install Dependencies",
-      "repositoryId": "typing-mind",
-      "command": "npm install",
-      "workingDir": ".",
-      "continueOnError": true,
-      "timeout": 600
     }
   ],
   "dockerImages": {
@@ -88,15 +68,6 @@
       "enabled": true,
       "repositoryIds": [
         "mcp-writing-servers"
-      ]
-    },
-    {
-      "id": "typing-mind-component",
-      "name": "Typing Mind Integration",
-      "description": "Optional Typing Mind UI component",
-      "enabled": true,
-      "repositoryIds": [
-        "typing-mind"
       ]
     }
   ],

@@ -40,7 +40,6 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
 }
 
 // Global polling interval
@@ -858,11 +857,10 @@ async function handleConfigureClaudeDesktop(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' } = {
       'postgres': 'postgres',
       'mcp-servers': 'mcp-writing-servers',
       'mcp-connector': 'mcp-connector',
-      'typing-mind': 'typing-mind',
     };
 
     const actualServiceName = serviceMap[serviceName];

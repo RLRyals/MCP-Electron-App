@@ -67,21 +67,6 @@ export class UpdateManager {
       logWithCategory('warn', LogCategory.GENERAL, `Could not check MCP-Writing-Servers updates: ${errorMsg}`);
     }
 
-    // Check TypingMind repository
-    try {
-      const typingmindPath = path.join(this.basePath, 'typingmind');
-      const tmStatus = await this.repoManager.checkForUpdates(typingmindPath);
-
-      result.repositories['typingmind'] = {
-        hasUpdate: tmStatus.hasUpdate,
-        commitsBehind: tmStatus.commitsBehind,
-        changes: tmStatus.changes,
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logWithCategory('warn', LogCategory.GENERAL, `Could not check TypingMind updates: ${errorMsg}`);
-    }
-
     // Check Docker images
     const images = ['postgres:16', 'node:18-alpine', 'nginx:alpine'];
 
@@ -169,9 +154,6 @@ export class UpdateManager {
 
         const mcpServersPath = path.join(this.basePath, 'mcp-writing-servers');
         await this.repoManager.updateRepository(mcpServersPath);
-
-        const typingmindPath = path.join(this.basePath, 'typingmind');
-        await this.repoManager.updateRepository(typingmindPath);
       }
 
       // Step 4: Update Docker images

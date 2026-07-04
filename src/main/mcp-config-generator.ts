@@ -223,7 +223,7 @@ Servers configured: ${serverCount}
 Available servers: ${serverList}
 
 ## Step 2: Configure TypingMind
-1. Open TypingMind in your browser at: http://localhost:${config.TYPING_MIND_PORT}
+1. Open TypingMind in your browser at: https://www.typingmind.com
 2. Go to Settings → Advanced Settings → Model Context Protocol
 3. Select: "Remote Server"
 4. Enter the following:

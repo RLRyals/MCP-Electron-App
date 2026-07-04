@@ -51,7 +51,6 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
-  TYPING_MIND_PORT: number;
 }
 
 /**
@@ -64,8 +63,6 @@ interface PortRowDefinition {
 
 /**
  * Canonical list of all user-facing ports.
- * NOTE: TYPING_MIND_PORT is intentionally excluded - it is dead config being
- * removed elsewhere and must not be surfaced in this panel.
  */
 const PORT_ROWS: PortRowDefinition[] = [
   { key: 'POSTGRES_PORT', name: 'PostgreSQL' },
@@ -435,17 +432,9 @@ export class ServicesTab {
    * Setup Typing Mind service listeners
    */
   private setupTypingMindListeners(): void {
-    const startBtn = document.getElementById('typing-mind-start');
-    const stopBtn = document.getElementById('typing-mind-stop');
-    const restartBtn = document.getElementById('typing-mind-restart');
-    const viewLogsBtn = document.getElementById('typing-mind-view-logs');
     const openBrowserBtn = document.getElementById('typing-mind-open-browser');
     const configureBtn = document.getElementById('typing-mind-configure');
 
-    if (startBtn) startBtn.addEventListener('click', () => this.handleTypingMindStart());
-    if (stopBtn) stopBtn.addEventListener('click', () => this.handleTypingMindStop());
-    if (restartBtn) restartBtn.addEventListener('click', () => this.handleTypingMindRestart());
-    if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('typing-mind', 'Typing Mind'));
     if (openBrowserBtn) openBrowserBtn.addEventListener('click', () => this.handleOpenTypingMind());
     if (configureBtn) configureBtn.addEventListener('click', () => this.handleConfigureTypingMind());
   }
@@ -604,62 +593,17 @@ export class ServicesTab {
   }
 
   /**
-   * Update Typing Mind service card
+   * Update Typing Mind service card (cloud link only — no local container)
    */
   private async updateTypingMindCard(): Promise<void> {
     try {
-      const status = await window.electronAPI.mcpSystem.getStatus();
-      const config = await window.electronAPI.envConfig.getConfig();
       const urls = await window.electronAPI.mcpSystem.getUrls();
 
-      const container = status.containers.find(c => c.name.includes('typingmind'));
-
-      const statusBadge = document.getElementById('typing-mind-status-badge');
       const urlDisplay = document.getElementById('typing-mind-url-info');
-      const versionDisplay = document.getElementById('typing-mind-version-info');
-      const resourceDisplay = document.getElementById('typing-mind-resource-usage');
 
-      if (statusBadge) {
-        if (container?.running && (container.health === 'healthy' || container.health === 'none' || container.health === 'unknown')) {
-          statusBadge.className = 'service-status-badge status-healthy';
-          statusBadge.textContent = 'Healthy';
-        } else if (container?.running) {
-          statusBadge.className = 'service-status-badge status-starting';
-          statusBadge.textContent = container.health === 'starting' ? 'Starting' : 'Unhealthy';
-        } else {
-          statusBadge.className = 'service-status-badge status-offline';
-          statusBadge.textContent = 'Offline';
-        }
+      if (urlDisplay) {
+        urlDisplay.textContent = urls.typingMind || 'https://www.typingmind.com';
       }
-
-      if (urlDisplay && urls.typingMind) {
-        urlDisplay.textContent = `URL: ${urls.typingMind}`;
-      } else if (urlDisplay) {
-        urlDisplay.textContent = `Port: ${config.TYPING_MIND_PORT}`;
-      }
-
-      if (versionDisplay) {
-        versionDisplay.textContent = 'Version: Latest';
-      }
-
-      // Update resource usage
-      if (resourceDisplay && container?.running) {
-        resourceDisplay.innerHTML = `
-          <div class="resource-item">
-            <span>CPU:</span>
-            <span class="resource-value">~3%</span>
-          </div>
-          <div class="resource-item">
-            <span>Memory:</span>
-            <span class="resource-value">~256MB</span>
-          </div>
-        `;
-      } else if (resourceDisplay) {
-        resourceDisplay.innerHTML = '<div class="resource-item">Not running</div>';
-      }
-
-      // Enable/disable controls based on status
-      this.updateServiceControls('typing-mind', container?.running || false);
     } catch (error) {
       console.error('Error updating Typing Mind card:', error);
     }
@@ -779,27 +723,6 @@ export class ServicesTab {
       console.error('Error checking MCP Servers health:', error);
       this.showNotification('Failed to check health status', 'error');
     }
-  }
-
-  /**
-   * Handle Typing Mind start
-   */
-  private async handleTypingMindStart(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to start all services.', 'info');
-  }
-
-  /**
-   * Handle Typing Mind stop
-   */
-  private async handleTypingMindStop(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to stop all services.', 'info');
-  }
-
-  /**
-   * Handle Typing Mind restart
-   */
-  private async handleTypingMindRestart(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to restart all services.', 'info');
   }
 
   /**
@@ -963,7 +886,7 @@ export class ServicesTab {
   /**
    * Handle viewing service logs
    */
-  private async handleViewLogs(serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', displayName: string): Promise<void> {
+  private async handleViewLogs(serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', displayName: string): Promise<void> {
     try {
       const result = await window.electronAPI.mcpSystem.getLogs(serviceName, 100);
 

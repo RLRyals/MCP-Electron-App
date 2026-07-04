@@ -20,7 +20,7 @@ echo.
 
 REM Check for MCP containers
 echo 2. Checking for MCP containers...
-docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" --format "{{.ID}} {{.Names}} {{.Status}}" > temp_containers.txt
+docker ps -a --filter "name=mcp-" --format "{{.ID}} {{.Names}} {{.Status}}" > temp_containers.txt
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to check containers
     del temp_containers.txt 2>nul
@@ -78,7 +78,7 @@ echo 5. Cleanup Options
 echo ==================
 echo.
 
-docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q > temp_cleanup.txt
+docker ps -a --filter "name=mcp-" -q > temp_cleanup.txt
 set NEED_CLEANUP=0
 for /f %%a in (temp_cleanup.txt) do set NEED_CLEANUP=1
 del temp_cleanup.txt
@@ -87,10 +87,10 @@ if %NEED_CLEANUP%==1 (
     set /p CLEANUP="Would you like to clean up MCP containers? (y/n): "
     if /i "%CLEANUP%"=="y" (
         echo Stopping MCP containers...
-        for /f %%i in ('docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q') do docker stop %%i
+        for /f %%i in ('docker ps -a --filter "name=mcp-" -q') do docker stop %%i
 
         echo Removing MCP containers...
-        for /f %%i in ('docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q') do docker rm -f %%i
+        for /f %%i in ('docker ps -a --filter "name=mcp-" -q') do docker rm -f %%i
 
         echo [OK] Cleanup complete
 

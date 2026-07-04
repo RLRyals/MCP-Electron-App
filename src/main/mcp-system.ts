@@ -217,7 +217,7 @@ export function getMCPRepositoryDirectory(): string {
 /**
  * Get docker-compose file path (now using the root docker-compose.yml)
  */
-function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
+function getDockerComposeFilePath(type: 'core'): string {
   // All services are now in a single docker-compose.yml at the project root
   return path.join(getProjectRootDirectory(), 'docker-compose.yml');
 }
@@ -442,10 +442,9 @@ export async function stopExistingContainers(): Promise<void> {
     // Step 2: Also try to remove by specific names (in case they're not running)
     const containerNames = [
       'fictionlab-postgres',
-      'fictionlab-pgbouncer', 
+      'fictionlab-pgbouncer',
       'fictionlab-mcp-connector',
-      'fictionlab-mcp-servers',
-      'fictionlab-typingmind'
+      'fictionlab-mcp-servers'
     ];
     
     for (const name of containerNames) {
@@ -624,8 +623,9 @@ async function determineServicesToStart(): Promise<{
     logWithCategory('info', LogCategory.DOCKER, 'MCP Connector will be started');
   }
 
-  // Note: TypingMind is no longer a Docker service - it uses typingmind.com directly
-  // No need to start a local TypingMind container
+  // TypingMind is a cloud service (typingmind.com) - there is no local Docker container to
+  // start. This flag only gates auto-configuring the MCP Connector for TypingMind's use.
+  services.typingMind = selectedClients.includes('typingmind');
 
   return services;
 }
@@ -1246,28 +1246,6 @@ export async function startMCPSystem(
       }
     }
 
-    // 2. Start Typing Mind if needed
-    // All services are now in a single docker-compose.yml
-    if (services.typingMind) {
-      if (progressCallback) {
-        progressCallback({
-          message: 'Starting Typing Mind...',
-          percent: 65,
-          step: 'starting-typing-mind',
-          status: 'starting',
-        });
-      }
-
-      try {
-        // Start the typingmind service from the single docker-compose.yml
-        await execDockerCompose(coreFile, 'up', ['-d', 'typingmind']);
-        logWithCategory('info', LogCategory.DOCKER, 'Typing Mind started');
-      } catch (error: any) {
-        logWithCategory('error', LogCategory.DOCKER, 'Failed to start Typing Mind', error);
-        // Continue anyway - other services might still work
-      }
-    }
-
     // Wait for all containers to be healthy
     if (progressCallback) {
       progressCallback({
@@ -1659,7 +1637,7 @@ export async function getDetailedServiceStatus(): Promise<DetailedSystemStatus> 
  * View service logs
  */
 export async function viewServiceLogs(
-  serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind',
+  serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector',
   tail: number = 100
 ): Promise<ServiceLogsResult> {
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
@@ -1674,7 +1652,6 @@ export async function viewServiceLogs(
         'postgres': 'fictionlab-postgres',
         'mcp-writing-servers': 'fictionlab-mcp-servers',
         'mcp-connector': 'fictionlab-mcp-connector',
-        'typing-mind': 'fictionlab-typingmind',
       };
 
       const containerName = containerNameMap[serviceName] || serviceName;
