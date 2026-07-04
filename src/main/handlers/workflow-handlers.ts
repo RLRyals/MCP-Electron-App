@@ -157,7 +157,10 @@ export function registerWorkflowHandlers() {
 
       // Collect existing workflow_ids so we can auto-suffix duplicates instead of
       // silently overwriting via ON CONFLICT (workflow_id, version) DO UPDATE.
-      let existingIds = new Set<string>();
+      // If the lookup itself fails, we CANNOT proceed: import_workflow_definition
+      // upserts on (workflow_id, version), so creating with an unverified slug
+      // could silently replace an existing workflow's graph with an empty one.
+      let existingIds: Set<string>;
       try {
         const defs = await client.getWorkflowDefinitions();
         existingIds = new Set(
@@ -166,8 +169,11 @@ export function registerWorkflowHandlers() {
             .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
         );
       } catch (lookupError: any) {
-        logWithCategory('warn', LogCategory.WORKFLOW,
+        logWithCategory('error', LogCategory.WORKFLOW,
           `Could not load existing workflows for uniqueness check: ${lookupError.message}`);
+        throw new Error(
+          'Could not verify workflow name uniqueness (workflow service unavailable) — please try again.'
+        );
       }
 
       const baseSlug = slugifyWorkflowName(trimmedName);

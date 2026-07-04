@@ -30,39 +30,6 @@
     "test:a11y": "jest --testPathPatterns=a11y",
     "test:a11y:watch": "jest --watch --testPathPatterns=a11y"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src",
-      "<rootDir>/tests"
-    ],
-    "transform": {
-      "^.+\\.tsx?$": [
-        "ts-jest",
-        {
-          "tsconfig": {
-            "isolatedModules": true
-          }
-        }
-      ]
-    },
-    "testMatch": [
-      "**/__tests__/**/*.test.ts?(x)",
-      "**/tests/**/*.test.ts?(x)"
-    ],
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/dist/",
-      "/out/"
-    ],
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx",
-      "json"
-    ]
-  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@google/generative-ai": "^0.24.1",
