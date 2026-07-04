@@ -4,9 +4,10 @@
  * Cross-platform support for Windows, macOS, and Linux
  */
 
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as log from 'electron-log';
 
 const execAsync = promisify(exec);
@@ -57,12 +58,72 @@ async function executeCommand(
 }
 
 /**
+ * Cache for the one-time `where`/`which docker` (or DOCKER_HOME override) lookup so
+ * getFixedEnv() - which runs on every exec call - doesn't re-shell-out each time.
+ */
+let cachedDockerCliResolution: { dir: string | null; source: string } | null = null;
+let loggedDockerCliResolution = false;
+
+/**
+ * Resolve the directory containing the `docker` binary beyond the hardcoded
+ * default-install guesses, so non-default installs (custom drive, portable
+ * install, symlinked binary, etc.) still get picked up.
+ *
+ * Resolution order:
+ * 1. `DOCKER_HOME` (or legacy `DOCKER_CLI_PATH`) env override, if set and it exists.
+ * 2. `where docker` (Windows) / `which docker` (macOS/Linux) - whatever the OS
+ *    would actually resolve on the current PATH right now.
+ */
+function resolveDockerCliDirectory(): { dir: string | null; source: string } {
+  if (cachedDockerCliResolution) {
+    return cachedDockerCliResolution;
+  }
+
+  const override = process.env.DOCKER_HOME || process.env.DOCKER_CLI_PATH;
+  if (override) {
+    try {
+      if (fs.existsSync(override)) {
+        cachedDockerCliResolution = { dir: override, source: `DOCKER_HOME/DOCKER_CLI_PATH override (${override})` };
+        return cachedDockerCliResolution;
+      }
+    } catch {
+      // ignore access errors, fall through
+    }
+  }
+
+  try {
+    const lookupCommand = process.platform === 'win32' ? 'where docker' : 'which docker';
+    const output = execSync(lookupCommand, { timeout: 3000, windowsHide: true, encoding: 'utf8' });
+    const firstMatch = output
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(line => line.length > 0);
+
+    if (firstMatch) {
+      cachedDockerCliResolution = { dir: path.dirname(firstMatch), source: `${lookupCommand} (${firstMatch})` };
+      return cachedDockerCliResolution;
+    }
+  } catch {
+    // docker not resolvable via where/which right now - fall back to hardcoded defaults
+  }
+
+  cachedDockerCliResolution = { dir: null, source: 'not found via DOCKER_HOME override or where/which docker' };
+  return cachedDockerCliResolution;
+}
+
+/**
  * Get environment variables with fixed PATH
  * Adds common locations for Docker and other tools on all platforms
  */
 export function getFixedEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   const currentPath = env.PATH || '';
+  const resolved = resolveDockerCliDirectory();
+
+  if (!loggedDockerCliResolution) {
+    loggedDockerCliResolution = true;
+    log.info(`Docker CLI PATH resolution: ${resolved.dir || 'none found beyond hardcoded defaults'} (source: ${resolved.source})`);
+  }
 
   if (process.platform === 'win32') {
     // Use %ProgramFiles% so this works regardless of install drive/locale
@@ -73,6 +134,12 @@ export function getFixedEnv(): NodeJS.ProcessEnv {
       `${programFiles}\\Docker\\Docker`,
       `${programData}\\DockerDesktop\\version-bin`,
     ];
+
+    // Prefer whatever `where docker`/DOCKER_HOME actually resolved - it wins ties
+    // with non-default installs that the hardcoded guesses above would miss.
+    if (resolved.dir && !commonPaths.includes(resolved.dir)) {
+      commonPaths.unshift(resolved.dir);
+    }
 
     // Append Docker paths that aren't already in PATH
     const missingPaths = commonPaths.filter(p => !currentPath.includes(p));
@@ -88,6 +155,10 @@ export function getFixedEnv(): NodeJS.ProcessEnv {
       '/usr/sbin',
       '/sbin'
     ];
+
+    if (resolved.dir && !commonPaths.includes(resolved.dir)) {
+      commonPaths.unshift(resolved.dir);
+    }
 
     // Add paths if missing, prioritizing them
     // We rebuild the PATH to ensure our paths come first

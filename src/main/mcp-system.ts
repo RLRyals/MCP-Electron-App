@@ -863,6 +863,187 @@ async function waitForHealthy(
 }
 
 /**
+ * Ensure the core containers required before the DB pool can initialize
+ * (postgres, pgbouncer) are up and healthy.
+ *
+ * This is a NARROW extraction of the postgres/pgbouncer portion of
+ * startMCPSystem() - deliberately not the full wizard-oriented path:
+ * - no mcp-writing-servers image build (that's a from-source image only
+ *   needed for mcp-connector/mcp-writing-servers, not the DB)
+ * - no mcp-connector/mcp-writing-servers containers
+ * - no aggressive stopExistingContainers() unless a real port conflict is found
+ *
+ * Used by the launch gate (index.ts) after the Docker daemon is confirmed
+ * reachable, so a machine with Docker up but containers down doesn't sail
+ * straight into a DB pool init failure.
+ *
+ * Port-conflict handling here intentionally stays a thin, read-only consumer
+ * of the existing checkPortConflicts()/stopExistingContainers() exports rather
+ * than re-implementing the richer conflict-resolution/retry logic that lives
+ * in startMCPSystem() (~line 1007+) - that logic is in-flight in a parallel PR.
+ * On an unresolved conflict this returns error: 'PORT_CONFLICT' for the caller
+ * to surface directly to the user; it must not be swallowed.
+ */
+export async function ensureCoreContainers(
+  progressCallback?: ProgressCallback
+): Promise<SystemOperationResult> {
+  logWithCategory('info', LogCategory.DOCKER, 'Ensuring core containers (postgres, pgbouncer) are up...');
+
+  try {
+    const coreFile = getDockerComposeFilePath('core');
+
+    // Fast path: if postgres + pgbouncer are already running and healthy
+    // (the common case - Docker was already up), skip straight to success.
+    if (progressCallback) {
+      progressCallback({
+        message: 'Checking core containers...',
+        percent: 5,
+        step: 'check-existing',
+        status: 'checking',
+      });
+    }
+
+    const existingHealth = await getContainerHealth([coreFile]);
+    const postgresUp = existingHealth.find(c => c.name.includes('postgres'));
+    const pgbouncerUp = existingHealth.find(c => c.name.includes('pgbouncer'));
+
+    if (postgresUp?.running && postgresUp.health === 'healthy' &&
+        pgbouncerUp?.running && pgbouncerUp.health === 'healthy') {
+      logWithCategory('info', LogCategory.DOCKER, 'Core containers already running and healthy - nothing to do');
+
+      if (progressCallback) {
+        progressCallback({ message: 'Core containers ready', percent: 100, step: 'complete', status: 'ready' });
+      }
+
+      return { success: true, message: 'Core containers already running and healthy' };
+    }
+
+    // Verify environment configuration is valid before starting anything
+    const config = await envConfig.loadEnvConfig();
+    if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '' ||
+        !config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+      logWithCategory('warn', LogCategory.DOCKER,
+        'Environment configuration incomplete - cannot start core containers yet');
+      return {
+        success: false,
+        message: 'Environment configuration is incomplete. Please complete the setup wizard before starting the system.',
+        error: 'INVALID_CONFIG',
+      };
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Preparing configuration...',
+        percent: 15,
+        step: 'config',
+        status: 'checking',
+      });
+    }
+
+    await initializeDockerDirectory();
+    await ensureDockerComposeFiles();
+
+    const pgbouncerResult = await pgbouncerConfig.generatePgBouncerConfig(config);
+    if (!pgbouncerResult.success) {
+      logWithCategory('warn', LogCategory.DOCKER, `Failed to generate PgBouncer config: ${pgbouncerResult.error}`);
+      // Continue anyway - matches startMCPSystem's tolerance for this failure
+    }
+
+    // Check for port conflicts (reuses the existing exported check - not modified here)
+    if (progressCallback) {
+      progressCallback({
+        message: 'Checking for port conflicts...',
+        percent: 25,
+        step: 'port-check',
+        status: 'checking',
+      });
+    }
+
+    let portCheck = await checkPortConflicts();
+    if (!portCheck.success) {
+      logWithCategory('warn', LogCategory.DOCKER,
+        `Port conflicts detected before starting core containers: ${portCheck.conflicts.join(', ')}`);
+
+      // Only postgres/pgbouncer are in play here - a single cleanup attempt via
+      // the existing exported helper is enough; do not retry aggressively.
+      await stopExistingContainers();
+      portCheck = await checkPortConflicts();
+
+      if (!portCheck.success) {
+        const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}. ` +
+          `Could not automatically free them.`;
+        logWithCategory('error', LogCategory.DOCKER, conflictMsg);
+        return {
+          success: false,
+          message: conflictMsg,
+          error: 'PORT_CONFLICT',
+        };
+      }
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Starting PostgreSQL and PgBouncer...',
+        percent: 40,
+        step: 'starting-core',
+        status: 'starting',
+      });
+    }
+
+    try {
+      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'pgbouncer']);
+      logWithCategory('info', LogCategory.DOCKER, 'Core containers (postgres, pgbouncer) started');
+    } catch (error: any) {
+      const errorStderr = error.stderr || '';
+      if (errorStderr.includes('port is already allocated')) {
+        const match = errorStderr.match(/port (\d+) is already allocated/);
+        const port = match ? match[1] : 'unknown';
+        return {
+          success: false,
+          message: `Port ${port} is already in use. Please change the port in environment configuration or stop the conflicting service.`,
+          error: 'PORT_CONFLICT',
+        };
+      }
+
+      logWithCategory('error', LogCategory.DOCKER, 'Failed to start core containers', error);
+      return {
+        success: false,
+        message: `Failed to start PostgreSQL/PgBouncer: ${error.message || error}`,
+        error: 'CONTAINER_START_FAILED',
+      };
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Waiting for core containers to become healthy...',
+        percent: 60,
+        step: 'health-check',
+        status: 'checking',
+      });
+    }
+
+    const healthResult = await waitForHealthy([coreFile], progressCallback);
+    if (!healthResult.success) {
+      return {
+        success: false,
+        message: healthResult.message,
+        error: 'CONTAINER_UNHEALTHY',
+      };
+    }
+
+    return { success: true, message: 'Core containers are up and healthy' };
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.DOCKER, 'Error ensuring core containers', error);
+    return {
+      success: false,
+      message: `Failed to ensure core containers: ${errorMessage}`,
+      error: 'UNKNOWN_ERROR',
+    };
+  }
+}
+
+/**
  * Start the MCP system
  */
 export async function startMCPSystem(
