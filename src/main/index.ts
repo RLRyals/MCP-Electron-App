@@ -424,6 +424,54 @@ import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers'
 import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
 
 /**
+ * Build the README.md dropped into a newly-initialized project root
+ * (project:initialize-workspace handler). Documents the SA v2-aligned
+ * scaffold (outputs/, series-planning/, .claude/) and the per-book
+ * isolation rule: each book's artifacts live under outputs/book_N/ and
+ * book N+1 must never overwrite book N's folder/files. See issue #165.
+ */
+function buildProjectReadme(projectName: string): string {
+  return `# ${projectName}
+
+This project was initialized by FictionLab / MCP Electron App using the
+Series Architect v2 scaffold.
+
+## Folder layout
+
+- \`outputs/\` — everything the Series Architect (SA) workflows write:
+  series-level documents (e.g. \`INDEX.md\`, \`series_bible.md\`,
+  \`market_research.md\`, \`genre_pack.json\`, \`series_framework.md\`) live
+  flat in \`outputs/\`, shared across the whole series. Per-book artifacts
+  live in their own \`outputs/book_N/\` subfolder (see below).
+- \`series-planning/\` — the Series Architect agent's own working folder.
+- \`.claude/\` — app + workflow metadata: \`settings.json\` (project settings,
+  including the selected genre pack id once one is chosen) and a
+  \`CLAUDE.md\` template used to resume workflow runs.
+
+Nothing else is scaffolded up front. Workflow steps create any additional
+folder they need at runtime (e.g. \`outputs/book_N/\`) via
+\`fs.ensureDir\`/\`fs-extra\`'s automatic parent-directory creation, so an
+empty folder here would only go stale -- the folders above are the ones
+every SA v2 workflow run actually reads from and writes to.
+
+## Per-book isolation (binding rule)
+
+Each book in the series gets its **own** folder: \`outputs/book_1/\`,
+\`outputs/book_2/\`, \`outputs/book_3/\`, and so on. This is enforced by the
+SA v2 workflows themselves (e.g. \`dramatica-storyform\` and
+\`series-architect-development\`), which parameterize every per-book file
+path by the current book number.
+
+**Book N+1 must never overwrite Book N's folder or files.** If you are
+authoring or modifying a workflow step that writes book-specific content,
+make sure its output path is parameterized by the book number (e.g.
+\`outputs/book_{{currentBookNumber}}/...\`) rather than a fixed or shared
+path -- a hardcoded or unparameterized path is a bug that will silently
+clobber a previous book's work.
+`;
+}
+
+/**
  * Set up IPC handlers for communication between main and renderer processes
  */
 function setupIPC(): void {
@@ -2336,20 +2384,41 @@ function setupIPC(): void {
     try {
       const { folderPath, projectName, genrePack } = options;
 
-      // Create standard directories
+      // Create standard directories. This mirrors the Series Architect v2
+      // workflow layout (FictIonLab-Downloads: outputs/ + series-planning/),
+      // not the earlier tiered planning/ proposal -- see issue #165. Per-book
+      // artifacts are NOT scaffolded here; SA v2 creates outputs/book_N/ at
+      // runtime (dramatica-storyform/workflow.yaml, series-architect-development
+      // /workflow.yaml), one folder per book, so book N+1 never touches book N.
       await fse.ensureDir(path.join(folderPath, '.claude'));
-      await fse.ensureDir(path.join(folderPath, 'planning'));
-      await fse.ensureDir(path.join(folderPath, 'planning', 'character-profiles'));
-      await fse.ensureDir(path.join(folderPath, 'planning', 'world-building'));
-      await fse.ensureDir(path.join(folderPath, 'books'));
-      await fse.ensureDir(path.join(folderPath, 'exports'));
+      await fse.ensureDir(path.join(folderPath, 'outputs'));
+      await fse.ensureDir(path.join(folderPath, 'series-planning'));
 
-      // Create settings.json
-      await fse.writeJson(path.join(folderPath, '.claude', 'settings.json'), {
+      // Create settings.json. Genre packs are copied to the project folder
+      // when a workflow runs, via the ResourceCopier in
+      // fictionlab-workflow/packages/workflow-runner (keyed by pack id --
+      // see #159/genre-pack-handlers.ts's GenrePack.id shape). We don't copy
+      // pack contents here at project-creation time, but we DO persist the
+      // selected id into settings.json so that later run knows which pack to
+      // copy instead of silently defaulting to none. The key is `genrePack`,
+      // matching the id field the run-time consumers already use
+      // (ResourceCopyOptions.genrePack / workflow-executor's
+      // initialVariables.genrePack).
+      const projectSettings: {
+        name: string;
+        projectType: string;
+        createdAt: string;
+        genrePack?: string;
+      } = {
         name: projectName,
         projectType: 'fiction-series',
         createdAt: new Date().toISOString()
-      }, { spaces: 2 });
+      };
+      if (genrePack && genrePack !== 'none') {
+        projectSettings.genrePack = genrePack;
+        logWithCategory('info', LogCategory.SYSTEM, `Genre pack '${genrePack}' recorded in project settings; will be copied when workflow runs`);
+      }
+      await fse.writeJson(path.join(folderPath, '.claude', 'settings.json'), projectSettings, { spaces: 2 });
 
       // Copy CLAUDE.md template for workflow resumption support
       const templatePath = app.isPackaged
@@ -2363,11 +2432,12 @@ function setupIPC(): void {
         logWithCategory('warn', LogCategory.SYSTEM, `CLAUDE.md template not found at ${templatePath}`);
       }
 
-      // Genre packs are now copied to the project folder when a workflow runs
-      // via the ResourceCopier in fictionlab-workflow/packages/workflow-runner
-      // No need to copy them here at project creation time
-      if (genrePack && genrePack !== 'none') {
-        logWithCategory('info', LogCategory.SYSTEM, `Genre pack '${genrePack}' will be copied when workflow runs`);
+      // Drop a README describing the scaffold + the per-book isolation rule
+      // (outputs/book_N/ per book; book N+1 must never write into book N's folder).
+      const readmePath = path.join(folderPath, 'README.md');
+      if (!(await fse.pathExists(readmePath))) {
+        await fse.writeFile(readmePath, buildProjectReadme(projectName), 'utf8');
+        logWithCategory('info', LogCategory.SYSTEM, 'Wrote project README.md');
       }
 
       logWithCategory('info', LogCategory.SYSTEM, `Workspace initialized at ${folderPath}`);
