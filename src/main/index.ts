@@ -421,6 +421,7 @@ import { registerImportHandlers } from './handlers/import-handlers';
 import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handlers';
 import { registerWorkflowHandlers } from './handlers/workflow-handlers';
 import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers';
+import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -437,6 +438,9 @@ function setupIPC(): void {
 
   // Register workflow handlers
   registerWorkflowHandlers();
+
+  // Register genre pack handlers
+  registerGenrePackHandlers();
 
   // Example IPC handler - ping/pong
   ipcMain.handle('ping', async () => {
@@ -2443,15 +2447,11 @@ function setupIPC(): void {
   });
 
   // List available genre packs
-  // Genre packs are now managed by fictionlab-workflow/resources/genre-packs
-  // and copied to projects when workflows run. This handler returns an empty list
-  // since genre packs are no longer bundled with the Electron app.
-  ipcMain.handle('project:list-genre-packs', async () => {
-    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing genre packs (now workflow-driven)');
-    // Genre packs are now workflow-driven and copied from fictionlab-workflow
-    // when a workflow executes. Return empty list for project creation UI.
-    return [];
-  });
+  // Registered separately via registerGenrePackHandlers() -- see
+  // ./handlers/genre-pack-handlers.ts. Genre packs live with the workflow
+  // plugin's bundled resources (fictionlab-workflow/resources/genre-packs),
+  // not inside this app; the handler resolves them via the workflow
+  // plugin's own ResourceCopier at {userData}/plugins/fictionlab-workflow.
 
   // ========================================
   // Provider Management Handlers
