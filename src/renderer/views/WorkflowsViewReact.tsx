@@ -19,6 +19,7 @@ import type { WorkflowListItem } from '../components/WorkflowList.js';
 import { WorkflowCanvas } from '../components/WorkflowCanvas.js';
 import { WorkflowImportDialog, ImportResult } from '../components/WorkflowImportDialog.js';
 import { WorkflowExportDialog } from '../components/WorkflowExportDialog.js';
+import { WorkflowCreateDialog } from '../components/WorkflowCreateDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
 import { WorkflowManagerPanel } from '../components/WorkflowManagerPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
@@ -49,6 +50,7 @@ const WorkflowsApp: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowListItem | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [executionStatus, setExecutionStatus] = useState<Map<string, NodeStatusInfo>>(new Map());
 
@@ -414,6 +416,34 @@ const WorkflowsApp: React.FC = () => {
     }
   };
 
+  // Create a brand-new empty workflow, then refresh the list and auto-select it
+  // so the canvas opens immediately with "+ Add Node" available.
+  const handleCreateWorkflow = async (name: string, description?: string) => {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI || !electronAPI.invoke) {
+      throw new Error('Electron API not available');
+    }
+
+    // Main-app channel (not plugin-namespaced): lives next to the canvas editing
+    // verbs it must cooperate with. Persisted via the importer's upsert path so
+    // the plugin's workflow:list (same DB via workflow-manager MCP) sees it.
+    const created = await electronAPI.invoke('workflow:create', { name, description });
+    console.log('[WorkflowsViewReact] Created workflow:', created);
+
+    // Refresh the manager panel list (skip cache) so the new row appears.
+    await loadWorkflows(true);
+
+    // Auto-select via the same path used for any imported workflow.
+    const newId = created?.id || created?.workflow_id;
+    if (newId) {
+      await handleSelectWorkflow(newId);
+    }
+
+    if (typeof (window as any).showNotification === 'function') {
+      (window as any).showNotification(`Workflow "${name}" created`, 'success');
+    }
+  };
+
   const handleStartWorkflow = async () => {
     if (!selectedWorkflow) return;
 
@@ -676,6 +706,12 @@ const WorkflowsApp: React.FC = () => {
       {/* Toolbar */}
       <div style={toolbarStyle}>
         <button
+          style={buttonStyle('success')}
+          onClick={() => setShowCreateDialog(true)}
+        >
+          🆕 New Workflow
+        </button>
+        <button
           style={buttonStyle('secondary')}
           onClick={() => setShowImportDialog(true)}
         >
@@ -810,6 +846,14 @@ const WorkflowsApp: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Create Dialog */}
+      {showCreateDialog && (
+        <WorkflowCreateDialog
+          onCreate={handleCreateWorkflow}
+          onClose={() => setShowCreateDialog(false)}
+        />
+      )}
 
       {/* Import Dialog */}
       {showImportDialog && (
