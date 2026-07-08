@@ -34,11 +34,25 @@ import type {
 } from '../../types/kanban.js';
 import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflow.js';
 import type { CurrentUserSetting } from '../../types/identity.js';
-import { DEFAULT_CURRENT_USER } from '../../types/identity.js';
 
 const KANBAN_PLUGIN = 'plugin:fictionlab-kanban:';
 const BOARD_KEY = 'dev-backlog';
 const POLL_INTERVAL_MS = 5000;
+
+// Transient placeholder for the brief window before loadCurrentUser() resolves
+// the real value via `app-settings:get-current-user`. Deliberately NOT the
+// shared `DEFAULT_CURRENT_USER` value from src/types/identity.ts -- that
+// module has a real runtime consumer on the main-process side too
+// (src/main/app-settings.ts), which needs it compiled as CommonJS, while this
+// renderer file is loaded as a real browser ES module. Both tsc project
+// configs (tsconfig.renderer.json, tsconfig.main.json) emit into the same
+// dist/types/ output path, so whichever compiles last on disk wins the
+// format war -- importing this by VALUE from the renderer is what caused
+// "does not provide an export named 'DEFAULT_CURRENT_USER'" the same way
+// KanbanCardTile.tsx's `PRIORITY_COLORS` import broke (see GH issue for the
+// renderer boot crash). The `CurrentUserSetting` type import above is
+// erasure-safe (no runtime import is emitted for `import type`) and stays.
+const UNINITIALIZED_CURRENT_USER: CurrentUserSetting = { id: '', displayName: '...' };
 
 let activeKanbanAppActions: { refresh: () => void; focusQuickAdd: () => void } | null = null;
 
@@ -85,7 +99,7 @@ const KanbanApp: React.FC = () => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workflowPhases, setWorkflowPhases] = useState<Map<string, ActiveWorkflowInstance>>(new Map());
-  const [currentUser, setCurrentUser] = useState<CurrentUserSetting>(DEFAULT_CURRENT_USER);
+  const [currentUser, setCurrentUser] = useState<CurrentUserSetting>(UNINITIALIZED_CURRENT_USER);
   const [identities, setIdentities] = useState<KanbanIdentity[]>([]);
   const [identityEditorOpen, setIdentityEditorOpen] = useState(false);
   const [identityIdDraft, setIdentityIdDraft] = useState('');

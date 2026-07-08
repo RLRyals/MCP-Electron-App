@@ -7,8 +7,7 @@
   "include": [
     "src/main/**/*",
     "src/preload/**/*",
-    "src/services/**/*",
-    "src/types/**/*"
+    "src/services/**/*"
   ],
   "exclude": [
     "**/__tests__/**",
