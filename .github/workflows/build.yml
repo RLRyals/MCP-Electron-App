@@ -50,6 +50,18 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Run full test suite (informational)
+        id: full_tests
+        continue-on-error: true
+        run: npm test
+
+      - name: Note pre-existing test failures
+        if: steps.full_tests.outcome == 'failure'
+        run: echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+
       - name: Build Electron app
         run: npm run ${{ matrix.build_script }}
         env:
