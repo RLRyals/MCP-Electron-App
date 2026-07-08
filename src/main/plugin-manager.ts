@@ -6,10 +6,12 @@
  */
 
 import { app, BrowserWindow, Menu, MenuItem as ElectronMenuItem, dialog } from 'electron';
+import * as path from 'path';
 import { logWithCategory, LogCategory } from './logger';
 import { PluginRegistry } from './plugin-registry';
 import { getDatabasePool, initializeDatabasePool } from './database-connection';
 import { getBaseMenuTemplate } from './index';
+import { recoverPluginsDirectory } from './plugin-update-swap';
 import {
   PluginState,
   PluginNotification,
@@ -41,6 +43,20 @@ class PluginManager {
     logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin manager...');
 
     try {
+      // Repair any plugin update swap interrupted by a crash/kill (issue
+      // #182), and clean up `.bak` copies left over from an update that
+      // completed successfully on a previous run. Must run before
+      // discovery so the loader never sees a half-swapped plugin.
+      const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+      try {
+        const recovery = await recoverPluginsDirectory(pluginsDir);
+        if (recovery.completed.length || recovery.rolledBack.length || recovery.cleaned.length) {
+          logWithCategory('info', LogCategory.SYSTEM, 'Plugin update recovery pass:', recovery);
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.SYSTEM, 'Plugin update recovery pass failed (continuing):', error);
+      }
+
       // Ensure database pool is initialized
       await initializeDatabasePool();
       const dbPool = getDatabasePool();
