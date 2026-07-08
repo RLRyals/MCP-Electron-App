@@ -152,3 +152,20 @@ export const PRIORITY_COLORS: Record<KanbanPriority, string> = {
   normal: '#3b82f6',
   low: '#6b7280',
 };
+
+/**
+ * Identities (companion MCP-Writing-Servers issue #62's `list_identities` /
+ * `upsert_identity` tools, same kanban server). The renderer feature-detects
+ * this tool -- when the board's `list-identities` channel resolves, the
+ * assignee picker becomes a dropdown grouped by `kind` and cards show a kind
+ * chip; when it isn't available yet (tool not deployed), the renderer falls
+ * back to free-text assignee entry and no chip is shown.
+ */
+export type IdentityKind = 'human' | 'persona' | 'agent';
+
+export interface KanbanIdentity {
+  id: string;
+  display_name: string;
+  kind: IdentityKind;
+  active?: boolean;
+}

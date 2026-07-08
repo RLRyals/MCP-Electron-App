@@ -23,6 +23,8 @@ import * as databaseBackup from './database-backup';
 import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
+import * as appSettings from './app-settings';
+import type { CurrentUserSetting } from '../types/identity';
 import * as migrations from './migrations';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
@@ -1295,6 +1297,17 @@ function setupIPC(): void {
   registerHandler('updater:set-preferences', "", async (_, prefs: updater.UpdatePreferences) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting update preferences...');
     return await updater.setUpdatePreferences(prefs);
+  });
+
+  // App Settings IPC handlers (issue #181 -- configured current-user identity)
+  registerHandler('app-settings:get-current-user', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting current user setting...');
+    return await appSettings.getCurrentUser();
+  });
+
+  registerHandler('app-settings:set-current-user', "", async (_, user: CurrentUserSetting) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting current user identity...');
+    return await appSettings.setCurrentUser(user);
   });
 
   // Setup Wizard IPC handlers

@@ -16,14 +16,26 @@ import {
   type KanbanCardStatus,
   type KanbanPriority,
   type KanbanLinkType,
+  type KanbanIdentity,
 } from '../../../types/kanban.js';
 import type { ActiveWorkflowInstance } from '../../../types/workflow.js';
+import type { CurrentUserSetting } from '../../../types/identity.js';
 
 const KANBAN_PLUGIN = 'plugin:fictionlab-kanban:';
+
+const IDENTITY_KIND_COLORS: Record<KanbanIdentity['kind'], string> = {
+  human: '#3b82f6',
+  persona: '#a855f7',
+  agent: '#10b981',
+};
 
 export interface CardDrawerProps {
   cardId: string;
   workflowPhase: ActiveWorkflowInstance | null;
+  /** The configured current-user identity -- actor/author attribution and assign-to-me target (issue #181). */
+  currentUser: CurrentUserSetting;
+  /** Known identities for the assignee dropdown, grouped by kind (issue #181 §3-4). Empty when list_identities isn't available yet -- falls back to free-text entry. */
+  identities: KanbanIdentity[];
   onClose: () => void;
   /** Called after any mutation succeeds, so the parent board can re-fetch immediately. */
   onMutated: () => void;
@@ -93,7 +105,7 @@ const primaryButtonStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, onClose, onMutated }) => {
+export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, currentUser, identities, onClose, onMutated }) => {
   const [detail, setDetail] = useState<KanbanCardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,9 +189,12 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
   }
 
   const card = detail.card;
+  const assigneeIdentityKind = card.assignee
+    ? identities.find((i) => i.id === card.assignee)?.kind
+    : undefined;
 
   const saveFieldChanges = () => {
-    const patch: Record<string, any> = { card_id: cardId, actor: 'rebecca' };
+    const patch: Record<string, any> = { card_id: cardId, actor: currentUser.id };
     let dirty = false;
     if (titleDraft !== card.title) { patch.title = titleDraft; dirty = true; }
     if (bodyDraft !== (card.body || '')) { patch.body = bodyDraft; dirty = true; }
@@ -224,7 +239,7 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
                 background: card.review_policy === 'review-required' ? '#f59e0b' : '#6b7280',
                 color: card.review_policy === 'review-required' ? '#1a1200' : 'white',
               }}
-              title="Risk-based review policy: review-required cards land in Rebecca's review queue when moved to review; auto-done cards may reach done directly."
+              title={`Risk-based review policy: review-required cards land in ${currentUser.displayName}'s review queue when moved to review; auto-done cards may reach done directly.`}
             >
               {card.review_policy}
             </span>
@@ -232,7 +247,7 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
               <button
                 style={buttonStyle}
                 disabled={saving}
-                onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: 'rebecca', review_policy: 'review-required' }))}
+                onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: currentUser.id, review_policy: 'review-required' }))}
               >
                 Escalate to review-required
               </button>
@@ -256,7 +271,7 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
             style={inputStyle}
             value={card.status}
             disabled={saving}
-            onChange={(e) => runMutation(() => invoke('board:move-card', { card_id: cardId, to_status: e.target.value as KanbanCardStatus, actor: 'rebecca' }))}
+            onChange={(e) => runMutation(() => invoke('board:move-card', { card_id: cardId, to_status: e.target.value as KanbanCardStatus, actor: currentUser.id }))}
           >
             {CARD_STATUSES.map((s) => (
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -266,27 +281,73 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
 
         {/* Assignee / claim */}
         <div style={sectionStyle}>
-          <label style={labelStyle}>Assignee</label>
+          <label style={labelStyle}>
+            Assignee
+            {card.assignee && assigneeIdentityKind && (
+              <span
+                title={`Identity kind: ${assigneeIdentityKind}`}
+                style={{
+                  marginLeft: '6px',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  color: 'white',
+                  textTransform: 'none',
+                  background: IDENTITY_KIND_COLORS[assigneeIdentityKind],
+                }}
+              >
+                {assigneeIdentityKind}
+              </span>
+            )}
+          </label>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-            <input
-              style={inputStyle}
-              value={assigneeDraft}
-              onChange={(e) => setAssigneeDraft(e.target.value)}
-              placeholder="unassigned"
-            />
+            {identities.length > 0 ? (
+              <select
+                style={inputStyle}
+                value={assigneeDraft}
+                title="Assignee"
+                aria-label="Assignee"
+                onChange={(e) => setAssigneeDraft(e.target.value)}
+              >
+                <option value="">unassigned</option>
+                {(['human', 'persona', 'agent'] as const).map((kind) => {
+                  const options = identities.filter((i) => i.kind === kind && i.active !== false);
+                  if (options.length === 0) return null;
+                  return (
+                    <optgroup key={kind} label={kind}>
+                      {options.map((i) => (
+                        <option key={i.id} value={i.id}>{i.display_name}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+                {/* Keep an existing (e.g. inactive, or not-yet-known-to-list_identities) assignee selectable/visible rather than silently blanking the control */}
+                {assigneeDraft && !identities.some((i) => i.id === assigneeDraft && i.active !== false) && (
+                  <option value={assigneeDraft}>{assigneeDraft}</option>
+                )}
+              </select>
+            ) : (
+              <input
+                style={inputStyle}
+                value={assigneeDraft}
+                onChange={(e) => setAssigneeDraft(e.target.value)}
+                placeholder="unassigned"
+              />
+            )}
             <button
               style={buttonStyle}
               disabled={saving}
-              onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: 'rebecca', assignee: assigneeDraft || '__clear__' }))}
+              onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: currentUser.id, assignee: assigneeDraft || '__clear__' }))}
             >
               Save
             </button>
           </div>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-            <button style={buttonStyle} disabled={saving} onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: 'rebecca', assignee: 'rebecca' }))}>
+            <button style={buttonStyle} disabled={saving} onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: currentUser.id, assignee: currentUser.id }))}>
               Assign to me
             </button>
-            <button style={buttonStyle} disabled={saving} onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: 'rebecca', assignee: '__clear__' }))}>
+            <button style={buttonStyle} disabled={saving} onClick={() => runMutation(() => invoke('board:update-card', { card_id: cardId, actor: currentUser.id, assignee: '__clear__' }))}>
               Clear assignee
             </button>
           </div>
@@ -410,7 +471,7 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, o
             style={{ ...primaryButtonStyle, marginTop: '6px' }}
             disabled={saving || !newComment.trim()}
             onClick={() => runMutation(async () => {
-              await invoke('board:comment-card', { card_id: cardId, author: 'rebecca', body: newComment.trim() });
+              await invoke('board:comment-card', { card_id: cardId, author: currentUser.id, body: newComment.trim() });
               setNewComment('');
             })}
           >

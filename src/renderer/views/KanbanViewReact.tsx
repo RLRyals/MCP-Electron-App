@@ -30,8 +30,11 @@ import type {
   KanbanAssigneeFilter,
   KanbanDueFilter,
   KanbanUpdate,
+  KanbanIdentity,
 } from '../../types/kanban.js';
 import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflow.js';
+import type { CurrentUserSetting } from '../../types/identity.js';
+import { DEFAULT_CURRENT_USER } from '../../types/identity.js';
 
 const KANBAN_PLUGIN = 'plugin:fictionlab-kanban:';
 const BOARD_KEY = 'dev-backlog';
@@ -82,15 +85,22 @@ const KanbanApp: React.FC = () => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workflowPhases, setWorkflowPhases] = useState<Map<string, ActiveWorkflowInstance>>(new Map());
+  const [currentUser, setCurrentUser] = useState<CurrentUserSetting>(DEFAULT_CURRENT_USER);
+  const [identities, setIdentities] = useState<KanbanIdentity[]>([]);
+  const [identityEditorOpen, setIdentityEditorOpen] = useState(false);
+  const [identityIdDraft, setIdentityIdDraft] = useState('');
+  const [identityNameDraft, setIdentityNameDraft] = useState('');
 
   const quickAddRef = useRef<HTMLInputElement | null>(null);
   const assigneeFilterRef = useRef(assigneeFilter);
   const dueFilterRef = useRef(dueFilter);
+  const currentUserRef = useRef(currentUser);
   assigneeFilterRef.current = assigneeFilter;
   dueFilterRef.current = dueFilter;
+  currentUserRef.current = currentUser;
 
-  const resolveAssigneeParam = (filter: KanbanAssigneeFilter): string | undefined => {
-    if (filter === 'mine') return 'rebecca';
+  const resolveAssigneeParam = (filter: KanbanAssigneeFilter, mineId: string): string | undefined => {
+    if (filter === 'mine') return mineId;
     if (filter === 'all') return undefined;
     if (filter === 'unassigned') return '__unassigned__';
     return filter; // a specific agent id
@@ -111,7 +121,7 @@ const KanbanApp: React.FC = () => {
   const loadCards = useCallback(async () => {
     try {
       const args: Record<string, any> = { board_key: BOARD_KEY, limit: 500 };
-      const assignee = resolveAssigneeParam(assigneeFilterRef.current);
+      const assignee = resolveAssigneeParam(assigneeFilterRef.current, currentUserRef.current.id);
       if (assignee !== undefined) args.assignee = assignee;
       if (dueFilterRef.current !== 'none') args.due_filter = dueFilterRef.current;
       args.include_workflow_phase = true;
@@ -138,16 +148,45 @@ const KanbanApp: React.FC = () => {
     }
   }, []);
 
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const electronAPI = (window as any).electronAPI;
+      if (!electronAPI?.invoke) return;
+      // Host-owned channel (un-prefixed) -- see src/main/app-settings.ts. Falls
+      // back to DEFAULT_CURRENT_USER (unset state) on any error.
+      const user = await electronAPI.invoke('app-settings:get-current-user');
+      if (user?.id) setCurrentUser(user);
+    } catch {
+      // Non-fatal -- keep whatever identity is already in state.
+    }
+  }, []);
+
+  const loadIdentities = useCallback(async () => {
+    try {
+      // Companion MCP-Writing-Servers issue #62 tool, proxied through the
+      // kanban plugin the same way board:* channels are. Feature-detected:
+      // if the tool isn't deployed yet this throws/resolves empty and the
+      // assignee picker falls back to free-text entry with no kind chips.
+      const result = await invoke<{ identities: KanbanIdentity[] }>('board:list-identities');
+      setIdentities(Array.isArray(result?.identities) ? result.identities : []);
+    } catch {
+      setIdentities([]);
+    }
+  }, []);
+
   const refresh = useCallback(() => {
     loadBoard();
     loadCards();
     loadWorkflowPhases();
-  }, [loadBoard, loadCards, loadWorkflowPhases]);
+    loadIdentities();
+  }, [loadBoard, loadCards, loadWorkflowPhases, loadIdentities]);
 
-  // Initial load + re-load when filters change.
+  // Initial load + re-load when filters (or the configured identity) change.
   useEffect(() => { loadBoard(); }, [loadBoard]);
-  useEffect(() => { loadCards(); }, [loadCards, assigneeFilter, dueFilter]);
+  useEffect(() => { loadCards(); }, [loadCards, assigneeFilter, dueFilter, currentUser]);
   useEffect(() => { loadWorkflowPhases(); }, [loadWorkflowPhases]);
+  useEffect(() => { loadCurrentUser(); }, [loadCurrentUser]);
+  useEffect(() => { loadIdentities(); }, [loadIdentities]);
 
   // Live refresh: kanban:card-updated push (primary, fed by LISTEN + this
   // view's own mutations), 5s poll (backstop), window-focus (hard
@@ -194,16 +233,49 @@ const KanbanApp: React.FC = () => {
   }, [refresh]);
 
   const handleDropCard = useCallback((cardId: string, statusKey: string) => {
-    invoke('board:move-card', { card_id: cardId, to_status: statusKey, actor: 'rebecca' })
+    invoke('board:move-card', { card_id: cardId, to_status: statusKey, actor: currentUser.id })
       .then(refresh)
       .catch((e: any) => setError(e?.message || 'Failed to move card'));
-  }, [refresh]);
+  }, [refresh, currentUser]);
 
   const selectedCard = selectedCardId ? cards.find((c) => c.id === selectedCardId) || null : null;
 
   const agentOptions = Array.from(
-    new Set(cards.map((c) => c.assignee).filter((a): a is string => !!a && a !== 'rebecca'))
+    new Set(cards.map((c) => c.assignee).filter((a): a is string => !!a && a !== currentUser.id))
   );
+
+  const identityKindById = React.useMemo(() => {
+    const map = new Map<string, KanbanIdentity['kind']>();
+    identities.forEach((identity) => map.set(identity.id, identity.kind));
+    return map;
+  }, [identities]);
+
+  const openIdentityEditor = useCallback(() => {
+    setIdentityIdDraft(currentUser.id);
+    setIdentityNameDraft(currentUser.displayName);
+    setIdentityEditorOpen(true);
+  }, [currentUser]);
+
+  const saveIdentity = useCallback(async () => {
+    const id = identityIdDraft.trim();
+    if (!id) return;
+    const displayName = identityNameDraft.trim() || id;
+    try {
+      const electronAPI = (window as any).electronAPI;
+      await electronAPI.invoke('app-settings:set-current-user', { id, displayName });
+      setCurrentUser({ id, displayName });
+      setIdentityEditorOpen(false);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to update current-user identity');
+    }
+  }, [identityIdDraft, identityNameDraft]);
+
+  const pickExistingIdentity = useCallback((identityId: string) => {
+    const identity = identities.find((i) => i.id === identityId);
+    if (!identity) return;
+    setIdentityIdDraft(identity.id);
+    setIdentityNameDraft(identity.display_name);
+  }, [identities]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -211,7 +283,14 @@ const KanbanApp: React.FC = () => {
         <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.5))', marginRight: '4px' }}>
           {board?.name || 'Board'}
         </span>
-        <button style={filterButtonStyle(assigneeFilter === 'mine')} onClick={() => setAssigneeFilter('mine')}>Mine (rebecca)</button>
+        <button style={filterButtonStyle(assigneeFilter === 'mine')} onClick={() => setAssigneeFilter('mine')}>Mine ({currentUser.displayName})</button>
+        <button
+          style={{ ...filterButtonStyle(false), padding: '5px 8px' }}
+          onClick={openIdentityEditor}
+          title="Change the configured current-user identity"
+        >
+          ⚙
+        </button>
         <button style={filterButtonStyle(assigneeFilter === 'all')} onClick={() => setAssigneeFilter('all')}>All</button>
         <button style={filterButtonStyle(assigneeFilter === 'unassigned')} onClick={() => setAssigneeFilter('unassigned')}>Unassigned</button>
         {agentOptions.map((agent) => (
@@ -227,6 +306,48 @@ const KanbanApp: React.FC = () => {
         {error && <span style={{ fontSize: '11px', color: '#ef4444', marginLeft: 'auto' }}>{error}</span>}
       </div>
 
+      {identityEditorOpen && (
+        <div style={{ ...filterBarStyle, background: 'rgba(0,0,0,0.15)', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.5))' }}>Current-user identity:</span>
+          {identities.length > 0 && (
+            <select
+              style={{ fontSize: '12px', padding: '4px 6px' }}
+              value=""
+              title="Pick an existing identity"
+              aria-label="Pick an existing identity"
+              onChange={(e) => { if (e.target.value) pickExistingIdentity(e.target.value); }}
+            >
+              <option value="">Pick existing identity...</option>
+              {(['human', 'persona', 'agent'] as const).map((kind) => {
+                const options = identities.filter((i) => i.kind === kind && i.active !== false);
+                if (options.length === 0) return null;
+                return (
+                  <optgroup key={kind} label={kind}>
+                    {options.map((i) => (
+                      <option key={i.id} value={i.id}>{i.display_name}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          )}
+          <input
+            style={{ fontSize: '12px', padding: '4px 6px', width: '140px' }}
+            placeholder="id (e.g. mom, blakemerrick)"
+            value={identityIdDraft}
+            onChange={(e) => setIdentityIdDraft(e.target.value)}
+          />
+          <input
+            style={{ fontSize: '12px', padding: '4px 6px', width: '160px' }}
+            placeholder="Display name"
+            value={identityNameDraft}
+            onChange={(e) => setIdentityNameDraft(e.target.value)}
+          />
+          <button style={filterButtonStyle(false)} onClick={saveIdentity}>Save</button>
+          <button style={filterButtonStyle(false)} onClick={() => setIdentityEditorOpen(false)}>Cancel</button>
+        </div>
+      )}
+
       <div style={boardStyle}>
         {columns.map((column, index) => (
           <KanbanColumn
@@ -234,6 +355,7 @@ const KanbanApp: React.FC = () => {
             column={column}
             cards={cards.filter((c) => c.status === column.status_key)}
             workflowPhases={workflowPhases}
+            identityKindById={identityKindById}
             onSelectCard={(card) => setSelectedCardId(card.id)}
             onQuickAdd={handleQuickAdd}
             onDropCard={handleDropCard}
@@ -251,6 +373,8 @@ const KanbanApp: React.FC = () => {
         <CardDrawer
           cardId={selectedCard.id}
           workflowPhase={selectedCard.workflow_registry_id ? workflowPhases.get(selectedCard.workflow_registry_id) || null : null}
+          currentUser={currentUser}
+          identities={identities}
           onClose={() => setSelectedCardId(null)}
           onMutated={refresh}
         />
