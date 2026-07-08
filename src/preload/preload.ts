@@ -443,6 +443,14 @@ interface UpdateResult {
 }
 
 /**
+ * Current-user identity setting (issue #181)
+ */
+interface CurrentUserSetting {
+  id: string;
+  displayName: string;
+}
+
+/**
  * Update preferences
  */
 interface UpdatePreferences {
@@ -1683,6 +1691,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openDirectory: (): Promise<void> => {
       return ipcRenderer.invoke('database-backup:open-directory');
+    },
+  },
+
+  /**
+   * App Settings API (issue #181 -- configured current-user identity)
+   */
+  appSettings: {
+    /**
+     * Get the configured current-user identity (defaults to 'rebecca' until changed)
+     */
+    getCurrentUser: (): Promise<CurrentUserSetting> => {
+      return ipcRenderer.invoke('app-settings:get-current-user');
+    },
+
+    /**
+     * Set the current-user identity
+     */
+    setCurrentUser: (user: CurrentUserSetting): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('app-settings:set-current-user', user);
     },
   },
 
