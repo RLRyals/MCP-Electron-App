@@ -12,6 +12,7 @@ import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { ViewRouter } from './components/ViewRouter.js';
 import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
+import { KanbanViewReact } from './views/KanbanViewReact.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
 // import { createDashboardTab } from './components/DashboardTab.js'; // No longer used with new ViewRouter
@@ -980,6 +981,14 @@ async function init(): Promise<void> {
     console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
   }
 
+  // KanbanViewReact requires fictionlab-kanban plugin
+  if (sidebar.isPluginInstalled('fictionlab-kanban')) {
+    viewRouter.registerView('kanban', KanbanViewReact);
+    console.log('[Renderer] KanbanViewReact registered (plugin installed)');
+  } else {
+    console.log('[Renderer] KanbanViewReact not registered (plugin not installed)');
+  }
+
   // Listen for plugin state changes and update navigation
   const electronAPI = (window as any).electronAPI;
   if (electronAPI?.on) {
@@ -1008,6 +1017,27 @@ async function init(): Promise<void> {
       } else {
         // Remove workflows view if plugin was uninstalled
         viewRouter.clearCache('workflows');
+      }
+
+      // Re-register plugin-dependent views
+      if (sidebar.isPluginInstalled('fictionlab-kanban')) {
+        const wasRegistered = viewRouter['viewClasses'].has('kanban');
+        if (!wasRegistered) {
+          viewRouter.registerView('kanban', KanbanViewReact);
+          console.log('[Renderer] KanbanViewReact registered after plugin install');
+        }
+
+        // If we're currently trying to view the board but it was showing
+        // "Plugin Required", re-navigate now that the plugin is ready
+        const currentViewId = viewRouter['currentViewId'];
+        const savedView = localStorage.getItem('fictionlab-active-view');
+        if (savedView === 'kanban' && (!currentViewId || currentViewId !== 'kanban' || !wasRegistered)) {
+          console.log('[Renderer] Re-navigating to kanban after plugin activation');
+          await viewRouter.navigateTo('kanban');
+        }
+      } else {
+        // Remove kanban view if plugin was uninstalled
+        viewRouter.clearCache('kanban');
       }
     });
   }
@@ -1126,6 +1156,12 @@ async function init(): Promise<void> {
       viewRouter.registerView('workflows', WorkflowsViewReact);
       console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
     }
+
+    // Register kanban view if the kanban plugin was installed
+    if (pluginId === 'fictionlab-kanban' && sidebar.isPluginInstalled('fictionlab-kanban')) {
+      viewRouter.registerView('kanban', KanbanViewReact);
+      console.log('[Renderer] KanbanViewReact registered after plugin installation');
+    }
   });
 
   // Listen for plugin uninstallation events to update the UI
@@ -1139,6 +1175,11 @@ async function init(): Promise<void> {
 
     // If workflow plugin was uninstalled and user is on workflows view, navigate away
     if (pluginId === 'fictionlab-workflow' && viewRouter.getCurrentViewId() === 'workflows') {
+      await viewRouter.navigateTo('dashboard');
+    }
+
+    // If kanban plugin was uninstalled and user is on the board view, navigate away
+    if (pluginId === 'fictionlab-kanban' && viewRouter.getCurrentViewId() === 'kanban') {
       await viewRouter.navigateTo('dashboard');
     }
   });

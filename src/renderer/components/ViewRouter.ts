@@ -48,7 +48,8 @@ export class ViewRouter {
 
   // Plugin-dependent views
   private pluginRequiredViews: Map<string, string> = new Map([
-    ['workflows', 'fictionlab-workflow']
+    ['workflows', 'fictionlab-workflow'],
+    ['kanban', 'fictionlab-kanban']
   ]);
 
   constructor(options: ViewRouterOptions) {
@@ -282,6 +283,7 @@ export class ViewRouter {
     const titles: Record<string, string> = {
       'dashboard': 'Dashboard',
       'workflows': 'Workflows',
+      'kanban': 'Board',
       'library': 'Library',
       'plugins': 'Plugins',
       'settings-setup': 'Setup',
@@ -390,7 +392,8 @@ export class ViewRouter {
    */
   private showPluginRequiredView(viewId: string, pluginId: string): void {
     const viewNames: Record<string, string> = {
-      'workflows': 'Workflows'
+      'workflows': 'Workflows',
+      'kanban': 'Board'
     };
     const viewName = viewNames[viewId] || viewId;
 
