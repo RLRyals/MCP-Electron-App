@@ -10,6 +10,83 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 import { Pool, PoolClient } from 'pg';
 import axios from 'axios';
+import { PersistentMCPClient } from './workflow/persistent-mcp-client';
+import { recordHandler, unrecordHandler } from './ipc-registry';
+
+// Singleton instance of PersistentMCPClient for workflow-manager stdio communication
+let workflowMCPClient: PersistentMCPClient | null = null;
+let workflowMCPClientStartPromise: Promise<void> | null = null;
+
+/**
+ * Get or create the singleton PersistentMCPClient for workflow-manager
+ * Uses stdio for low-latency communication per architecture spec
+ */
+async function getWorkflowMCPClient(): Promise<PersistentMCPClient> {
+  if (workflowMCPClient && workflowMCPClient.isReady()) {
+    return workflowMCPClient;
+  }
+
+  if (workflowMCPClientStartPromise) {
+    await workflowMCPClientStartPromise;
+    if (workflowMCPClient) {
+      return workflowMCPClient;
+    }
+  }
+
+  workflowMCPClient = new PersistentMCPClient();
+  workflowMCPClientStartPromise = workflowMCPClient.start();
+
+  try {
+    await workflowMCPClientStartPromise;
+    logWithCategory('info', LogCategory.SYSTEM, 'PersistentMCPClient started for workflow-manager stdio communication');
+    return workflowMCPClient;
+  } catch (error: any) {
+    workflowMCPClient = null;
+    workflowMCPClientStartPromise = null;
+    throw error;
+  }
+}
+
+// Singleton instance of PersistentMCPClient for kanban-server stdio communication.
+// Same stdio-first treatment workflow-manager gets (S11 §4a / GH issue #179 §2:
+// "give kanban the same stdio treatment workflow-manager gets... rather than the
+// HTTP /api/tool-call branch"). A second singleton pair, mirroring
+// workflowMCPClient/getWorkflowMCPClient() above, rather than generalizing a
+// shared cache keyed by serverId -- called out in the issue as an acceptable v1
+// shortcut ("a minimally-duplicated second PersistentMCPClient instance").
+let kanbanMCPClient: PersistentMCPClient | null = null;
+let kanbanMCPClientStartPromise: Promise<void> | null = null;
+
+/**
+ * Get or create the singleton PersistentMCPClient for kanban-server.
+ * Uses stdio for low-latency communication, same as workflow-manager.
+ */
+async function getKanbanMCPClient(): Promise<PersistentMCPClient> {
+  if (kanbanMCPClient && kanbanMCPClient.isReady()) {
+    return kanbanMCPClient;
+  }
+
+  if (kanbanMCPClientStartPromise) {
+    await kanbanMCPClientStartPromise;
+    if (kanbanMCPClient) {
+      return kanbanMCPClient;
+    }
+  }
+
+  kanbanMCPClient = new PersistentMCPClient('kanban-server');
+  kanbanMCPClientStartPromise = kanbanMCPClient.start();
+
+  try {
+    await kanbanMCPClientStartPromise;
+    logWithCategory('info', LogCategory.SYSTEM, 'PersistentMCPClient started for kanban-server stdio communication');
+    return kanbanMCPClient;
+  } catch (error: any) {
+    kanbanMCPClient = null;
+    kanbanMCPClientStartPromise = null;
+    throw error;
+  }
+}
+
 import {
   PluginContext,
   PluginServices,
@@ -35,6 +112,8 @@ import {
   DialogResult,
   PluginError,
   PluginErrorType,
+  WorkflowService,
+  WorkflowImportResult,
 } from '../types/plugin-api';
 import { logWithCategory, LogCategory } from './logger';
 
@@ -82,6 +161,7 @@ function createPluginServices(
     fileSystem: createFileSystemService(pluginId, permissions),
     docker: permissions.docker ? createDockerService(pluginId) : undefined,
     environment: createEnvironmentService(),
+    workflow: createWorkflowService(pluginId, permissions),
   };
 }
 
@@ -181,7 +261,17 @@ function createMCPConnectionManager(
   pluginId: string,
   permissions: PluginPermissions
 ): MCPConnectionManager {
-  const allowedServers = permissions.mcp || [];
+  // Handle both array format (mcp: ["server1", "server2"])
+  // and object format (mcp: { enabled: true, servers: ["server1"] })
+  let allowedServers: string[] = [];
+  if (Array.isArray(permissions.mcp)) {
+    allowedServers = permissions.mcp;
+  } else if (permissions.mcp && typeof permissions.mcp === 'object') {
+    const mcpConfig = permissions.mcp as any;
+    if (mcpConfig.enabled && Array.isArray(mcpConfig.servers)) {
+      allowedServers = mcpConfig.servers;
+    }
+  }
 
   return {
     getEndpoint(serverId: string): string | null {
@@ -205,6 +295,7 @@ function createMCPConnectionManager(
         'review': 3007,
         'reporting': 3008,
         'author': 3009,
+        'kanban': 3015,
       };
 
       const port = serverPorts[serverId];
@@ -220,6 +311,66 @@ function createMCPConnectionManager(
       toolName: string,
       args: Record<string, any>
     ): Promise<T> {
+      // Check permission first
+      if (!allowedServers.includes(serverId)) {
+        throw new PluginError(
+          PluginErrorType.PERMISSION_DENIED,
+          pluginId,
+          `MCP server '${serverId}' not permitted. Allowed servers: ${allowedServers.join(', ')}`
+        );
+      }
+
+      // Use stdio (PersistentMCPClient) for workflow-manager - per architecture spec
+      if (serverId === 'workflow-manager') {
+        try {
+          // Fix for MCP server bug: when version is 'latest', omit it entirely
+          // The server incorrectly concatenates "id vlatest" instead of treating them separately
+          let fixedArgs = args;
+          if (toolName === 'get_workflow_definition' && args.version === 'latest') {
+            fixedArgs = { ...args };
+            delete fixedArgs.version;
+            logWithCategory('debug', LogCategory.SYSTEM,
+              `Removed 'latest' version from get_workflow_definition call to avoid MCP server bug`);
+          }
+
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} calling workflow-manager tool via stdio: ${toolName}`, fixedArgs);
+
+          const client = await getWorkflowMCPClient();
+          const result = await client.callTool(toolName, fixedArgs);
+
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} workflow-manager result for ${toolName}:`,
+            `type=${typeof result}, isArray=${Array.isArray(result)}, value=${JSON.stringify(result).substring(0, 300)}`);
+
+          return result as T;
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM,
+            `Plugin ${pluginId} workflow-manager stdio error:`, error);
+          throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
+        }
+      }
+
+      // Use stdio (PersistentMCPClient) for kanban-server -- same treatment as
+      // workflow-manager (S11 §4a / GH issue #179 §2: the proven path, rather
+      // than the HTTP /api/tool-call branch).
+      if (serverId === 'kanban') {
+        try {
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} calling kanban-server tool via stdio: ${toolName}`, args);
+
+          const client = await getKanbanMCPClient();
+          const result = await client.callTool(toolName, args);
+
+          return result as T;
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM,
+            `Plugin ${pluginId} kanban-server stdio error:`, error);
+          throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
+        }
+      }
+
+      // Use HTTP for all other MCP servers
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         throw new PluginError(
@@ -276,6 +427,27 @@ function createMCPConnectionManager(
     },
 
     async isServerRunning(serverId: string): Promise<boolean> {
+      // For workflow-manager, check if the PersistentMCPClient is ready
+      if (serverId === 'workflow-manager') {
+        try {
+          const client = await getWorkflowMCPClient();
+          return client.isReady();
+        } catch {
+          return false;
+        }
+      }
+
+      // For kanban, same stdio ready-check as workflow-manager
+      if (serverId === 'kanban') {
+        try {
+          const client = await getKanbanMCPClient();
+          return client.isReady();
+        } catch {
+          return false;
+        }
+      }
+
+      // For other servers, use HTTP health check
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         return false;
@@ -294,6 +466,51 @@ function createMCPConnectionManager(
     },
 
     async getServerInfo(serverId: string): Promise<MCPServerInfo | null> {
+      // For workflow-manager, use stdio client
+      if (serverId === 'workflow-manager') {
+        try {
+          const client = await getWorkflowMCPClient();
+          const running = client.isReady();
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: running ? 'running' : 'stopped',
+            tools: [], // Tools list not available via stdio without additional protocol
+          };
+        } catch (error) {
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: 'error',
+          };
+        }
+      }
+
+      // For kanban, same stdio client shape as workflow-manager
+      if (serverId === 'kanban') {
+        try {
+          const client = await getKanbanMCPClient();
+          const running = client.isReady();
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: running ? 'running' : 'stopped',
+            tools: [],
+          };
+        } catch (error) {
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: 'error',
+          };
+        }
+      }
+
+      // For other servers, use HTTP
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
         return null;
@@ -506,6 +723,91 @@ function createEnvironmentService(): EnvironmentService {
 }
 
 /**
+ * Creates workflow service
+ *
+ * Provides workflow import/delete operations through the plugin API
+ * instead of requiring plugins to import internal modules directly
+ */
+function createWorkflowService(
+  pluginId: string,
+  permissions: PluginPermissions
+): WorkflowService | undefined {
+  // Check if plugin has MCP permission for workflow-manager
+  const hasMcpPermission = Array.isArray(permissions.mcp)
+    ? permissions.mcp.includes('workflow-manager')
+    : permissions.mcp && typeof permissions.mcp === 'object' &&
+      (permissions.mcp as any).enabled &&
+      Array.isArray((permissions.mcp as any).servers) &&
+      (permissions.mcp as any).servers.includes('workflow-manager');
+
+  if (!hasMcpPermission) {
+    return undefined;
+  }
+
+  // Lazy import to avoid circular dependencies
+  const getFolderImporter = async () => {
+    const { FolderImporter } = await import('./workflow/folder-importer');
+    return new FolderImporter();
+  };
+
+  return {
+    async importFromFolder(
+      folderPath: string,
+      customId?: string,
+      customName?: string
+    ): Promise<WorkflowImportResult> {
+      try {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Plugin ${pluginId} importing workflow from: ${folderPath}`);
+
+        const importer = await getFolderImporter();
+        const result = await importer.importFromFolder(folderPath, customId, customName);
+
+        return {
+          success: true,
+          workflowId: result.workflowId,
+          message: result.message,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Plugin ${pluginId} workflow import failed:`, error);
+
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+    },
+
+    async deleteWorkflow(workflowId: string): Promise<void> {
+      try {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Plugin ${pluginId} deleting workflow: ${workflowId}`);
+
+        const client = await getWorkflowMCPClient();
+        await client.callTool('delete_workflow_definition', { id: workflowId });
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Plugin ${pluginId} workflow delete failed:`, error);
+        throw error;
+      }
+    },
+
+    async getImportSource(workflowId: string): Promise<string | null> {
+      try {
+        const client = await getWorkflowMCPClient();
+        const result = await client.callTool('get_workflow_import_source', { id: workflowId });
+        return result?.sourcePath || null;
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.SYSTEM,
+          `Plugin ${pluginId} could not get import source for ${workflowId}:`, error.message);
+        return null;
+      }
+    },
+  };
+}
+
+/**
  * Creates workspace info
  */
 function createWorkspaceInfo(pluginId: string): WorkspaceInfo {
@@ -533,6 +835,7 @@ function createPluginIPC(pluginId: string): PluginIPC {
       const fullChannel = `plugin:${pluginId}:${channel}`;
       ipcMain.handle(fullChannel, handler);
       registeredChannels.push(fullChannel);
+      recordHandler(fullChannel, '', `plugin:${pluginId}`);
       logWithCategory('debug', LogCategory.SYSTEM, `Plugin ${pluginId} registered IPC handler: ${fullChannel}`);
     },
 
@@ -546,6 +849,7 @@ function createPluginIPC(pluginId: string): PluginIPC {
     removeHandler(channel: string): void {
       const fullChannel = `plugin:${pluginId}:${channel}`;
       ipcMain.removeHandler(fullChannel);
+      unrecordHandler(fullChannel);
       const index = registeredChannels.indexOf(fullChannel);
       if (index > -1) {
         registeredChannels.splice(index, 1);

@@ -64,6 +64,22 @@ export class PluginLoader {
           continue;
         }
 
+        // Skip update-swap bookkeeping directories (see plugin-update-swap.ts,
+        // issue #182): a `.bak` is the pre-update copy of a plugin kept around
+        // for crash rollback, and `.staging` is a not-yet-swapped-in update.
+        // Both are full copies of a real plugin (same id, own plugin.json),
+        // so without this guard they'd be "discovered" as duplicate plugins.
+        // Also skip the older ad-hoc `.backup-<timestamp>` naming in case any
+        // are still on disk from before this change.
+        if (
+          entry.name.endsWith('.bak') ||
+          entry.name.endsWith('.staging') ||
+          entry.name.includes('.backup-')
+        ) {
+          logWithCategory('debug', LogCategory.SYSTEM, `Skipping update-swap directory: ${entry.name}`);
+          continue;
+        }
+
         const pluginPath = path.join(this.pluginsDirectory, entry.name);
         const manifestPath = path.join(pluginPath, 'plugin.json');
 
@@ -213,6 +229,9 @@ export class PluginLoader {
     const entryPath = path.join(pluginPath, manifest.entry.main);
 
     try {
+      // Setup bundled dependencies before loading (handles @fictionlab/workflow-runner etc.)
+      await this.setupBundledDependencies(pluginPath);
+
       // Clear require cache for hot reloading
       if (options.force && require.cache[entryPath]) {
         delete require.cache[entryPath];
@@ -289,6 +308,59 @@ export class PluginLoader {
         `Failed to load plugin entry point: ${error.message}`,
         { originalError: error }
       );
+    }
+  }
+
+  /**
+   * Setup bundled dependencies for a plugin
+   *
+   * Copies packages from the plugin's bundled/ folder into node_modules/
+   * This handles cases like @fictionlab/workflow-runner that are shipped with the plugin
+   *
+   * @param pluginPath Path to the plugin directory
+   */
+  private async setupBundledDependencies(pluginPath: string): Promise<void> {
+    const bundledPath = path.join(pluginPath, 'bundled');
+    const nodeModulesPath = path.join(pluginPath, 'node_modules');
+
+    if (!await fs.pathExists(bundledPath)) {
+      return; // No bundled dependencies
+    }
+
+    try {
+      const bundledEntries = await fs.readdir(bundledPath, { withFileTypes: true });
+
+      for (const entry of bundledEntries) {
+        if (!entry.isDirectory()) continue;
+
+        const bundledPkgPath = path.join(bundledPath, entry.name, 'package.json');
+        if (!await fs.pathExists(bundledPkgPath)) continue;
+
+        const bundledPkg = await fs.readJson(bundledPkgPath);
+        const pkgName = bundledPkg.name || entry.name;
+
+        // Determine target path (handles scoped packages like @fictionlab/workflow-runner)
+        let targetPath: string;
+        if (pkgName.startsWith('@')) {
+          const [scope, name] = pkgName.split('/');
+          const scopePath = path.join(nodeModulesPath, scope);
+          await fs.ensureDir(scopePath);
+          targetPath = path.join(scopePath, name);
+        } else {
+          await fs.ensureDir(nodeModulesPath);
+          targetPath = path.join(nodeModulesPath, pkgName);
+        }
+
+        // Only copy if not already present
+        if (!await fs.pathExists(targetPath)) {
+          const bundledSrcPath = path.join(bundledPath, entry.name);
+          await fs.copy(bundledSrcPath, targetPath);
+          logWithCategory('info', LogCategory.SYSTEM, `Setup bundled dependency: ${pkgName}`);
+        }
+      }
+    } catch (error: any) {
+      logWithCategory('warn', LogCategory.SYSTEM, `Failed to setup bundled dependencies for plugin:`, error.message);
+      // Continue - plugin might still work
     }
   }
 

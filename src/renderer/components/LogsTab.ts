@@ -31,12 +31,13 @@ export class LogsTab {
   private autoRefresh: boolean;
   private refreshInterval: number;
   private refreshTimer: NodeJS.Timeout | null = null;
-  private currentService: 'application' | 'postgres' | 'mcp-servers' | 'mcp-connector' | 'typing-mind' = 'application';
+  private currentService: 'application' | 'postgres' | 'mcp-servers' | 'mcp-connector' = 'application';
   private currentFilter: 'all' | 'error' | 'warn' | 'info' | 'debug' = 'all';
   private searchQuery: string = '';
   private logs: LogEntry[] = [];
   private isInitialized: boolean = false;
-  
+  private currentLogLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
+
   // Database Connection & Activity
   private dbConnectionInterval: NodeJS.Timeout | null = null;
   private isDbConnected: boolean = false;
@@ -61,6 +62,7 @@ export class LogsTab {
 
     try {
       this.render();
+      await this.loadCurrentLogLevel();
       this.attachEventListeners();
       await this.loadLogs();
 
@@ -115,7 +117,6 @@ export class LogsTab {
               <option value="postgres">PostgreSQL</option>
               <option value="mcp-servers">MCP Servers</option>
               <option value="mcp-connector">MCP Connector</option>
-              <option value="typing-mind">Typing Mind</option>
             </select>
           </div>
 
@@ -147,6 +148,19 @@ export class LogsTab {
             <button id="clear-search" class="logs-icon-btn" title="Clear search">
               ✕
             </button>
+          </div>
+
+          <div class="logs-control-group">
+            <label for="console-log-level">
+              <span class="control-icon">🎛️</span>
+              Console Level:
+            </label>
+            <select id="console-log-level" class="logs-select" title="Set console output verbosity (affects terminal logs)">
+              <option value="error">Error Only</option>
+              <option value="warn">Warnings & Errors</option>
+              <option value="info" selected>Info (Normal)</option>
+              <option value="debug">Debug (Verbose)</option>
+            </select>
           </div>
 
           <button id="refresh-logs" class="logs-btn logs-btn-primary" title="Refresh logs">
@@ -444,6 +458,26 @@ export class LogsTab {
       .logs-btn-primary:hover:not(:disabled) {
         background: rgba(0, 212, 170, 0.5);
         border-color: rgba(0, 212, 170, 0.7);
+      }
+
+      .logs-btn-secondary {
+        background: rgba(100, 149, 237, 0.3);
+        border-color: rgba(100, 149, 237, 0.5);
+      }
+
+      .logs-btn-secondary:hover:not(:disabled) {
+        background: rgba(100, 149, 237, 0.5);
+        border-color: rgba(100, 149, 237, 0.7);
+      }
+
+      .logs-btn-warning {
+        background: rgba(255, 165, 0, 0.3);
+        border-color: rgba(255, 165, 0, 0.5);
+      }
+
+      .logs-btn-warning:hover:not(:disabled) {
+        background: rgba(255, 165, 0, 0.5);
+        border-color: rgba(255, 165, 0, 0.7);
       }
 
       .logs-icon-btn {
@@ -948,6 +982,14 @@ export class LogsTab {
       refreshBtn.addEventListener('click', () => this.loadLogs());
     }
 
+    // Console log level selector
+    const consoleLogLevel = document.getElementById('console-log-level') as HTMLSelectElement;
+    if (consoleLogLevel) {
+      consoleLogLevel.addEventListener('change', async () => {
+        await this.setConsoleLogLevel(consoleLogLevel.value as 'debug' | 'info' | 'warn' | 'error');
+      });
+    }
+
     // Toggle auto-refresh
     const toggleAutoRefresh = document.getElementById('toggle-auto-refresh');
     if (toggleAutoRefresh) {
@@ -1058,11 +1100,10 @@ export class LogsTab {
    */
   private async loadServiceLogs(service: string): Promise<void> {
     try {
-      const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind' } = {
+      const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' } = {
         'postgres': 'postgres',
         'mcp-servers': 'mcp-writing-servers',
         'mcp-connector': 'mcp-connector',
-        'typing-mind': 'typing-mind',
       };
 
       const serviceName = serviceMap[service];
@@ -1236,8 +1277,7 @@ export class LogsTab {
         'application': 'Application',
         'postgres': 'PostgreSQL',
         'mcp-servers': 'MCP Servers',
-        'mcp-connector': 'MCP Connector',
-        'typing-mind': 'Typing Mind'
+        'mcp-connector': 'MCP Connector'
       };
       logSource.textContent = sourceNames[this.currentService] || this.currentService;
     }
@@ -1307,6 +1347,61 @@ export class LogsTab {
     } finally {
       const button = document.getElementById('export-logs') as HTMLButtonElement;
       if (button) button.disabled = false;
+    }
+  }
+
+  /**
+   * Load current console log level from backend
+   */
+  private async loadCurrentLogLevel(): Promise<void> {
+    try {
+      const level = await window.electronAPI.logger.getLogLevel();
+      this.currentLogLevel = level as 'debug' | 'info' | 'warn' | 'error';
+
+      // Update the UI dropdown to reflect current level
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) {
+        selector.value = this.currentLogLevel;
+      }
+    } catch (error) {
+      console.error('Error loading log level:', error);
+      this.currentLogLevel = 'info'; // Default fallback
+    }
+  }
+
+  /**
+   * Set console log level
+   */
+  private async setConsoleLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): Promise<void> {
+    try {
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) selector.disabled = true;
+
+      await window.electronAPI.logger.setLogLevel(level);
+      this.currentLogLevel = level;
+
+      const levelNames = {
+        error: 'Error Only',
+        warn: 'Warnings & Errors',
+        info: 'Info (Normal)',
+        debug: 'Debug (Verbose)'
+      };
+
+      this.showNotification(
+        `Console log level set to: ${levelNames[level]}. Terminal will now show ${level} and above.`,
+        'success'
+      );
+
+      // Optionally refresh logs if viewing application logs
+      if (this.currentService === 'application') {
+        await this.loadLogs();
+      }
+    } catch (error) {
+      console.error('Error setting log level:', error);
+      this.showNotification('Failed to set log level', 'error');
+    } finally {
+      const selector = document.getElementById('console-log-level') as HTMLSelectElement;
+      if (selector) selector.disabled = false;
     }
   }
 

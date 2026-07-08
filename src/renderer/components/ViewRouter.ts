@@ -44,6 +44,13 @@ export class ViewRouter {
   private history: string[] = [];
   private historyIndex: number = -1;
   private maxHistorySize: number = 20;
+  private initPromise: Promise<void> | null = null;
+
+  // Plugin-dependent views
+  private pluginRequiredViews: Map<string, string> = new Map([
+    ['workflows', 'fictionlab-workflow'],
+    ['kanban', 'fictionlab-kanban']
+  ]);
 
   constructor(options: ViewRouterOptions) {
     this.container = options.container;
@@ -54,48 +61,61 @@ export class ViewRouter {
   /**
    * Initialize the router
    */
-  public initialize(): void {
-    this.registerDefaultViews();
-    console.log('[ViewRouter] Initialized');
+  public initialize(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.registerDefaultViews().then(() => {
+        console.log('[ViewRouter] Initialized');
+      });
+    }
+    return this.initPromise;
   }
 
   /**
    * Register default views
    */
+  /**
+   * Register default views
+   */
   private async registerDefaultViews(): Promise<void> {
     // Import and register view classes dynamically
+    const register = async (id: string, importFn: () => Promise<any>, exportName: string) => {
+      try {
+        const module = await importFn();
+        const ViewClass = module[exportName];
+        if (ViewClass) {
+          this.registerView(id, ViewClass);
+        } else {
+          console.error(`[ViewRouter] Failed to register view ${id}: Export ${exportName} not found`);
+        }
+      } catch (error) {
+        console.error(`[ViewRouter] Failed to register view ${id}:`, error);
+      }
+    };
+
     try {
       // Dashboard view (existing DashboardTab)
-      const { DashboardView } = await import('../views/DashboardView.js');
-      this.registerView('dashboard', DashboardView);
+      await register('dashboard', () => import('../views/DashboardView.js'), 'DashboardView');
 
       // Settings views (wrappers for existing tab components)
-      const { SetupView } = await import('../views/SetupView.js');
-      const { DatabaseView } = await import('../views/DatabaseView.js');
-      const { ServicesView } = await import('../views/ServicesView.js');
-      const { LogsView } = await import('../views/LogsView.js');
-      this.registerView('settings-setup', SetupView);
-      this.registerView('settings-database', DatabaseView);
-      this.registerView('settings-services', ServicesView);
-      this.registerView('settings-logs', LogsView);
+      await register('settings-setup', () => import('../views/SetupView.js'), 'SetupView');
+      await register('settings-database', () => import('../views/DatabaseView.js'), 'DatabaseView');
+      await register('settings-services', () => import('../views/ServicesView.js'), 'ServicesView');
+      await register('settings-logs', () => import('../views/LogsView.js'), 'LogsView');
 
       // New views
-      const { PluginsLauncher } = await import('../views/PluginsLauncher.js');
-      const { WorkflowsView } = await import('../views/WorkflowsView.js');
-      const { LibraryView } = await import('../views/LibraryView.js');
-      this.registerView('plugins', PluginsLauncher);
-      this.registerView('workflows', WorkflowsView);
-      this.registerView('library', LibraryView);
+      await register('plugins', () => import('../views/PluginsLauncher.js'), 'PluginsLauncher');
+
+      // Note: WorkflowsViewReact is registered manually in renderer.ts (uses React via import map)
+
+      await register('library', () => import('../views/LibraryView.js'), 'LibraryView');
 
       // Help and About views
-      const { HelpView } = await import('../views/HelpView.js');
-      const { AboutView } = await import('../views/AboutView.js');
-      this.registerView('help', HelpView);
-      this.registerView('about', AboutView);
+      await register('help', () => import('../views/HelpView.js'), 'HelpView');
+      await register('about', () => import('../views/AboutView.js'), 'AboutView');
 
-      console.log('[ViewRouter] Default views registered');
+      console.log('[ViewRouter] Default views registration process completed');
     } catch (error) {
-      console.error('[ViewRouter] Failed to register views:', error);
+      console.error('[ViewRouter] general error during view registration:', error);
     }
   }
 
@@ -121,6 +141,13 @@ export class ViewRouter {
 
     // Check if view is registered
     if (!this.viewClasses.has(viewId)) {
+      // View not registered - check if it requires a plugin
+      if (this.pluginRequiredViews.has(viewId)) {
+        const requiredPlugin = this.pluginRequiredViews.get(viewId)!;
+        console.warn('[ViewRouter] View requires plugin:', viewId, requiredPlugin);
+        this.showPluginRequiredView(viewId, requiredPlugin);
+        return;
+      }
       console.error('[ViewRouter] View not registered:', viewId);
       this.showErrorView(`View "${viewId}" not found`);
       return;
@@ -256,6 +283,7 @@ export class ViewRouter {
     const titles: Record<string, string> = {
       'dashboard': 'Dashboard',
       'workflows': 'Workflows',
+      'kanban': 'Board',
       'library': 'Library',
       'plugins': 'Plugins',
       'settings-setup': 'Setup',
@@ -355,6 +383,33 @@ export class ViewRouter {
         <button class="top-bar-action" onclick="window.location.reload()">
           Reload Application
         </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Show a plugin required view
+   */
+  private showPluginRequiredView(viewId: string, pluginId: string): void {
+    const viewNames: Record<string, string> = {
+      'workflows': 'Workflows',
+      'kanban': 'Board'
+    };
+    const viewName = viewNames[viewId] || viewId;
+
+    this.container.innerHTML = `
+      <div class="error-message">
+        <h2>Plugin Required</h2>
+        <p>The <strong>${viewName}</strong> view requires the <strong>${pluginId}</strong> plugin to be installed.</p>
+        <p>Please install the plugin from the Plugins page to use this feature.</p>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+          <button class="top-bar-action" onclick="(window.__viewRouter__ || window).navigateTo ? (window.__viewRouter__ || window).navigateTo('plugins') : window.location.href='#plugins'">
+            Go to Plugins
+          </button>
+          <button class="top-bar-action" onclick="(window.__viewRouter__ || window).navigateTo ? (window.__viewRouter__ || window).navigateTo('dashboard') : window.location.href='#dashboard'">
+            Go to Dashboard
+          </button>
+        </div>
       </div>
     `;
   }

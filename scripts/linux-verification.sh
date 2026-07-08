@@ -45,19 +45,12 @@ echo "=== Docker Mount Path Checks ==="
 # Adjust these paths based on where the app is actually running/installed if needed
 USER_DATA_DIR="$HOME/.config/FictionLab"
 MCP_REPO_DIR="$USER_DATA_DIR/repositories/mcp-writing-servers"
-TYPING_MIND_DIR="$USER_DATA_DIR/repositories/typing-mind/src"
 
 echo "Checking if application directories exist (after running the app):"
 if [ -d "$MCP_REPO_DIR" ]; then
     echo "✅ MCP Repository Directory exists: $MCP_REPO_DIR"
 else
     echo "❌ MCP Repository Directory does NOT exist: $MCP_REPO_DIR"
-fi
-
-if [ -d "$TYPING_MIND_DIR" ]; then
-    echo "✅ Typing Mind Directory exists: $TYPING_MIND_DIR"
-else
-    echo "❌ Typing Mind Directory does NOT exist: $TYPING_MIND_DIR"
 fi
 
 echo ""

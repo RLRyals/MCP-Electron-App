@@ -5,6 +5,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// Note: CSP hash calculation was removed because Electron/Chromium has issues
+// with import map CSP hashes. Using 'unsafe-inline' instead, which is acceptable
+// for Electron desktop apps that don't load external content.
+
 function ensureDirSync(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -21,10 +25,10 @@ function copyAssets() {
     // Ensure dist/renderer directory exists
     ensureDirSync(distRenderer);
 
-    // Copy HTML and CSS files
+    // Copy HTML, CSS, and JSON files (like import-map.json)
     const files = fs.readdirSync(srcRenderer);
     for (const file of files) {
-      if (file.endsWith('.html') || file.endsWith('.css')) {
+      if (file.endsWith('.html') || file.endsWith('.css') || file.endsWith('.json')) {
         const srcPath = path.join(srcRenderer, file);
         const destPath = path.join(distRenderer, file);
         fs.copyFileSync(srcPath, destPath);
@@ -56,6 +60,157 @@ function copyAssets() {
       console.log(`  ✓ Copied icon.png`);
     } else {
       console.warn(`  ⚠ Warning: icon.png not found at ${iconSrc}`);
+    }
+
+    // Copy vendor directory (React bundles for offline use)
+    const srcVendor = path.join(srcRenderer, 'vendor');
+    const distVendor = path.join(distRenderer, 'vendor');
+    if (fs.existsSync(srcVendor)) {
+      ensureDirSync(distVendor);
+      const vendorFiles = fs.readdirSync(srcVendor);
+      for (const file of vendorFiles) {
+        if (file.endsWith('.js')) {
+          const srcPath = path.join(srcVendor, file);
+          const destPath = path.join(distVendor, file);
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`  ✓ Copied vendor/${file}`);
+        }
+      }
+    }
+
+    // Copy xterm assets (JS and CSS)
+    try {
+      const xtermPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'xterm');
+      const fitPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'addon-fit');
+      const webLinksPkgPath = path.join(__dirname, '..', 'node_modules', '@xterm', 'addon-web-links');
+      const distStyles = path.join(distRenderer, 'styles');
+      const distVendor = path.join(distRenderer, 'vendor');
+
+      ensureDirSync(distStyles);
+      ensureDirSync(distVendor);
+
+      // 1. Copy xterm CSS
+      if (fs.existsSync(xtermPkgPath)) {
+        const xtermCssSrc = path.join(xtermPkgPath, 'css', 'xterm.css');
+        const xtermCssDest = path.join(distStyles, 'xterm.css');
+        if (fs.existsSync(xtermCssSrc)) {
+          fs.copyFileSync(xtermCssSrc, xtermCssDest);
+          console.log('  ✓ Copied xterm.css from node_modules');
+        }
+
+        // Copy xterm.js (UMD) and create wrapper
+        const xtermJsSrc = path.join(xtermPkgPath, 'lib', 'xterm.js');
+        const xtermJsDest = path.join(distVendor, 'xterm.umd.js');
+        if (fs.existsSync(xtermJsSrc)) {
+          fs.copyFileSync(xtermJsSrc, xtermJsDest);
+          console.log('  ✓ Copied xterm.js from node_modules');
+
+          const wrapperPath = path.join(distVendor, 'xterm.js');
+          const wrapperContent = `import './xterm.umd.js';\nexport const Terminal = window.Terminal;`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/xterm.js wrapper');
+        }
+      }
+
+      // 2. Copy addon-fit
+      if (fs.existsSync(fitPkgPath)) {
+        const fitJsSrc = path.join(fitPkgPath, 'lib', 'addon-fit.js');
+        const fitJsDest = path.join(distVendor, 'addon-fit.umd.js');
+        if (fs.existsSync(fitJsSrc)) {
+          fs.copyFileSync(fitJsSrc, fitJsDest);
+          console.log('  ✓ Copied addon-fit.js from node_modules');
+
+          // Create a wrapper that handles different UMD export styles
+          const wrapperPath = path.join(distVendor, 'addon-fit.js');
+          // Check if it's exported as default or named export
+          const wrapperContent = `
+import './addon-fit.umd.js';
+// The UMD build might export to window.FitAddon directly or window.FitAddon.FitAddon
+const Plugin = window.FitAddon;
+export const FitAddon = (Plugin.FitAddon || Plugin.default || Plugin);
+`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/addon-fit.js wrapper');
+        }
+      }
+
+      // 3. Copy addon-web-links
+      if (fs.existsSync(webLinksPkgPath)) {
+        const linksJsSrc = path.join(webLinksPkgPath, 'lib', 'addon-web-links.js');
+        const linksJsDest = path.join(distVendor, 'addon-web-links.umd.js');
+        if (fs.existsSync(linksJsSrc)) {
+          fs.copyFileSync(linksJsSrc, linksJsDest);
+          console.log('  ✓ Copied addon-web-links.js from node_modules');
+
+          const wrapperPath = path.join(distVendor, 'addon-web-links.js');
+          const wrapperContent = `
+import './addon-web-links.umd.js';
+const Plugin = window.WebLinksAddon;
+export const WebLinksAddon = (Plugin.WebLinksAddon || Plugin.default || Plugin);
+`;
+          fs.writeFileSync(wrapperPath, wrapperContent);
+          console.log('  ✓ Generated vendor/addon-web-links.js wrapper');
+        }
+      }
+    } catch (err) {
+      console.warn('  ⚠ Failed to copy xterm assets:', err.message);
+    }
+
+    // Copy @xyflow/react from node_modules
+    try {
+      const xyflowPath = path.join(__dirname, '..', 'node_modules', '@xyflow', 'react', 'dist');
+      if (fs.existsSync(xyflowPath)) {
+        ensureDirSync(distVendor);
+
+        // Copy UMD build
+        const rfUmdSrc = path.join(xyflowPath, 'umd', 'index.js');
+        const rfUmdDest = path.join(distVendor, 'xyflow-react.umd.js');
+        if (fs.existsSync(rfUmdSrc)) {
+          fs.copyFileSync(rfUmdSrc, rfUmdDest);
+          console.log('  ✓ Copied xyflow-react.umd.js from node_modules');
+        }
+
+        // Copy CSS (keeping filename as reactflow.css for compatibility with index.html)
+        const rfCssSrc = path.join(xyflowPath, 'style.css');
+        const distStyles = path.join(distRenderer, 'styles');
+        const rfCssDest = path.join(distStyles, 'reactflow.css');
+        if (fs.existsSync(rfCssSrc)) {
+          ensureDirSync(distStyles);
+          fs.copyFileSync(rfCssSrc, rfCssDest);
+          console.log('  ✓ Copied @xyflow/react style.css as reactflow.css');
+        }
+
+        // Generate ESM wrapper for @xyflow/react
+        const rfWrapperPath = path.join(distVendor, 'xyflow-react.js');
+        const rfWrapperContent = `
+// @xyflow/react UMD build exports to window.ReactFlow
+const XYFlowLib = window.ReactFlow;
+
+// Export named exports from the library (v12 uses named exports, not default)
+export const ReactFlow = XYFlowLib.ReactFlow;
+export const Controls = XYFlowLib.Controls;
+export const Background = XYFlowLib.Background;
+export const Handle = XYFlowLib.Handle;
+export const Position = XYFlowLib.Position;
+export const useNodesState = XYFlowLib.useNodesState;
+export const useEdgesState = XYFlowLib.useEdgesState;
+export const addEdge = XYFlowLib.addEdge;
+export const BackgroundVariant = XYFlowLib.BackgroundVariant;
+export const MarkerType = XYFlowLib.MarkerType;
+export const BaseEdge = XYFlowLib.BaseEdge;
+export const EdgeLabelRenderer = XYFlowLib.EdgeLabelRenderer;
+export const getSmoothStepPath = XYFlowLib.getSmoothStepPath;
+
+// Default export for backwards compatibility
+export default XYFlowLib.ReactFlow;
+`;
+        fs.writeFileSync(rfWrapperPath, rfWrapperContent);
+        console.log('  ✓ Generated vendor/xyflow-react.js wrapper');
+      } else {
+        console.warn('  ⚠ Warning: node_modules/@xyflow/react not found');
+      }
+    } catch (err) {
+      console.warn('  ⚠ Failed to copy @xyflow/react assets:', err.message);
     }
 
     // Copy all icon files from resources to dist/resources

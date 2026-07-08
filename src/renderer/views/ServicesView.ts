@@ -60,6 +60,49 @@ export class ServicesView implements View {
             <span id="services-last-updated" class="last-updated">Last updated: --:--:--</span>
           </div>
         </div>
+
+        ${this.renderPortsSection()}
+      </div>
+    `;
+  }
+
+  /**
+   * Render the Ports settings section: lists every configurable service port
+   * with a live in-use indicator, an editable field, and controls to check for
+   * conflicts, apply suggested alternatives, and save + restart.
+   */
+  private renderPortsSection(): string {
+    return `
+      <div class="dashboard-card" style="margin-top: 20px;">
+        <div class="dashboard-header">
+          <h2>Ports</h2>
+          <div class="dashboard-actions" style="gap: 10px;">
+            <button id="ports-check-all" class="action-button" title="Check all ports for conflicts">Check All</button>
+            <button id="ports-use-suggested" class="action-button" title="Apply suggested available ports" style="display: none;">Use Suggested</button>
+            <button id="ports-save" class="action-button primary" title="Save port configuration">Save</button>
+          </div>
+        </div>
+
+        <div id="ports-status-message" style="margin-bottom: 10px;"></div>
+
+        <div style="overflow-x: auto;">
+          <table class="ports-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <th style="padding: 8px;">Service</th>
+                <th style="padding: 8px;">Port</th>
+                <th style="padding: 8px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="ports-table-body">
+              <!-- Rows are injected by ServicesTab.ts -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="dashboard-footer" style="margin-top: 15px;">
+          <span id="ports-last-checked" class="last-updated">Not checked yet</span>
+        </div>
       </div>
     `;
   }
@@ -135,24 +178,12 @@ export class ServicesView implements View {
           <div class="service-name">
             <h4>Typing Mind</h4>
           </div>
-          <span id="typing-mind-status-badge" class="service-status-badge status-offline">Offline</span>
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
-            <div class="service-detail" id="typing-mind-url-info">Port: 8080</div>
-            <div class="service-detail" id="typing-mind-version-info">Version: Latest</div>
-          </div>
-          <div class="service-info" style="margin-bottom: 15px;">
-            <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
-            <div id="typing-mind-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
-              <div class="resource-item">Not running</div>
-            </div>
+            <div class="service-detail" id="typing-mind-url-info">https://www.typingmind.com</div>
           </div>
           <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <button id="typing-mind-start" class="service-action-btn" title="Start Typing Mind">Start</button>
-            <button id="typing-mind-stop" class="service-action-btn" title="Stop Typing Mind">Stop</button>
-            <button id="typing-mind-restart" class="service-action-btn" title="Restart Typing Mind">Restart</button>
-            <button id="typing-mind-view-logs" class="service-action-btn" title="View Typing Mind logs">View Logs</button>
             <button id="typing-mind-open-browser" class="service-action-btn" title="Open in browser">Open Browser</button>
             <button id="typing-mind-configure" class="service-action-btn" title="Configure Typing Mind">Configure</button>
           </div>

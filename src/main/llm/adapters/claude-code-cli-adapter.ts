@@ -1,0 +1,136 @@
+/**
+ * Claude Code CLI Adapter
+ *
+ * Adapter for executing Claude Code via CLI (headless mode)
+ * Uses existing ClaudeCodeExecutor wrapped in the adapter interface
+ */
+
+import { LLMProviderAdapter } from '../provider-manager';
+import { LLMRequest, LLMResponse, ProviderValidationResult, ClaudeCodeCLIProvider } from '../../../types/llm-providers';
+import { ClaudeCodeExecutor } from '../../workflow/claude-code-executor';
+import { logWithCategory, LogCategory } from '../../logger';
+
+export class ClaudeCodeCLIAdapter implements LLMProviderAdapter {
+  type: ClaudeCodeCLIProvider['type'] = 'claude-code-cli';
+  streamSupport = true;
+  private executor: ClaudeCodeExecutor;
+
+  constructor() {
+    // Use singleton instance - ensures shared state across all adapters
+    this.executor = ClaudeCodeExecutor.getInstance();
+
+    // Forward claude-setup-required events from executor to provider manager
+    // This allows the main process to catch and forward to renderer
+    // Note: Only attach listener once per adapter instance
+    this.executor.on('claude-setup-required', (data) => {
+      // Re-emit on global event bus
+      const { getProviderManager } = require('../provider-manager');
+      const manager = getProviderManager();
+      manager.emit('claude-setup-required', data);
+    });
+  }
+
+  /**
+   * Execute request with Claude Code CLI
+   */
+  async execute(request: LLMRequest): Promise<LLMResponse> {
+    const provider = request.provider as ClaudeCodeCLIProvider;
+
+    try {
+      // Extract agent from context (Claude CLI uses --agent, not --skill)
+      const agent = request.context?.agent || null;
+      const phaseNumber = request.context?.phaseNumber || 0;
+
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Executing Claude Code CLI with agent: ${agent || 'none'}`);
+
+      // Execute via existing ClaudeCodeExecutor (always headless)
+      const result = await this.executor.executeSkill(
+        agent,
+        phaseNumber,
+        request.prompt,
+        request.context // Pass context including projectFolder
+      );
+
+      if (!result.success) {
+        return {
+          success: false,
+          output: null,
+          error: result.error || 'Execution failed',
+        };
+      }
+
+      return {
+        success: true,
+        output: result.output,
+        // The actual model is chosen by the Claude Code CLI session (executeSkill passes no --model).
+        // config.model is a label/hint only — don't fabricate a specific retired id when unset.
+        model:
+          provider.config?.model && provider.config.model !== 'default'
+            ? provider.config.model
+            : 'claude-code-cli (session default)',
+      };
+
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW,
+        `Claude Code CLI execution failed: ${error.message}`);
+
+      return {
+        success: false,
+        output: null,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Validate Claude Code CLI is available
+   */
+  async validateCredentials(credentials: any): Promise<ProviderValidationResult> {
+    try {
+      // Check if Claude CLI is available by running --version
+      const { spawn } = require('child_process');
+
+      return new Promise((resolve) => {
+        const claude = spawn('claude', ['--version']);
+
+        let output = '';
+
+        claude.stdout.on('data', (data: Buffer) => {
+          output += data.toString();
+        });
+
+        claude.stderr.on('data', (data: Buffer) => {
+          output += data.toString();
+        });
+
+        claude.on('close', (code: number) => {
+          if (code === 0) {
+            resolve({
+              valid: true,
+              model: 'Claude Code CLI installed',
+            });
+          } else {
+            resolve({
+              valid: false,
+              error: 'Claude Code CLI not found. Please install it first.',
+            });
+          }
+        });
+
+        claude.on('error', (error: Error) => {
+          resolve({
+            valid: false,
+            error: `Claude Code CLI not available: ${error.message}`,
+          });
+        });
+      });
+
+    } catch (error: any) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+  }
+}

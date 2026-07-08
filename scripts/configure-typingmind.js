@@ -120,7 +120,7 @@ function configureTypingMind() {
 
   console.log('Setup Instructions for TypingMind:');
   console.log('----------------------------------');
-  console.log('1. Open TypingMind at: http://localhost:' + (envConfig.TYPING_MIND_PORT || 3000));
+  console.log('1. Open TypingMind at: https://www.typingmind.com');
   console.log('2. Navigate to Settings → MCP Integration');
   console.log('3. Enter the following:');
   console.log(`   Server URL: ${config.serverUrl}`);

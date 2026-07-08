@@ -12,6 +12,11 @@ import logger from './logger';
 import { sanitizeEnvFileContent } from './utils/sanitize';
 
 /**
+ * Track the last logged config to avoid duplicate logs
+ */
+let lastLoggedConfigHash: string | null = null;
+
+/**
  * Environment configuration interface
  */
 export interface EnvConfig {
@@ -24,7 +29,8 @@ export interface EnvConfig {
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
   PGBOUNCER_PORT: number;
-  TYPING_MIND_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -36,12 +42,13 @@ export const DEFAULT_CONFIG: EnvConfig = {
   POSTGRES_USER: 'writer',
   POSTGRES_PASSWORD: '',
   POSTGRES_PORT: 5432,
-  MCP_CONNECTOR_PORT: 50880,
+  MCP_CONNECTOR_PORT: 51300,
   HTTP_SSE_PORT: 3001,
   DB_ADMIN_PORT: 3010,
   MCP_AUTH_TOKEN: '',
   PGBOUNCER_PORT: 6432,
-  TYPING_MIND_PORT: 8080,
+  NPE_PORT: 3011,
+  WORKFLOW_MANAGER_PORT: 3012,
   GITHUB_TOKEN: '',
 };
 
@@ -448,6 +455,8 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.HTTP_SSE_PORT, name: 'HTTP/SSE', key: 'HTTP_SSE_PORT' as const },
     { port: config.DB_ADMIN_PORT, name: 'DB Admin', key: 'DB_ADMIN_PORT' as const },
     { port: config.PGBOUNCER_PORT, name: 'PgBouncer', key: 'PGBOUNCER_PORT' as const },
+    { port: config.NPE_PORT, name: 'NPE Server', key: 'NPE_PORT' as const },
+    { port: config.WORKFLOW_MANAGER_PORT, name: 'Workflow Manager', key: 'WORKFLOW_MANAGER_PORT' as const },
   ];
 
   // Check configurable ports
@@ -526,6 +535,42 @@ export async function checkAllPortsAndSuggestAlternatives(
 }
 
 /**
+ * Compute a hash of the config for change detection
+ * @param content Sanitized env file content
+ */
+function computeConfigHash(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Log env config only if it has changed since last log
+ * @param content Raw env file content
+ * @param action Action being performed (e.g., "Loaded", "Saved")
+ * @param envPath Path to the env file
+ */
+function logEnvConfigIfChanged(content: string, action: string, envPath: string): void {
+  const sanitized = sanitizeEnvFileContent(content);
+  const currentHash = computeConfigHash(sanitized);
+
+  if (lastLoggedConfigHash !== currentHash) {
+    logger.info(`${action} .env configuration from: ${envPath}`);
+    logger.info('Sanitized .env content:\n' + sanitized);
+    lastLoggedConfigHash = currentHash;
+  } else {
+    logger.debug(`${action} .env configuration (unchanged, skipping detailed log)`);
+  }
+}
+
+/**
+ * Reset the logged config hash to force logging on next load/save
+ * Useful for debugging or when you explicitly want to see the config again
+ */
+export function resetConfigLogging(): void {
+  lastLoggedConfigHash = null;
+  logger.info('Config logging reset - next load/save will log full details');
+}
+
+/**
  * Parse .env file content
  * @param content File content to parse
  */
@@ -579,6 +624,12 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'PGBOUNCER_PORT':
           config.PGBOUNCER_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'NPE_PORT':
+          config.NPE_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'WORKFLOW_MANAGER_PORT':
+          config.WORKFLOW_MANAGER_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -626,10 +677,8 @@ export async function loadEnvConfig(): Promise<EnvConfig> {
         logger.warn('POSTGRES_PASSWORD is empty in .env file - this will cause database connection errors');
       }
 
-      // Log with sanitized content
-      const sanitized = sanitizeEnvFileContent(content);
-      logger.info('Loaded .env configuration from:', envPath);
-      logger.info('Sanitized .env content:\n' + sanitized);
+      // Log with sanitized content only if changed
+      logEnvConfigIfChanged(content, 'Loaded', envPath);
 
       return config;
     } else {
@@ -681,6 +730,8 @@ export function formatEnvFile(config: EnvConfig): string {
     `DB_ADMIN_PORT=${config.DB_ADMIN_PORT}`,
     `MCP_AUTH_TOKEN=${config.MCP_AUTH_TOKEN}`,
     `PGBOUNCER_PORT=${config.PGBOUNCER_PORT}`,
+    `NPE_PORT=${config.NPE_PORT}`,
+    `WORKFLOW_MANAGER_PORT=${config.WORKFLOW_MANAGER_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -711,10 +762,8 @@ export async function saveEnvConfig(config: EnvConfig): Promise<{ success: boole
     const content = formatEnvFile(config);
     fs.writeFileSync(envPath, content, 'utf-8');
 
-    // Log with sanitized content
-    const sanitized = sanitizeEnvFileContent(content);
-    logger.info('Saved .env configuration to:', envPath);
-    logger.info('Sanitized .env content:\n' + sanitized);
+    // Log with sanitized content only if changed
+    logEnvConfigIfChanged(content, 'Saved', envPath);
 
     return { success: true, path: envPath };
   } catch (error) {
@@ -772,6 +821,16 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const pgBouncerPortValidation = validatePort(config.PGBOUNCER_PORT);
   if (!pgBouncerPortValidation.valid) {
     errors.push(`PgBouncer port: ${pgBouncerPortValidation.error}`);
+  }
+
+  const npePortValidation = validatePort(config.NPE_PORT);
+  if (!npePortValidation.valid) {
+    errors.push(`NPE port: ${npePortValidation.error}`);
+  }
+
+  const workflowManagerPortValidation = validatePort(config.WORKFLOW_MANAGER_PORT);
+  if (!workflowManagerPortValidation.valid) {
+    errors.push(`Workflow Manager port: ${workflowManagerPortValidation.error}`);
   }
 
   // Validate auth token

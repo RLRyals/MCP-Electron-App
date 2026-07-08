@@ -29,11 +29,11 @@ export function initializePluginHandlers(): void {
 
   try {
     // Listen for plugin actions from main process
-    (window as any).electronAPI.plugins.onAction((data: { pluginId: string; action: string }) => {
+    (window as any).electronAPI.plugins.onAction((data: { pluginId: string; action: string; channelName?: string }) => {
       console.log(`Plugin action received: ${data.pluginId} -> ${data.action}`);
 
       // Handle the plugin action asynchronously but don't block the event
-      handlePluginAction(data.pluginId, data.action).catch((error) => {
+      handlePluginAction(data.pluginId, data.action, data.channelName).catch((error) => {
         console.error('Uncaught error in plugin action handler:', error);
         showPluginNotification('error', 'Plugin Error', 'An unexpected error occurred while handling the plugin action.');
       });
@@ -46,11 +46,36 @@ export function initializePluginHandlers(): void {
 }
 
 /**
- * Handle a plugin action by showing the appropriate view
+ * Handle a plugin action by showing the appropriate view or invoking an IPC handler
  */
-async function handlePluginAction(pluginId: string, action: string): Promise<void> {
-  console.log(`handlePluginAction called: ${pluginId} -> ${action}`);
+async function handlePluginAction(pluginId: string, action: string, channelName?: string): Promise<void> {
+  console.log(`handlePluginAction called: ${pluginId} -> ${action}${channelName ? ` (${channelName})` : ''}`);
 
+  // If channelName is provided, invoke the IPC handler directly
+  if (channelName) {
+    try {
+      console.log(`Invoking IPC handler: ${channelName}`);
+      const result = await (window as any).electronAPI.invoke(channelName);
+      console.log(`IPC handler ${channelName} completed:`, result);
+
+      // Show success notification if the handler returned a success message
+      if (result && result.success && result.message) {
+        showPluginNotification('success', 'Success', result.message);
+      }
+
+      return;
+    } catch (error) {
+      console.error(`Failed to invoke IPC handler ${channelName}:`, error);
+      showPluginNotification(
+        'error',
+        'Plugin Action Failed',
+        `Unable to execute ${action}. ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      return;
+    }
+  }
+
+  // Otherwise, try to show a view
   const viewName = ACTION_TO_VIEW_MAP[action];
 
   if (!viewName) {

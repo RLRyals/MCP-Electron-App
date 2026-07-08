@@ -130,8 +130,8 @@ export class DatabaseMigrator {
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS migrations (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        run_on TIMESTAMP DEFAULT NOW()
+        filename VARCHAR(255) NOT NULL,
+        applied_at TIMESTAMP DEFAULT NOW()
       );
     `;
     
@@ -143,16 +143,16 @@ export class DatabaseMigrator {
    */
   private async getAppliedMigrations(): Promise<string[]> {
     try {
-      const { stdout } = await this.executeSql("SELECT name FROM migrations ORDER BY id ASC;", true);
+      const { stdout } = await this.executeSql("SELECT filename FROM migrations ORDER BY id ASC;", true);
       // Parse output usually looks like:
-      // name
+      // filename
       // ------
       // 001_initial.sql
       // (1 row)
       
       const lines = stdout.split('\n')
         .map(l => l.trim())
-        .filter(l => l && !l.startsWith('name') && !l.startsWith('----') && !l.match(/^\(\d+ rows?\)$/));
+        .filter(l => l && !l.startsWith('filename') && !l.startsWith('----') && !l.match(/^\(\d+ rows?\)$/));
       
       return lines;
     } catch (error) {

@@ -83,7 +83,54 @@ echo ""
 
 # 6. Check port conflicts
 echo -e "${YELLOW}[6/10] Checking for port conflicts...${NC}"
-PORTS=(5432 6432 3001 50880)
+
+# Locate the app's .env file so we check the ACTUAL configured ports rather than
+# hardcoded defaults - ports are user-configurable (Setup Wizard / Ports settings
+# panel / auto-remediation) and commonly get remapped away from these defaults,
+# especially on Linux where native Postgres often already holds 5432.
+# Electron's userData dir for this app lives under ~/.config/<app name> on Linux;
+# check both the package.json "name" and "productName" casings to be safe.
+ENV_CANDIDATES=(
+    "$HOME/.config/fictionlab/.env"
+    "$HOME/.config/FictionLab/.env"
+    "$XDG_CONFIG_HOME/fictionlab/.env"
+)
+ENV_FILE=""
+for candidate in "${ENV_CANDIDATES[@]}"; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+        ENV_FILE="$candidate"
+        break
+    fi
+done
+
+if [ -n "$ENV_FILE" ]; then
+    echo -e "${GREEN}  Reading configured ports from: $ENV_FILE${NC}"
+else
+    echo -e "${YELLOW}  No .env file found in expected locations - falling back to defaults${NC}"
+fi
+
+# Read a PORT_NAME=value out of the .env file, or fall back to the given default
+# (these defaults must match DEFAULT_CONFIG in src/main/env-config.ts)
+get_env_port() {
+    local var_name="$1"
+    local default_value="$2"
+    if [ -n "$ENV_FILE" ]; then
+        local value
+        value=$(grep -E "^${var_name}=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d '=' -f2- | tr -d '"'"'"'\r')
+        if [ -n "$value" ]; then
+            echo "$value"
+            return
+        fi
+    fi
+    echo "$default_value"
+}
+
+POSTGRES_PORT_VAL=$(get_env_port "POSTGRES_PORT" 5432)
+PGBOUNCER_PORT_VAL=$(get_env_port "PGBOUNCER_PORT" 6432)
+HTTP_SSE_PORT_VAL=$(get_env_port "HTTP_SSE_PORT" 3001)
+MCP_CONNECTOR_PORT_VAL=$(get_env_port "MCP_CONNECTOR_PORT" 51300)
+
+PORTS=("$POSTGRES_PORT_VAL" "$PGBOUNCER_PORT_VAL" "$HTTP_SSE_PORT_VAL" "$MCP_CONNECTOR_PORT_VAL")
 PORT_NAMES=("PostgreSQL" "PgBouncer" "MCP-HTTP" "MCP-Connector")
 for i in "${!PORTS[@]}"; do
     PORT=${PORTS[$i]}

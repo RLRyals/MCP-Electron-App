@@ -5,7 +5,8 @@
  */
 
 import type { View } from '../components/ViewRouter.js';
-import type { TopBarConfig } from '../components/TopBar.js';
+import type { TopBarConfig} from '../components/TopBar.js';
+import { PluginInstallWizard } from '../components/PluginInstallWizard.js';
 
 export class PluginsLauncher implements View {
   private container: HTMLElement | null = null;
@@ -97,28 +98,40 @@ export class PluginsLauncher implements View {
     const isPinned = this.isPluginPinned(plugin.id);
     const isActive = plugin.status === 'active';
 
+    // Plugin data structure: { id, manifest: { pluginType, name, version, icon, description }, status }
+    const manifest = plugin.manifest || {};
+    const isUtility = manifest.pluginType === 'utility';
+    const name = manifest.name || plugin.id;
+    const description = manifest.description || 'No description';
+    const version = manifest.version || '1.0.0';
+    const icon = manifest.icon || '🔌';
+
     return `
       <div class="plugin-card ${isActive ? 'active' : 'inactive'}" data-plugin-id="${plugin.id}">
-        <div class="plugin-icon">${plugin.icon || '🔌'}</div>
+        <div class="plugin-icon">${icon}</div>
         <div class="plugin-info">
-          <h3 class="plugin-name">${this.escapeHtml(plugin.name || plugin.id)}</h3>
-          <p class="plugin-description">${this.escapeHtml(plugin.description || 'No description')}</p>
+          <h3 class="plugin-name">${this.escapeHtml(name)}</h3>
+          <p class="plugin-description">${this.escapeHtml(description)}</p>
           <div class="plugin-meta">
-            <span class="plugin-version">v${plugin.version || '1.0.0'}</span>
+            <span class="plugin-version">v${version}</span>
             <span class="plugin-status ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+            ${isUtility ? '<span class="plugin-type">Utility</span>' : ''}
           </div>
         </div>
         <div class="plugin-actions">
-          ${isActive ? `
+          ${isActive && !isUtility ? `
             <button class="plugin-action-btn primary" data-action="launch" title="Launch Plugin">
               Launch
             </button>
+            <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
+                    data-action="pin"
+                    title="${isPinned ? 'Unpin' : 'Pin'}">
+              ${isPinned ? '📌' : '📍'}
+            </button>
           ` : ''}
-          <button class="plugin-action-btn ${isPinned ? 'pinned' : ''}"
-                  data-action="pin"
-                  title="${isPinned ? 'Unpin' : 'Pin'}">
-            ${isPinned ? '📌' : '📍'}
-          </button>
+          ${isUtility ? `
+            <span class="plugin-utility-label">Backend Service</span>
+          ` : ''}
         </div>
       </div>
     `;
@@ -248,6 +261,39 @@ export class PluginsLauncher implements View {
         launchBtn.addEventListener('click', () => this.launchPlugin(pluginId));
       }
 
+      // Settings button (for utility plugins)
+      const settingsBtn = card.querySelector('[data-action="settings"]');
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            // Build the IPC channel name based on plugin ID
+            const channelName = `plugin:${pluginId}:show-settings`;
+            console.log('[PluginsLauncher] Invoking settings handler:', channelName);
+
+            const result = await (window as any).electronAPI.invoke(channelName);
+            if (result && result.success) {
+              console.log('[PluginsLauncher] Settings configured:', result);
+
+              // Show success notification
+              if ((window as any).showNotification) {
+                (window as any).showNotification(result.message || 'Settings saved successfully', 'success');
+              }
+            }
+          } catch (error) {
+            console.error('[PluginsLauncher] Failed to show settings:', error);
+
+            // Show error notification
+            if ((window as any).showNotification) {
+              (window as any).showNotification(
+                `Failed to open settings: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                'error'
+              );
+            }
+          }
+        });
+      }
+
       // Pin button
       const pinBtn = card.querySelector('[data-action="pin"]');
       if (pinBtn) {
@@ -257,9 +303,10 @@ export class PluginsLauncher implements View {
         });
       }
 
-      // Card click to launch (if active)
+      // Card click to launch (if active and not a utility plugin)
       const plugin = this.plugins.find(p => p.id === pluginId);
-      if (plugin && plugin.status === 'active') {
+      const pluginType = plugin?.manifest?.pluginType;
+      if (plugin && plugin.status === 'active' && pluginType !== 'utility') {
         card.addEventListener('click', (e) => {
           // Don't trigger if clicking on action buttons
           if ((e.target as HTMLElement).closest('.plugin-action-btn')) return;
@@ -306,34 +353,304 @@ export class PluginsLauncher implements View {
         });
         break;
       case 'import':
-        try {
-          const electronAPI = (window as any).electronAPI;
-          const result = await electronAPI.dialog.showOpenDialog({
-            title: 'Import Plugin',
-            properties: ['openDirectory'],
-            buttonLabel: 'Import Plugin',
-          });
-          
-          if (!result.canceled && result.filePaths.length > 0) {
-            const path = result.filePaths[0];
-            await electronAPI.import.plugin(path);
-            // Refresh list
-            await this.loadPlugins();
-            this.render();
-            this.attachEventListeners();
-            alert('Plugin imported successfully!');
+        console.log('[PluginsLauncher] Import action triggered');
+        // Show the plugin install wizard
+        console.log('[PluginsLauncher] Creating PluginInstallWizard...');
+        const wizard = new PluginInstallWizard({
+          onComplete: async (success, pluginId) => {
+            if (success) {
+              // Refresh plugin list
+              await this.loadPlugins();
+              this.render();
+              this.attachEventListeners();
+
+              // Notify that a plugin was installed (for sidebar/router updates)
+              window.dispatchEvent(new CustomEvent('plugin-installed', { detail: { pluginId } }));
+
+              // Show success notification
+              if ((window as any).showNotification) {
+                (window as any).showNotification(
+                  `Plugin ${pluginId || ''} installed successfully! Reloading...`,
+                  'success'
+                );
+              }
+
+              // Reload app to activate plugin
+              setTimeout(() => {
+                const electronAPI = (window as any).electronAPI;
+                if (electronAPI && electronAPI.app && electronAPI.app.relaunch) {
+                  electronAPI.app.relaunch();
+                }
+              }, 1500);
+            }
+          },
+          onCancel: () => {
+            console.log('[PluginsLauncher] Install wizard cancelled');
           }
-        } catch (error: any) {
-          console.error('[PluginsLauncher] Import failed:', error);
-          alert(`Import failed: ${error.message}`);
-        }
+        });
+        console.log('[PluginsLauncher] Wizard created, calling show()...');
+        wizard.show();
+        console.log('[PluginsLauncher] Wizard.show() called');
         break;
       case 'manage':
-        // TODO: Open plugin management dialog
-        console.log('[PluginsLauncher] Manage plugins');
+        // Show plugin management dialog
+        this.showPluginManagementDialog();
         break;
       default:
         console.warn('[PluginsLauncher] Unknown action:', actionId);
+    }
+  }
+
+  /**
+   * Show plugin management dialog
+   */
+  private async showPluginManagementDialog(): Promise<void> {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'plugin-manage-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'plugin-manage-dialog';
+    dialog.style.cssText = `
+      background: var(--bg-secondary, #1e1e1e);
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 500px;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    dialog.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: var(--text-primary, #fff);">Manage Plugins</h2>
+        <button id="close-manage-dialog" style="background: none; border: none; color: var(--text-secondary, #888); font-size: 24px; cursor: pointer;">&times;</button>
+      </div>
+      <div id="plugin-list-container" style="color: var(--text-primary, #fff);">
+        <div style="text-align: center; padding: 20px;">Loading plugins...</div>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Close button handler
+    const closeBtn = dialog.querySelector('#close-manage-dialog');
+    closeBtn?.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Load plugins
+    const container = dialog.querySelector('#plugin-list-container');
+    if (!container) return;
+
+    try {
+      const plugins = await (window as any).electronAPI.plugins.listInstalled();
+
+      if (plugins.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--text-secondary, #888);">
+            <p>No plugins installed</p>
+            <p style="font-size: 14px;">Use "Import Plugin" to install plugins</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      for (const plugin of plugins) {
+        const card = document.createElement('div');
+        card.className = 'plugin-manage-card';
+        card.style.cssText = `
+          background: var(--bg-tertiary, #2a2a2a);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 12px;
+        `;
+
+        card.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h3 style="margin: 0 0 4px 0; color: var(--text-primary, #fff);">${this.escapeHtml(plugin.name)}</h3>
+              <p style="margin: 0 0 8px 0; color: var(--text-secondary, #888); font-size: 13px;">${this.escapeHtml(plugin.description || 'No description')}</p>
+              <div style="font-size: 12px; color: var(--text-tertiary, #666);">
+                <span>Version: ${this.escapeHtml(plugin.version)}</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap;">
+              <button class="plugin-folder-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Update this plugin in place from a local plugin folder" style="
+                background: var(--bg-quaternary, #3a3a3a);
+                color: var(--text-primary, #fff);
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Update…</button>
+              <button class="plugin-open-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Open plugin folder in file explorer" style="
+                background: var(--bg-quaternary, #3a3a3a);
+                color: var(--text-primary, #fff);
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Open</button>
+              <button class="plugin-uninstall-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" style="
+                background: var(--danger-color, #d32f2f);
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Uninstall</button>
+            </div>
+          </div>
+          <div class="plugin-status" data-plugin-id="${this.escapeHtml(plugin.id)}" style="margin-top: 8px; font-size: 12px; display: none;"></div>
+        `;
+
+        container.appendChild(card);
+      }
+
+      // Add event listeners for "Update…" buttons.
+      // Flow lives in the main process (src/main/handlers/plugin-update-handlers.ts):
+      // pick folder -> validate (id + strictly-greater semver, refused before
+      // any file is touched) -> native confirm (current -> new version) ->
+      // atomic swap with .bak rollback -> native "Restart Now / Later" prompt.
+      // This handler just reflects whatever the main process reports back.
+      container.querySelectorAll('.plugin-folder-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          const statusEl = container.querySelector(`.plugin-status[data-plugin-id="${pluginId}"]`) as HTMLElement;
+          const button = e.target as HTMLButtonElement;
+
+          button.disabled = true;
+          button.textContent = 'Select Folder...';
+
+          if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--text-secondary, #888)';
+            statusEl.textContent = 'Select the updated plugin folder containing plugin.json...';
+          }
+
+          try {
+            const result = await (window as any).electronAPI.plugins.updateFromFolder(pluginId);
+
+            if (result.cancelled) {
+              button.disabled = false;
+              button.textContent = 'Update…';
+              if (statusEl) statusEl.style.display = 'none';
+              return;
+            }
+
+            if (result.refused) {
+              // Refused before any file was touched: id mismatch, downgrade,
+              // or an invalid bundle. Nothing changed on disk.
+              if (statusEl) {
+                statusEl.style.color = 'var(--danger-color, #d32f2f)';
+                statusEl.textContent = result.message || 'Update refused.';
+              }
+              button.disabled = false;
+              button.textContent = 'Update…';
+              return;
+            }
+
+            if (statusEl) {
+              statusEl.style.color = 'var(--success-color, #4caf50)';
+              statusEl.textContent = result.message || 'Update successful.';
+            }
+            button.textContent = result.restarting ? 'Restarting…' : 'Updated';
+            // Leave the button disabled: either FictionLab is about to
+            // relaunch, or the swap is done and re-running it against the
+            // now-current version would just be refused as "not an upgrade".
+          } catch (error: any) {
+            if (statusEl) {
+              statusEl.style.color = 'var(--danger-color, #d32f2f)';
+              statusEl.textContent = `Update failed: ${error.message}`;
+            }
+            button.disabled = false;
+            button.textContent = 'Update…';
+          }
+        });
+      });
+
+      // Add event listeners for "Open Folder" buttons
+      container.querySelectorAll('.plugin-open-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          try {
+            await (window as any).electronAPI.plugins.openFolder(pluginId);
+          } catch (error: any) {
+            alert(`Could not open folder: ${error.message}`);
+          }
+        });
+      });
+
+      // Add event listeners for uninstall buttons
+      container.querySelectorAll('.plugin-uninstall-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          if (!confirm(`Are you sure you want to uninstall "${pluginId}"? This cannot be undone.`)) {
+            return;
+          }
+
+          const button = e.target as HTMLButtonElement;
+          const card = button.closest('.plugin-manage-card');
+
+          button.disabled = true;
+          button.textContent = 'Uninstalling...';
+
+          try {
+            await (window as any).electronAPI.plugins.uninstall(pluginId);
+            card?.remove();
+
+            // Refresh if no plugins left
+            const remaining = container.querySelectorAll('.plugin-manage-card');
+            if (remaining.length === 0) {
+              container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary, #888);">
+                  <p>No plugins installed</p>
+                  <p style="font-size: 14px;">Use "Import Plugin" to install plugins</p>
+                </div>
+              `;
+            }
+          } catch (error: any) {
+            alert(`Uninstall failed: ${error.message}`);
+            button.disabled = false;
+            button.textContent = 'Uninstall';
+          }
+        });
+      });
+    } catch (error: any) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--danger-color, #d32f2f);">
+          <p>Failed to load plugins</p>
+          <p style="font-size: 14px;">${this.escapeHtml(error.message)}</p>
+        </div>
+      `;
     }
   }
 

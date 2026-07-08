@@ -386,6 +386,132 @@ Think of Docker as a lightweight virtual machine that provides a safe, isolated 
 }
 
 /**
+ * Get Git download URL for the current platform
+ */
+export function getGitDownloadUrl(): string {
+  const platform = getPlatform();
+  const arch = process.arch;
+
+  log.info(`Getting Git download URL for platform: ${platform}, arch: ${arch}`);
+
+  switch (platform) {
+    case 'windows':
+      // Git for Windows - 64-bit installer
+      if (arch === 'arm64') {
+        // Windows ARM64 - use the portable version or standard installer
+        return 'https://git-scm.com/download/win';
+      }
+      return 'https://git-scm.com/download/win';
+
+    case 'macos':
+      // macOS - recommend Homebrew or direct download
+      return 'https://git-scm.com/download/mac';
+
+    case 'linux':
+      // Linux - point to installation instructions
+      return 'https://git-scm.com/download/linux';
+
+    default:
+      log.warn(`Unknown platform: ${platform}`);
+      return 'https://git-scm.com/downloads';
+  }
+}
+
+/**
+ * Open the Git download page in the default browser
+ */
+export async function openGitDownloadPage(): Promise<void> {
+  const downloadUrl = getGitDownloadUrl();
+
+  log.info(`Opening Git download page: ${downloadUrl}`);
+
+  try {
+    await shell.openExternal(downloadUrl);
+    log.info('Git download page opened successfully');
+  } catch (error) {
+    log.error('Error opening Git download page:', error);
+    throw new Error('Failed to open Git download page');
+  }
+}
+
+/**
+ * Get "Why do I need Git?" explanation
+ */
+export function getWhyGitExplanation(): string {
+  return `Git is required for this application because:
+
+• Git manages version control for MCP server source code
+• It enables downloading and updating MCP servers from GitHub repositories
+• Git tracks changes to your configuration and customizations
+• It allows you to easily roll back to previous versions if needed
+• Many MCP servers are distributed via Git repositories
+
+Git is the industry-standard version control system used by developers worldwide.`;
+}
+
+/**
+ * Get Node.js download URL for the current platform
+ */
+export function getNodeJsDownloadUrl(): string {
+  const platform = getPlatform();
+  const arch = process.arch;
+
+  log.info(`Getting Node.js download URL for platform: ${platform}, arch: ${arch}`);
+
+  switch (platform) {
+    case 'windows':
+      // Node.js for Windows - LTS version
+      if (arch === 'arm64') {
+        return 'https://nodejs.org/en/download/';
+      }
+      return 'https://nodejs.org/en/download/';
+
+    case 'macos':
+      // macOS - recommend installer or Homebrew
+      return 'https://nodejs.org/en/download/';
+
+    case 'linux':
+      // Linux - point to package manager instructions
+      return 'https://nodejs.org/en/download/package-manager/';
+
+    default:
+      log.warn(`Unknown platform: ${platform}`);
+      return 'https://nodejs.org/en/download/';
+  }
+}
+
+/**
+ * Open the Node.js download page in the default browser
+ */
+export async function openNodeJsDownloadPage(): Promise<void> {
+  const downloadUrl = getNodeJsDownloadUrl();
+
+  log.info(`Opening Node.js download page: ${downloadUrl}`);
+
+  try {
+    await shell.openExternal(downloadUrl);
+    log.info('Node.js download page opened successfully');
+  } catch (error) {
+    log.error('Error opening Node.js download page:', error);
+    throw new Error('Failed to open Node.js download page');
+  }
+}
+
+/**
+ * Get "Why do I need Node.js?" explanation
+ */
+export function getWhyNodeJsExplanation(): string {
+  return `Node.js is required for this application because:
+
+• Node.js runs the MCP server build process
+• npm (included with Node.js) manages dependencies for MCP servers
+• Many MCP tools and utilities are built with Node.js
+• It provides the JavaScript runtime for server-side operations
+
+Node.js is a widely-used JavaScript runtime that powers modern development tools.`;
+}
+
+/**
  * Export all public functions and interfaces
  */
 export default {
@@ -395,4 +521,10 @@ export default {
   copyCommandToClipboard,
   getStep,
   getWhyDockerExplanation,
+  getGitDownloadUrl,
+  openGitDownloadPage,
+  getWhyGitExplanation,
+  getNodeJsDownloadUrl,
+  openNodeJsDownloadPage,
+  getWhyNodeJsExplanation,
 };

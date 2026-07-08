@@ -48,8 +48,31 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
+  PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
 }
+
+/**
+ * A single row in the Ports settings table
+ */
+interface PortRowDefinition {
+  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT';
+  name: string;
+}
+
+/**
+ * Canonical list of all user-facing ports.
+ */
+const PORT_ROWS: PortRowDefinition[] = [
+  { key: 'POSTGRES_PORT', name: 'PostgreSQL' },
+  { key: 'PGBOUNCER_PORT', name: 'PgBouncer' },
+  { key: 'MCP_CONNECTOR_PORT', name: 'MCP Connector' },
+  { key: 'HTTP_SSE_PORT', name: 'HTTP/SSE' },
+  { key: 'DB_ADMIN_PORT', name: 'DB Admin' },
+  { key: 'NPE_PORT', name: 'NPE Server' },
+  { key: 'WORKFLOW_MANAGER_PORT', name: 'Workflow Manager' },
+];
 
 interface DockerStatus {
   running: boolean;
@@ -61,6 +84,7 @@ interface DockerStatus {
 export class ServicesTab {
   private updateInterval: NodeJS.Timeout | null = null;
   private readonly REFRESH_INTERVAL = 5000; // 5 seconds
+  private lastSuggestedPortsConfig: EnvConfig | null = null;
 
   constructor() {
     console.log('ServicesTab component initialized');
@@ -78,6 +102,9 @@ export class ServicesTab {
 
       // Load initial service status
       await this.refreshAllServices();
+
+      // Load the Ports settings table
+      await this.loadPortsTable();
 
       // Start auto-refresh
       this.startAutoRefresh();
@@ -109,6 +136,261 @@ export class ServicesTab {
     const refreshBtn = document.getElementById('services-refresh-all');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.refreshAllServices());
+    }
+
+    // Ports section controls
+    this.setupPortsListeners();
+  }
+
+  /**
+   * Setup Ports section listeners
+   */
+  private setupPortsListeners(): void {
+    const checkAllBtn = document.getElementById('ports-check-all');
+    const useSuggestedBtn = document.getElementById('ports-use-suggested');
+    const saveBtn = document.getElementById('ports-save');
+
+    if (checkAllBtn) checkAllBtn.addEventListener('click', () => this.handleCheckAllPorts());
+    if (useSuggestedBtn) useSuggestedBtn.addEventListener('click', () => this.handleUseSuggestedPorts());
+    if (saveBtn) saveBtn.addEventListener('click', () => this.handleSavePorts());
+  }
+
+  /**
+   * Build the current port values from the table's input fields.
+   * Falls back to the last-loaded config for any row not yet rendered.
+   */
+  private readPortsFromInputs(baseConfig: EnvConfig): EnvConfig {
+    const config: EnvConfig = { ...baseConfig };
+    for (const row of PORT_ROWS) {
+      const input = document.getElementById(`port-input-${row.key}`) as HTMLInputElement | null;
+      if (input && input.value.trim() !== '') {
+        const parsed = parseInt(input.value, 10);
+        if (!isNaN(parsed)) {
+          (config as any)[row.key] = parsed;
+        }
+      }
+    }
+    return config;
+  }
+
+  /**
+   * Render a single port row's markup
+   */
+  private renderPortRowHtml(row: PortRowDefinition, port: number): string {
+    return `
+      <tr id="port-row-${row.key}" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <td style="padding: 8px;">${row.name}</td>
+        <td style="padding: 8px;">
+          <input type="number" id="port-input-${row.key}" value="${port}" min="1024" max="65535"
+                 style="width: 100px; padding: 4px 6px; background: rgba(0,0,0,0.2); color: inherit; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;" />
+        </td>
+        <td style="padding: 8px;">
+          <span id="port-status-${row.key}" class="port-status">
+            <span class="loading">checking…</span>
+          </span>
+        </td>
+      </tr>
+    `;
+  }
+
+  /**
+   * Load the Ports table: fetch current config, render rows, and check live status
+   */
+  private async loadPortsTable(): Promise<void> {
+    const tbody = document.getElementById('ports-table-body');
+    if (!tbody) return;
+
+    try {
+      const config = await window.electronAPI.envConfig.getConfig() as EnvConfig;
+
+      tbody.innerHTML = PORT_ROWS.map(row => this.renderPortRowHtml(row, (config as any)[row.key])).join('');
+
+      // Wire up per-row "check on change"
+      for (const row of PORT_ROWS) {
+        const input = document.getElementById(`port-input-${row.key}`) as HTMLInputElement | null;
+        if (input) {
+          input.addEventListener('change', () => {
+            const port = parseInt(input.value, 10);
+            if (!isNaN(port)) {
+              this.refreshPortRowStatus(row.key, port);
+            }
+          });
+        }
+      }
+
+      // Live-check each port's current availability
+      await Promise.all(PORT_ROWS.map(row => this.refreshPortRowStatus(row.key, (config as any)[row.key])));
+
+      this.updatePortsLastChecked();
+    } catch (error) {
+      console.error('Error loading ports table:', error);
+      tbody.innerHTML = '<tr><td colspan="3" style="padding: 8px;">Failed to load ports</td></tr>';
+    }
+  }
+
+  /**
+   * Check a single port's availability and update its status cell
+   */
+  private async refreshPortRowStatus(key: PortRowDefinition['key'], port: number): Promise<void> {
+    const statusEl = document.getElementById(`port-status-${key}`);
+    if (!statusEl) return;
+
+    try {
+      const available = await window.electronAPI.envConfig.checkPort(port);
+      statusEl.innerHTML = available
+        ? '<span class="available" style="color: #4CAF50;">✓ Available</span>'
+        : '<span class="unavailable" style="color: #f44336;">✗ In use</span>';
+    } catch (error) {
+      console.error(`Error checking port ${port}:`, error);
+      statusEl.innerHTML = '<span class="unavailable">? Unknown</span>';
+    }
+  }
+
+  /**
+   * "Check All" - runs checkAllPortsAndSuggestAlternatives against the current
+   * table values and surfaces any conflicts plus a "Use Suggested" option.
+   */
+  private async handleCheckAllPorts(): Promise<void> {
+    const statusMsg = document.getElementById('ports-status-message');
+    const useSuggestedBtn = document.getElementById('ports-use-suggested');
+
+    try {
+      if (statusMsg) statusMsg.innerHTML = '<div style="opacity: 0.8;">Checking all ports…</div>';
+
+      const baseConfig = await window.electronAPI.envConfig.getConfig() as EnvConfig;
+      const config = this.readPortsFromInputs(baseConfig);
+
+      const result = await window.electronAPI.envConfig.checkAllPorts(config as any);
+
+      // Refresh each row's live status against the values actually checked
+      await Promise.all(PORT_ROWS.map(row => this.refreshPortRowStatus(row.key, (config as any)[row.key])));
+
+      if (result.hasConflicts) {
+        this.lastSuggestedPortsConfig = (result.suggestedConfig as EnvConfig) || null;
+
+        const conflictList = result.conflicts.map((c: any) =>
+          `<li><strong>${c.name}</strong>: port ${c.port} is in use (suggested: ${c.suggested})</li>`
+        ).join('');
+
+        if (statusMsg) {
+          statusMsg.innerHTML = `
+            <div class="alert warning">
+              <strong>Port conflicts detected</strong>
+              <ul style="margin: 5px 0 0 20px; padding: 0;">${conflictList}</ul>
+            </div>
+          `;
+        }
+
+        if (useSuggestedBtn) useSuggestedBtn.style.display = 'inline-block';
+      } else {
+        this.lastSuggestedPortsConfig = null;
+        if (statusMsg) {
+          statusMsg.innerHTML = '<div class="alert success">All ports are available.</div>';
+        }
+        if (useSuggestedBtn) useSuggestedBtn.style.display = 'none';
+      }
+
+      this.updatePortsLastChecked();
+    } catch (error) {
+      console.error('Error checking all ports:', error);
+      if (statusMsg) statusMsg.innerHTML = '<div class="alert error">Failed to check ports.</div>';
+    }
+  }
+
+  /**
+   * "Use Suggested" - applies the last-computed suggestedConfig to the input fields
+   */
+  private handleUseSuggestedPorts(): void {
+    if (!this.lastSuggestedPortsConfig) return;
+
+    for (const row of PORT_ROWS) {
+      const input = document.getElementById(`port-input-${row.key}`) as HTMLInputElement | null;
+      const value = (this.lastSuggestedPortsConfig as any)[row.key];
+      if (input && value !== undefined) {
+        input.value = String(value);
+        input.style.borderColor = '#4CAF50';
+        setTimeout(() => { input.style.borderColor = 'rgba(255, 255, 255, 0.2)'; }, 2000);
+      }
+    }
+
+    this.showNotification('Applied suggested available ports. Click Save to persist.', 'success');
+
+    // Re-check with the newly applied values
+    this.handleCheckAllPorts();
+  }
+
+  /**
+   * "Save" - persists the port configuration to .env and prompts to restart services
+   */
+  private async handleSavePorts(): Promise<void> {
+    const statusMsg = document.getElementById('ports-status-message');
+    const saveBtn = document.getElementById('ports-save') as HTMLButtonElement | null;
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+
+      const baseConfig = await window.electronAPI.envConfig.getConfig() as EnvConfig;
+      const config = this.readPortsFromInputs(baseConfig);
+
+      const validation = await window.electronAPI.envConfig.validateConfig(config as any);
+      if (!validation.valid) {
+        if (statusMsg) {
+          statusMsg.innerHTML = `<div class="alert error">Validation failed: ${validation.errors.join(', ')}</div>`;
+        }
+        return;
+      }
+
+      const result = await window.electronAPI.envConfig.saveConfig(config as any);
+
+      if (result.success) {
+        if (statusMsg) {
+          statusMsg.innerHTML = `<div class="alert success">Ports saved to ${result.path}. Restart services for changes to take effect.</div>`;
+        }
+        this.showNotification('Ports saved successfully', 'success');
+
+        const shouldRestart = window.confirm(
+          'Port configuration saved. Services must be restarted for the new ports to take effect. Restart now?'
+        );
+        if (shouldRestart) {
+          this.showNotification('Restarting MCP system...', 'info');
+          const restartResult = await window.electronAPI.mcpSystem.restart();
+          if (restartResult.success) {
+            this.showNotification('Services restarted successfully', 'success');
+            await this.refreshAllServices();
+          } else {
+            this.showNotification(`Failed to restart services: ${restartResult.message}`, 'error');
+          }
+        }
+
+        await this.loadPortsTable();
+      } else {
+        if (statusMsg) {
+          statusMsg.innerHTML = `<div class="alert error">Failed to save: ${result.error}</div>`;
+        }
+        this.showNotification('Failed to save port configuration', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving ports:', error);
+      if (statusMsg) statusMsg.innerHTML = '<div class="alert error">Error saving port configuration.</div>';
+      this.showNotification('Error saving port configuration', 'error');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    }
+  }
+
+  /**
+   * Update the "last checked" timestamp for the Ports section
+   */
+  private updatePortsLastChecked(): void {
+    const el = document.getElementById('ports-last-checked');
+    if (el) {
+      el.textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
     }
   }
 
@@ -150,17 +432,9 @@ export class ServicesTab {
    * Setup Typing Mind service listeners
    */
   private setupTypingMindListeners(): void {
-    const startBtn = document.getElementById('typing-mind-start');
-    const stopBtn = document.getElementById('typing-mind-stop');
-    const restartBtn = document.getElementById('typing-mind-restart');
-    const viewLogsBtn = document.getElementById('typing-mind-view-logs');
     const openBrowserBtn = document.getElementById('typing-mind-open-browser');
     const configureBtn = document.getElementById('typing-mind-configure');
 
-    if (startBtn) startBtn.addEventListener('click', () => this.handleTypingMindStart());
-    if (stopBtn) stopBtn.addEventListener('click', () => this.handleTypingMindStop());
-    if (restartBtn) restartBtn.addEventListener('click', () => this.handleTypingMindRestart());
-    if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('typing-mind', 'Typing Mind'));
     if (openBrowserBtn) openBrowserBtn.addEventListener('click', () => this.handleOpenTypingMind());
     if (configureBtn) configureBtn.addEventListener('click', () => this.handleConfigureTypingMind());
   }
@@ -319,62 +593,17 @@ export class ServicesTab {
   }
 
   /**
-   * Update Typing Mind service card
+   * Update Typing Mind service card (cloud link only — no local container)
    */
   private async updateTypingMindCard(): Promise<void> {
     try {
-      const status = await window.electronAPI.mcpSystem.getStatus();
-      const config = await window.electronAPI.envConfig.getConfig();
       const urls = await window.electronAPI.mcpSystem.getUrls();
 
-      const container = status.containers.find(c => c.name.includes('typingmind'));
-
-      const statusBadge = document.getElementById('typing-mind-status-badge');
       const urlDisplay = document.getElementById('typing-mind-url-info');
-      const versionDisplay = document.getElementById('typing-mind-version-info');
-      const resourceDisplay = document.getElementById('typing-mind-resource-usage');
 
-      if (statusBadge) {
-        if (container?.running && (container.health === 'healthy' || container.health === 'none' || container.health === 'unknown')) {
-          statusBadge.className = 'service-status-badge status-healthy';
-          statusBadge.textContent = 'Healthy';
-        } else if (container?.running) {
-          statusBadge.className = 'service-status-badge status-starting';
-          statusBadge.textContent = container.health === 'starting' ? 'Starting' : 'Unhealthy';
-        } else {
-          statusBadge.className = 'service-status-badge status-offline';
-          statusBadge.textContent = 'Offline';
-        }
+      if (urlDisplay) {
+        urlDisplay.textContent = urls.typingMind || 'https://www.typingmind.com';
       }
-
-      if (urlDisplay && urls.typingMind) {
-        urlDisplay.textContent = `URL: ${urls.typingMind}`;
-      } else if (urlDisplay) {
-        urlDisplay.textContent = `Port: ${config.TYPING_MIND_PORT}`;
-      }
-
-      if (versionDisplay) {
-        versionDisplay.textContent = 'Version: Latest';
-      }
-
-      // Update resource usage
-      if (resourceDisplay && container?.running) {
-        resourceDisplay.innerHTML = `
-          <div class="resource-item">
-            <span>CPU:</span>
-            <span class="resource-value">~3%</span>
-          </div>
-          <div class="resource-item">
-            <span>Memory:</span>
-            <span class="resource-value">~256MB</span>
-          </div>
-        `;
-      } else if (resourceDisplay) {
-        resourceDisplay.innerHTML = '<div class="resource-item">Not running</div>';
-      }
-
-      // Enable/disable controls based on status
-      this.updateServiceControls('typing-mind', container?.running || false);
     } catch (error) {
       console.error('Error updating Typing Mind card:', error);
     }
@@ -494,27 +723,6 @@ export class ServicesTab {
       console.error('Error checking MCP Servers health:', error);
       this.showNotification('Failed to check health status', 'error');
     }
-  }
-
-  /**
-   * Handle Typing Mind start
-   */
-  private async handleTypingMindStart(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to start all services.', 'info');
-  }
-
-  /**
-   * Handle Typing Mind stop
-   */
-  private async handleTypingMindStop(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to stop all services.', 'info');
-  }
-
-  /**
-   * Handle Typing Mind restart
-   */
-  private async handleTypingMindRestart(): Promise<void> {
-    this.showNotification('Typing Mind is managed as part of the full system. Use Dashboard to restart all services.', 'info');
   }
 
   /**
@@ -678,7 +886,7 @@ export class ServicesTab {
   /**
    * Handle viewing service logs
    */
-  private async handleViewLogs(serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', displayName: string): Promise<void> {
+  private async handleViewLogs(serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', displayName: string): Promise<void> {
     try {
       const result = await window.electronAPI.mcpSystem.getLogs(serviceName, 100);
 
