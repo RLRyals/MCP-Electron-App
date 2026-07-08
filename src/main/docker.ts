@@ -6,6 +6,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import Docker from 'dockerode';
 import { getPlatform, checkDockerRunning, getFixedEnv } from './prerequisites';
 import { LogCategory, logWithCategory } from './logger';
 
@@ -47,6 +48,237 @@ export interface DockerOperationResult {
 }
 
 /**
+ * Result of a daemon-level ping probe (dockerode, not the CLI)
+ */
+export interface DockerPingResult {
+  reachable: boolean;
+  attempts: number;
+  elapsedMs: number;
+  error?: string;
+}
+
+/**
+ * Get the platform-appropriate Docker Engine API socket/pipe path.
+ * Windows: named pipe. macOS/Linux: unix socket.
+ * dockerode/docker-modem already default to these same paths, but we set them
+ * explicitly so the probe is authoritative regardless of DOCKER_HOST or other
+ * environment overrides, and so the chosen path is visible in logs.
+ */
+function getDockerSocketPath(): string {
+  const platform = getPlatform();
+  if (platform === 'windows') {
+    return '//./pipe/docker_engine';
+  }
+  // macOS and Linux both use the standard Docker Engine unix socket location
+  return '/var/run/docker.sock';
+}
+
+/**
+ * Single dockerode `docker.ping()` attempt against the Engine API, bounded by
+ * an explicit timeout (dockerode/docker-modem have no built-in per-call timeout).
+ * No retry here - callers compose retry/backoff on top of this primitive.
+ */
+async function pingDockerOnce(timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
+  const socketPath = getDockerSocketPath();
+  const docker = new Docker({ socketPath });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    await docker.ping({ abortSignal: controller.signal } as any);
+    return { ok: true };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || String(error) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ping the Docker daemon directly via dockerode against the Engine API socket/pipe
+ * (Windows named pipe `//./pipe/docker_engine`, unix socket elsewhere) rather than
+ * shelling out to the `docker` CLI. This is the authoritative liveness signal:
+ * a reachable daemon means Docker is genuinely up, independent of whether the CLI
+ * binary is on PATH or how long `docker info` takes to cold-start.
+ *
+ * Retries a fixed number of short-timeout attempts with backoff before declaring
+ * the daemon unreachable - a cold WSL2 backend can take a few seconds to start
+ * responding even once the process exists.
+ */
+export async function pingDockerDaemon(options: {
+  attempts?: number;
+  attemptTimeoutMs?: number;
+  backoffMs?: number;
+} = {}): Promise<DockerPingResult> {
+  const attempts = options.attempts ?? 5;
+  const attemptTimeoutMs = options.attemptTimeoutMs ?? 3000;
+  const backoffMs = options.backoffMs ?? 3000;
+
+  const start = Date.now();
+  let lastError: string | undefined;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const result = await pingDockerOnce(attemptTimeoutMs);
+
+    if (result.ok) {
+      const elapsedMs = Date.now() - start;
+      logWithCategory('info', LogCategory.DOCKER,
+        `Docker daemon ping succeeded on attempt ${attempt}/${attempts} (${elapsedMs}ms, socket: ${getDockerSocketPath()})`);
+      return { reachable: true, attempts: attempt, elapsedMs };
+    }
+
+    lastError = result.error;
+    logWithCategory('debug', LogCategory.DOCKER,
+      `Docker daemon ping attempt ${attempt}/${attempts} failed: ${lastError}`);
+
+    if (attempt < attempts) {
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  const elapsedMs = Date.now() - start;
+  logWithCategory('warn', LogCategory.DOCKER,
+    `Docker daemon ping failed after ${attempts} attempts (${elapsedMs}ms): ${lastError}`);
+
+  return { reachable: false, attempts, elapsedMs, error: lastError };
+}
+
+/**
+ * Poll the daemon ping until it succeeds or the timeout expires.
+ * Used by the launch gate for both the "process already running, still
+ * initializing" case (~90s budget) and the "we just started it" case (~120s
+ * budget) - the daemon ping is the readiness signal in both cases, not window
+ * state or the CLI.
+ */
+export async function waitForDockerPingReady(
+  maxTimeoutSeconds: number,
+  progressCallback?: ProgressCallback,
+  checkIntervalSeconds: number = 3
+): Promise<DockerOperationResult> {
+  logWithCategory('info', LogCategory.DOCKER,
+    `Polling Docker daemon ping (timeout: ${maxTimeoutSeconds}s)`);
+
+  const start = Date.now();
+  const timeoutMs = maxTimeoutSeconds * 1000;
+  let attempt = 0;
+  let lastError: string | undefined;
+
+  while (Date.now() - start < timeoutMs) {
+    attempt++;
+    const attemptTimeoutMs = checkIntervalSeconds * 1000;
+    const result = await pingDockerOnce(attemptTimeoutMs);
+
+    if (result.ok) {
+      const message = 'Docker daemon is ready!';
+      logWithCategory('info', LogCategory.DOCKER, `${message} (after ${attempt} poll(s))`);
+
+      if (progressCallback) {
+        progressCallback({ message, percent: 100, step: 'ready' });
+      }
+
+      return { success: true, message };
+    }
+
+    lastError = result.error;
+    const elapsed = Date.now() - start;
+    const percent = Math.min(90, Math.floor((elapsed / timeoutMs) * 90));
+    const message = `Waiting for Docker daemon... (attempt ${attempt}, ${Math.floor(elapsed / 1000)}s elapsed)`;
+
+    logWithCategory('debug', LogCategory.DOCKER, `${message}: ${lastError}`);
+
+    if (progressCallback) {
+      progressCallback({ message, percent, step: 'waiting' });
+    }
+
+    // pingDockerOnce already blocks for up to attemptTimeoutMs on failure/timeout,
+    // so only add a small gap between attempts rather than a full extra interval.
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  const errorMessage = `Docker daemon did not respond within ${maxTimeoutSeconds} seconds`;
+  logWithCategory('error', LogCategory.DOCKER, `${errorMessage}${lastError ? `: ${lastError}` : ''}`);
+
+  if (progressCallback) {
+    progressCallback({ message: 'Docker daemon did not respond in time', percent: 100, step: 'timeout' });
+  }
+
+  return { success: false, message: 'Docker daemon did not respond in time', error: lastError || errorMessage };
+}
+
+/**
+ * Check if Docker Desktop process is running at the OS level,
+ * independent of whether the Docker daemon is ready.
+ * This detects Docker Desktop that is still initializing.
+ */
+export async function isDockerDesktopProcessRunning(): Promise<boolean> {
+  const platform = getPlatform();
+  logWithCategory('info', LogCategory.DOCKER,
+    `Checking if Docker Desktop process is running on ${platform}...`);
+
+  try {
+    if (platform === 'windows') {
+      const { stdout } = await execAsync(
+        'tasklist /FI "IMAGENAME eq Docker Desktop.exe" /NH',
+        { timeout: 5000, windowsHide: true }
+      );
+      const isRunning = stdout.toLowerCase().includes('docker desktop.exe');
+      logWithCategory('info', LogCategory.DOCKER,
+        `Docker Desktop process running (Windows): ${isRunning}`);
+      return isRunning;
+
+    } else if (platform === 'macos') {
+      try {
+        const { stdout } = await execAsync(
+          'pgrep -f "Docker Desktop"',
+          { timeout: 5000 }
+        );
+        const isRunning = stdout.trim().length > 0;
+        logWithCategory('info', LogCategory.DOCKER,
+          `Docker Desktop process running (macOS): ${isRunning}`);
+        return isRunning;
+      } catch {
+        // pgrep returns exit code 1 when no process found
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process not running (macOS)');
+        return false;
+      }
+
+    } else if (platform === 'linux') {
+      try {
+        const { stdout } = await execAsync(
+          'systemctl is-active docker',
+          { timeout: 5000 }
+        );
+        const status = stdout.trim();
+        const isRunning = status === 'active' || status === 'activating';
+        logWithCategory('info', LogCategory.DOCKER,
+          `Docker service status (Linux): ${status}, running: ${isRunning}`);
+        return isRunning;
+      } catch {
+        // Fallback: check for dockerd process
+        try {
+          const { stdout } = await execAsync('pgrep dockerd', { timeout: 5000 });
+          const isRunning = stdout.trim().length > 0;
+          logWithCategory('info', LogCategory.DOCKER,
+            `dockerd process running (Linux fallback): ${isRunning}`);
+          return isRunning;
+        } catch {
+          logWithCategory('info', LogCategory.DOCKER,
+            'Docker process not running (Linux)');
+          return false;
+        }
+      }
+    }
+
+    return false;
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.DOCKER,
+      'Error checking Docker Desktop process', { error: error.message });
+    return false;
+  }
+}
+
+/**
  * Start Docker Desktop programmatically
  * Platform-specific implementation
  */
@@ -69,7 +301,8 @@ export async function startDockerDesktop(
 
     // Platform-specific Docker Desktop startup
     if (platform === 'windows') {
-      const dockerPath = 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe';
+      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+      const dockerPath = `${programFiles}\\Docker\\Docker\\Docker Desktop.exe`;
       logWithCategory('info', LogCategory.DOCKER, `Starting Docker Desktop on Windows: ${dockerPath}`);
 
       // Start Docker Desktop without waiting for it to complete
@@ -479,21 +712,37 @@ export async function startAndWaitForDocker(
 ): Promise<DockerOperationResult> {
   logWithCategory('info', LogCategory.DOCKER, 'Starting Docker and waiting for it to be ready...');
 
-  // First, start Docker Desktop
-  const startResult = await startDockerDesktop((progress) => {
+  // Check if Docker Desktop process is already running (but daemon not ready yet)
+  const processAlreadyRunning = await isDockerDesktopProcessRunning();
+
+  if (processAlreadyRunning) {
+    logWithCategory('info', LogCategory.DOCKER,
+      'Docker Desktop process is already running. Waiting for daemon to become ready...');
+
     if (progressCallback) {
       progressCallback({
-        ...progress,
-        percent: Math.min(progress.percent, 10), // Cap at 10% for start phase
+        message: 'Docker Desktop is starting up, waiting for daemon...',
+        percent: 10,
+        step: 'waiting-for-existing',
       });
     }
-  });
+  } else {
+    // Docker Desktop is NOT running - start it
+    const startResult = await startDockerDesktop((progress) => {
+      if (progressCallback) {
+        progressCallback({
+          ...progress,
+          percent: Math.min(progress.percent, 10), // Cap at 10% for start phase
+        });
+      }
+    });
 
-  if (!startResult.success) {
-    return startResult;
+    if (!startResult.success) {
+      return startResult;
+    }
   }
 
-  // Then wait for it to be ready
+  // Wait for the daemon to be ready (same regardless of whether we started it or not)
   const readyResult = await waitForDockerReady((progress) => {
     if (progressCallback) {
       progressCallback({

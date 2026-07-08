@@ -8,5 +8,13 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/services/**/*"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ]
 }

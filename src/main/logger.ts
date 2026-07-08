@@ -22,6 +22,7 @@ export enum LogCategory {
   SYSTEM = 'SYSTEM',
   ERROR = 'ERROR',
   CONFIG = 'CONFIG',
+  WORKFLOW = "WORKFLOW",
 }
 
 /**
@@ -44,7 +45,7 @@ export function initializeLogger(): void {
   log.transports.file.resolvePathFn = () => path.join(logsPath, 'main.log');
 
   // Configure console transport
-  log.transports.console.level = 'info';
+  log.transports.console.level = 'warn';
   log.transports.console.format = '[{y}-{m}-{d} {h}:{i}:{s}] [{level}] {text}';
 
   // Default log level is already set via transports
@@ -202,6 +203,36 @@ export function clearLogs(): void {
   } catch (error) {
     log.error('Error clearing logs:', error);
   }
+}
+
+/**
+ * Set console log level for verbose debugging
+ * @param level The log level to set ('debug' for verbose, 'info' for normal)
+ */
+export function setConsoleLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): void {
+  log.transports.console.level = level;
+  log.info(`Console log level set to: ${level}`);
+}
+
+/**
+ * Get current console log level
+ */
+export function getConsoleLogLevel(): string {
+  return log.transports.console.level as string;
+}
+
+/**
+ * Enable verbose logging (sets console to debug level)
+ */
+export function enableVerboseLogging(): void {
+  setConsoleLogLevel('debug');
+}
+
+/**
+ * Disable verbose logging (sets console to info level)
+ */
+export function disableVerboseLogging(): void {
+  setConsoleLogLevel('info');
 }
 
 // Export the logger instance

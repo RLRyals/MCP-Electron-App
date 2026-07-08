@@ -108,10 +108,9 @@ function initializeSidebarSteps() {
         { number: 1, name: 'Welcome', description: 'Getting started' },
         { number: 2, name: 'Prerequisites', description: 'System requirements' },
         { number: 3, name: 'Environment', description: 'Configuration' },
-        { number: 4, name: 'Client Selection', description: 'Choose clients' },
-        { number: 5, name: 'Download & Setup', description: 'Preparing components' },
-        { number: 6, name: 'System Startup', description: 'Starting services' },
-        { number: 7, name: 'Complete', description: 'All done!' }
+        { number: 4, name: 'Download & Setup', description: 'Preparing components' },
+        { number: 5, name: 'System Startup', description: 'Starting services' },
+        { number: 6, name: 'Complete', description: 'All done!' }
     ];
 
     stepsContainer.innerHTML = '';
@@ -256,15 +255,12 @@ async function initializeCurrentStep() {
             await initializeEnvironmentStep();
             break;
         case 4:
-            await initializeClientSelectionStep();
-            break;
-        case 5:
             await initializeDownloadStep();
             break;
-        case 6:
+        case 5:
             await initializeSystemStartupStep();
             break;
-        case 7:
+        case 6:
             await initializeCompleteStep();
             break;
     }
@@ -317,6 +313,18 @@ async function checkPrerequisites() {
             gitValid ? null : 'Git is required for version control.'
         ));
 
+        // Node.js card
+        const nodeValid = results.nodejs.installed;
+        if (!nodeValid) allValid = false;
+
+        cards.push(createPrerequisiteCard(
+            'Node.js',
+            '🟢',
+            nodeValid,
+            results.nodejs.installed ? `Installed (${results.nodejs.version})` : 'Not installed',
+            nodeValid ? null : 'Node.js is required for building MCP servers.'
+        ));
+
         // WSL card (Windows only)
         if (results.wsl) {
             const wslValid = results.wsl.installed;
@@ -342,8 +350,13 @@ async function checkPrerequisites() {
                         <span style="font-size: 1.5rem;">⚠️</span>
                         <div>
                             <strong>Prerequisites Not Met</strong><br>
-                            Please install the required software before continuing.
+                            Please install the required software, then click "Check Again" to verify.
                         </div>
+                    </div>
+                    <div style="margin-top: 15px; text-align: center;">
+                        <button class="wizard-btn primary" id="check-prereqs-again-btn" style="padding: 12px 24px; font-size: 1rem;">
+                            <span style="margin-right: 8px;">↻</span> Check Again
+                        </button>
                     </div>
                 `;
             } else {
@@ -362,21 +375,55 @@ async function checkPrerequisites() {
                     prerequisites: {
                         docker: true,
                         git: true,
+                        nodejs: true,
                         wsl: results.wsl?.installed || undefined
                     }
                 });
             }
         }
 
-        // Add event listeners for installation buttons
-        if (!dockerValid && !results.docker.installed) {
-            const installDockerBtn = document.getElementById('install-docker-btn');
-            if (installDockerBtn) {
-                installDockerBtn.addEventListener('click', async () => {
-                    await (window as any).electronAPI.wizard.openDownloadPage();
-                });
+        // Use setTimeout to ensure DOM is fully updated before attaching listeners
+        setTimeout(() => {
+            // Add event listeners for installation buttons
+            if (!dockerValid && !results.docker.installed) {
+                const installDockerBtn = document.getElementById('install-docker-btn');
+                if (installDockerBtn) {
+                    installDockerBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openDownloadPage();
+                    });
+                }
             }
-        }
+
+            // Add Git install button listener
+            if (!gitValid) {
+                const installGitBtn = document.getElementById('install-git-btn');
+                if (installGitBtn) {
+                    installGitBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openGitDownloadPage();
+                    });
+                }
+            }
+
+            // Add Node.js install button listener
+            if (!nodeValid) {
+                const installNodeBtn = document.getElementById('install-nodejs-btn');
+                if (installNodeBtn) {
+                    installNodeBtn.addEventListener('click', async () => {
+                        await (window as any).electronAPI.wizard.openNodeJsDownloadPage();
+                    });
+                }
+            }
+
+            // Add Check Again button listener (if prerequisites not met)
+            if (!allValid) {
+                const checkAgainBtn = document.getElementById('check-prereqs-again-btn');
+                if (checkAgainBtn) {
+                    checkAgainBtn.addEventListener('click', () => {
+                        checkPrerequisites();
+                    });
+                }
+            }
+        }, 0);
 
     } catch (error) {
         console.error('Error checking prerequisites:', error);
@@ -403,6 +450,30 @@ function createPrerequisiteCard(
     status: string,
     error: string | null
 ): string {
+    // Determine which install button to show based on title
+    let installButton = '';
+    if (error) {
+        if (title === 'Docker Desktop') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-docker-btn">Install Docker</button>
+                </div>
+            `;
+        } else if (title === 'Git') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-git-btn">Install Git</button>
+                </div>
+            `;
+        } else if (title === 'Node.js') {
+            installButton = `
+                <div class="prereq-actions">
+                    <button class="wizard-btn" id="install-nodejs-btn">Install Node.js</button>
+                </div>
+            `;
+        }
+    }
+
     return `
         <div class="prereq-card ${success ? 'success' : 'error'}">
             <div class="prereq-header">
@@ -416,11 +487,7 @@ function createPrerequisiteCard(
                 <div class="prereq-status" style="margin-top: 10px; background: rgba(244, 67, 54, 0.1);">
                     ${error}
                 </div>
-                ${title === 'Docker Desktop' ? `
-                    <div class="prereq-actions">
-                        <button class="wizard-btn" id="install-docker-btn">Install Docker</button>
-                    </div>
-                ` : ''}
+                ${installButton}
             ` : ''}
         </div>
     `;
@@ -526,7 +593,6 @@ function applySuggestedConfig(config: any) {
         { id: 'mcp-port', key: 'MCP_CONNECTOR_PORT' },
         { id: 'http-port', key: 'HTTP_SSE_PORT' },
         { id: 'db-admin-port', key: 'DB_ADMIN_PORT' },
-        { id: 'typing-mind-port', key: 'TYPING_MIND_PORT' },
         { id: 'pgbouncer-port', key: 'PGBOUNCER_PORT' }
     ];
 
@@ -603,11 +669,6 @@ function createEnvironmentConfigForm(config: any): string {
 
 
                 <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Typing Mind Port</label>
-                    <input type="number" id="typing-mind-port" value="${config.TYPING_MIND_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
-                </div>
-
-                <div>
                     <label style="display: block; margin-bottom: 8px; font-weight: 500;">PgBouncer Port</label>
                     <input type="number" id="pgbouncer-port" value="${config.PGBOUNCER_PORT}" min="1024" max="65535" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff; font-size: 1rem;">
                 </div>
@@ -649,6 +710,11 @@ async function saveEnvironmentConfig(): Promise<boolean> {
     const statusEl = document.getElementById('env-config-status');
 
     try {
+        // Get current config first so we can preserve fields the wizard form doesn't
+        // expose (credentials, and ports like NPE_PORT/WORKFLOW_MANAGER_PORT that are
+        // only editable from the Ports settings panel, not this wizard step)
+        const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
+
         // Get form values
         const config = {
             POSTGRES_DB: (document.getElementById('postgres-db') as HTMLInputElement).value,
@@ -659,13 +725,15 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             HTTP_SSE_PORT: parseInt((document.getElementById('http-sse-port') as HTMLInputElement).value),
             DB_ADMIN_PORT: parseInt((document.getElementById('db-admin-port') as HTMLInputElement).value),
             MCP_AUTH_TOKEN: '', // Will be auto-generated
-            TYPING_MIND_PORT: parseInt((document.getElementById('typing-mind-port') as HTMLInputElement).value),
-            PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value)
+            PGBOUNCER_PORT: parseInt((document.getElementById('pgbouncer-port') as HTMLInputElement).value),
+            // Not exposed in this wizard step - preserve existing value, default otherwise
+            NPE_PORT: currentConfig?.NPE_PORT || 3011,
+            WORKFLOW_MANAGER_PORT: currentConfig?.WORKFLOW_MANAGER_PORT || 3012,
+            // Not exposed in this wizard step - preserve existing value so a re-save
+            // doesn't silently erase a stored GitHub token
+            GITHUB_TOKEN: currentConfig?.GITHUB_TOKEN,
         };
 
-        // Get current config to check if credentials already exist
-        const currentConfig = await (window as any).electronAPI.envConfig.getConfig();
-        
         // Check if .env file actually exists on disk
         // This is critical to prevent password regeneration
         const envFileExists = await (window as any).electronAPI.envConfig.fileExists();
@@ -761,124 +829,7 @@ async function saveEnvironmentConfig(): Promise<boolean> {
 }
 
 /**
- * Step 4: Initialize Client Selection
- */
-/**
- * Step 4: Initialize Client Selection
- */
-async function initializeClientSelectionStep() {
-    const container = document.getElementById('client-selection-container');
-    if (!container) return;
-
-    try {
-        // Load available clients
-        const clients = await (window as any).electronAPI.clientSelection.getOptions();
-        console.log('Available clients:', clients);
-
-        // Get current selection
-        const selection = await (window as any).electronAPI.clientSelection.getSelection();
-        const selectedClients = selection?.clients || [];
-
-        // Create client cards using shared UI
-        container.innerHTML = (window as any).ClientManagementUI.createClientSelectionCards(clients, selectedClients);
-
-        // Add event listeners using shared UI
-        // Pass initializeClientSelectionStep as onRefresh callback
-        // Pass saveClientSelection as onSaveSelection callback
-        (window as any).ClientManagementUI.setupClientSelectionListeners(
-            async () => { await initializeClientSelectionStep(); },
-            async () => { await saveClientSelection(); }
-        );
-
-    } catch (error) {
-        console.error('Error loading client selection:', error);
-        container.innerHTML = `
-            <div class="alert error">
-                <span style="font-size: 1.5rem;">⚠️</span>
-                <div>
-                    <strong>Error Loading Clients</strong><br>
-                    ${error instanceof Error ? error.message : String(error)}
-                </div>
-            </div>
-        `;
-    }
-}
-/**
- * Create client selection cards HTML
- */
-/**
- * Create client selection cards HTML
- */
-
-
-/**
- * Save client selection
- */
-async function saveClientSelection(): Promise<boolean> {
-    const statusEl = document.getElementById('client-selection-status');
-
-    try {
-        // Get selected clients
-        const selectedClients: string[] = [];
-        document.querySelectorAll('.client-checkbox:checked').forEach((checkbox: any) => {
-            selectedClients.push(checkbox.value);
-        });
-
-        console.log('Selected clients:', selectedClients);
-
-        if (statusEl) {
-            statusEl.innerHTML = '<div class="spinner" style="display: inline-block;"></div> Saving selection...';
-        }
-
-        // Save selection
-        const result = await (window as any).electronAPI.clientSelection.saveSelection(selectedClients);
-
-        if (result.success) {
-            // Save wizard state
-            const saveStateResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.CLIENT_SELECTION, {
-                clients: selectedClients
-            });
-
-            if (!saveStateResult.success) {
-                throw new Error(`Failed to save wizard state: ${saveStateResult.error}`);
-            }
-
-            if (statusEl) {
-                statusEl.innerHTML = `
-                    <div class="alert success">
-                        <span style="font-size: 1.5rem;">✓</span>
-                        <div>
-                            <strong>Selection Saved</strong><br>
-                            ${selectedClients.length} client(s) selected: ${selectedClients.join(', ')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            return true;
-        } else {
-            throw new Error(result.error || 'Failed to save selection');
-        }
-
-    } catch (error) {
-        console.error('Error saving client selection:', error);
-        if (statusEl) {
-            statusEl.innerHTML = `
-                <div class="alert error">
-                    <span style="font-size: 1.5rem;">⚠️</span>
-                    <div>
-                        <strong>Error Saving Selection</strong><br>
-                        ${error instanceof Error ? error.message : String(error)}
-                    </div>
-                </div>
-            `;
-        }
-        return false;
-    }
-}
-
-/**
- * Step 5: Initialize Build Pipeline
+ * Step 4: Initialize Build Pipeline
  * Create retry button HTML
  */
 function createRetryButton(buttonId: string, stepFunction: () => void, buttonText: string = 'Retry'): string {
@@ -943,36 +894,13 @@ async function initializeDownloadStep() {
         return;
     }
 
-    // If Typing Mind downloads are complete but build pipeline is not marked complete, show warning
-    // This indicates a potential inconsistency in the state
-    // Note: We only check typingMindCompleted since Docker images aren't used yet
-    const needsTypingMind = wizardState.data.clients?.includes('typingmind');
-    if (needsTypingMind &&
-        wizardState.data.downloads?.typingMindCompleted &&
-        !wizardState.data.buildPipeline?.completed) {
-        console.log('WARNING: Typing Mind complete but build pipeline not marked complete - inconsistent state');
-        statusContainer.innerHTML = `
-            <div class="alert warning" style="background: rgba(255, 152, 0, 0.2); border: 2px solid rgba(255, 152, 0, 0.5); padding: 20px; border-radius: 12px;">
-                <span style="font-size: 1.5rem;">⚠️</span>
-                <div>
-                    <strong>Build Status Inconsistent</strong><br>
-                    Downloads appear complete but build pipeline is not marked finished. Click Retry to verify and complete the build.
-                </div>
-            </div>
-            ${createRetryButton('retry-build-status-btn', initializeDownloadStep, 'Retry')}
-        `;
-        return;
-    }
-
     // Initialize the downloads object at the start of the build process if it doesn't exist
     // This allows the validation to pass while the build is in progress
-    // Note: typingMindCompleted is set to true since we use typingmind.com directly (no download needed)
     // Note: dockerImagesCompleted is set to true since Docker images aren't used yet
     if (!wizardState.data.downloads) {
         console.log('Initializing downloads state object...');
         const initResult = await (window as any).electronAPI.setupWizard.saveState(WizardStep.DOWNLOAD_SETUP, {
             downloads: {
-                typingMindCompleted: true,  // Set to true since we use typingmind.com directly
                 dockerImagesCompleted: true  // Set to true since Docker images aren't used yet
             }
         });
@@ -1104,14 +1032,7 @@ async function initializeDownloadStep() {
         }
 
         // Docker is now running, proceed with the build pipeline
-        // Get selected clients to determine which components to build
-        const selection = await (window as any).electronAPI.clientSelection.getSelection();
-        const selectedComponents = ['core-system']; // Always include core system
-
-        // Add optional components based on client selection
-        if (selection?.clients?.includes('typingmind')) {
-            selectedComponents.push('typing-mind-component');
-        }
+        const selectedComponents = ['core-system']; // Core system only
 
         console.log('Starting build pipeline with components:', selectedComponents);
 
@@ -1273,7 +1194,6 @@ async function initializeDownloadStep() {
                 verifiedArtifacts: result.result?.verifiedArtifacts || []
             },
             downloads: {
-                typingMindCompleted: true,
                 dockerImagesCompleted: true
             }
         });
@@ -1614,11 +1534,6 @@ async function initializeCompleteStep() {
             summary.push('Environment configuration saved');
         }
 
-        const clients = wizardState.data.clients || [];
-        if (clients.length > 0) {
-            summary.push(`${clients.length} client(s) selected: ${clients.join(', ')}`);
-        }
-
         if (wizardState.data.downloads?.dockerImagesCompleted) {
             summary.push('Docker images loaded successfully');
         }
@@ -1742,34 +1657,6 @@ async function nextStep() {
         return;
     }
 
-    // For CLIENT_SELECTION step, automatically save selection before proceeding
-    if (currentStep === WizardStep.CLIENT_SELECTION) {
-        const saved = await saveClientSelection();
-        if (!saved) {
-            // Save failed, don't proceed
-            return;
-        }
-
-        // Now complete the step and move to next
-        const result = await (window as any).electronAPI.setupWizard.completeStep(currentStep);
-        if (result.success && result.nextStep) {
-            // Update wizard state
-            wizardState = await (window as any).electronAPI.setupWizard.getState();
-
-            // Show next step
-            showStep(result.nextStep);
-
-            // Initialize next step
-            await initializeCurrentStep();
-
-            // Update progress
-            await updateProgress();
-
-            // Update sidebar
-            initializeSidebarSteps();
-        }
-        return;
-    }
 
     // Validate current step before proceeding
     const canProceed = await validateCurrentStep();

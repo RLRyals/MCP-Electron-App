@@ -8,10 +8,36 @@
  * 4. MCP Servers - Data persistence
  */
 
+// Import enhanced node types and LLM providers
+import type { WorkflowNode as EnhancedWorkflowNode } from './workflow-nodes';
+import type { LLMProviderConfig } from './llm-providers';
+import type { WorkflowExecutionContext } from './workflow-context';
+
+// Re-export for convenience
+export type { EnhancedWorkflowNode, LLMProviderConfig, WorkflowExecutionContext };
+export * from './workflow-nodes';
+export * from './llm-providers';
+export * from './workflow-context';
+
 /**
  * Phase types in the workflow
+ * Includes both legacy types and new enhanced node types
  */
-export type PhaseType = 'planning' | 'gate' | 'writing' | 'loop' | 'user' | 'subworkflow';
+export type PhaseType =
+  | 'planning'
+  | 'writing'
+  | 'gate'
+  | 'user-input'
+  | 'user'
+  | 'code'
+  | 'http'
+  | 'file'
+  | 'conditional'
+  | 'loop'
+  | 'subworkflow'
+  | 'parallel'
+  | 'blackboard'
+  | 'swarm';
 
 /**
  * Workflow execution status
@@ -22,6 +48,33 @@ export type WorkflowStatus = 'draft' | 'ready' | 'in_progress' | 'paused' | 'com
  * Phase execution status
  */
 export type PhaseStatus = 'pending' | 'running' | 'complete' | 'failed' | 'blocked' | 'skipped';
+
+/**
+ * Node execution status for canvas display
+ * Maps to visual states in PhaseNode component
+ */
+export type NodeExecutionStatus = 'pending' | 'running' | 'in_progress' | 'completed' | 'failed';
+
+/**
+ * Extended node status info for canvas display
+ * Includes loop iteration tracking for nodes executing inside loops
+ */
+export interface NodeStatusInfo {
+  status: NodeExecutionStatus;
+  /** Current loop iteration (1-based) if executing inside a loop */
+  loopIteration?: number;
+}
+
+/**
+ * Display labels for node execution status
+ */
+export const NodeExecutionStatusLabel: Record<NodeExecutionStatus, string> = {
+  pending: 'PENDING',
+  running: 'RUNNING',
+  in_progress: 'RUNNING',  // in_progress and running both display as "RUNNING"
+  completed: 'COMPLETED',
+  failed: 'FAILED',
+};
 
 /**
  * Gate result
@@ -79,30 +132,12 @@ export interface WorkflowDefinition {
 
 /**
  * Workflow graph representation (for React Flow visualization)
+ * Uses WorkflowNode from workflow-nodes.ts (the enhanced format)
  */
 export interface WorkflowGraph {
-  nodes: WorkflowNode[];
+  nodes: EnhancedWorkflowNode[];  // Use the new enhanced format
   edges: WorkflowEdge[];
-  metadata: WorkflowMetadata;
-}
-
-/**
- * Visual node in workflow graph
- */
-export interface WorkflowNode {
-  id: string;
-  type: PhaseType;
-  label: string;
-  agent: string;
-  skill?: string;
-  subWorkflowId?: string;
-  data: {
-    phase: WorkflowPhase;
-    status?: PhaseStatus;
-    executionData?: any;
-  };
-  position: { x: number; y: number };
-  style?: Record<string, any>;      // Custom styling
+  metadata?: WorkflowMetadata;
 }
 
 /**
@@ -112,7 +147,7 @@ export interface WorkflowEdge {
   id: string;
   source: string;
   target: string;
-  type: 'sequential' | 'conditional' | 'loop';
+  type: 'sequential' | 'conditional' | 'loop' | 'parallel-fan' | 'consolidation';
   condition?: string;
   label?: string;
   style?: Record<string, any>;
@@ -249,3 +284,136 @@ export interface WorkflowExecutionResult {
   error?: string;
   errorPhase?: number;
 }
+
+/**
+ * Source of workflow execution
+ */
+export type WorkflowSource = 'fictionlab_ui' | 'claude_code' | 'typingmind';
+
+/**
+ * Active workflow instance status
+ */
+export type ActiveWorkflowStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * Breadcrumb entry for tracking nested workflow navigation
+ * Used when executing workflows that contain subworkflows
+ */
+export interface WorkflowBreadcrumbEntry {
+  /** The workflow ID at this level */
+  workflowId: string;
+  /** Human-readable workflow name */
+  workflowName: string;
+  /** The node ID within this workflow that was/is being executed */
+  nodeId: string;
+  /** Human-readable node name */
+  nodeName: string;
+  /** If this is a subworkflow node, the subworkflow's registry ID */
+  subWorkflowRegistryId?: string;
+}
+
+/**
+ * Active workflow instance for cross-project tracking
+ * Used by the Workflow Manager Panel to display all running workflows
+ */
+export interface ActiveWorkflowInstance {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  source: WorkflowSource;
+  projectFolder: string;
+  projectName: string;
+  currentNodeId: string;
+  currentNodeName: string;
+  status: ActiveWorkflowStatus;
+  progressPercent: number;
+  totalNodes: number;
+  completedNodes: number;
+  /**
+   * List of completed node IDs for accurate status display
+   * Supports parallel workflow execution where node order doesn't determine completion
+   */
+  completedNodeIds?: string[];
+  startedAt: string;
+  updatedAt: string;
+  availableNodes: { id: string; name: string }[];
+  metadata?: Record<string, any>;
+  /**
+   * Breadcrumb trail for nested workflow execution
+   * Shows the path through parent workflows to reach the current execution point
+   * Example: [{ workflowId: "12-phase", nodeName: "Phase 3" }, { workflowId: "series-architect", nodeName: "Step 2" }]
+   */
+  breadcrumb?: WorkflowBreadcrumbEntry[];
+  /**
+   * Parent workflow registry ID if this is a subworkflow
+   */
+  parentWorkflowId?: string;
+}
+
+/**
+ * Workflow update event types
+ */
+export type WorkflowUpdateType = 'progress' | 'status' | 'node_changed' | 'completed' | 'failed';
+
+/**
+ * Workflow update event payload
+ * Broadcast via IPC when workflow state changes
+ */
+export interface WorkflowUpdate {
+  registryId: string;
+  type: WorkflowUpdateType;
+  data: Partial<ActiveWorkflowInstance>;
+  timestamp: string;
+}
+
+// ============================================================================
+// DATABASE FORMAT TYPES
+// These types represent workflows as stored in the database via MCP
+// The "_json" suffix indicates fields that are serialized JSON in the database
+// but typed objects in TypeScript
+// ============================================================================
+
+/**
+ * Workflow definition as stored in database
+ * This is the format returned by MCP workflow-manager server
+ *
+ * Key differences from file-based WorkflowDefinition:
+ * - Uses `graph_json` instead of a separate graph property
+ * - Uses `dependencies_json` instead of `dependencies`
+ * - Includes database-specific fields like `tags`, `is_system`, `created_by`
+ */
+export interface DatabaseWorkflowDefinition {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+
+  /**
+   * Graph-based workflow structure (PRIMARY)
+   * Contains nodes and edges for the workflow canvas
+   */
+  graph_json?: WorkflowGraph;
+
+  /**
+   * Dependencies required to run this workflow
+   */
+  dependencies_json?: WorkflowDependencies;
+
+  /** Tags for categorization and filtering */
+  tags?: string[];
+
+  /** Marketplace/sharing metadata */
+  marketplace_metadata?: Record<string, unknown>;
+
+  /** Whether this is a system-provided workflow */
+  is_system?: boolean;
+
+  /** Who created this workflow */
+  created_by?: string;
+}
+
+/**
+ * Type alias for backward compatibility
+ * Use DatabaseWorkflowDefinition in new code
+ */
+export type MCPWorkflowDefinition = DatabaseWorkflowDefinition;

@@ -40,7 +40,6 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
 }
 
 // Global polling interval
@@ -382,10 +381,15 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
   // Remove all status classes
   statusElement.classList.remove('status-green', 'status-yellow', 'status-red');
 
+  let topBarStatus: 'healthy' | 'warning' | 'error' = 'error';
+  let topBarText = 'Status Unknown';
+
   if (!status.running) {
     // System offline - red
     statusElement.classList.add('status-red');
     statusTextElement.textContent = 'System Offline';
+    topBarStatus = 'error';
+    topBarText = 'System Offline';
 
     // Show helpful message if system is offline (only once)
     if (status.message && !hasShownOfflineNotification) {
@@ -419,20 +423,36 @@ function updateStatusIndicator(status: MCPSystemStatus): void {
       // All core systems operational - green
       statusElement.classList.add('status-green');
       statusTextElement.textContent = 'System Ready';
+      topBarStatus = 'healthy';
+      topBarText = 'All Systems Operational';
       // Reset notification flag when system is healthy
       hasShownOfflineNotification = false;
     } else if (someCoreStarting) {
       // Core system starting - yellow
       statusElement.classList.add('status-yellow');
       statusTextElement.textContent = 'System Starting';
+      topBarStatus = 'warning';
+      topBarText = 'System Starting';
       hasShownOfflineNotification = false;
     } else {
       // Core system degraded - yellow
       statusElement.classList.add('status-yellow');
       statusTextElement.textContent = 'System Degraded';
+      topBarStatus = 'warning';
+      topBarText = 'System Degraded';
       // Reset notification flag when system comes back online
       hasShownOfflineNotification = false;
     }
+  }
+
+  // Update TopBar environment indicator if available
+  try {
+    const topBar = (window as any).topBar;
+    if (topBar && typeof topBar.updateEnvironmentStatus === 'function') {
+      topBar.updateEnvironmentStatus(topBarStatus, topBarText);
+    }
+  } catch (error) {
+    console.error('Failed to update TopBar environment status:', error);
   }
 }
 
@@ -837,11 +857,10 @@ async function handleConfigureClaudeDesktop(): Promise<void> {
 async function handleViewLogs(serviceName: string): Promise<void> {
   try {
     // Map UI service names to actual service names
-    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind' } = {
+    const serviceMap: { [key: string]: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' } = {
       'postgres': 'postgres',
       'mcp-servers': 'mcp-writing-servers',
       'mcp-connector': 'mcp-connector',
-      'typing-mind': 'typing-mind',
     };
 
     const actualServiceName = serviceMap[serviceName];

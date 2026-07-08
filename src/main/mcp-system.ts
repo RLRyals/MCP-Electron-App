@@ -16,6 +16,7 @@ import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
 import * as pgbouncerConfig from './pgbouncer-config';
 import { checkDockerRunning, getFixedEnv } from './prerequisites';
+import { startAndWaitForDocker as dockerStartAndWait } from './docker';
 
 const execAsync = promisify(exec);
 
@@ -216,7 +217,7 @@ export function getMCPRepositoryDirectory(): string {
 /**
  * Get docker-compose file path (now using the root docker-compose.yml)
  */
-function getDockerComposeFilePath(type: 'core' | 'typing-mind'): string {
+function getDockerComposeFilePath(type: 'core'): string {
   // All services are now in a single docker-compose.yml at the project root
   return path.join(getProjectRootDirectory(), 'docker-compose.yml');
 }
@@ -408,61 +409,6 @@ async function killProcessOnPort(port: number): Promise<boolean> {
 }
 
 /**
- * Attempt to start Docker Desktop
- * Returns true if Docker was started successfully or is already running
- */
-async function startDockerDesktop(): Promise<boolean> {
-  try {
-    let command: string;
-    
-    switch (process.platform) {
-      case 'win32':
-        // Windows: Start Docker Desktop
-        command = 'powershell -Command "Start-Process \\"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\\""';
-        break;
-      case 'darwin':
-        // macOS: Open Docker.app
-        command = 'open -a Docker';
-        break;
-      case 'linux':
-        // Linux: Try to start docker service
-        command = 'sudo systemctl start docker';
-        break;
-      default:
-        logWithCategory('warn', LogCategory.DOCKER, `Unsupported platform for auto-start: ${process.platform}`);
-        return false;
-    }
-    
-    logWithCategory('info', LogCategory.DOCKER, `Attempting to start Docker Desktop: ${command}`);
-    await execAsync(command, { timeout: 10000 });
-    
-    // Wait for Docker to actually start (up to 30 seconds)
-    const maxWaitTime = 30000;
-    const checkInterval = 2000;
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < maxWaitTime) {
-      const dockerStatus = await checkDockerRunning();
-      if (dockerStatus.running) {
-        logWithCategory('info', LogCategory.DOCKER, 'Docker Desktop started successfully');
-        return true;
-      }
-      
-      logWithCategory('info', LogCategory.DOCKER, 'Waiting for Docker to be ready...');
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
-    }
-    
-    logWithCategory('warn', LogCategory.DOCKER, 'Docker Desktop did not become ready within 30 seconds');
-    return false;
-    
-  } catch (error: any) {
-    logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker Desktop', error);
-    return false;
-  }
-}
-
-
-/**
  * Stop existing containers to release ports - AGGRESSIVE cleanup
  */
 export async function stopExistingContainers(): Promise<void> {
@@ -496,10 +442,9 @@ export async function stopExistingContainers(): Promise<void> {
     // Step 2: Also try to remove by specific names (in case they're not running)
     const containerNames = [
       'fictionlab-postgres',
-      'fictionlab-pgbouncer', 
+      'fictionlab-pgbouncer',
       'fictionlab-mcp-connector',
-      'fictionlab-mcp-servers',
-      'fictionlab-typingmind'
+      'fictionlab-mcp-servers'
     ];
     
     for (const name of containerNames) {
@@ -612,7 +557,7 @@ async function identifyPortUser(port: number): Promise<string | null> {
 /**
  * Check if ports are available before starting
  */
-export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[]; details?: any }> {
+export async function checkPortConflicts(): Promise<{ success: boolean; conflicts: number[]; details?: any; suggestedConfig?: envConfig.EnvConfig }> {
   logWithCategory('info', LogCategory.DOCKER, 'Checking for port conflicts...');
 
   const config = await envConfig.loadEnvConfig();
@@ -621,22 +566,23 @@ export async function checkPortConflicts(): Promise<{ success: boolean; conflict
   if (result.hasConflicts) {
     const conflictPorts = result.conflicts.map(c => c.port);
     logWithCategory('warn', LogCategory.DOCKER, `Port conflicts detected: ${conflictPorts.join(', ')}`);
-    
+
     // On Linux, try to identify what's using the ports
     if (process.platform === 'linux') {
       for (const conflict of result.conflicts) {
         const portUser = await identifyPortUser(conflict.port);
         if (portUser) {
-          logWithCategory('info', LogCategory.DOCKER, 
+          logWithCategory('info', LogCategory.DOCKER,
             `Port ${conflict.port} is being used by:\n${portUser}`);
         }
       }
     }
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       conflicts: conflictPorts,
-      details: result.conflicts
+      details: result.conflicts,
+      suggestedConfig: result.suggestedConfig,
     };
   }
 
@@ -677,8 +623,9 @@ async function determineServicesToStart(): Promise<{
     logWithCategory('info', LogCategory.DOCKER, 'MCP Connector will be started');
   }
 
-  // Note: TypingMind is no longer a Docker service - it uses typingmind.com directly
-  // No need to start a local TypingMind container
+  // TypingMind is a cloud service (typingmind.com) - there is no local Docker container to
+  // start. This flag only gates auto-configuring the MCP Connector for TypingMind's use.
+  services.typingMind = selectedClients.includes('typingmind');
 
   return services;
 }
@@ -727,6 +674,8 @@ async function execDockerCompose(
         MCP_CONNECTOR_PORT: String(config.MCP_CONNECTOR_PORT),
         HTTP_SSE_PORT: String(config.HTTP_SSE_PORT),
         DB_ADMIN_PORT: String(config.DB_ADMIN_PORT),
+        NPE_PORT: String(config.NPE_PORT),
+        WORKFLOW_MANAGER_PORT: String(config.WORKFLOW_MANAGER_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         // Path to MCP config file for Docker volume mounting
         MCP_CONFIG_FILE_PATH: mcpConfigPath,
@@ -914,6 +863,187 @@ async function waitForHealthy(
 }
 
 /**
+ * Ensure the core containers required before the DB pool can initialize
+ * (postgres, pgbouncer) are up and healthy.
+ *
+ * This is a NARROW extraction of the postgres/pgbouncer portion of
+ * startMCPSystem() - deliberately not the full wizard-oriented path:
+ * - no mcp-writing-servers image build (that's a from-source image only
+ *   needed for mcp-connector/mcp-writing-servers, not the DB)
+ * - no mcp-connector/mcp-writing-servers containers
+ * - no aggressive stopExistingContainers() unless a real port conflict is found
+ *
+ * Used by the launch gate (index.ts) after the Docker daemon is confirmed
+ * reachable, so a machine with Docker up but containers down doesn't sail
+ * straight into a DB pool init failure.
+ *
+ * Port-conflict handling here intentionally stays a thin, read-only consumer
+ * of the existing checkPortConflicts()/stopExistingContainers() exports rather
+ * than re-implementing the richer conflict-resolution/retry logic that lives
+ * in startMCPSystem() (~line 1007+) - that logic is in-flight in a parallel PR.
+ * On an unresolved conflict this returns error: 'PORT_CONFLICT' for the caller
+ * to surface directly to the user; it must not be swallowed.
+ */
+export async function ensureCoreContainers(
+  progressCallback?: ProgressCallback
+): Promise<SystemOperationResult> {
+  logWithCategory('info', LogCategory.DOCKER, 'Ensuring core containers (postgres, pgbouncer) are up...');
+
+  try {
+    const coreFile = getDockerComposeFilePath('core');
+
+    // Fast path: if postgres + pgbouncer are already running and healthy
+    // (the common case - Docker was already up), skip straight to success.
+    if (progressCallback) {
+      progressCallback({
+        message: 'Checking core containers...',
+        percent: 5,
+        step: 'check-existing',
+        status: 'checking',
+      });
+    }
+
+    const existingHealth = await getContainerHealth([coreFile]);
+    const postgresUp = existingHealth.find(c => c.name.includes('postgres'));
+    const pgbouncerUp = existingHealth.find(c => c.name.includes('pgbouncer'));
+
+    if (postgresUp?.running && postgresUp.health === 'healthy' &&
+        pgbouncerUp?.running && pgbouncerUp.health === 'healthy') {
+      logWithCategory('info', LogCategory.DOCKER, 'Core containers already running and healthy - nothing to do');
+
+      if (progressCallback) {
+        progressCallback({ message: 'Core containers ready', percent: 100, step: 'complete', status: 'ready' });
+      }
+
+      return { success: true, message: 'Core containers already running and healthy' };
+    }
+
+    // Verify environment configuration is valid before starting anything
+    const config = await envConfig.loadEnvConfig();
+    if (!config.MCP_AUTH_TOKEN || config.MCP_AUTH_TOKEN.trim() === '' ||
+        !config.POSTGRES_PASSWORD || config.POSTGRES_PASSWORD.trim() === '') {
+      logWithCategory('warn', LogCategory.DOCKER,
+        'Environment configuration incomplete - cannot start core containers yet');
+      return {
+        success: false,
+        message: 'Environment configuration is incomplete. Please complete the setup wizard before starting the system.',
+        error: 'INVALID_CONFIG',
+      };
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Preparing configuration...',
+        percent: 15,
+        step: 'config',
+        status: 'checking',
+      });
+    }
+
+    await initializeDockerDirectory();
+    await ensureDockerComposeFiles();
+
+    const pgbouncerResult = await pgbouncerConfig.generatePgBouncerConfig(config);
+    if (!pgbouncerResult.success) {
+      logWithCategory('warn', LogCategory.DOCKER, `Failed to generate PgBouncer config: ${pgbouncerResult.error}`);
+      // Continue anyway - matches startMCPSystem's tolerance for this failure
+    }
+
+    // Check for port conflicts (reuses the existing exported check - not modified here)
+    if (progressCallback) {
+      progressCallback({
+        message: 'Checking for port conflicts...',
+        percent: 25,
+        step: 'port-check',
+        status: 'checking',
+      });
+    }
+
+    let portCheck = await checkPortConflicts();
+    if (!portCheck.success) {
+      logWithCategory('warn', LogCategory.DOCKER,
+        `Port conflicts detected before starting core containers: ${portCheck.conflicts.join(', ')}`);
+
+      // Only postgres/pgbouncer are in play here - a single cleanup attempt via
+      // the existing exported helper is enough; do not retry aggressively.
+      await stopExistingContainers();
+      portCheck = await checkPortConflicts();
+
+      if (!portCheck.success) {
+        const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}. ` +
+          `Could not automatically free them.`;
+        logWithCategory('error', LogCategory.DOCKER, conflictMsg);
+        return {
+          success: false,
+          message: conflictMsg,
+          error: 'PORT_CONFLICT',
+        };
+      }
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Starting PostgreSQL and PgBouncer...',
+        percent: 40,
+        step: 'starting-core',
+        status: 'starting',
+      });
+    }
+
+    try {
+      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'pgbouncer']);
+      logWithCategory('info', LogCategory.DOCKER, 'Core containers (postgres, pgbouncer) started');
+    } catch (error: any) {
+      const errorStderr = error.stderr || '';
+      if (errorStderr.includes('port is already allocated')) {
+        const match = errorStderr.match(/port (\d+) is already allocated/);
+        const port = match ? match[1] : 'unknown';
+        return {
+          success: false,
+          message: `Port ${port} is already in use. Please change the port in environment configuration or stop the conflicting service.`,
+          error: 'PORT_CONFLICT',
+        };
+      }
+
+      logWithCategory('error', LogCategory.DOCKER, 'Failed to start core containers', error);
+      return {
+        success: false,
+        message: `Failed to start PostgreSQL/PgBouncer: ${error.message || error}`,
+        error: 'CONTAINER_START_FAILED',
+      };
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        message: 'Waiting for core containers to become healthy...',
+        percent: 60,
+        step: 'health-check',
+        status: 'checking',
+      });
+    }
+
+    const healthResult = await waitForHealthy([coreFile], progressCallback);
+    if (!healthResult.success) {
+      return {
+        success: false,
+        message: healthResult.message,
+        error: 'CONTAINER_UNHEALTHY',
+      };
+    }
+
+    return { success: true, message: 'Core containers are up and healthy' };
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.DOCKER, 'Error ensuring core containers', error);
+    return {
+      success: false,
+      message: `Failed to ensure core containers: ${errorMessage}`,
+      error: 'UNKNOWN_ERROR',
+    };
+  }
+}
+
+/**
  * Start the MCP system
  */
 export async function startMCPSystem(
@@ -935,7 +1065,7 @@ export async function startMCPSystem(
     const dockerStatus = await checkDockerRunning();
     if (!dockerStatus.running) {
       logWithCategory('warn', LogCategory.DOCKER, 'Docker is not running, attempting to start...');
-      
+
       if (progressCallback) {
         progressCallback({
           message: 'Starting Docker Desktop...',
@@ -945,10 +1075,10 @@ export async function startMCPSystem(
         });
       }
 
-      // Attempt to start Docker
-      const dockerStarted = await startDockerDesktop();
-      
-      if (!dockerStarted) {
+      // Attempt to start Docker (checks if process is already running before launching)
+      const dockerResult = await dockerStartAndWait();
+
+      if (!dockerResult.success) {
         logWithCategory('error', LogCategory.DOCKER, 'Failed to start Docker');
         return {
           success: false,
@@ -956,7 +1086,7 @@ export async function startMCPSystem(
           error: 'DOCKER_NOT_RUNNING',
         };
       }
-      
+
       logWithCategory('info', LogCategory.DOCKER, 'Docker started successfully');
     }
 
@@ -1074,9 +1204,59 @@ export async function startMCPSystem(
       }
 
       await stopExistingContainers();
-      
+
       // Re-check ports
       portCheck = await checkPortConflicts();
+
+      if (!portCheck.success) {
+        // Conflicts persist even after stopping our own containers - something else
+        // (or another process) still holds these ports. Attempt automatic remediation:
+        // apply the suggested (available) ports, persist them, and retry once before
+        // giving up. This runs on every platform (not just Linux) - when there are no
+        // conflicts, this branch never executes, so Windows behavior is unchanged.
+        logWithCategory('warn', LogCategory.DOCKER,
+          `Port conflicts persist after cleanup on ports: ${portCheck.conflicts.join(', ')}. Attempting automatic port remediation...`);
+
+        if (progressCallback) {
+          progressCallback({
+            message: 'Port conflicts persist. Remapping to available ports...',
+            percent: 16,
+            step: 'port-remediation',
+            status: 'checking',
+          });
+        }
+
+        if (portCheck.suggestedConfig && Array.isArray(portCheck.details) && portCheck.details.length > 0) {
+          // Log prominently which ports are moving before we apply the change
+          for (const detail of portCheck.details) {
+            logWithCategory('warn', LogCategory.DOCKER,
+              `PORT REMAP: ${detail.name} port ${detail.port} is in use - moving to ${detail.suggested}`);
+          }
+
+          const saveResult = await envConfig.saveEnvConfig(portCheck.suggestedConfig);
+
+          if (saveResult.success) {
+            logWithCategory('info', LogCategory.DOCKER,
+              `Auto-remediated port configuration saved to ${saveResult.path}. Retrying startup with new ports...`);
+
+            // Retry the conflict check once with the remediated configuration
+            portCheck = await checkPortConflicts();
+
+            if (portCheck.success) {
+              logWithCategory('info', LogCategory.DOCKER, 'Port remediation succeeded - all ports now available.');
+            } else {
+              logWithCategory('error', LogCategory.DOCKER,
+                `Port remediation retry failed - conflicts remain on ports: ${portCheck.conflicts.join(', ')}`);
+            }
+          } else {
+            logWithCategory('error', LogCategory.DOCKER,
+              `Failed to persist auto-remediated port configuration: ${saveResult.error}`);
+          }
+        } else {
+          logWithCategory('warn', LogCategory.DOCKER,
+            'No suggested port configuration available - cannot auto-remediate port conflicts.');
+        }
+      }
 
       if (!portCheck.success) {
         // Build a detailed error message with process info if available
@@ -1087,21 +1267,16 @@ export async function startMCPSystem(
             if (detail.processInfo) {
               conflictDetails += `:\n  ${detail.processInfo.split('\n').join('\n  ')}`;
             }
-            // Special note for PgBouncer port which cannot be changed
-            if (detail.port === 6432) {
-              conflictDetails += '\n  ⚠️ This port is required by PgBouncer and cannot be changed.';
-              conflictDetails += '\n  You must stop whatever is using port 6432 before starting.';
-            }
           }
         }
 
         const conflictMsg = `Port conflicts detected on ports: ${portCheck.conflicts.join(', ')}.\n` +
           (conflictDetails ? `\nConflict details:${conflictDetails}\n` : '') +
-          `\nThe application attempted to free these ports automatically but was unable to do so.\n\n` +
+          `\nThe application attempted to free these ports automatically (including remapping to suggested alternatives) but was unable to do so.\n\n` +
           `Please try one of the following:\n` +
           `1. Stop any other applications using these ports (check details above)\n` +
           `2. On Linux, run: sudo lsof -i :<port> to see what's using a port\n` +
-          `3. For configurable ports, change them in the Setup Wizard (Environment Configuration step)\n` +
+          `3. For configurable ports, change them in the Setup Wizard (Environment Configuration step) or the Ports settings panel\n` +
           `4. Restart your computer to clear all port locks\n` +
           `5. Check the logs for more details`;
 
@@ -1249,28 +1424,6 @@ export async function startMCPSystem(
           message: 'Failed to start core services. Check logs for details.',
           error: error.message,
         };
-      }
-    }
-
-    // 2. Start Typing Mind if needed
-    // All services are now in a single docker-compose.yml
-    if (services.typingMind) {
-      if (progressCallback) {
-        progressCallback({
-          message: 'Starting Typing Mind...',
-          percent: 65,
-          step: 'starting-typing-mind',
-          status: 'starting',
-        });
-      }
-
-      try {
-        // Start the typingmind service from the single docker-compose.yml
-        await execDockerCompose(coreFile, 'up', ['-d', 'typingmind']);
-        logWithCategory('info', LogCategory.DOCKER, 'Typing Mind started');
-      } catch (error: any) {
-        logWithCategory('error', LogCategory.DOCKER, 'Failed to start Typing Mind', error);
-        // Continue anyway - other services might still work
       }
     }
 
@@ -1694,7 +1847,7 @@ export async function getDetailedServiceStatus(): Promise<DetailedSystemStatus> 
  * View service logs
  */
 export async function viewServiceLogs(
-  serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind',
+  serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector',
   tail: number = 100
 ): Promise<ServiceLogsResult> {
   logWithCategory('info', LogCategory.DOCKER, `Getting logs for ${serviceName}...`);
@@ -1709,7 +1862,6 @@ export async function viewServiceLogs(
         'postgres': 'fictionlab-postgres',
         'mcp-writing-servers': 'fictionlab-mcp-servers',
         'mcp-connector': 'fictionlab-mcp-connector',
-        'typing-mind': 'fictionlab-typingmind',
       };
 
       const containerName = containerNameMap[serviceName] || serviceName;

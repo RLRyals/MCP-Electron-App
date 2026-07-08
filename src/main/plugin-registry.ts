@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { logWithCategory, LogCategory } from './logger';
 import { PluginLoader } from './plugin-loader';
 import { createPluginContext } from './plugin-context';
+import { unrecordHandler } from './ipc-registry';
 import {
   PluginState,
   PluginManifest,
@@ -297,6 +298,7 @@ export class PluginRegistry extends EventEmitter {
       for (const channel of state.ipcChannels) {
         const { ipcMain } = require('electron');
         ipcMain.removeHandler(channel);
+        unrecordHandler(channel);
       }
       state.ipcChannels = [];
 
@@ -311,12 +313,18 @@ export class PluginRegistry extends EventEmitter {
       state.status = 'error';
       state.error = error;
 
-      logWithCategory('error', LogCategory.SYSTEM, `Failed to deactivate plugin ${pluginId}:`, error);
+      // Serialize error properly for logging
+      const errorMessage = error?.message || error?.toString?.() || String(error);
+      const errorStack = error?.stack || '';
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to deactivate plugin ${pluginId}: ${errorMessage}`);
+      if (errorStack) {
+        logWithCategory('debug', LogCategory.SYSTEM, `Deactivation error stack: ${errorStack}`);
+      }
 
       const pluginError = new PluginError(
         PluginErrorType.DEACTIVATION_FAILED,
         pluginId,
-        `Plugin deactivation failed: ${error.message}`,
+        `Plugin deactivation failed: ${errorMessage}`,
         { originalError: error }
       );
 
@@ -436,7 +444,8 @@ export class PluginRegistry extends EventEmitter {
       try {
         await this.deactivatePlugin(state.id);
       } catch (error: any) {
-        logWithCategory('error', LogCategory.SYSTEM, `Failed to deactivate plugin ${state.id}:`, error);
+        // Error already logged in deactivatePlugin, just continue
+        // Deactivation errors during shutdown are non-critical
       }
     }
 

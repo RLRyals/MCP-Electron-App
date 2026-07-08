@@ -10,7 +10,6 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 import { app } from 'electron';
 import logger, { logWithCategory, LogCategory } from './logger';
-import * as typingMindDownloader from './typingmind-downloader';
 import * as envConfig from './env-config';
 import * as mcpSystem from './mcp-system';
 import { checkDockerRunning } from './prerequisites';
@@ -53,7 +52,6 @@ export interface UpdateInfo {
 export interface UpdateCheckResult {
   hasUpdates: boolean;
   mcpServers: UpdateInfo;
-  typingMind: UpdateInfo;
   customClients: Record<string, UpdateInfo>; // Added support for custom clients
   checkedAt: string;
 }
@@ -78,7 +76,6 @@ export interface UpdatePreferences {
   notifyOnlyIfUpdatesAvailable: boolean;
   skippedVersions?: {
     mcpServers?: string;
-    typingMind?: string;
   };
 }
 
@@ -91,11 +88,6 @@ interface SystemMetadata {
     updatedAt?: string;
     version?: string;
     repositoryUrl?: string;
-  };
-  typingMind?: {
-    sha?: string;
-    updatedAt?: string;
-    installedAt?: string;
   };
   customClients?: Record<string, {
     sha?: string;
@@ -289,63 +281,18 @@ export async function checkForMCPServersUpdate(): Promise<UpdateInfo> {
 }
 
 /**
- * Check for Typing Mind updates
- * Uses existing checkForUpdates from typingmind-downloader
- */
-export async function checkForTypingMindUpdate(): Promise<UpdateInfo> {
-  try {
-    logWithCategory('info', LogCategory.SYSTEM, 'Checking for Typing Mind updates...');
-
-    // Check if Typing Mind is installed
-    const isInstalled = await typingMindDownloader.isInstalled();
-    if (!isInstalled) {
-      return {
-        available: false,
-        error: 'Typing Mind is not installed',
-      };
-    }
-
-    // Use existing check function
-    const result = await typingMindDownloader.checkForUpdates();
-
-    if (result.error) {
-      return {
-        available: false,
-        error: result.error,
-      };
-    }
-
-    return {
-      available: result.hasUpdate,
-      currentVersion: result.currentVersion ? result.currentVersion.substring(0, 7) : undefined,
-      latestVersion: result.latestVersion ? result.latestVersion.substring(0, 7) : undefined,
-    };
-
-  } catch (error: any) {
-    logger.error('Error checking for Typing Mind updates:', error);
-    return {
-      available: false,
-      error: error.message,
-    };
-  }
-}
-
-/**
  * Check for all updates
  */
 export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
   logWithCategory('info', LogCategory.SYSTEM, 'Checking for all updates...');
 
-  const [mcpServers, typingMind] = await Promise.all([
-    checkForMCPServersUpdate(),
-    checkForTypingMindUpdate(),
-  ]);
+  const mcpServers = await checkForMCPServersUpdate();
 
   // Check custom clients
   const customClients: Record<string, UpdateInfo> = {};
   const availableClients = await clientSelection.getAvailableClients();
   const selectedClients = await clientSelection.loadClientSelection();
-  
+
   // Only check selected clients
   if (selectedClients && selectedClients.clients) {
     for (const clientId of selectedClients.clients) {
@@ -358,7 +305,7 @@ export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
     }
   }
 
-  const hasUpdates = mcpServers.available || typingMind.available || Object.values(customClients).some(c => c.available);
+  const hasUpdates = mcpServers.available || Object.values(customClients).some(c => c.available);
 
   // Update last checked timestamp
   const prefs = await getUpdatePreferences();
@@ -368,7 +315,6 @@ export async function checkForAllUpdates(): Promise<UpdateCheckResult> {
   return {
     hasUpdates,
     mcpServers,
-    typingMind,
     customClients,
     checkedAt: new Date().toISOString(),
   };
@@ -808,125 +754,6 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
 }
 
 /**
- * Update Typing Mind
- */
-export async function updateTypingMind(progressCallback?: ProgressCallback): Promise<UpdateResult> {
-  logWithCategory('info', LogCategory.SYSTEM, 'Starting Typing Mind update...');
-
-  try {
-    // 1. Check if Typing Mind is installed
-    const isInstalled = await typingMindDownloader.isInstalled();
-    if (!isInstalled) {
-      return {
-        success: false,
-        message: 'Typing Mind is not installed',
-        error: 'NOT_INSTALLED',
-      };
-    }
-
-    // 2. Check if Typing Mind container is running
-    progressCallback?.({
-      message: 'Checking Typing Mind status...',
-      percent: 5,
-      step: 'check',
-      status: 'checking',
-    });
-
-    const status = await mcpSystem.getSystemStatus();
-    const typingMindContainer = status.containers.find(c => c.name.includes('typing-mind'));
-    const wasRunning = typingMindContainer?.running || false;
-
-    // 3. Stop Typing Mind if running
-    if (wasRunning) {
-      progressCallback?.({
-        message: 'Stopping Typing Mind...',
-        percent: 10,
-        step: 'stop',
-        status: 'updating',
-      });
-
-      // Stop just the typing-mind service using mcp-system's stopMCPSystem
-      // which will stop all services - we'll restart core services after update
-      await mcpSystem.stopMCPSystem();
-
-      // Wait for shutdown
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-
-    // 4. Download latest Typing Mind files
-    progressCallback?.({
-      message: 'Downloading latest Typing Mind...',
-      percent: 20,
-      step: 'download',
-      status: 'downloading',
-    });
-
-    // Use existing download function which handles progress
-    const downloadResult = await typingMindDownloader.downloadTypingMind((tmProgress) => {
-      // Map Typing Mind progress to update progress
-      progressCallback?.({
-        message: tmProgress.message,
-        percent: 20 + (tmProgress.percent * 0.6), // Scale 0-100 to 20-80
-        step: tmProgress.step,
-        status: tmProgress.status === 'complete' ? 'complete' : 'downloading',
-      });
-    });
-
-    if (!downloadResult.success) {
-      return {
-        success: false,
-        message: downloadResult.message,
-        error: downloadResult.error,
-      };
-    }
-
-    // 5. Restart Typing Mind if it was running
-    if (wasRunning) {
-      progressCallback?.({
-        message: 'Restarting Typing Mind...',
-        percent: 90,
-        step: 'restart',
-        status: 'updating',
-      });
-
-      // Restart the full MCP system which will include Typing Mind if configured
-      await mcpSystem.startMCPSystem();
-    }
-
-    // 6. Complete
-    progressCallback?.({
-      message: 'Typing Mind updated!',
-      percent: 100,
-      step: 'complete',
-      status: 'complete',
-    });
-
-    logWithCategory('info', LogCategory.SYSTEM, 'Typing Mind updated successfully');
-
-    return {
-      success: true,
-      message: 'Typing Mind updated successfully',
-    };
-
-  } catch (error: any) {
-    logger.error('Error updating Typing Mind:', error);
-
-    progressCallback?.({
-      message: `Update failed: ${error.message}`,
-      percent: 0,
-      step: 'error',
-      status: 'error',
-    });
-
-    return {
-      success: false,
-      message: `Failed to update Typing Mind: ${error.message}`,
-      error: error.message,
-    };
-  }
-}
-
-/**
  * Update all components that have updates available
  */
 export async function updateAll(progressCallback?: ProgressCallback): Promise<UpdateResult> {
@@ -977,34 +804,6 @@ export async function updateAll(progressCallback?: ProgressCallback): Promise<Up
 
       if (!result.success) {
         logWithCategory('error', LogCategory.SYSTEM, `MCP Servers update failed: ${result.message}`);
-      }
-    }
-
-    // Update Typing Mind if needed
-    if (updateCheck.typingMind.available) {
-      progressCallback?.({
-        message: 'Updating Typing Mind...',
-        percent: 60,
-        step: 'typing-mind',
-        status: 'updating',
-      });
-
-      const result = await updateTypingMind((progress) => {
-        // Scale progress to 60-100%
-        progressCallback?.({
-          ...progress,
-          percent: 60 + (progress.percent * 0.4),
-        });
-      });
-
-      results.push({
-        component: 'Typing Mind',
-        success: result.success,
-        message: result.message,
-      });
-
-      if (!result.success) {
-        logWithCategory('error', LogCategory.SYSTEM, `Typing Mind update failed: ${result.message}`);
       }
     }
 

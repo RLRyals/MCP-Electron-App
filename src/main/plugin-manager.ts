@@ -6,9 +6,12 @@
  */
 
 import { app, BrowserWindow, Menu, MenuItem as ElectronMenuItem, dialog } from 'electron';
+import * as path from 'path';
 import { logWithCategory, LogCategory } from './logger';
 import { PluginRegistry } from './plugin-registry';
 import { getDatabasePool, initializeDatabasePool } from './database-connection';
+import { getBaseMenuTemplate } from './index';
+import { recoverPluginsDirectory } from './plugin-update-swap';
 import {
   PluginState,
   PluginNotification,
@@ -40,6 +43,20 @@ class PluginManager {
     logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin manager...');
 
     try {
+      // Repair any plugin update swap interrupted by a crash/kill (issue
+      // #182), and clean up `.bak` copies left over from an update that
+      // completed successfully on a previous run. Must run before
+      // discovery so the loader never sees a half-swapped plugin.
+      const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+      try {
+        const recovery = await recoverPluginsDirectory(pluginsDir);
+        if (recovery.completed.length || recovery.rolledBack.length || recovery.cleaned.length) {
+          logWithCategory('info', LogCategory.SYSTEM, 'Plugin update recovery pass:', recovery);
+        }
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.SYSTEM, 'Plugin update recovery pass failed (continuing):', error);
+      }
+
       // Ensure database pool is initialized
       await initializeDatabasePool();
       const dbPool = getDatabasePool();
@@ -84,6 +101,16 @@ class PluginManager {
   }
 
   /**
+   * Check if the main window is still valid for IPC communication
+   */
+  private isWindowValid(): boolean {
+    return this.mainWindow !== null &&
+           !this.mainWindow.isDestroyed() &&
+           this.mainWindow.webContents &&
+           !this.mainWindow.webContents.isDestroyed();
+  }
+
+  /**
    * Set up event listeners for plugin events
    */
   private setupEventListeners(): void {
@@ -100,6 +127,11 @@ class PluginManager {
 
       // Update plugin menu
       this.updatePluginMenu();
+
+      // Notify renderer of plugin state change (check window is still valid)
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('plugin-state-changed', { pluginId, state: 'activated' });
+      }
     });
 
     this.registry.on('plugin-deactivated', (pluginId: string) => {
@@ -107,14 +139,19 @@ class PluginManager {
 
       // Update plugin menu
       this.updatePluginMenu();
+
+      // Notify renderer of plugin state change (check window is still valid)
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('plugin-state-changed', { pluginId, state: 'deactivated' });
+      }
     });
 
     this.registry.on('plugin-error', (pluginId: string, error: Error) => {
       logWithCategory('error', LogCategory.SYSTEM, `Plugin error (${pluginId}):`, error);
 
-      // Show error notification to user
-      if (this.mainWindow) {
-        dialog.showMessageBox(this.mainWindow, {
+      // Show error notification to user (check window is still valid)
+      if (this.isWindowValid()) {
+        dialog.showMessageBox(this.mainWindow!, {
           type: 'error',
           title: 'Plugin Error',
           message: `Plugin ${pluginId} encountered an error`,
@@ -137,7 +174,7 @@ class PluginManager {
    * Show a notification from a plugin
    */
   private showPluginNotification(pluginId: string, notification: PluginNotification): void {
-    if (!this.mainWindow) {
+    if (!this.isWindowValid()) {
       return;
     }
 
@@ -146,7 +183,7 @@ class PluginManager {
       ? 'info'
       : notification.type;
 
-    dialog.showMessageBox(this.mainWindow, {
+    dialog.showMessageBox(this.mainWindow!, {
       type: dialogType,
       title: notification.title || `Plugin: ${pluginId}`,
       message: notification.message,
@@ -160,15 +197,6 @@ class PluginManager {
     if (!this.registry) {
       return;
     }
-
-    // Get menu template
-    const menu = Menu.getApplicationMenu();
-    if (!menu) {
-      return;
-    }
-
-    // Find or create Plugins menu
-    let pluginMenuIndex = menu.items.findIndex(item => item.label === 'Plugins');
 
     const activePlugins = this.registry.getPluginsByStatus('active');
 
@@ -184,8 +212,14 @@ class PluginManager {
     ];
 
     // Add items from each active plugin
+    logWithCategory('info', LogCategory.SYSTEM, `Building menu for ${activePlugins.length} active plugins`);
+
     for (const plugin of activePlugins) {
+      logWithCategory('info', LogCategory.SYSTEM, `Checking plugin ${plugin.id} for menu items...`);
+
       if (plugin.manifest.ui?.menuItems) {
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${plugin.id} has ${plugin.manifest.ui.menuItems.length} menu items`);
+
         for (const menuItem of plugin.manifest.ui.menuItems) {
           pluginMenuItems.push({
             label: menuItem.label,
@@ -209,6 +243,8 @@ class PluginManager {
             }),
           });
         }
+      } else {
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${plugin.id} has no menu items (ui: ${!!plugin.manifest.ui})`);
       }
     }
 
@@ -220,38 +256,26 @@ class PluginManager {
       });
     }
 
-    // Create/update Plugins menu
-    if (pluginMenuIndex === -1) {
-      // Add new Plugins menu after View menu
-      const viewMenuIndex = menu.items.findIndex(item => item.label === 'View');
-      const insertIndex = viewMenuIndex !== -1 ? viewMenuIndex + 1 : menu.items.length;
+    // Rebuild the full menu from the base template every time rather than
+    // reading back Menu.getApplicationMenu().items. That base template is
+    // plain MenuItemConstructorOptions (never live MenuItem instances), so
+    // click handlers on every submenu survive the rebuild, and rebuilding
+    // from source each time makes repeated calls idempotent — no
+    // accumulation of stale/duplicate Plugins menus.
+    const baseTemplate = getBaseMenuTemplate();
+    const viewMenuIndex = baseTemplate.findIndex(item => item.label === 'View');
+    const insertIndex = viewMenuIndex !== -1 ? viewMenuIndex + 1 : baseTemplate.length;
 
-      const newMenu = Menu.buildFromTemplate([
-        ...menu.items.slice(0, insertIndex),
-        {
-          label: 'Plugins',
-          submenu: pluginMenuItems,
-        },
-        ...menu.items.slice(insertIndex),
-      ]);
+    const fullTemplate: Electron.MenuItemConstructorOptions[] = [
+      ...baseTemplate.slice(0, insertIndex),
+      {
+        label: 'Plugins',
+        submenu: pluginMenuItems,
+      },
+      ...baseTemplate.slice(insertIndex),
+    ];
 
-      Menu.setApplicationMenu(newMenu);
-    } else {
-      // Update existing Plugins menu
-      const newMenu = Menu.buildFromTemplate(
-        menu.items.map((item, index) => {
-          if (index === pluginMenuIndex) {
-            return {
-              label: 'Plugins',
-              submenu: pluginMenuItems,
-            };
-          }
-          return item;
-        })
-      );
-
-      Menu.setApplicationMenu(newMenu);
-    }
+    Menu.setApplicationMenu(Menu.buildFromTemplate(fullTemplate));
 
     logWithCategory('debug', LogCategory.SYSTEM, 'Plugin menu updated');
   }
@@ -260,13 +284,13 @@ class PluginManager {
    * Open the plugin manager UI
    */
   private openPluginManager(): void {
-    if (!this.mainWindow) {
-      logWithCategory('warn', LogCategory.SYSTEM, 'Cannot open plugin manager: no main window');
+    if (!this.isWindowValid()) {
+      logWithCategory('warn', LogCategory.SYSTEM, 'Cannot open plugin manager: no valid window');
       return;
     }
 
     // Send message to renderer to show plugin manager
-    this.mainWindow.webContents.send('show-plugin-manager');
+    this.mainWindow!.webContents.send('show-plugin-manager');
 
     logWithCategory('debug', LogCategory.SYSTEM, 'Opening plugin manager UI');
   }
@@ -274,19 +298,38 @@ class PluginManager {
   /**
    * Handle a menu action from a plugin
    */
-  private handlePluginMenuAction(pluginId: string, action: string): void {
+  private async handlePluginMenuAction(pluginId: string, action: string): Promise<void> {
     if (!this.registry) {
       return;
     }
 
     logWithCategory('info', LogCategory.SYSTEM, `Handling plugin action: ${pluginId} -> ${action}`);
 
-    // Send action to renderer to show plugin UI
-    if (this.mainWindow) {
-      this.mainWindow.webContents.send('plugin-action', {
-        pluginId,
-        action,
-      });
+    // Send message to renderer to invoke the plugin's IPC handler
+    // The renderer will call electronAPI.invoke(channelName)
+    const channelName = `plugin:${pluginId}:${action}`;
+
+    try {
+      if (this.isWindowValid()) {
+        // Send event to renderer to invoke the handler
+        this.mainWindow!.webContents.send('plugin-action', {
+          pluginId,
+          action,
+          channelName
+        });
+
+        logWithCategory('debug', LogCategory.SYSTEM, `Sent plugin action to renderer: ${channelName}`);
+      }
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Plugin action ${channelName} failed:`, error);
+
+      // Show error notification
+      if (this.isWindowValid()) {
+        this.mainWindow!.webContents.send('show-notification', {
+          type: 'error',
+          message: `Plugin action failed: ${error.message}`,
+        });
+      }
     }
   }
 
@@ -422,14 +465,92 @@ class PluginManager {
       // 3. Copy plugin
       logWithCategory('info', LogCategory.SYSTEM, `Copying plugin to ${destPath}...`);
       await fs.copy(sourcePath, destPath, { overwrite: true });
-      
-      // 4. Reload plugins
-      if (this.registry) {
-        // If plugin was already loaded, we might need to unload it first?
-        // simple approach: discover and load all (which updates existing)
-        await this.registry.discoverAndLoadAll();
+
+      // 3.5. Setup bundled dependencies and install external dependencies if needed
+      const nodeModulesPath = path.join(destPath, 'node_modules');
+      const packageJsonPath = path.join(destPath, 'package.json');
+      const bundledPath = path.join(destPath, 'bundled');
+
+      // First, link any bundled dependencies into node_modules
+      // This handles packages like @fictionlab/workflow-runner that are bundled with the plugin
+      if (await fs.pathExists(bundledPath)) {
+        logWithCategory('info', LogCategory.SYSTEM, `Setting up bundled dependencies...`);
+        try {
+          const bundledEntries = await fs.readdir(bundledPath, { withFileTypes: true });
+
+          for (const entry of bundledEntries) {
+            if (entry.isDirectory()) {
+              const bundledPkgPath = path.join(bundledPath, entry.name, 'package.json');
+
+              if (await fs.pathExists(bundledPkgPath)) {
+                const bundledPkg = await fs.readJson(bundledPkgPath);
+                const pkgName = bundledPkg.name || entry.name;
+
+                // Determine target path in node_modules (handles scoped packages like @fictionlab/workflow-runner)
+                let targetPath: string;
+                if (pkgName.startsWith('@')) {
+                  const [scope, name] = pkgName.split('/');
+                  const scopePath = path.join(nodeModulesPath, scope);
+                  await fs.ensureDir(scopePath);
+                  targetPath = path.join(scopePath, name);
+                } else {
+                  await fs.ensureDir(nodeModulesPath);
+                  targetPath = path.join(nodeModulesPath, pkgName);
+                }
+
+                // Copy bundled package to node_modules (more reliable than symlinks on Windows)
+                const bundledSrcPath = path.join(bundledPath, entry.name);
+                await fs.copy(bundledSrcPath, targetPath, { overwrite: true });
+
+                logWithCategory('info', LogCategory.SYSTEM, `Linked bundled dependency: ${pkgName}`);
+              }
+            }
+          }
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM, `Failed to setup bundled dependencies:`, error);
+          // Continue - the plugin might still work
+        }
       }
-      
+
+      // Then install any external dependencies if needed
+      if (await fs.pathExists(packageJsonPath)) {
+        // Check if package.json has dependencies that need installing
+        const packageJson = await fs.readJson(packageJsonPath);
+        const hasDependencies = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0;
+
+        if (hasDependencies) {
+          logWithCategory('info', LogCategory.SYSTEM, `Installing plugin dependencies...`);
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+
+            // Run npm install in the plugin directory
+            await execAsync('npm install --omit=dev', {
+              cwd: destPath,
+              timeout: 120000 // 2 minute timeout
+            });
+
+            logWithCategory('info', LogCategory.SYSTEM, `Plugin dependencies installed successfully`);
+          } catch (error: any) {
+            logWithCategory('error', LogCategory.SYSTEM, `Failed to install plugin dependencies:`, error);
+            // Don't throw - try to load anyway in case dependencies are optional
+          }
+        }
+      }
+
+      // 4. Load the new plugin
+      if (this.registry) {
+        // Only load this specific plugin instead of re-discovering all plugins
+        // This avoids "already loaded" errors for existing plugins
+        await this.registry.loadPlugin(destPath, { force: false });
+
+        // Activate the plugin if auto-activate is enabled
+        if (this.registry['options']?.autoActivate) {
+          await this.registry.activatePlugin(manifest.id);
+        }
+      }
+
       return manifest.id;
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, 'Failed to import plugin:', error);

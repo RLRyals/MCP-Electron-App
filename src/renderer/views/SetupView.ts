@@ -27,6 +27,9 @@ export class SetupView implements View {
       await initializeSetupTab();
       console.log('[SetupView] Setup tab initialized');
 
+      // Load app info (version, platform, etc.) now that the elements exist
+      await this.loadAppInfo();
+
       // Re-setup event listeners for forms that were just rendered
       setupEnvConfigListeners();
       loadEnvConfig();
@@ -112,15 +115,6 @@ export class SetupView implements View {
             </label>
             <button type="button" class="test-button" id="update-mcp-servers" title="Pull latest changes from MCP-Writing-Servers repository">Update MCP-Writing-Servers</button>
             <div id="mcp-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
-          </div>
-
-          <div class="form-group">
-            <label>
-              Typing Mind
-              <span class="tooltip" title="Check for and install Typing Mind updates">ⓘ</span>
-            </label>
-            <button type="button" class="test-button" id="update-typing-mind" title="Check for Typing Mind updates">Check for Updates</button>
-            <div id="typing-mind-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
           </div>
 
           <div class="form-group">
@@ -351,6 +345,42 @@ export class SetupView implements View {
    */
   async unmount(): Promise<void> {
     this.container = null;
+  }
+
+  /**
+   * Load app info (version, platform, architecture, node version)
+   */
+  private async loadAppInfo(): Promise<void> {
+    try {
+      // Get app version
+      const version = await (window as any).electronAPI.getAppVersion();
+      const versionElement = document.getElementById('app-version');
+      if (versionElement) {
+        versionElement.textContent = version;
+      }
+
+      // Get platform info
+      const platformInfo = await (window as any).electronAPI.getPlatformInfo();
+
+      const platformElement = document.getElementById('platform');
+      if (platformElement) {
+        platformElement.textContent = platformInfo.platform;
+      }
+
+      const archElement = document.getElementById('architecture');
+      if (archElement) {
+        archElement.textContent = platformInfo.arch;
+      }
+
+      const nodeVersionElement = document.getElementById('node-version');
+      if (nodeVersionElement) {
+        nodeVersionElement.textContent = platformInfo.version;
+      }
+
+      console.log('[SetupView] App info loaded successfully');
+    } catch (error) {
+      console.error('[SetupView] Error loading app info:', error);
+    }
   }
 
   /**

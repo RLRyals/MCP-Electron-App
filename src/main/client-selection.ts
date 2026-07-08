@@ -80,8 +80,7 @@ export const DEFAULT_CLIENTS: Record<string, ClientMetadata> = {
       '~63MB download'
     ],
     downloadSize: '~63MB',
-    installation: 'automatic',
-    repoUrl: 'https://github.com/TypingMind/typingmind.git'
+    installation: 'automatic'
   },
   'claude-desktop': {
     id: 'claude-desktop',

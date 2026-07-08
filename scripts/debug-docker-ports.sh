@@ -26,7 +26,7 @@ echo ""
 
 # Check for MCP containers
 echo "2. Checking for MCP containers..."
-MCP_CONTAINERS=$(docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" --format "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}")
+MCP_CONTAINERS=$(docker ps -a --filter "name=mcp-" --format "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}")
 if [ -z "$MCP_CONTAINERS" ]; then
     echo -e "${GREEN}✓ No MCP containers found${NC}"
 else
@@ -93,9 +93,9 @@ if [ ! -z "$MCP_CONTAINERS" ]; then
     read -r CLEANUP
     if [ "$CLEANUP" = "y" ] || [ "$CLEANUP" = "Y" ]; then
         echo "Stopping MCP containers..."
-        docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q | xargs -r docker stop
+        docker ps -a --filter "name=mcp-" -q | xargs -r docker stop
         echo "Removing MCP containers..."
-        docker ps -a --filter "name=mcp-" --filter "name=typing-mind-" -q | xargs -r docker rm -f
+        docker ps -a --filter "name=mcp-" -q | xargs -r docker rm -f
         echo -e "${GREEN}✓ Cleanup complete${NC}"
 
         # Wait for ports to be released

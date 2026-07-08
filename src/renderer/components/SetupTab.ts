@@ -74,11 +74,6 @@ function setupSetupTabListeners(): void {
     updateMCPBtn.addEventListener('click', handleUpdateMCPServers);
   }
 
-  const updateTypingMindBtn = document.getElementById('update-typing-mind');
-  if (updateTypingMindBtn) {
-    updateTypingMindBtn.addEventListener('click', handleUpdateTypingMind);
-  }
-
   const checkUpdatesBtn = document.getElementById('check-fictionlab-updates');
   if (checkUpdatesBtn) {
     checkUpdatesBtn.addEventListener('click', handleCheckFictionLabUpdates);
@@ -272,80 +267,6 @@ async function handleUpdateMCPServers(): Promise<void> {
   } finally {
     button.disabled = false;
     button.textContent = 'Update MCP-Writing-Servers';
-  }
-}
-
-/**
- * Handle Update Typing Mind action
- */
-async function handleUpdateTypingMind(): Promise<void> {
-  const button = document.getElementById('update-typing-mind') as HTMLButtonElement;
-  const statusDiv = document.getElementById('typing-mind-update-status');
-
-  if (!button) return;
-
-  try {
-    button.disabled = true;
-    button.textContent = 'Checking...';
-
-    if (statusDiv) {
-      statusDiv.textContent = 'Checking for updates...';
-      statusDiv.style.display = 'block';
-      statusDiv.style.color = '#FFB84D';
-    }
-
-    showNotification('Checking for Typing Mind updates...', 'info');
-
-    // Check for updates using the updater API
-    const updateCheck = await window.electronAPI.updater.checkTypingMind();
-
-    if (!updateCheck.available) {
-      showNotification('Typing Mind is already up to date', 'info');
-      if (statusDiv) {
-        statusDiv.textContent = `Already up to date (${updateCheck.currentVersion || 'latest'})`;
-        statusDiv.style.color = '#00D4AA';
-      }
-      return;
-    }
-
-    // Show update available message
-    if (statusDiv) {
-      statusDiv.textContent = `Update available: ${updateCheck.latestVersion || 'newer version'}`;
-      statusDiv.style.color = '#FFB84D';
-    }
-
-    // Ask user if they want to update
-    if (confirm(`A new version of Typing Mind is available${updateCheck.latestVersion ? `: ${updateCheck.latestVersion}` : ''}\n\nWould you like to update now?`)) {
-      button.textContent = 'Updating...';
-      showNotification('Updating Typing Mind...', 'info');
-
-      const result = await window.electronAPI.updater.updateTypingMind();
-
-      if (result.success) {
-        showNotification('Typing Mind updated successfully!', 'success');
-        if (statusDiv) {
-          statusDiv.textContent = `Updated: ${result.message}`;
-          statusDiv.style.color = '#00D4AA';
-        }
-      } else {
-        showNotification(`Update failed: ${result.error || result.message}`, 'error');
-        if (statusDiv) {
-          statusDiv.textContent = `Update failed: ${result.error || result.message}`;
-          statusDiv.style.color = '#f44336';
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error('Error checking Typing Mind updates:', error);
-    showNotification('Failed to check for updates', 'error');
-    if (statusDiv) {
-      statusDiv.textContent = `Failed to check for updates: ${error instanceof Error ? error.message : String(error)}`;
-      statusDiv.style.color = '#f44336';
-    }
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Check for Updates';
   }
 }
 

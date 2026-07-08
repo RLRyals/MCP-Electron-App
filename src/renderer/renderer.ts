@@ -11,9 +11,11 @@ import { initializeDashboard, setupDashboardHandlers } from './dashboard-handler
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { ViewRouter } from './components/ViewRouter.js';
+import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
+import { KanbanViewReact } from './views/KanbanViewReact.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
-import { createDashboardTab } from './components/DashboardTab.js';
+// import { createDashboardTab } from './components/DashboardTab.js'; // No longer used with new ViewRouter
 import { createDefaultLogsTab } from './components/LogsTab.js';
 import { initializeServicesTab } from './components/ServicesTab.js';
 import { createDatabaseTab } from './components/DatabaseTab.js';
@@ -68,7 +70,21 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
+  PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
+}
+
+interface PortConflictDetail {
+  port: number;
+  name: string;
+  suggested: number;
+}
+
+interface PortConflictCheckResult {
+  hasConflicts: boolean;
+  conflicts: PortConflictDetail[];
+  suggestedConfig?: EnvConfig;
 }
 
 interface ConfigValidationResult {
@@ -271,6 +287,10 @@ interface ElectronAPI {
     getRecentLogs: (lines?: number) => Promise<string[]>;
     generateIssueTemplate: (title: string, message: string, stack?: string) => Promise<string>;
     openGitHubIssue: (title: string, message: string, stack?: string) => Promise<void>;
+    getLogLevel: () => Promise<string>;
+    setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error') => Promise<{ success: boolean; level: string }>;
+    enableVerbose: () => Promise<{ success: boolean }>;
+    disableVerbose: () => Promise<{ success: boolean }>;
     onSystemTestResults: (callback: (results: SystemTestResult) => void) => void;
   };
   envConfig: {
@@ -279,6 +299,7 @@ interface ElectronAPI {
     generatePassword: (length?: number) => Promise<string>;
     generateToken: () => Promise<string>;
     checkPort: (port: number) => Promise<boolean>;
+    checkAllPorts: (config: EnvConfig) => Promise<PortConflictCheckResult>;
     resetDefaults: () => Promise<EnvConfig>;
     validateConfig: (config: EnvConfig) => Promise<ConfigValidationResult>;
     calculatePasswordStrength: (password: string) => Promise<'weak' | 'medium' | 'strong'>;
@@ -318,7 +339,7 @@ interface ElectronAPI {
     restart: () => Promise<MCPSystemOperationResult>;
     getStatus: () => Promise<MCPSystemStatus>;
     getUrls: () => Promise<ServiceUrls>;
-    getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => Promise<ServiceLogsResult>;
+    getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', tail?: number) => Promise<ServiceLogsResult>;
     checkPorts: () => Promise<PortConflictResult>;
     getWorkingDirectory: () => Promise<string>;
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
@@ -373,10 +394,8 @@ interface ElectronAPI {
   updater: {
     checkAll: () => Promise<any>;
     checkMCPServers: () => Promise<any>;
-    checkTypingMind: () => Promise<any>;
     updateAll: () => Promise<any>;
     updateMCPServers: () => Promise<any>;
-    updateTypingMind: () => Promise<any>;
     getPreferences: () => Promise<any>;
     setPreferences: (prefs: any) => Promise<void>;
     onProgress: (callback: (progress: any) => void) => void;
@@ -788,9 +807,119 @@ function migrateOldTabState(): void {
 }
 
 /**
+ * Show Claude Code CLI installation dialog
+ */
+function showClaudeCodeInstallDialog(reason: string): void {
+  const dialog = document.createElement('div');
+  dialog.className = 'error-dialog';
+  dialog.innerHTML = `
+    <div class="error-dialog-backdrop"></div>
+    <div class="error-dialog-content" style="max-width: 600px;">
+      <h3>Claude Code CLI ${reason === 'not_installed' ? 'Not Installed' : 'Setup Required'}</h3>
+      <p>${reason === 'not_installed'
+        ? 'Claude Code CLI is not installed. You need to install it to run workflows that use your Claude subscription.'
+        : 'You are not logged in to Claude. Please log in to continue.'
+      }</p>
+
+      <div id="installation-status" style="background: rgba(0, 150, 255, 0.1); border: 1px solid rgba(0, 150, 255, 0.3); border-radius: 8px; padding: 15px; margin: 15px 0;">
+        <p style="margin: 0;">Click the button below to automatically install and set up Claude Code.</p>
+      </div>
+
+      <div class="error-dialog-buttons">
+        <button id="auto-install-claude" class="button primary">Install Claude Code Automatically</button>
+        <button id="close-claude-dialog" class="button">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  // Auto-install Claude Code
+  const autoInstallBtn = document.getElementById('auto-install-claude') as HTMLButtonElement;
+  const statusDiv = document.getElementById('installation-status');
+
+  if (autoInstallBtn && statusDiv) {
+    autoInstallBtn.addEventListener('click', async () => {
+      try {
+        autoInstallBtn.disabled = true;
+        autoInstallBtn.textContent = 'Installing...';
+        statusDiv.innerHTML = '<p style="margin: 0;">Installing Claude Code CLI... This may take a minute.</p>';
+
+        // Call backend to install Claude Code
+        const result = await (window as any).electronAPI.invoke('claude:install-cli');
+
+        if (result.success) {
+          statusDiv.innerHTML = `
+            <p style="margin: 0; color: #4ade80;">✓ Claude Code CLI installed successfully!</p>
+            <p style="margin: 10px 0 0 0; font-size: 0.9em;">Opening browser for authentication...</p>
+          `;
+          autoInstallBtn.textContent = 'Authenticating...';
+
+          // Now authenticate
+          const authResult = await (window as any).electronAPI.invoke('claude:authenticate');
+
+          if (authResult.success) {
+            statusDiv.innerHTML = `
+              <p style="margin: 0; color: #4ade80;">✓ Successfully authenticated!</p>
+              <p style="margin: 10px 0 0 0;">Claude Code is now ready. Click below to retry your workflow.</p>
+            `;
+            autoInstallBtn.textContent = 'Retry Workflow';
+            autoInstallBtn.disabled = false;
+            showNotification('Claude Code setup complete!', 'success');
+
+            // Change button to retry workflow
+            const retryHandler = async () => {
+              autoInstallBtn.removeEventListener('click', retryHandler);
+              document.body.removeChild(dialog);
+
+              // Reload the page to reset the workflow state
+              showNotification('Restarting application to apply changes...', 'info');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            };
+
+            autoInstallBtn.addEventListener('click', retryHandler);
+          } else {
+            throw new Error(authResult.error || 'Authentication failed');
+          }
+        } else {
+          throw new Error(result.error || 'Installation failed');
+        }
+      } catch (error: any) {
+        console.error('Auto-install failed:', error);
+        statusDiv.innerHTML = `
+          <p style="margin: 0; color: #f87171;">✗ Installation failed: ${error.message}</p>
+          <p style="margin: 10px 0 0 0; font-size: 0.9em;">Please make sure you have npm installed and an internet connection.</p>
+        `;
+        autoInstallBtn.disabled = false;
+        autoInstallBtn.textContent = 'Retry Installation';
+        showNotification('Installation failed. Please try again.', 'error');
+      }
+    });
+  }
+
+  // Close button
+  const closeButton = document.getElementById('close-claude-dialog');
+  if (closeButton) {
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  }
+
+  // Close on backdrop click
+  const backdrop = dialog.querySelector('.error-dialog-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+  }
+}
+
+/**
  * Initialize the renderer process
  */
-function init(): void {
+async function init(): Promise<void> {
   console.log('Renderer process initialized - NEW DASHBOARD LAYOUT');
 
   // Migrate old tab state if needed
@@ -815,6 +944,9 @@ function init(): void {
     container: document.getElementById('top-bar')!,
   });
 
+  // Make topBar globally accessible for dashboard handlers
+  (window as any).topBar = topBar;
+
   const viewRouter = new ViewRouter({
     container: document.getElementById('content-area')!,
     sidebar,
@@ -822,14 +954,100 @@ function init(): void {
   });
 
   // Initialize components
-  sidebar.initialize();
   topBar.initialize();
-  viewRouter.initialize();
 
-  // Connect sidebar navigation to router
+  // Initialize sidebar but prevent navigation during setup
+  let isViewRouterReady = false;
   sidebar.on('navigate', (viewId: string) => {
-    viewRouter.navigateTo(viewId);
+    if (isViewRouterReady) {
+      viewRouter.navigateTo(viewId);
+    } else {
+      console.log('[Renderer] Navigation blocked - ViewRouter not ready yet');
+    }
   });
+
+  // Initialize sidebar (async - loads installed plugins)
+  await sidebar.initialize();
+
+  // Initialize ViewRouter (async - registers all views)
+  await viewRouter.initialize();
+
+  // Register React-based views manually only if their plugins are installed
+  // WorkflowsViewReact requires fictionlab-workflow plugin
+  if (sidebar.isPluginInstalled('fictionlab-workflow')) {
+    viewRouter.registerView('workflows', WorkflowsViewReact);
+    console.log('[Renderer] WorkflowsViewReact registered (plugin installed)');
+  } else {
+    console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
+  }
+
+  // KanbanViewReact requires fictionlab-kanban plugin
+  if (sidebar.isPluginInstalled('fictionlab-kanban')) {
+    viewRouter.registerView('kanban', KanbanViewReact);
+    console.log('[Renderer] KanbanViewReact registered (plugin installed)');
+  } else {
+    console.log('[Renderer] KanbanViewReact not registered (plugin not installed)');
+  }
+
+  // Listen for plugin state changes and update navigation
+  const electronAPI = (window as any).electronAPI;
+  if (electronAPI?.on) {
+    electronAPI.on('plugin-state-changed', async (data: { pluginId: string; state: string }) => {
+      console.log('[Renderer] Plugin state changed:', data);
+
+      // Reload sidebar navigation
+      await sidebar.updateNavigation();
+
+      // Re-register plugin-dependent views
+      if (sidebar.isPluginInstalled('fictionlab-workflow')) {
+        const wasRegistered = viewRouter['viewClasses'].has('workflows');
+        if (!wasRegistered) {
+          viewRouter.registerView('workflows', WorkflowsViewReact);
+          console.log('[Renderer] WorkflowsViewReact registered after plugin install');
+        }
+
+        // If we're currently trying to view workflows but it was showing "Plugin Required",
+        // re-navigate to actually load the view now that the plugin is ready
+        const currentViewId = viewRouter['currentViewId'];
+        const savedView = localStorage.getItem('fictionlab-active-view');
+        if (savedView === 'workflows' && (!currentViewId || currentViewId !== 'workflows' || !wasRegistered)) {
+          console.log('[Renderer] Re-navigating to workflows view after plugin activation');
+          await viewRouter.navigateTo('workflows');
+        }
+      } else {
+        // Remove workflows view if plugin was uninstalled
+        viewRouter.clearCache('workflows');
+      }
+
+      // Re-register plugin-dependent views
+      if (sidebar.isPluginInstalled('fictionlab-kanban')) {
+        const wasRegistered = viewRouter['viewClasses'].has('kanban');
+        if (!wasRegistered) {
+          viewRouter.registerView('kanban', KanbanViewReact);
+          console.log('[Renderer] KanbanViewReact registered after plugin install');
+        }
+
+        // If we're currently trying to view the board but it was showing
+        // "Plugin Required", re-navigate now that the plugin is ready
+        const currentViewId = viewRouter['currentViewId'];
+        const savedView = localStorage.getItem('fictionlab-active-view');
+        if (savedView === 'kanban' && (!currentViewId || currentViewId !== 'kanban' || !wasRegistered)) {
+          console.log('[Renderer] Re-navigating to kanban after plugin activation');
+          await viewRouter.navigateTo('kanban');
+        }
+      } else {
+        // Remove kanban view if plugin was uninstalled
+        viewRouter.clearCache('kanban');
+      }
+    });
+  }
+
+  isViewRouterReady = true;
+
+  // Get initial view and navigate to it
+  const savedView = localStorage.getItem('fictionlab-active-view');
+  const initialView = savedView || 'dashboard';
+  await viewRouter.navigateTo(initialView);
 
   // Connect top bar actions to active view
   topBar.on('action-clicked', (actionId: string) => {
@@ -911,6 +1129,11 @@ function init(): void {
         window.location.reload();
         break;
 
+      // Plugins menu
+      case 'plugins-manage':
+        viewRouter.navigateTo('plugins');
+        break;
+
       default:
         console.warn('[Renderer] Unknown menu action:', action);
     }
@@ -919,11 +1142,54 @@ function init(): void {
   // Store viewRouter globally for plugin handlers
   (window as any).__viewRouter__ = viewRouter;
 
+  // Listen for plugin installation events to update the UI
+  window.addEventListener('plugin-installed', async (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const { pluginId } = customEvent.detail || {};
+    console.log('[Renderer] Plugin installed:', pluginId);
+
+    // Update sidebar navigation
+    await sidebar.updateNavigation();
+
+    // Register workflow view if the workflow plugin was installed
+    if (pluginId === 'fictionlab-workflow' && sidebar.isPluginInstalled('fictionlab-workflow')) {
+      viewRouter.registerView('workflows', WorkflowsViewReact);
+      console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
+    }
+
+    // Register kanban view if the kanban plugin was installed
+    if (pluginId === 'fictionlab-kanban' && sidebar.isPluginInstalled('fictionlab-kanban')) {
+      viewRouter.registerView('kanban', KanbanViewReact);
+      console.log('[Renderer] KanbanViewReact registered after plugin installation');
+    }
+  });
+
+  // Listen for plugin uninstallation events to update the UI
+  window.addEventListener('plugin-uninstalled', async (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const { pluginId } = customEvent.detail || {};
+    console.log('[Renderer] Plugin uninstalled:', pluginId);
+
+    // Update sidebar navigation
+    await sidebar.updateNavigation();
+
+    // If workflow plugin was uninstalled and user is on workflows view, navigate away
+    if (pluginId === 'fictionlab-workflow' && viewRouter.getCurrentViewId() === 'workflows') {
+      await viewRouter.navigateTo('dashboard');
+    }
+
+    // If kanban plugin was uninstalled and user is on the board view, navigate away
+    if (pluginId === 'fictionlab-kanban' && viewRouter.getCurrentViewId() === 'kanban') {
+      await viewRouter.navigateTo('dashboard');
+    }
+  });
+
   console.log('[Renderer] Dashboard components initialized successfully');
 
   // Legacy: Keep dashboard tab initialization for backward compatibility
-  const dashboardTab = createDashboardTab();
-  dashboardTab.initialize();
+  // DISABLED: DashboardTab is no longer used with the new ViewRouter-based dashboard
+  // const dashboardTab = createDashboardTab();
+  // dashboardTab.initialize();
 
   // Legacy: Initialize logs tab component
   const logsTab = createDefaultLogsTab();
@@ -1085,6 +1351,14 @@ function init(): void {
       }
     });
   }
+
+  // Listen for Claude Code setup required events
+  (window as any).electronAPI.on('claude-setup-required', (data: any) => {
+    console.log('[Renderer] Claude setup required:', data);
+
+    // Show Claude Code CLI installation dialog
+    showClaudeCodeInstallDialog(data.reason);
+  });
 
   // Automatically check prerequisites on load
   checkPrerequisites();

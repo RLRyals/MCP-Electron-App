@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fse from 'fs-extra';
 import * as prerequisites from './prerequisites';
 import logger, { initializeLogger, getRecentLogs, LogCategory, logWithCategory } from './logger';
 import {
@@ -16,21 +17,25 @@ import * as dockerImages from './docker-images';
 import * as envConfig from './env-config';
 import * as installationWizard from './installation-wizard';
 import * as clientSelection from './client-selection';
-import * as typingMindDownloader from './typingmind-downloader';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpSystem from './mcp-system';
 import * as databaseBackup from './database-backup';
 import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as setupWizard from './setup-wizard';
+import * as appSettings from './app-settings';
+import type { CurrentUserSetting } from '../types/identity';
 import * as migrations from './migrations';
 import { repositoryManager } from './repository-manager';
 import { createBuildOrchestrator } from './build-orchestrator';
 import { createBuildPipelineOrchestrator, resolveConfigPath } from './build-pipeline-orchestrator';
 import { ProgressThrottler, IPC_CHANNELS } from '../types/ipc';
+import { registerHandler, getRegisteredHandlers } from './ipc-registry';
 import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
+import { getProviderManager } from './llm/provider-manager';
+import type { LLMProviderConfig } from '../types/llm-providers';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -78,10 +83,17 @@ function getIconPath(): string {
 }
 
 /**
- * Create the application menu
+ * Build the base application menu template.
+ *
+ * Returns a fresh `MenuItemConstructorOptions[]` array (plain options, not live
+ * `MenuItem` instances) every time it's called. Other modules (e.g.
+ * plugin-manager's `updatePluginMenu()`) should build the full menu by
+ * splicing into a fresh copy of this template rather than reading back
+ * `Menu.getApplicationMenu().items` — round-tripping live MenuItem instances
+ * through `Menu.buildFromTemplate()` silently drops their `click` handlers.
  */
-function createMenu(): void {
-  const template: Electron.MenuItemConstructorOptions[] = [
+export function getBaseMenuTemplate(): Electron.MenuItemConstructorOptions[] {
+  return [
     {
       label: 'File',
       submenu: [
@@ -242,8 +254,13 @@ function createMenu(): void {
       ],
     },
   ];
+}
 
-  const menu = Menu.buildFromTemplate(template);
+/**
+ * Create the application menu
+ */
+function createMenu(): void {
+  const menu = Menu.buildFromTemplate(getBaseMenuTemplate());
   Menu.setApplicationMenu(menu);
 }
 
@@ -403,6 +420,58 @@ function openTypingMindInBrowser(url: string): void {
 }
 
 import { registerImportHandlers } from './handlers/import-handlers';
+import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handlers';
+import { registerWorkflowHandlers } from './handlers/workflow-handlers';
+import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers';
+import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
+
+/**
+ * Build the README.md dropped into a newly-initialized project root
+ * (project:initialize-workspace handler). Documents the SA v2-aligned
+ * scaffold (outputs/, series-planning/, .claude/) and the per-book
+ * isolation rule: each book's artifacts live under outputs/book_N/ and
+ * book N+1 must never overwrite book N's folder/files. See issue #165.
+ */
+function buildProjectReadme(projectName: string): string {
+  return `# ${projectName}
+
+This project was initialized by FictionLab / MCP Electron App using the
+Series Architect v2 scaffold.
+
+## Folder layout
+
+- \`outputs/\` — everything the Series Architect (SA) workflows write:
+  series-level documents (e.g. \`INDEX.md\`, \`series_bible.md\`,
+  \`market_research.md\`, \`genre_pack.json\`, \`series_framework.md\`) live
+  flat in \`outputs/\`, shared across the whole series. Per-book artifacts
+  live in their own \`outputs/book_N/\` subfolder (see below).
+- \`series-planning/\` — the Series Architect agent's own working folder.
+- \`.claude/\` — app + workflow metadata: \`settings.json\` (project settings,
+  including the selected genre pack id once one is chosen) and a
+  \`CLAUDE.md\` template used to resume workflow runs.
+
+Nothing else is scaffolded up front. Workflow steps create any additional
+folder they need at runtime (e.g. \`outputs/book_N/\`) via
+\`fs.ensureDir\`/\`fs-extra\`'s automatic parent-directory creation, so an
+empty folder here would only go stale -- the folders above are the ones
+every SA v2 workflow run actually reads from and writes to.
+
+## Per-book isolation (binding rule)
+
+Each book in the series gets its **own** folder: \`outputs/book_1/\`,
+\`outputs/book_2/\`, \`outputs/book_3/\`, and so on. This is enforced by the
+SA v2 workflows themselves (e.g. \`dramatica-storyform\` and
+\`series-architect-development\`), which parameterize every per-book file
+path by the current book number.
+
+**Book N+1 must never overwrite Book N's folder or files.** If you are
+authoring or modifying a workflow step that writes book-specific content,
+make sure its output path is parameterized by the book number (e.g.
+\`outputs/book_{{currentBookNumber}}/...\`) rather than a fixed or shared
+path -- a hardcoded or unparameterized path is a bug that will silently
+clobber a previous book's work.
+`;
+}
 
 /**
  * Set up IPC handlers for communication between main and renderer processes
@@ -411,20 +480,32 @@ function setupIPC(): void {
   // Register import handlers
   registerImportHandlers();
 
+  // Register bundled plugins handlers
+  registerBundledPluginsHandlers();
+
+  // Register plugin update handlers
+  registerPluginUpdateHandlers();
+
+  // Register workflow handlers
+  registerWorkflowHandlers();
+
+  // Register genre pack handlers
+  registerGenrePackHandlers();
+
   // Example IPC handler - ping/pong
-  ipcMain.handle('ping', async () => {
+  registerHandler('ping', "Health-check ping/pong", async () => {
 
     logger.info('Received ping from renderer');
     return 'pong';
   });
 
   // Get app version
-  ipcMain.handle('get-app-version', async () => {
+  registerHandler('get-app-version', "Get the running app version", async () => {
     return app.getVersion();
   });
 
   // Get platform info
-  ipcMain.handle('get-platform-info', async () => {
+  registerHandler('get-platform-info', "Get platform/arch/node version info", async () => {
     return {
       platform: process.platform,
       arch: process.arch,
@@ -432,14 +513,24 @@ function setupIPC(): void {
     };
   });
 
+  // IPC introspection: list every registered channel (app + plugin-namespaced),
+  // optionally filtered to channels starting with `prefix`.
+  registerHandler(
+    'help',
+    'List registered IPC channels (optionally filtered by a channel-name prefix), for introspection/discovery by external IPC clients',
+    async (_event, prefix?: string) => {
+      return getRegisteredHandlers(prefix);
+    }
+  );
+
   // Window controls (for frameless window on Windows)
-  ipcMain.handle('window:minimize', async () => {
+  registerHandler('window:minimize', "", async () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.minimize();
     }
   });
 
-  ipcMain.handle('window:maximize', async () => {
+  registerHandler('window:maximize', "", async () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMaximized()) {
         mainWindow.restore();
@@ -449,87 +540,113 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('window:close', async () => {
+  registerHandler('window:close', "", async () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.close();
     }
   });
 
   // Prerequisites checks
-  ipcMain.handle('prerequisites:check-docker', async () => {
+  registerHandler('prerequisites:check-docker', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Checking Docker installation...');
     return await prerequisites.checkDockerInstalled();
   });
 
-  ipcMain.handle('prerequisites:check-docker-running', async () => {
+  registerHandler('prerequisites:check-docker-running', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Checking if Docker is running...');
     return await prerequisites.checkDockerRunning();
   });
 
-  ipcMain.handle('prerequisites:get-docker-version', async () => {
+  registerHandler('prerequisites:get-docker-version', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Getting Docker version...');
     return await prerequisites.getDockerVersion();
   });
 
-  ipcMain.handle('prerequisites:check-git', async () => {
+  registerHandler('prerequisites:check-git', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Checking Git installation...');
     return await prerequisites.checkGit();
   });
 
-  ipcMain.handle('prerequisites:check-wsl', async () => {
+  registerHandler('prerequisites:check-wsl', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Checking WSL status...');
     return await prerequisites.checkWSL();
   });
 
-  ipcMain.handle('prerequisites:check-all', async () => {
+  registerHandler('prerequisites:check-all', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Running all prerequisite checks...');
     return await prerequisites.checkAll();
   });
 
-  ipcMain.handle('prerequisites:get-platform-info', async () => {
+  registerHandler('prerequisites:get-platform-info', "", async () => {
     return prerequisites.getPlatformInfo();
   });
 
   // Logging and diagnostics IPC handlers
-  ipcMain.handle('logger:open', async () => {
+  registerHandler('logger:open', "", async () => {
     logger.info('Opening log file...');
     return await openLogFile();
   });
 
-  ipcMain.handle('logger:open-directory', async () => {
+  registerHandler('logger:open-directory', "", async () => {
     logger.info('Opening logs directory...');
     return await openLogsDirectory();
   });
 
-  ipcMain.handle('logger:export', async () => {
+  registerHandler('logger:export', "", async () => {
     logger.info('Exporting diagnostic report...');
     return await exportDiagnosticReport();
   });
 
-  ipcMain.handle('logger:test-system', async () => {
+  registerHandler('logger:test-system', "", async () => {
     logger.info('Running system tests...');
     return await testSystem();
   });
 
-  ipcMain.handle('logger:get-logs', async (_, lines: number = 100) => {
+  registerHandler('logger:get-logs', "", async (_, lines: number = 100) => {
     return getRecentLogs(lines);
   });
 
-  ipcMain.handle('logger:generate-issue-template', async (_, title: string, message: string, stack?: string) => {
+  registerHandler('logger:get-log-level', "", async () => {
+    const { getConsoleLogLevel } = await import('./logger.js');
+    return getConsoleLogLevel();
+  });
+
+  registerHandler('logger:set-log-level', "", async (_, level: 'debug' | 'info' | 'warn' | 'error') => {
+    const { setConsoleLogLevel } = await import('./logger.js');
+    setConsoleLogLevel(level);
+    return { success: true, level };
+  });
+
+  registerHandler('logger:enable-verbose', "", async () => {
+    const { enableVerboseLogging } = await import('./logger.js');
+    enableVerboseLogging();
+    // Also reset env config logging to show full details
+    const { resetConfigLogging } = await import('./env-config.js');
+    resetConfigLogging();
+    return { success: true };
+  });
+
+  registerHandler('logger:disable-verbose', "", async () => {
+    const { disableVerboseLogging } = await import('./logger.js');
+    disableVerboseLogging();
+    return { success: true };
+  });
+
+  registerHandler('logger:generate-issue-template', "", async (_, title: string, message: string, stack?: string) => {
     return generateGitHubIssueTemplate(title, message, stack);
   });
 
-  ipcMain.handle('logger:open-github-issue', async (_, title: string, message: string, stack?: string) => {
+  registerHandler('logger:open-github-issue', "", async (_, title: string, message: string, stack?: string) => {
     return await openGitHubIssue(title, message, stack);
   });
 
   // Environment configuration IPC handlers
-  ipcMain.handle('env:get-config', async () => {
+  registerHandler('env:get-config', "Get the current .env configuration", async () => {
     logger.info('Getting environment configuration...');
     return await envConfig.loadEnvConfig();
   });
 
-  ipcMain.handle('env:save-config', async (_, config: envConfig.EnvConfig) => {
+  registerHandler('env:save-config', "Save the .env configuration", async (_, config: envConfig.EnvConfig) => {
     logger.info('Saving environment configuration...');
     logger.info('Config credentials check:', {
       hasPassword: !!config.POSTGRES_PASSWORD,
@@ -561,22 +678,22 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('env:generate-password', async (_, length?: number) => {
+  registerHandler('env:generate-password', "Generate a random password", async (_, length?: number) => {
     logger.info('Generating password...');
     return envConfig.generatePassword(length);
   });
 
-  ipcMain.handle('env:generate-token', async () => {
+  registerHandler('env:generate-token', "Generate a random auth token", async () => {
     logger.info('Generating auth token...');
     return envConfig.generateAuthToken();
   });
 
-  ipcMain.handle('env:check-port', async (_, port: number) => {
+  registerHandler('env:check-port', "Check whether a single port is available", async (_, port: number) => {
     logger.info(`Checking if port ${port} is available...`);
     return await envConfig.checkPortAvailable(port);
   });
 
-  ipcMain.handle('env:reset-defaults', async () => {
+  registerHandler('env:reset-defaults', "Reset .env configuration to defaults", async () => {
     logger.info('Resetting to default configuration...');
     return {
       ...envConfig.DEFAULT_CONFIG,
@@ -585,36 +702,36 @@ function setupIPC(): void {
     };
   });
 
-  ipcMain.handle('env:validate-config', async (_, config: envConfig.EnvConfig) => {
+  registerHandler('env:validate-config', "Validate an .env configuration object", async (_, config: envConfig.EnvConfig) => {
     return envConfig.validateConfig(config);
   });
 
-  ipcMain.handle('env:calculate-password-strength', async (_, password: string) => {
+  registerHandler('env:calculate-password-strength', "Calculate a password strength score", async (_, password: string) => {
     return envConfig.calculatePasswordStrength(password);
   });
 
-  ipcMain.handle('env:get-env-file-path', async () => {
+  registerHandler('env:get-env-file-path', "Get the filesystem path to the .env file", async () => {
     return envConfig.getEnvFilePath();
   });
 
-  ipcMain.handle('env:file-exists', async () => {
+  registerHandler('env:file-exists', "Check whether the .env file exists", async () => {
     const envPath = envConfig.getEnvFilePath();
     return fs.existsSync(envPath);
   });
 
-  ipcMain.handle('env:check-all-ports', async (_, config: envConfig.EnvConfig) => {
+  registerHandler('env:check-all-ports', "Check availability of all configured ports", async (_, config: envConfig.EnvConfig) => {
     logger.info('Checking all ports for conflicts...');
     return await envConfig.checkAllPortsAndSuggestAlternatives(config);
   });
 
-  ipcMain.handle('env:find-next-available-port', async (_, startPort: number) => {
+  registerHandler('env:find-next-available-port', "Find the next available port starting from a given port", async (_, startPort: number) => {
     logger.info(`Finding next available port starting from ${startPort}...`);
     return await envConfig.findNextAvailablePort(startPort);
   });
 
   
   // Docker IPC handlers
-  ipcMain.handle('docker:start', async (_event) => {
+  registerHandler('docker:start', "Start Docker services", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting Docker Desktop...');
 
     // Send progress updates to renderer
@@ -628,7 +745,7 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker:wait-ready', async (_event) => {
+  registerHandler('docker:wait-ready', "Wait for Docker services to become ready", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Waiting for Docker to be ready...');
 
     // Send progress updates to renderer
@@ -642,7 +759,7 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker:start-and-wait', async (_event) => {
+  registerHandler('docker:start-and-wait', "Start Docker services and wait until ready", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting Docker and waiting for it to be ready...');
 
     // Send progress updates to renderer
@@ -656,12 +773,12 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker:stop', async () => {
+  registerHandler('docker:stop', "Stop Docker services", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Stopping Docker Desktop...');
     return await docker.stopDocker();
   });
 
-  ipcMain.handle('docker:restart', async (_event) => {
+  registerHandler('docker:restart', "Restart Docker services", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Restarting Docker Desktop...');
 
     // Send progress updates to renderer
@@ -675,182 +792,164 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker:health-check', async () => {
+  registerHandler('docker:health-check', "Run a Docker health check", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Checking Docker health...');
     return await docker.checkDockerHealth();
   });
 
-  ipcMain.handle('docker:containers-status', async () => {
+  registerHandler('docker:containers-status', "Get status of Docker containers", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting containers status...');
     return await docker.getContainersStatus();
   });
 
   // Installation wizard IPC handlers
-  ipcMain.handle('wizard:get-instructions', async () => {
+  registerHandler('wizard:get-instructions', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Getting installation instructions...');
     return installationWizard.getInstallationInstructions();
   });
 
-  ipcMain.handle('wizard:get-download-url', async () => {
+  registerHandler('wizard:get-download-url', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Getting Docker download URL...');
     return installationWizard.getDockerDownloadUrl();
   });
 
-  ipcMain.handle('wizard:open-download', async () => {
+  registerHandler('wizard:open-download', "", async () => {
     logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Docker download page...');
     return await installationWizard.openDownloadPage();
   });
 
-  ipcMain.handle('wizard:copy-command', async (_, command: string) => {
+  registerHandler('wizard:open-git-download', "", async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Git download page...');
+    return await installationWizard.openGitDownloadPage();
+  });
+
+  registerHandler('wizard:get-git-download-url', "", async () => {
+    return installationWizard.getGitDownloadUrl();
+  });
+
+  registerHandler('wizard:copy-command', "", async (_, command: string) => {
     logWithCategory('info', LogCategory.PREREQUISITES, `Copying command to clipboard: ${command}`);
     return installationWizard.copyCommandToClipboard(command);
   });
 
-  ipcMain.handle('wizard:get-step', async (_, stepNumber: number) => {
+  registerHandler('wizard:get-step', "", async (_, stepNumber: number) => {
     return installationWizard.getStep(stepNumber);
   });
 
-  ipcMain.handle('wizard:get-explanation', async () => {
+  registerHandler('wizard:get-explanation', "", async () => {
     return installationWizard.getWhyDockerExplanation();
   });
 
+  registerHandler('wizard:get-git-explanation', "", async () => {
+    return installationWizard.getWhyGitExplanation();
+  });
+
+  registerHandler('wizard:open-nodejs-download', "", async () => {
+    logWithCategory('info', LogCategory.PREREQUISITES, 'Opening Node.js download page...');
+    return await installationWizard.openNodeJsDownloadPage();
+  });
+
+  registerHandler('wizard:get-nodejs-download-url', "", async () => {
+    return installationWizard.getNodeJsDownloadUrl();
+  });
+
+  registerHandler('wizard:get-nodejs-explanation', "", async () => {
+    return installationWizard.getWhyNodeJsExplanation();
+  });
+
   // Client selection IPC handlers
-  ipcMain.handle('client:get-options', async () => {
+  registerHandler('client:get-options', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'Getting available client options...');
     return clientSelection.getAvailableClients();
   });
 
-  ipcMain.handle('client:save-selection', async (_, clients: string[]) => {
+  registerHandler('client:save-selection', "", async (_, clients: string[]) => {
     logWithCategory('info', LogCategory.SYSTEM, `Saving client selection: ${clients.join(', ')}`);
     return await clientSelection.saveClientSelection(clients);
   });
 
-  ipcMain.handle('client:get-selection', async () => {
+  registerHandler('client:get-selection', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'Getting current client selection...');
     return await clientSelection.loadClientSelection();
   });
 
-  ipcMain.handle('client:get-status', async () => {
+  registerHandler('client:get-status', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'Getting client status...');
     return await clientSelection.getClientStatus();
   });
 
-  ipcMain.handle('client:clear-selection', async () => {
+  registerHandler('client:clear-selection', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'Clearing client selection...');
     return await clientSelection.clearClientSelection();
   });
 
-  ipcMain.handle('client:get-by-id', async (_, clientId: string) => {
+  registerHandler('client:get-by-id', "", async (_, clientId: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `Getting client by ID: ${clientId}`);
     return clientSelection.getClientById(clientId);
   });
 
-  ipcMain.handle('client:add-custom', async (_, client: clientSelection.ClientMetadata) => {
+  registerHandler('client:add-custom', "", async (_, client: clientSelection.ClientMetadata) => {
     logWithCategory('info', LogCategory.SYSTEM, `Adding custom client: ${client.name}`);
     return await clientSelection.addCustomClient(client);
   });
 
-  ipcMain.handle('client:remove-custom', async (_, clientId: string) => {
+  registerHandler('client:remove-custom', "", async (_, clientId: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `Removing custom client: ${clientId}`);
     return await clientSelection.removeCustomClient(clientId);
   });
 
-  ipcMain.handle('client:update-config', async (_, clientId: string, updates: Partial<clientSelection.ClientMetadata>) => {
+  registerHandler('client:update-config', "", async (_, clientId: string, updates: Partial<clientSelection.ClientMetadata>) => {
     logWithCategory('info', LogCategory.SYSTEM, `Updating client config: ${clientId}`);
     return await clientSelection.updateClientConfig(clientId, updates);
   });
 
-  ipcMain.handle('client:get-selection-file-path', async () => {
+  registerHandler('client:get-selection-file-path', "", async () => {
     return clientSelection.getSelectionFilePath();
   });
 
-  ipcMain.handle('client:launch-electron-app', async (_, clientId: string) => {
+  registerHandler('client:launch-electron-app', "", async (_, clientId: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `Launching electron app: ${clientId}`);
     return await clientSelection.launchElectronApp(clientId);
   });
 
-  // Typing Mind downloader IPC handlers
-  ipcMain.handle('typingmind:download', async (_event) => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Starting Typing Mind download...');
-
-    // Send progress updates to renderer
-    const progressCallback: typingMindDownloader.ProgressCallback = (progress) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('typingmind:progress', progress);
-      }
-    };
-
-    const result = await typingMindDownloader.downloadTypingMind(progressCallback);
-    return result;
-  });
-
-  ipcMain.handle('typingmind:cancel-download', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Cancelling Typing Mind download...');
-    return await typingMindDownloader.cancelDownload();
-  });
-
-  ipcMain.handle('typingmind:is-installed', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking if Typing Mind is installed...');
-    return await typingMindDownloader.isInstalled();
-  });
-
-  ipcMain.handle('typingmind:get-version', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Getting Typing Mind version...');
-    return await typingMindDownloader.getVersion();
-  });
-
-  ipcMain.handle('typingmind:uninstall', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Uninstalling Typing Mind...');
-    return await typingMindDownloader.uninstall();
-  });
-
-  ipcMain.handle('typingmind:check-updates', async () => {
-    logWithCategory('info', LogCategory.SCRIPT, 'IPC: Checking for Typing Mind updates...');
-    return await typingMindDownloader.checkForUpdates();
-  });
-
-  ipcMain.handle('typingmind:get-install-path', async () => {
-    return typingMindDownloader.getTypingMindDirectory();
-  });
-
   // TypingMind Auto-Configuration IPC handlers
-  ipcMain.handle('typingmind:auto-configure', async () => {
+  registerHandler('typingmind:auto-configure', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring TypingMind with MCP Connector...');
     return await typingMindAutoConfig.autoConfigureTypingMind();
   });
 
-  ipcMain.handle('typingmind:set-custom-config', async (_event, serverUrl: string, authToken: string) => {
+  registerHandler('typingmind:set-custom-config', "", async (_event, serverUrl: string, authToken: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting custom TypingMind configuration...');
     return await typingMindAutoConfig.setCustomTypingMindConfig(serverUrl, authToken);
   });
 
-  ipcMain.handle('typingmind:get-config', async () => {
+  registerHandler('typingmind:get-config', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting TypingMind configuration...');
     return await typingMindAutoConfig.loadTypingMindConfig();
   });
 
-  ipcMain.handle('typingmind:get-config-instructions', async () => {
+  registerHandler('typingmind:get-config-instructions', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting TypingMind configuration instructions...');
     return await typingMindAutoConfig.getConfigurationInstructions();
   });
 
-  ipcMain.handle('typingmind:is-configured', async () => {
+  registerHandler('typingmind:is-configured', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if TypingMind is configured...');
     return await typingMindAutoConfig.isTypingMindConfigured();
   });
 
-  ipcMain.handle('typingmind:reset-config', async () => {
+  registerHandler('typingmind:reset-config', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting TypingMind configuration...');
     return await typingMindAutoConfig.resetTypingMindConfig();
   });
 
-  ipcMain.handle('typingmind:get-mcp-servers-json', async () => {
+  registerHandler('typingmind:get-mcp-servers-json', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting MCP servers JSON configuration...');
     const serversConfig = await typingMindAutoConfig.buildMCPServersConfig();
     return JSON.stringify(serversConfig, null, 2);
   });
 
-  ipcMain.handle('typingmind:open-window', async (_, url: string) => {
+  registerHandler('typingmind:open-window', "", async (_, url: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening Typing Mind in browser at ${url}...`);
     try {
       openTypingMindInBrowser(url);
@@ -865,51 +964,64 @@ function setupIPC(): void {
   });
 
   // Claude Desktop Auto-Configuration IPC handlers
-  ipcMain.handle('claude-desktop:auto-configure', async () => {
+  registerHandler('claude-desktop:auto-configure', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Auto-configuring Claude Desktop...');
     const { autoConfigureClaudeDesktop } = await import('./claude-desktop-auto-config');
     return await autoConfigureClaudeDesktop();
   });
 
-  ipcMain.handle('claude-desktop:is-configured', async () => {
+  registerHandler('claude-desktop:is-configured', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if Claude Desktop is configured...');
     const { isClaudeDesktopConfigured } = await import('./claude-desktop-auto-config');
     return await isClaudeDesktopConfigured();
   });
 
-  ipcMain.handle('claude-desktop:get-config', async () => {
+  registerHandler('claude-desktop:get-config', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop configuration...');
     const { getClaudeDesktopConfig } = await import('./claude-desktop-auto-config');
     return await getClaudeDesktopConfig();
   });
 
-  ipcMain.handle('claude-desktop:reset-config', async () => {
+  registerHandler('claude-desktop:reset-config', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting Claude Desktop configuration...');
     const { resetClaudeDesktopConfig } = await import('./claude-desktop-auto-config');
     return await resetClaudeDesktopConfig();
   });
 
-  ipcMain.handle('claude-desktop:get-config-path', () => {
+  registerHandler('claude-desktop:get-config-path', "", () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop config path...');
     const { getClaudeDesktopConfigPath } = require('./claude-desktop-auto-config');
     return getClaudeDesktopConfigPath();
   });
 
-  ipcMain.handle('claude-desktop:open-config-folder', async () => {
+  registerHandler('claude-desktop:open-config-folder', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening Claude Desktop config folder...');
     const { getClaudeDesktopConfigPath } = await import('./claude-desktop-auto-config');
     const configPath = getClaudeDesktopConfigPath();
     await shell.showItemInFolder(configPath);
   });
 
-  ipcMain.handle('claude-desktop:get-config-instructions', async () => {
+  registerHandler('claude-desktop:get-config-instructions', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Desktop configuration instructions...');
     const { getConfigurationInstructions } = await import('./claude-desktop-auto-config');
     return await getConfigurationInstructions();
   });
 
+  // Claude Code CLI IPC handlers
+  registerHandler('claude-code:get-status', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting Claude Code CLI status...');
+    const { ClaudeCodeDetector } = await import('./claude-code-detector');
+    const detector = new ClaudeCodeDetector();
+    return await detector.getStatus();
+  });
+
+  registerHandler('claude-code:open-install-page', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening Claude Code installation page...');
+    await shell.openExternal('https://www.anthropic.com/claude-code');
+  });
+
   // Docker Images IPC handlers
-  ipcMain.handle('docker-images:load-all', async (_event) => {
+  registerHandler('docker-images:load-all', "", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Loading all Docker images...');
 
     // Send progress updates to renderer
@@ -923,7 +1035,7 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker-images:load-image', async (_event, imagePath: string, imageName: string) => {
+  registerHandler('docker-images:load-image', "", async (_event, imagePath: string, imageName: string) => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, `IPC: Loading Docker image ${imageName} from ${imagePath}...`);
 
     // Send progress updates to renderer
@@ -937,28 +1049,28 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('docker-images:check-exists', async (_event, imageName: string) => {
+  registerHandler('docker-images:check-exists', "", async (_event, imageName: string) => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, `IPC: Checking if image exists: ${imageName}`);
     return await dockerImages.checkImageExists(imageName);
   });
 
-  ipcMain.handle('docker-images:list', async () => {
+  registerHandler('docker-images:list', "", async () => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Getting Docker image list...');
     return await dockerImages.getImageList();
   });
 
-  ipcMain.handle('docker-images:get-bundled', async () => {
+  registerHandler('docker-images:get-bundled', "", async () => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Getting bundled images information...');
     return await dockerImages.getBundledImages();
   });
 
-  ipcMain.handle('docker-images:check-disk-space', async () => {
+  registerHandler('docker-images:check-disk-space', "", async () => {
     logWithCategory('info', LogCategory.DOCKER_IMAGE, 'IPC: Checking disk space...');
     return await dockerImages.checkDiskSpace();
   });
 
   // MCP System IPC handlers
-  ipcMain.handle('mcp-system:start', async (_event) => {
+  registerHandler('mcp-system:start', "", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Starting MCP system...');
 
     // Send progress updates to renderer
@@ -972,12 +1084,12 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('mcp-system:stop', async () => {
+  registerHandler('mcp-system:stop', "", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Stopping MCP system...');
     return await mcpSystem.stopMCPSystem();
   });
 
-  ipcMain.handle('mcp-system:restart', async (_event) => {
+  registerHandler('mcp-system:restart', "", async (_event) => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Restarting MCP system...');
 
     // Send progress updates to renderer
@@ -991,172 +1103,167 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('mcp-system:status', async () => {
+  registerHandler('mcp-system:status', "", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting MCP system status...');
     return await mcpSystem.getSystemStatus();
   });
 
-  ipcMain.handle('mcp-system:detailed-status', async () => {
+  registerHandler('mcp-system:detailed-status', "", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting detailed MCP system status...');
     return await mcpSystem.getDetailedServiceStatus();
   });
 
-  ipcMain.handle('mcp-system:urls', async () => {
+  registerHandler('mcp-system:urls', "", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Getting service URLs...');
     return await mcpSystem.getServiceUrls();
   });
 
-  ipcMain.handle('mcp-system:logs', async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind', tail?: number) => {
+  registerHandler('mcp-system:logs', "", async (_, serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', tail?: number) => {
     logWithCategory('info', LogCategory.DOCKER, `IPC: Getting logs for ${serviceName}...`);
     return await mcpSystem.viewServiceLogs(serviceName, tail);
   });
 
-  ipcMain.handle('mcp-system:check-ports', async () => {
+  registerHandler('mcp-system:check-ports', "", async () => {
     logWithCategory('info', LogCategory.DOCKER, 'IPC: Checking port conflicts...');
     return await mcpSystem.checkPortConflicts();
   });
 
-  ipcMain.handle('mcp-system:working-directory', async () => {
+  registerHandler('mcp-system:working-directory', "", async () => {
     return mcpSystem.getMCPWorkingDirectoryPath();
   });
 
   // Database Backup/Restore IPC handlers
-  ipcMain.handle('database-backup:create', async (_, customPath?: string, compressed?: boolean) => {
+  registerHandler('database-backup:create', "", async (_, customPath?: string, compressed?: boolean) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Creating database backup...');
     return await databaseBackup.createBackup(customPath, compressed);
   });
 
-  ipcMain.handle('database-backup:restore', async (_, backupPath: string, dropExisting?: boolean) => {
+  registerHandler('database-backup:restore', "", async (_, backupPath: string, dropExisting?: boolean) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Restoring database from ${backupPath}...`);
     return await databaseBackup.restoreBackup(backupPath, dropExisting);
   });
 
-  ipcMain.handle('database-backup:list', async () => {
+  registerHandler('database-backup:list', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing available backups...');
     return await databaseBackup.listBackups();
   });
 
-  ipcMain.handle('database-backup:delete', async (_, backupPath: string) => {
+  registerHandler('database-backup:delete', "", async (_, backupPath: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting backup ${backupPath}...`);
     return await databaseBackup.deleteBackup(backupPath);
   });
 
-  ipcMain.handle('database-backup:select-save-location', async () => {
+  registerHandler('database-backup:select-save-location', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Showing save dialog for backup...');
     return await databaseBackup.selectBackupSaveLocation();
   });
 
-  ipcMain.handle('database-backup:select-restore-file', async () => {
+  registerHandler('database-backup:select-restore-file', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Showing open dialog for restore...');
     return await databaseBackup.selectBackupFileForRestore();
   });
 
-  ipcMain.handle('database-backup:get-directory', async () => {
+  registerHandler('database-backup:get-directory', "", async () => {
     return databaseBackup.getBackupDirectoryPath();
   });
 
-  ipcMain.handle('database-backup:open-directory', async () => {
+  registerHandler('database-backup:open-directory', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Opening backup directory...');
     return await databaseBackup.openBackupDirectory();
   });
 
   // Database Administration IPC handlers (MCP database tools)
-  ipcMain.handle('database-admin:check-connection', async () => {
+  registerHandler('database-admin:check-connection', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking database admin server connection...');
     return await databaseAdmin.checkConnection();
   });
 
-  ipcMain.handle('database-admin:get-server-info', async () => {
+  registerHandler('database-admin:get-server-info', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting database server info...');
     return await databaseAdmin.getServerInfo();
   });
 
   // CRUD Operations
-  ipcMain.handle('database-admin:query-records', async (_, params: any) => {
+  registerHandler('database-admin:query-records', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Querying records from table ${params.table}...`);
     return await databaseAdmin.queryRecords(params);
   });
 
-  ipcMain.handle('database-admin:insert-record', async (_, params: any) => {
+  registerHandler('database-admin:insert-record', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Inserting record into table ${params.table}...`);
     return await databaseAdmin.insertRecord(params);
   });
 
-  ipcMain.handle('database-admin:update-records', async (_, params: any) => {
+  registerHandler('database-admin:update-records', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating records in table ${params.table}...`);
     return await databaseAdmin.updateRecords(params);
   });
 
-  ipcMain.handle('database-admin:delete-records', async (_, params: any) => {
+  registerHandler('database-admin:delete-records', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting records from table ${params.table}...`);
     return await databaseAdmin.deleteRecords(params);
   });
 
   // Batch Operations
-  ipcMain.handle('database-admin:batch-insert', async (_, params: any) => {
+  registerHandler('database-admin:batch-insert', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch inserting ${params.records?.length || 0} records into table ${params.table}...`);
     return await databaseAdmin.batchInsert(params);
   });
 
-  ipcMain.handle('database-admin:batch-update', async (_, params: any) => {
+  registerHandler('database-admin:batch-update', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch updating records in table ${params.table}...`);
     return await databaseAdmin.batchUpdate(params);
   });
 
-  ipcMain.handle('database-admin:batch-delete', async (_, params: any) => {
+  registerHandler('database-admin:batch-delete', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Batch deleting records from table ${params.table}...`);
     return await databaseAdmin.batchDelete(params);
   });
 
   // Schema Management
-  ipcMain.handle('database-admin:get-schema', async (_, params: any) => {
+  registerHandler('database-admin:get-schema', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting schema for table ${params.table}...`);
     return await databaseAdmin.getSchema(params);
   });
 
-  ipcMain.handle('database-admin:list-tables', async () => {
+  registerHandler('database-admin:list-tables', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing database tables...');
     return await databaseAdmin.listTables();
   });
 
-  ipcMain.handle('database-admin:get-relationships', async (_, params: any) => {
+  registerHandler('database-admin:get-relationships', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting table relationships...');
     return await databaseAdmin.getRelationships(params);
   });
 
-  ipcMain.handle('database-admin:list-columns', async (_, params: any) => {
+  registerHandler('database-admin:list-columns', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Listing columns for table ${params.table}...`);
     return await databaseAdmin.listColumns(params);
   });
 
   // Audit Functions
-  ipcMain.handle('database-admin:query-audit-logs', async (_, params: any) => {
+  registerHandler('database-admin:query-audit-logs', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Querying audit logs...');
     return await databaseAdmin.queryAuditLogs(params);
   });
 
-  ipcMain.handle('database-admin:get-audit-summary', async (_, params: any) => {
+  registerHandler('database-admin:get-audit-summary', "", async (_, params: any) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting audit summary...');
     return await databaseAdmin.getAuditSummary(params);
   });
 
   // Updater IPC handlers
-  ipcMain.handle('updater:check-all', async () => {
+  registerHandler('updater:check-all', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for all updates...');
     return await updater.checkForAllUpdates();
   });
 
-  ipcMain.handle('updater:check-mcp-servers', async () => {
+  registerHandler('updater:check-mcp-servers', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for MCP servers updates...');
     return await updater.checkForMCPServersUpdate();
   });
 
-  ipcMain.handle('updater:check-typing-mind', async () => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for Typing Mind updates...');
-    return await updater.checkForTypingMindUpdate();
-  });
-
-  ipcMain.handle('updater:update-all', async (_event) => {
+  registerHandler('updater:update-all', "", async (_event) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating all components...');
 
     // Send progress updates to renderer
@@ -1169,7 +1276,7 @@ function setupIPC(): void {
     return await updater.updateAll(progressCallback);
   });
 
-  ipcMain.handle('updater:update-mcp-servers', async (_event) => {
+  registerHandler('updater:update-mcp-servers', "", async (_event) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating MCP servers...');
 
     // Send progress updates to renderer
@@ -1182,56 +1289,54 @@ function setupIPC(): void {
     return await updater.updateMCPServers(progressCallback);
   });
 
-  ipcMain.handle('updater:update-typing-mind', async (_event) => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Updating Typing Mind...');
-
-    // Send progress updates to renderer
-    const progressCallback: updater.ProgressCallback = (progress) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('updater:progress', progress);
-      }
-    };
-
-    return await updater.updateTypingMind(progressCallback);
-  });
-
-  ipcMain.handle('updater:get-preferences', async () => {
+  registerHandler('updater:get-preferences', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting update preferences...');
     return await updater.getUpdatePreferences();
   });
 
-  ipcMain.handle('updater:set-preferences', async (_, prefs: updater.UpdatePreferences) => {
+  registerHandler('updater:set-preferences', "", async (_, prefs: updater.UpdatePreferences) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting update preferences...');
     return await updater.setUpdatePreferences(prefs);
   });
 
+  // App Settings IPC handlers (issue #181 -- configured current-user identity)
+  registerHandler('app-settings:get-current-user', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting current user setting...');
+    return await appSettings.getCurrentUser();
+  });
+
+  registerHandler('app-settings:set-current-user', "", async (_, user: CurrentUserSetting) => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting current user identity...');
+    return await appSettings.setCurrentUser(user);
+  });
+
   // Setup Wizard IPC handlers
-  ipcMain.handle('setup-wizard:is-first-run', async () => {
+  registerHandler('setup-wizard:is-first-run', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if first run...');
     return await setupWizard.isFirstRun();
   });
 
-  ipcMain.handle('setup-wizard:get-state', async () => {
+  registerHandler('setup-wizard:get-state', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting wizard state...');
     return await setupWizard.getWizardState();
   });
 
-  ipcMain.handle('setup-wizard:save-state', async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
+  registerHandler('setup-wizard:save-state', "", async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Saving wizard state for step ${step}...`);
     return await setupWizard.saveWizardState(step, data);
   });
 
-  ipcMain.handle('setup-wizard:complete-step', async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
+  registerHandler('setup-wizard:complete-step', "", async (_, step: setupWizard.WizardStep, data?: Partial<setupWizard.WizardStepData>) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Completing wizard step ${step}...`);
     return await setupWizard.completeStep(step, data);
   });
 
-  ipcMain.handle('setup-wizard:go-to-step', async (_, step: setupWizard.WizardStep) => {
+  registerHandler('setup-wizard:go-to-step', "", async (_, step: setupWizard.WizardStep) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Navigating to wizard step ${step}...`);
     return await setupWizard.goToStep(step);
   });
 
-  ipcMain.handle('setup-wizard:mark-complete', async () => {
+  registerHandler('setup-wizard:mark-complete', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Marking wizard as complete...');
     const result = await setupWizard.markWizardComplete();
 
@@ -1254,87 +1359,87 @@ function setupIPC(): void {
     return result;
   });
 
-  ipcMain.handle('setup-wizard:reset', async () => {
+  registerHandler('setup-wizard:reset', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Resetting wizard...');
     return await setupWizard.resetWizard();
   });
 
-  ipcMain.handle('setup-wizard:get-progress', async () => {
+  registerHandler('setup-wizard:get-progress', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting wizard progress...');
     return await setupWizard.getWizardProgress();
   });
 
-  ipcMain.handle('setup-wizard:is-step-completed', async (_, step: setupWizard.WizardStep) => {
+  registerHandler('setup-wizard:is-step-completed', "", async (_, step: setupWizard.WizardStep) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Checking if step ${step} is completed...`);
     return await setupWizard.isStepCompleted(step);
   });
 
-  ipcMain.handle('setup-wizard:get-step-name', async (_, step: setupWizard.WizardStep) => {
+  registerHandler('setup-wizard:get-step-name', "", async (_, step: setupWizard.WizardStep) => {
     return setupWizard.getStepName(step);
   });
 
-  ipcMain.handle('setup-wizard:get-step-description', async (_, step: setupWizard.WizardStep) => {
+  registerHandler('setup-wizard:get-step-description', "", async (_, step: setupWizard.WizardStep) => {
     return setupWizard.getStepDescription(step);
   });
 
-  ipcMain.handle('setup-wizard:can-proceed', async (_, step: setupWizard.WizardStep) => {
+  registerHandler('setup-wizard:can-proceed', "", async (_, step: setupWizard.WizardStep) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Checking if can proceed from step ${step}...`);
     return await setupWizard.canProceedToNextStep(step);
   });
 
-  ipcMain.handle('setup-wizard:get-installation-version', async () => {
+  registerHandler('setup-wizard:get-installation-version', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting installation version...');
     return await setupWizard.getInstallationVersion();
   });
 
-  ipcMain.handle('setup-wizard:is-installation-outdated', async () => {
+  registerHandler('setup-wizard:is-installation-outdated', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking if installation is outdated...');
     return await setupWizard.isInstallationOutdated();
   });
 
-  ipcMain.handle('setup-wizard:get-migration-history', async () => {
+  registerHandler('setup-wizard:get-migration-history', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting migration history...');
     return await setupWizard.getMigrationHistory();
   });
 
-  ipcMain.handle('setup-wizard:add-migration-record', async (_, record: setupWizard.MigrationRecord) => {
+  registerHandler('setup-wizard:add-migration-record', "", async (_, record: setupWizard.MigrationRecord) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Adding migration record for version ${record.version}...`);
     return await setupWizard.addMigrationRecord(record);
   });
 
   // Migration IPC handlers
-  ipcMain.handle('migrations:check-pending', async () => {
+  registerHandler('migrations:check-pending', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for pending migrations...');
     return await migrations.checkForPendingMigrations();
   });
 
-  ipcMain.handle('migrations:run', async (_, migrationsToRun: migrations.Migration[]) => {
+  registerHandler('migrations:run', "", async (_, migrationsToRun: migrations.Migration[]) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Running ${migrationsToRun.length} migrations...`);
     return await migrations.runMigrations(migrationsToRun);
   });
 
-  ipcMain.handle('migrations:get-all', async () => {
+  registerHandler('migrations:get-all', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting all registered migrations...');
     return migrations.getAllMigrations();
   });
 
-  ipcMain.handle('migrations:get-for-upgrade', async (_, fromVersion: string, toVersion: string) => {
+  registerHandler('migrations:get-for-upgrade', "", async (_, fromVersion: string, toVersion: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting migrations for upgrade ${fromVersion} -> ${toVersion}...`);
     return migrations.getMigrationsForUpgrade(fromVersion, toVersion);
   });
 
-  ipcMain.handle('migrations:get-steps-to-rerun', async (_, pendingMigrations: migrations.Migration[]) => {
+  registerHandler('migrations:get-steps-to-rerun', "", async (_, pendingMigrations: migrations.Migration[]) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting steps to rerun for pending migrations...');
     return migrations.getStepsToRerunForMigrations(pendingMigrations);
   });
 
-  ipcMain.handle('migrations:validate', async () => {
+  registerHandler('migrations:validate', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Validating migration registry...');
     return migrations.validateMigrations();
   });
 
   // Migration Wizard IPC handlers
-  ipcMain.handle('migrations:complete', async () => {
+  registerHandler('migrations:complete', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Migration wizard completed, transitioning to main app...');
 
     // Close the current migration wizard window
@@ -1349,7 +1454,7 @@ function setupIPC(): void {
     return { success: true };
   });
 
-  ipcMain.handle('closeWindow', async () => {
+  registerHandler('closeWindow', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Closing current window...');
 
     if (mainWindow) {
@@ -1360,14 +1465,14 @@ function setupIPC(): void {
   });
 
   // GitHub Credentials IPC handlers
-  ipcMain.handle('github-credentials:set-token', async (_, token: string) => {
+  registerHandler('github-credentials:set-token', "", async (_, token: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting GitHub token...');
     const { getGitHubCredentialManager } = await import('./github-credential-manager');
     getGitHubCredentialManager(token);
     return { success: true };
   });
 
-  ipcMain.handle('github-credentials:get-status', async () => {
+  registerHandler('github-credentials:get-status', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Getting GitHub credentials status...');
     const { getGitHubCredentialManager } = await import('./github-credential-manager');
     const credentialManager = getGitHubCredentialManager();
@@ -1376,19 +1481,19 @@ function setupIPC(): void {
     };
   });
 
-  ipcMain.handle('github-credentials:test-token', async (_, token?: string) => {
+  registerHandler('github-credentials:test-token', "", async (_, token?: string) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Testing GitHub token...');
     const { getGitHubCredentialManager } = await import('./github-credential-manager');
     const credentialManager = getGitHubCredentialManager();
     return await credentialManager.testTokenValidity(token);
   });
 
-  ipcMain.handle('github-credentials:validate-token-format', async (_, token: string) => {
+  registerHandler('github-credentials:validate-token-format', "", async (_, token: string) => {
     const { GitHubCredentialManager } = await import('./github-credential-manager');
     return GitHubCredentialManager.validateTokenFormat(token);
   });
 
-  ipcMain.handle('github-credentials:clear-token', async () => {
+  registerHandler('github-credentials:clear-token', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Clearing GitHub token...');
     const { getGitHubCredentialManager } = await import('./github-credential-manager');
     const credentialManager = getGitHubCredentialManager();
@@ -1403,8 +1508,7 @@ function setupIPC(): void {
   /**
    * Clone a Git repository with progress tracking
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.CLONE,
+  registerHandler(IPC_CHANNELS.REPOSITORY.CLONE, "",
     async (_event, request: RepositoryCloneRequest): Promise<RepositoryCloneResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Cloning repository ${request.url} to ${request.targetPath}`);
 
@@ -1456,8 +1560,7 @@ function setupIPC(): void {
   /**
    * Checkout a specific version (branch, tag, or commit)
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.CHECKOUT_VERSION,
+  registerHandler(IPC_CHANNELS.REPOSITORY.CHECKOUT_VERSION, "",
     async (_event, request: RepositoryCheckoutRequest): Promise<RepositoryCheckoutResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Checking out version ${request.version} in ${request.repoPath}`);
 
@@ -1483,8 +1586,7 @@ function setupIPC(): void {
   /**
    * Get repository status
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.GET_STATUS,
+  registerHandler(IPC_CHANNELS.REPOSITORY.GET_STATUS, "",
     async (_event, request: RepositoryStatusRequest): Promise<RepositoryStatusResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Getting repository status for ${request.repoPath}`);
 
@@ -1508,8 +1610,7 @@ function setupIPC(): void {
   /**
    * Get current branch name
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.GET_CURRENT_BRANCH,
+  registerHandler(IPC_CHANNELS.REPOSITORY.GET_CURRENT_BRANCH, "",
     async (_event, request: RepositoryBranchRequest): Promise<RepositoryBranchResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Getting current branch for ${request.repoPath}`);
 
@@ -1540,8 +1641,7 @@ function setupIPC(): void {
   /**
    * List all branches in repository
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.LIST_BRANCHES,
+  registerHandler(IPC_CHANNELS.REPOSITORY.LIST_BRANCHES, "",
     async (_event, request: RepositoryBranchRequest): Promise<RepositoryBranchResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Listing branches for ${request.repoPath}`);
 
@@ -1580,8 +1680,7 @@ function setupIPC(): void {
   /**
    * Get latest commit information
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.GET_LATEST_COMMIT,
+  registerHandler(IPC_CHANNELS.REPOSITORY.GET_LATEST_COMMIT, "",
     async (_event, request: RepositoryCommitRequest): Promise<RepositoryCommitResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Getting latest commit for ${request.repoPath}`);
 
@@ -1612,8 +1711,7 @@ function setupIPC(): void {
   /**
    * Cancel ongoing repository operation
    */
-  ipcMain.handle(
-    IPC_CHANNELS.REPOSITORY.CANCEL,
+  registerHandler(IPC_CHANNELS.REPOSITORY.CANCEL, "",
     async (): Promise<RepositoryCancelResponse> => {
       logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling repository operation');
 
@@ -1641,8 +1739,7 @@ function setupIPC(): void {
   /**
    * Execute npm install
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.NPM_INSTALL,
+  registerHandler(IPC_CHANNELS.BUILD.NPM_INSTALL, "",
     async (_event, request: BuildNpmInstallRequest): Promise<BuildNpmInstallResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Running npm install in ${request.repoPath}`);
 
@@ -1685,8 +1782,7 @@ function setupIPC(): void {
   /**
    * Execute npm build
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.NPM_BUILD,
+  registerHandler(IPC_CHANNELS.BUILD.NPM_BUILD, "",
     async (_event, request: BuildNpmBuildRequest): Promise<BuildNpmBuildResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Running npm build in ${request.repoPath}`);
 
@@ -1729,8 +1825,7 @@ function setupIPC(): void {
   /**
    * Execute docker build
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.DOCKER_BUILD,
+  registerHandler(IPC_CHANNELS.BUILD.DOCKER_BUILD, "",
     async (_event, request: BuildDockerBuildRequest): Promise<BuildDockerBuildResponse> => {
       logWithCategory('info', LogCategory.DOCKER, `IPC: Building Docker image ${request.imageName}`);
 
@@ -1774,8 +1869,7 @@ function setupIPC(): void {
   /**
    * Execute build chain
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.EXECUTE_CHAIN,
+  registerHandler(IPC_CHANNELS.BUILD.EXECUTE_CHAIN, "",
     async (_event, request: BuildExecuteChainRequest): Promise<BuildExecuteChainResponse> => {
       logWithCategory('info', LogCategory.GENERAL, `IPC: Executing build chain with ${request.steps.length} steps`);
 
@@ -1817,8 +1911,7 @@ function setupIPC(): void {
   /**
    * Execute custom script
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.EXECUTE_CUSTOM_SCRIPT,
+  registerHandler(IPC_CHANNELS.BUILD.EXECUTE_CUSTOM_SCRIPT, "",
     async (_event, request: BuildExecuteCustomScriptRequest): Promise<BuildExecuteCustomScriptResponse> => {
       logWithCategory('info', LogCategory.SCRIPT, `IPC: Executing custom script: ${request.command}`);
 
@@ -1861,8 +1954,7 @@ function setupIPC(): void {
   /**
    * Cancel ongoing build operation
    */
-  ipcMain.handle(
-    IPC_CHANNELS.BUILD.CANCEL,
+  registerHandler(IPC_CHANNELS.BUILD.CANCEL, "",
     async (): Promise<BuildCancelResponse> => {
       logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling build operation');
 
@@ -1893,8 +1985,7 @@ function setupIPC(): void {
   /**
    * Execute build pipeline
    */
-  ipcMain.handle(
-    IPC_CHANNELS.PIPELINE.EXECUTE,
+  registerHandler(IPC_CHANNELS.PIPELINE.EXECUTE, "",
     async (_event, request: PipelineExecuteRequest): Promise<PipelineExecuteResponse> => {
       logWithCategory('info', LogCategory.GENERAL, 'IPC: Executing build pipeline', { configPath: request.configPath });
 
@@ -1975,8 +2066,7 @@ function setupIPC(): void {
   /**
    * Cancel ongoing pipeline operation
    */
-  ipcMain.handle(
-    IPC_CHANNELS.PIPELINE.CANCEL,
+  registerHandler(IPC_CHANNELS.PIPELINE.CANCEL, "",
     async (): Promise<PipelineCancelResponse> => {
       logWithCategory('info', LogCategory.GENERAL, 'IPC: Cancelling pipeline operation');
 
@@ -2006,8 +2096,7 @@ function setupIPC(): void {
   /**
    * Get current pipeline status
    */
-  ipcMain.handle(
-    IPC_CHANNELS.PIPELINE.GET_STATUS,
+  registerHandler(IPC_CHANNELS.PIPELINE.GET_STATUS, "",
     async (): Promise<PipelineStatusResponse> => {
       try {
         if (currentPipelineOrchestrator) {
@@ -2038,7 +2127,7 @@ function setupIPC(): void {
   // Plugin Management IPC Handlers
   // ============================================================================
 
-  ipcMain.handle('plugins:get-all', async () => {
+  registerHandler('plugins:get-all', "", async () => {
     try {
       return {
         success: true,
@@ -2052,7 +2141,25 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('plugins:get-statistics', async () => {
+  // Alias for plugins:get-all (for backwards compatibility with 'plugin:list')
+  registerHandler('plugin:list', "", async () => {
+    try {
+      const plugins = pluginManager.getAllPlugins();
+      // Sanitize plugin data - only return serializable fields
+      return plugins.map(plugin => ({
+        id: plugin.id,
+        manifest: plugin.manifest,
+        status: plugin.status,
+        error: plugin.error,
+        // Don't include 'instance' or 'context' as they contain non-serializable functions
+      }));
+    } catch (error: any) {
+      logger.error('Error getting plugin list:', error);
+      return [];
+    }
+  });
+
+  registerHandler('plugins:get-statistics', "", async () => {
     try {
       return {
         success: true,
@@ -2066,7 +2173,7 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('plugins:activate', async (_event, pluginId: string) => {
+  registerHandler('plugins:activate', "", async (_event, pluginId: string) => {
     try {
       await pluginManager.activatePlugin(pluginId);
       return {
@@ -2081,7 +2188,7 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('plugins:deactivate', async (_event, pluginId: string) => {
+  registerHandler('plugins:deactivate', "", async (_event, pluginId: string) => {
     try {
       await pluginManager.deactivatePlugin(pluginId);
       return {
@@ -2096,7 +2203,7 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('plugins:reload', async (_event, pluginId: string) => {
+  registerHandler('plugins:reload', "", async (_event, pluginId: string) => {
     try {
       await pluginManager.reloadPlugin(pluginId);
       return {
@@ -2113,7 +2220,7 @@ function setupIPC(): void {
 
   // Plugin View IPC handlers
   // NEW: Get plugin view URL for embedding in main window
-  ipcMain.handle('plugin:get-view-url', async (_event, pluginId: string, viewName: string) => {
+  registerHandler('plugin:get-view-url', "", async (_event, pluginId: string, viewName: string) => {
     try {
       logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting plugin view URL ${pluginId}:${viewName}`);
 
@@ -2161,7 +2268,7 @@ function setupIPC(): void {
   });
 
   // DEPRECATED: Old plugin:show-view handler (kept for backward compatibility)
-  ipcMain.handle('plugin:show-view', async (_event, pluginId: string, viewName: string) => {
+  registerHandler('plugin:show-view', "", async (_event, pluginId: string, viewName: string) => {
     try {
       logWithCategory('warn', LogCategory.SYSTEM, `[DEPRECATED] plugin:show-view called - use ViewRouter instead`);
       logWithCategory('info', LogCategory.SYSTEM, `IPC: Showing plugin view ${pluginId}:${viewName}`);
@@ -2203,165 +2310,585 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('plugin:hide-view', (_event, pluginId: string, viewName: string) => {
+  registerHandler('plugin:hide-view', "", (_event, pluginId: string, viewName: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Hiding plugin view ${pluginId}:${viewName}`);
     pluginViewManager.hidePluginView(pluginId, viewName);
   });
 
-  ipcMain.handle('plugin:close-view', (_event, pluginId: string, viewName: string) => {
+  registerHandler('plugin:close-view', "", (_event, pluginId: string, viewName: string) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Closing plugin view ${pluginId}:${viewName}`);
     pluginViewManager.closePluginView(pluginId, viewName);
   });
 
   // ========================================
-  // Workflow IPC Handlers
+  // Project and Series Management IPC Handlers
   // ========================================
 
-  ipcMain.handle('workflows:list', async () => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Listing workflows');
+  // Project handlers
+  registerHandler('project:create', "Create a new project", async (_event, data: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Creating project: ${data.name}`);
     try {
-      const pool = getDatabasePool();
-      const result = await pool.query(
-        `SELECT id, name, description, steps, target_type, target_id, status, version,
-                run_count, success_count, failure_count, last_run_at, last_run_status,
-                created_at, updated_at
-         FROM workflows
-         ORDER BY updated_at DESC`
-      );
-      return result.rows;
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.createProject(data);
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error listing workflows:', error);
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to create project: ${error.message}`);
       throw error;
     }
   });
 
-  ipcMain.handle('workflows:get', async (_event, workflowId: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting workflow ${workflowId}`);
+  registerHandler('project:list', "List all projects", async () => {
+    logWithCategory('debug', LogCategory.SYSTEM, 'IPC: Listing projects');
     try {
-      const pool = getDatabasePool();
-      const result = await pool.query(
-        'SELECT * FROM workflows WHERE id = $1',
-        [workflowId]
-      );
-      return result.rows[0] || null;
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.listProjects();
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error getting workflow:', error);
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to list projects: ${error.message}`);
       throw error;
     }
   });
 
-  ipcMain.handle('workflows:execute', async (_event, workflowId: string, initialContext?: any) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Executing workflow ${workflowId}`);
+  registerHandler('project:get', "Get a project by id", async (_event, id: number) => {
+    logWithCategory('debug', LogCategory.SYSTEM, `IPC: Getting project ${id}`);
     try {
-      const pool = getDatabasePool();
-      const { WorkflowEngine } = await import('./workflow-engine');
-      const engine = new WorkflowEngine(pool);
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      return await projectManager.getProject(id);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to get project: ${error.message}`);
+      throw error;
+    }
+  });
 
-      const result = await engine.executeWorkflow(workflowId, initialContext || {}, 'manual');
+  registerHandler('project:update', "Update a project", async (_event, id: number, data: any) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating project ${id}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      await projectManager.updateProject(id, data);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to update project: ${error.message}`);
+      throw error;
+    }
+  });
 
-      logWithCategory('info', LogCategory.SYSTEM, `Workflow execution completed: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+  registerHandler('project:delete', "Delete a project", async (_event, id: number) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting project ${id}`);
+    try {
+      const { ProjectManager } = await import('./project-manager');
+      const projectManager = new ProjectManager();
+      await projectManager.deleteProject(id);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to delete project: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // Initialize workspace structure with optional genre pack
+  registerHandler('project:initialize-workspace', "Initialize a project's workspace folder structure", async (_event, options: {
+    folderPath: string;
+    projectName: string;
+    genrePack?: string;
+  }) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Initializing workspace at ${options.folderPath}`);
+    try {
+      const { folderPath, projectName, genrePack } = options;
+
+      // Create standard directories. This mirrors the Series Architect v2
+      // workflow layout (FictIonLab-Downloads: outputs/ + series-planning/),
+      // not the earlier tiered planning/ proposal -- see issue #165. Per-book
+      // artifacts are NOT scaffolded here; SA v2 creates outputs/book_N/ at
+      // runtime (dramatica-storyform/workflow.yaml, series-architect-development
+      // /workflow.yaml), one folder per book, so book N+1 never touches book N.
+      await fse.ensureDir(path.join(folderPath, '.claude'));
+      await fse.ensureDir(path.join(folderPath, 'outputs'));
+      await fse.ensureDir(path.join(folderPath, 'series-planning'));
+
+      // Create settings.json. Genre packs are copied to the project folder
+      // when a workflow runs, via the ResourceCopier in
+      // fictionlab-workflow/packages/workflow-runner (keyed by pack id --
+      // see #159/genre-pack-handlers.ts's GenrePack.id shape). We don't copy
+      // pack contents here at project-creation time, but we DO persist the
+      // selected id into settings.json so that later run knows which pack to
+      // copy instead of silently defaulting to none. The key is `genrePack`,
+      // matching the id field the run-time consumers already use
+      // (ResourceCopyOptions.genrePack / workflow-executor's
+      // initialVariables.genrePack).
+      const projectSettings: {
+        name: string;
+        projectType: string;
+        createdAt: string;
+        genrePack?: string;
+      } = {
+        name: projectName,
+        projectType: 'fiction-series',
+        createdAt: new Date().toISOString()
+      };
+      if (genrePack && genrePack !== 'none') {
+        projectSettings.genrePack = genrePack;
+        logWithCategory('info', LogCategory.SYSTEM, `Genre pack '${genrePack}' recorded in project settings; will be copied when workflow runs`);
+      }
+      await fse.writeJson(path.join(folderPath, '.claude', 'settings.json'), projectSettings, { spaces: 2 });
+
+      // Copy CLAUDE.md template for workflow resumption support
+      const templatePath = app.isPackaged
+        ? path.join(process.resourcesPath, 'resources', 'templates', 'project-init', 'CLAUDE.md')
+        : path.join(__dirname, '..', '..', 'resources', 'templates', 'project-init', 'CLAUDE.md');
+
+      if (await fse.pathExists(templatePath)) {
+        await fse.copy(templatePath, path.join(folderPath, '.claude', 'CLAUDE.md'));
+        logWithCategory('info', LogCategory.SYSTEM, 'Copied CLAUDE.md template to project');
+      } else {
+        logWithCategory('warn', LogCategory.SYSTEM, `CLAUDE.md template not found at ${templatePath}`);
+      }
+
+      // Drop a README describing the scaffold + the per-book isolation rule
+      // (outputs/book_N/ per book; book N+1 must never write into book N's folder).
+      const readmePath = path.join(folderPath, 'README.md');
+      if (!(await fse.pathExists(readmePath))) {
+        await fse.writeFile(readmePath, buildProjectReadme(projectName), 'utf8');
+        logWithCategory('info', LogCategory.SYSTEM, 'Wrote project README.md');
+      }
+
+      logWithCategory('info', LogCategory.SYSTEM, `Workspace initialized at ${folderPath}`);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to initialize workspace: ${error.message}`);
+      throw error;
+    }
+  });
+
+  // List available genre packs
+  // Registered separately via registerGenrePackHandlers() -- see
+  // ./handlers/genre-pack-handlers.ts. Genre packs live with the workflow
+  // plugin's bundled resources (fictionlab-workflow/resources/genre-packs),
+  // not inside this app; the handler resolves them via the workflow
+  // plugin's own ResourceCopier at {userData}/plugins/fictionlab-workflow.
+
+  // ========================================
+  // Provider Management Handlers
+  // ========================================
+
+  // List all saved providers
+  registerHandler('provider:list', "", async () => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const providers = await providerManager.listSavedProviders();
+      return providers;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to list providers: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
+  // Add new provider
+  registerHandler('provider:add', "", async (_event, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const id = await providerManager.saveProvider(provider);
+      return { success: true, id };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to add provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Update existing provider
+  registerHandler('provider:update', "", async (_event, id: string, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const updatedProvider = { ...provider, id };
+      await providerManager.saveProvider(updatedProvider);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to update provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Delete provider
+  registerHandler('provider:delete', "", async (_event, id: string) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      await providerManager.deleteProvider(id);
+      return { success: true };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to delete provider: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Test provider credentials
+  registerHandler('provider:test', "", async (_event, provider: LLMProviderConfig) => {
+    try {
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
+      const result = await providerManager.validateProvider(provider);
       return result;
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error executing workflow:', error);
-      throw error;
+      logWithCategory('error', LogCategory.WORKFLOW, `Provider test failed: ${error.message}`);
+      return { valid: false, error: error.message };
     }
   });
 
-  ipcMain.handle('workflows:cancel', async (_event, runId: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Cancelling workflow run ${runId}`);
+  // Get all available LLM providers (for workflow node configuration)
+  registerHandler('llm-providers:get-all', "", async () => {
     try {
-      const pool = getDatabasePool();
-      const { WorkflowEngine } = await import('./workflow-engine');
-      const engine = new WorkflowEngine(pool);
+      const providerManager = getProviderManager();
+      await providerManager.initialize();
 
-      await engine.cancelWorkflow(runId);
+      // Get saved providers from credential store
+      const savedProviders = await providerManager.listSavedProviders();
+
+      // If no saved providers, return a default Claude Code CLI provider
+      if (!savedProviders || savedProviders.length === 0) {
+        logWithCategory('info', LogCategory.WORKFLOW, 'No saved providers, returning default Claude Code CLI');
+        return [{
+          id: 'default-claude-code-cli',
+          type: 'claude-code-cli',
+          name: 'Claude Code (Default)',
+          enabled: true,
+          config: {
+            model: 'default',
+            headless: true,
+            outputFormat: 'text'
+          }
+        }];
+      }
+
+      return savedProviders;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Failed to get LLM providers: ${error.message}`);
+      // Return default provider even on error
+      return [{
+        id: 'default-claude-code-cli',
+        type: 'claude-code-cli',
+        name: 'Claude Code (Default)',
+        enabled: true,
+        config: {
+          model: 'claude-sonnet-4-5',
+          headless: true,
+          outputFormat: 'text'
+        }
+      }];
+    }
+  });
+
+  // ========================================
+  // File Browser Handlers
+  // ========================================
+
+  // Open file picker dialog
+  registerHandler('dialog:open-file', "", async (_event, options?: { defaultPath?: string }) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        defaultPath: options?.defaultPath,
+      });
+
+      if (result.canceled) {
+        return { canceled: true };
+      }
+
+      return { canceled: false, filePath: result.filePaths[0] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `File dialog error: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
+  // Open folder picker dialog
+  registerHandler('dialog:open-folder', "", async (_event, options?: { defaultPath?: string }) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        defaultPath: options?.defaultPath,
+      });
+
+      if (result.canceled) {
+        return { canceled: true };
+      }
+
+      return { canceled: false, folderPath: result.filePaths[0] };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, `Folder dialog error: ${error.message}`);
+      return { error: error.message };
+    }
+  });
+
+  // Shell operations
+  registerHandler('shell:open-path', "", async (_event, path: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Opening path: ${path}`);
+    try {
+      const result = await shell.openPath(path);
+      if (result) {
+        // openPath returns empty string on success, error message on failure
+        logWithCategory('error', LogCategory.SYSTEM, `Failed to open path: ${result}`);
+        throw new Error(result);
+      }
       return { success: true };
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error cancelling workflow:', error);
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to open path: ${error.message}`);
       throw error;
     }
   });
 
-  ipcMain.handle('workflows:get-runs', async (_event, workflowId: string, limit?: number) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Getting workflow runs for ${workflowId}`);
+  // Automated Claude Code CLI installation
+  registerHandler('claude:install-cli', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Installing Claude Code CLI');
     try {
-      const pool = getDatabasePool();
-      const { WorkflowEngine } = await import('./workflow-engine');
-      const engine = new WorkflowEngine(pool);
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
 
-      const runs = await engine.getWorkflowRuns(workflowId, limit);
-      return runs;
+      // Install via npm globally
+      logWithCategory('info', LogCategory.SYSTEM, 'Running: npm install -g @anthropic-ai/claude-code');
+
+      const { stdout, stderr } = await execAsync('npm install -g @anthropic-ai/claude-code', {
+        timeout: 120000 // 2 minutes timeout
+      });
+
+      logWithCategory('info', LogCategory.SYSTEM, `Installation output: ${stdout}`);
+
+      if (stderr && !stderr.includes('npm WARN')) {
+        logWithCategory('warn', LogCategory.SYSTEM, `Installation warnings: ${stderr}`);
+      }
+
+      return { success: true, message: 'Claude Code CLI installed successfully' };
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error getting workflow runs:', error);
-      throw error;
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to install Claude Code CLI: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || 'Installation failed. Make sure npm is installed and you have an internet connection.'
+      };
     }
   });
 
-  ipcMain.handle('workflows:delete', async (_event, workflowId: string) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Deleting workflow ${workflowId}`);
+  // Automated Claude Code authentication
+  registerHandler('claude:authenticate', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Authenticating with Claude');
     try {
-      const pool = getDatabasePool();
-      await pool.query('DELETE FROM workflows WHERE id = $1', [workflowId]);
-      return { success: true };
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error deleting workflow:', error);
-      throw error;
-    }
-  });
+      const { spawn } = require('child_process');
 
-  ipcMain.handle('workflows:create', async (_event, workflow: any) => {
-    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Creating new workflow');
-    try {
-      const pool = getDatabasePool();
-      const result = await pool.query(
-        `INSERT INTO workflows (name, description, steps, target_type, status)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [
-          workflow.name,
-          workflow.description || null,
-          JSON.stringify(workflow.steps),
-          workflow.target_type || null,
-          workflow.status || 'draft'
-        ]
-      );
-      return result.rows[0];
-    } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error creating workflow:', error);
-      throw error;
-    }
-  });
+      // Run claude auth login in interactive mode
+      // This will open a browser for the user to authenticate
+      logWithCategory('info', LogCategory.SYSTEM, 'Running: claude auth login');
 
-  ipcMain.handle('workflows:update', async (_event, workflowId: string, updates: any) => {
-    logWithCategory('info', LogCategory.SYSTEM, `IPC: Updating workflow ${workflowId}`);
-    try {
-      const pool = getDatabasePool();
-      const result = await pool.query(
-        `UPDATE workflows
-         SET name = COALESCE($1, name),
-             description = COALESCE($2, description),
-             steps = COALESCE($3, steps),
-             status = COALESCE($4, status),
-             target_type = COALESCE($5, target_type)
-         WHERE id = $6
-         RETURNING *`,
-        [
-          updates.name || null,
-          updates.description || null,
-          updates.steps ? JSON.stringify(updates.steps) : null,
-          updates.status || null,
-          updates.target_type || null,
-          workflowId
-        ]
-      );
-      return result.rows[0];
+      return new Promise((resolve) => {
+        const authProcess = spawn('claude', ['auth', 'login'], {
+          stdio: 'inherit', // Allow browser interaction
+          shell: true
+        });
+
+        authProcess.on('close', (code: number) => {
+          if (code === 0) {
+            logWithCategory('info', LogCategory.SYSTEM, 'Authentication successful');
+            resolve({ success: true, message: 'Authentication successful' });
+          } else {
+            logWithCategory('error', LogCategory.SYSTEM, `Authentication failed with code ${code}`);
+            resolve({
+              success: false,
+              error: `Authentication process exited with code ${code}`
+            });
+          }
+        });
+
+        authProcess.on('error', (error: Error) => {
+          logWithCategory('error', LogCategory.SYSTEM, `Authentication error: ${error.message}`);
+          resolve({
+            success: false,
+            error: error.message
+          });
+        });
+      });
     } catch (error: any) {
-      logWithCategory('error', LogCategory.SYSTEM, 'Error updating workflow:', error);
-      throw error;
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to authenticate: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || 'Authentication failed'
+      };
     }
   });
 
   logger.info('IPC handlers registered');
+}
+
+/**
+ * Launch-time Docker readiness gate.
+ *
+ * Replaces the old single-shot `docker info` (CLI-only, no retry, no process
+ * awareness) with:
+ *   1. A direct dockerode daemon ping (authoritative - independent of the
+ *      `docker` CLI being slow/missing on PATH).
+ *   2. If unreachable, check whether Docker Desktop's process is already
+ *      running - if so, this is the "still initializing" case: poll the ping
+ *      for up to ~90s and do NOT relaunch it.
+ *   3. If the process isn't running, start Docker Desktop (tray-only - the
+ *      dashboard window is controlled by Docker Desktop's own startup
+ *      setting) and poll the ping for up to ~120s.
+ *   4. Once the daemon is reachable, ensure the core containers
+ *      (postgres/pgbouncer) are up via mcpSystem.ensureCoreContainers()
+ *      before returning, so the DB pool init that follows doesn't hit a cold
+ *      database.
+ *
+ * Returns true when it's safe to proceed, false when the user chose to quit.
+ * Never calls app.quit() itself - caller owns that decision.
+ */
+async function ensureDockerReadyForLaunch(): Promise<boolean> {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    logWithCategory('info', LogCategory.DOCKER, 'Pinging Docker daemon (dockerode)...');
+    const pingResult = await docker.pingDockerDaemon();
+    let daemonReady = pingResult.reachable;
+
+    if (!daemonReady) {
+      const processRunning = await docker.isDockerDesktopProcessRunning();
+
+      if (processRunning) {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process is running but daemon is not responding yet - ' +
+          'treating as still-initializing and polling (no relaunch)...');
+
+        const waitResult = await docker.waitForDockerPingReady(90, (progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker init wait: ${progress.message} (${progress.percent}%)`);
+        });
+        daemonReady = waitResult.success;
+      } else {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Docker Desktop process is not running - starting it...');
+
+        const startResult = await docker.startDockerDesktop((progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker start: ${progress.message} (${progress.percent}%)`);
+        });
+
+        if (!startResult.success) {
+          logWithCategory('warn', LogCategory.DOCKER,
+            `startDockerDesktop reported failure (continuing to poll anyway): ${startResult.error}`);
+        }
+
+        const waitResult = await docker.waitForDockerPingReady(120, (progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Docker start wait: ${progress.message} (${progress.percent}%)`);
+        });
+        daemonReady = waitResult.success;
+      }
+    }
+
+    if (!daemonReady) {
+      // Secondary confirmation via the CLI before giving up entirely - the ping
+      // is authoritative, but this catches the unlikely case of a socket/pipe
+      // probe issue where the CLI path would still work.
+      const cliStatus = await docker.checkDockerHealth();
+      daemonReady = cliStatus.running && cliStatus.healthy;
+
+      if (daemonReady) {
+        logWithCategory('info', LogCategory.DOCKER,
+          'Daemon ping failed but CLI confirms Docker is healthy - proceeding');
+      }
+    }
+
+    if (daemonReady) {
+      logWithCategory('info', LogCategory.DOCKER, 'Docker daemon is reachable - ensuring core containers...');
+
+      const containerResult = await mcpSystem.ensureCoreContainers((progress) => {
+        logWithCategory('debug', LogCategory.DOCKER,
+          `Core container startup: ${progress.message} (${progress.percent}%)`);
+      });
+
+      if (containerResult.success) {
+        return true;
+      }
+
+      if (containerResult.error === 'INVALID_CONFIG') {
+        // First-run case: env config (MCP_AUTH_TOKEN/POSTGRES_PASSWORD) isn't
+        // written yet. That's the setup wizard's job, not this gate's - let
+        // launch proceed so isFirstRun()/createWizardWindow() can run.
+        logWithCategory('info', LogCategory.DOCKER,
+          'Core containers not started - environment not configured yet (first run). Deferring to setup wizard.');
+        return true;
+      }
+
+      // Surface the result (including PORT_CONFLICT) - never swallow it.
+      logWithCategory('error', LogCategory.DOCKER,
+        `Failed to ensure core containers (${containerResult.error}): ${containerResult.message}`);
+
+      const isPortConflict = containerResult.error === 'PORT_CONFLICT';
+      const choice = await dialog.showMessageBox({
+        type: 'error',
+        title: isPortConflict ? 'Port Conflict' : 'Container Startup Failed',
+        message: isPortConflict
+          ? 'A required port is already in use'
+          : 'Could not start required Docker containers',
+        detail: `${containerResult.message}\n\nWould you like to retry, open Docker Desktop to investigate, or quit?`,
+        buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+        defaultId: 0,
+        cancelId: 2,
+      });
+
+      if (choice.response === 0) continue; // Retry the whole gate
+      if (choice.response === 1) {
+        await docker.startDockerDesktop();
+        continue; // Loop back and re-check after giving the user a look
+      }
+      return false; // Quit
+    }
+
+    // Daemon genuinely unreachable - offer Retry / Open Docker Desktop / Quit
+    // instead of exiting immediately.
+    const choice = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Docker Desktop Required',
+      message: 'Docker daemon is not responding',
+      detail:
+        `FictionLab could not reach the Docker daemon.\n\n` +
+        (pingResult.error ? `Last error: ${pingResult.error}\n\n` : '') +
+        `Make sure Docker Desktop is installed and running, then click Retry. ` +
+        `If it's still starting up, give it a few more seconds first.`,
+      buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+    });
+
+    if (choice.response === 0) continue;
+    if (choice.response === 1) {
+      await docker.startDockerDesktop();
+      continue;
+    }
+    return false;
+  }
+}
+
+// --help / -help: print CLI usage and exit before the app initializes further. No window is
+// opened. On Windows, a packaged (non-dev) build launched without an attached console will
+// not surface this stdout output in the parent shell — this works reliably when run from a
+// dev checkout / terminal (e.g. `npm start -- --help`, `electron . --help`).
+if (process.argv.includes('--help') || process.argv.includes('-help')) {
+  const usageLines = [
+    `${app.getName()} v${app.getVersion()}`,
+    '',
+    'Usage: electron . [flags]',
+    '',
+    'Flags:',
+    '  --dev           Run in development mode',
+    '  --help, -help   Show this usage information and exit',
+    '',
+    'Once the app is running, the full IPC channel surface (including plugin-namespaced',
+    "channels) can be listed via the 'help' IPC channel, e.g.:",
+    "  ipcRenderer.invoke('help')            // all registered channels",
+    "  ipcRenderer.invoke('help', 'docker')  // only channels starting with 'docker'",
+  ];
+  process.stdout.write(usageLines.join('\n') + '\n');
+  app.quit();
+  process.exit(0);
 }
 
 // This method will be called when Electron has finished initialization
@@ -2375,29 +2902,178 @@ app.whenReady().then(async () => {
     app.setAppUserModelId('net.fictionlab.studio');
   }
 
+  // CRITICAL: Check Docker before initializing database and MCP client
+  // Docker is a core dependency - MCP servers run in Docker containers
+  try {
+    logWithCategory('info', LogCategory.SYSTEM, 'Checking Docker status...');
+
+    // First, check if Docker is installed at all
+    const dockerInstalled = await prerequisites.checkDockerInstalled();
+
+    if (!dockerInstalled.installed) {
+      // Docker is NOT installed - show helpful dialog with download link
+      logWithCategory('warn', LogCategory.DOCKER, 'Docker Desktop is not installed');
+
+      const downloadUrl = installationWizard.getDockerDownloadUrl();
+      const response = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Docker Desktop Required',
+        message: 'Docker Desktop is not installed',
+        detail: `This application requires Docker Desktop to run MCP servers.\n\n` +
+          `Please download and install Docker Desktop, then restart this application.\n\n` +
+          `Download URL:\n${downloadUrl}`,
+        buttons: ['Download Docker Desktop', 'Exit'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response.response === 0) {
+        // User clicked "Download Docker Desktop"
+        await installationWizard.openDownloadPage();
+        logWithCategory('info', LogCategory.DOCKER, 'Opened Docker Desktop download page');
+      }
+
+      app.quit();
+      return;
+    }
+
+    // Docker is installed - run the daemon-ping-first readiness gate (with
+    // process-awareness, retries, and container startup). Offers Retry/Open/Quit
+    // on failure instead of exiting immediately.
+    const dockerReady = await ensureDockerReadyForLaunch();
+    if (!dockerReady) {
+      logWithCategory('warn', LogCategory.DOCKER, 'User chose to quit from the Docker readiness gate');
+      app.quit();
+      return;
+    }
+
+    logWithCategory('info', LogCategory.DOCKER, 'Docker daemon and core containers are ready');
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.DOCKER, `Unexpected error in Docker readiness gate: ${errorMessage}`);
+
+    const choice = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Docker Required',
+      message: 'Unexpected error while checking Docker Desktop',
+      detail:
+        `Error: ${errorMessage}\n\n` +
+        `Docker Desktop is required to run this application.\n\n` +
+        `Would you like to retry, open Docker Desktop, or quit?`,
+      buttons: ['Retry', 'Open Docker Desktop', 'Quit'],
+      defaultId: 0,
+      cancelId: 2,
+    });
+
+    if (choice.response === 2) {
+      app.quit();
+      return;
+    }
+    // Give the gate one more shot (Retry, or after opening Docker Desktop).
+    // Bounded: if this second attempt itself throws, don't let the rejection
+    // escape the promise chain and leave the app with no window and no
+    // dialog - show a final error and quit instead.
+    try {
+      if (choice.response === 1) {
+        await docker.startDockerDesktop();
+      }
+
+      const retryReady = await ensureDockerReadyForLaunch();
+      if (!retryReady) {
+        app.quit();
+        return;
+      }
+    } catch (retryError: any) {
+      const retryErrorMessage = retryError.message || String(retryError);
+      logWithCategory('error', LogCategory.DOCKER, `Docker readiness retry failed: ${retryErrorMessage}`);
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Docker Required',
+        message: 'Docker Desktop could not be verified',
+        detail: `Error: ${retryErrorMessage}\n\nThe application will now close.`,
+      });
+      app.quit();
+      return;
+    }
+  }
+
   setupIPC();
   createMenu();
 
-  // Initialize GitHub credentials from environment
-  try {
-    const config = await envConfig.loadEnvConfig();
-    if (config.GITHUB_TOKEN) {
-      const { getGitHubCredentialManager } = await import('./github-credential-manager');
-      getGitHubCredentialManager(config.GITHUB_TOKEN);
-      logger.info('GitHub credentials initialized from environment');
-    }
-  } catch (error) {
-    logger.warn('Error initializing GitHub credentials from environment:', error);
-  }
-
-  // Check if this is the first run
+  // Check if this is the first run BEFORE trying to connect to database
+  // On first run, the MCP containers (including PostgreSQL) haven't been started yet
   const isFirst = await setupWizard.isFirstRun();
   logger.info(`First run: ${isFirst}`);
 
   if (isFirst) {
-    // Show setup wizard
+    // Show setup wizard - database will be initialized after MCP system starts
     createWizardWindow();
   } else {
+    // Not first run - MCP containers should be running, initialize database
+    try {
+      logWithCategory('info', LogCategory.SYSTEM, 'Initializing database pool...');
+      await initializeDatabasePool();
+      logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized');
+    } catch (error) {
+      logWithCategory('error', LogCategory.SYSTEM, 'Error initializing database:', error);
+      // Database connection failed - likely MCP containers not running
+      // Show helpful error with option to start MCP system
+      const response = await dialog.showMessageBox({
+        type: 'error',
+        title: 'Database Connection Failed',
+        message: 'Could not connect to the database',
+        detail: `The application could not connect to the PostgreSQL database.\n\n` +
+          `This usually means the MCP containers are not running.\n\n` +
+          `Error: ${error}\n\n` +
+          `Would you like to start the MCP system now?`,
+        buttons: ['Start MCP System', 'Exit'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response.response === 0) {
+        // User wants to start MCP system
+        try {
+          logWithCategory('info', LogCategory.SYSTEM, 'Starting MCP system...');
+          const startResult = await mcpSystem.startMCPSystem();
+
+          if (startResult.success) {
+            logWithCategory('info', LogCategory.SYSTEM, 'MCP system started, retrying database connection...');
+            // Wait a moment for PostgreSQL to be ready
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Retry database initialization
+            await initializeDatabasePool();
+            logWithCategory('info', LogCategory.SYSTEM, 'Database pool initialized after MCP start');
+          } else {
+            throw new Error(startResult.error || 'Failed to start MCP system');
+          }
+        } catch (retryError) {
+          logWithCategory('error', LogCategory.SYSTEM, 'Failed to recover:', retryError);
+          dialog.showErrorBox('Initialization Error',
+            `Failed to start MCP system and connect to database.\n\n` +
+            `Error: ${retryError}\n\n` +
+            `Please try restarting the application.`);
+          app.quit();
+          return;
+        }
+      } else {
+        app.quit();
+        return;
+      }
+    }
+
+    // Initialize GitHub credentials from environment
+    try {
+      const config = await envConfig.loadEnvConfig();
+      if (config.GITHUB_TOKEN) {
+        const { getGitHubCredentialManager } = await import('./github-credential-manager');
+        getGitHubCredentialManager(config.GITHUB_TOKEN);
+        logger.info('GitHub credentials initialized from environment');
+      }
+    } catch (error) {
+      logger.warn('Error initializing GitHub credentials from environment:', error);
+    }
     // Check for pending migrations before showing main window
     try {
       logWithCategory('info', LogCategory.SYSTEM, 'Checking for pending migrations...');
@@ -2439,19 +3115,18 @@ app.whenReady().then(async () => {
     createWindow();
 
     // Initialize plugin system after main window is created
+    // (Database and MCP client are already initialized before setupIPC)
     try {
       logWithCategory('info', LogCategory.SYSTEM, 'Initializing plugin system...');
 
-      // Initialize database pool first
-      await initializeDatabasePool();
-
-      // Initialize plugin manager
-      await pluginManager.initialize();
-
-      // Set main window reference for plugin UI interactions
+      // Set main window reference BEFORE initializing plugins
+      // so that plugin-state-changed events can be sent during activation
       if (mainWindow) {
         pluginManager.setMainWindow(mainWindow);
       }
+
+      // Initialize plugin manager (discovers and activates plugins)
+      await pluginManager.initialize();
 
       logWithCategory('info', LogCategory.SYSTEM, 'Plugin system initialized successfully');
     } catch (error) {
@@ -2504,8 +3179,18 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle app before quit
-app.on('before-quit', async () => {
+// Handle app before quit with proper async cleanup
+let isQuitting = false;
+app.on('before-quit', async (event) => {
+  if (isQuitting) {
+    // Already cleaning up, allow quit to proceed
+    return;
+  }
+
+  // Prevent default quit to allow async cleanup
+  event.preventDefault();
+  isQuitting = true;
+
   logger.info('App is quitting...');
 
   // Clean up plugin system
@@ -2522,13 +3207,21 @@ app.on('before-quit', async () => {
   } catch (error) {
     logWithCategory('error', LogCategory.SYSTEM, 'Error closing database pool:', error);
   }
+
+  // Now actually quit
+  logWithCategory('info', LogCategory.SYSTEM, 'Cleanup complete, quitting app');
+  app.quit();
 });
 
-// Log any unhandled errors
+// Log any unhandled errors and prevent default error dialog
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
+  console.error('UNCAUGHT EXCEPTION:', error);
+  // Prevent the error dialog sound
+  return true;
 });
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection:', reason);
+  console.error('UNHANDLED REJECTION:', reason);
 });

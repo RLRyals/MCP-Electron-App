@@ -75,8 +75,6 @@ async function getMCPServerUrl(): Promise<string> {
  * Call an MCP tool using JSON-RPC 2.0 protocol
  */
 async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperationResult> {
-  // VERSION MARKER - If you see this, the new code IS running!
-  console.error(`[DATABASE-ADMIN-V2] *** CALLING MCP TOOL: ${toolName} ***`);
   logWithCategory('info', LogCategory.SYSTEM, `Calling MCP tool: ${toolName}`);
 
   const baseUrl = await getMCPServerUrl();
@@ -118,11 +116,18 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       };
     }
 
+    // DEBUG: Log the full response structure
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse type: ${typeof mcpResponse}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse keys: ${Object.keys(mcpResponse).join(', ')}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse.result exists: ${!!mcpResponse.result}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] mcpResponse.content exists: ${!!mcpResponse.content}`);
+    logWithCategory('info', LogCategory.SYSTEM, `[DEBUG] Full mcpResponse: ${JSON.stringify(mcpResponse).substring(0, 1000)}`);
+
     // The response can come in two formats:
     // 1. JSON-RPC format: { jsonrpc: "2.0", result: { content: [...] }, id: ... }
     // 2. Direct format: { content: [...] }
     let contentArray: Array<{ type: string; text: string }> | undefined;
-    
+
     if (mcpResponse.result?.content) {
       // JSON-RPC format
       contentArray = mcpResponse.result.content;
@@ -177,7 +182,6 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
 
         // LOG WHAT WE'RE ABOUT TO RETURN
         logWithCategory('info', LogCategory.SYSTEM, `[RETURNING] success: true, data type: ${typeof resultData}, data keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
-        console.error(`[DATABASE-ADMIN] *** NEW CODE IS RUNNING *** Returning parsed data with keys: ${resultData && typeof resultData === 'object' ? Object.keys(resultData).join(', ') : 'N/A'}`);
 
         return {
           success: true,
@@ -196,19 +200,33 @@ async function callMCPTool(toolName: string, args: any): Promise<DatabaseOperati
       }
     }
 
-    // No result content - this shouldn't happen for successful queries
-    console.error('[DATABASE-ADMIN] No content array found in response!', {
-      hasResult: !!mcpResponse.result,
-      hasResultContent: !!mcpResponse.result?.content,
-      hasDirectContent: !!mcpResponse.content,
+    // No result content in standard locations - try alternative parsing
+    logWithCategory('debug', LogCategory.SYSTEM, '[DATABASE-ADMIN] No standard content array, checking alternatives...');
+
+    // Check if mcpResponse itself has the content structure (alternative format)
+    if (mcpResponse && typeof mcpResponse === 'object') {
+      const rawResponse = mcpResponse as any;
+      if (rawResponse.content && Array.isArray(rawResponse.content) && rawResponse.content[0]?.text) {
+        try {
+          const textContent = rawResponse.content[0].text;
+          const jsonStartIndex = textContent.search(/[\{\[]/);
+          const jsonText = jsonStartIndex >= 0 ? textContent.substring(jsonStartIndex) : textContent;
+          const resultData = JSON.parse(jsonText);
+          logWithCategory('debug', LogCategory.SYSTEM, '[DATABASE-ADMIN] Successfully parsed from alternative content location');
+          return {
+            success: true,
+            data: resultData,
+          };
+        } catch (parseError: any) {
+          logWithCategory('warn', LogCategory.SYSTEM, `[DATABASE-ADMIN] Failed to parse alternative content: ${parseError.message}`);
+        }
+      }
+    }
+
+    // Return raw response as last resort
+    logWithCategory('warn', LogCategory.SYSTEM, '[DATABASE-ADMIN] Returning raw MCP response - no parseable content found', {
       responseKeys: Object.keys(mcpResponse)
     });
-    
-    logWithCategory('warn', LogCategory.SYSTEM, 'MCP response has no content array', {
-      responseStructure: JSON.stringify(mcpResponse).substring(0, 200)
-    });
-    
-    // Return the raw response as a last resort so we can see what's happening
     return {
       success: true,
       data: mcpResponse,
@@ -267,6 +285,7 @@ export async function queryRecords(params: {
   limit?: number;
   offset?: number;
 }): Promise<DatabaseOperationResult> {
+  logWithCategory('info', LogCategory.SYSTEM, `Querying records from table ${params.table}`);
   return callMCPTool('db_query_records', params);
 }
 

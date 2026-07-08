@@ -221,27 +221,24 @@ jobs:
 
           ## Installation
 
-          ### Windows
-          Download and run the installer executable for Windows.
+          **Windows**: Download and run the installer executable.
 
-          ### macOS
-          Download the DMG file, mount it, and drag the app to Applications.
+          **macOS**: Download the DMG file, mount it, and drag the app to Applications.
 
-          ### Linux
-          **AppImage**: Download the AppImage file, make it executable, and run:
+          **Linux AppImage**: Download the AppImage file, make it executable, and run:
           \`\`\`bash
           chmod +x FictionLab-*.AppImage
           ./FictionLab-*.AppImage
           \`\`\`
 
-          **Debian/Ubuntu**: Download and install the .deb package:
+          **Linux Debian/Ubuntu**: Download and install the .deb package:
           \`\`\`bash
           sudo dpkg -i fictionlab_*.deb
           \`\`\`
 
           ## Checksums (SHA256)
 
-          Checksums are included in the \`checksums-*.txt\` files for each platform.
+          Checksums are included in the \`checksums-*.txt\` files for verification.
 
           ## Notes
 

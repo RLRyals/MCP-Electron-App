@@ -75,7 +75,9 @@ interface EnvConfig {
   HTTP_SSE_PORT: number;
   DB_ADMIN_PORT: number;
   MCP_AUTH_TOKEN: string;
-  TYPING_MIND_PORT: number;
+  PGBOUNCER_PORT: number;
+  NPE_PORT: number;
+  WORKFLOW_MANAGER_PORT: number;
 }
 
 /**
@@ -284,50 +286,6 @@ interface SaveSelectionResult {
 }
 
 /**
- * Typing Mind progress update
- */
-interface TypingMindProgress {
-  message: string;
-  percent: number;
-  step: string;
-  status: 'downloading' | 'verifying' | 'complete' | 'error';
-}
-
-/**
- * Typing Mind download result
- */
-interface TypingMindDownloadResult {
-  success: boolean;
-  message: string;
-  path?: string;
-  version?: string;
-  error?: string;
-}
-
-/**
- * Typing Mind metadata
- */
-interface TypingMindMetadata {
-  installed: boolean;
-  version?: string;
-  installedAt?: string;
-  lastUpdated?: string;
-  path?: string;
-  repositoryUrl?: string;
-  commitHash?: string;
-}
-
-/**
- * Typing Mind update check result
- */
-interface TypingMindUpdateCheck {
-  hasUpdate: boolean;
-  currentVersion?: string;
-  latestVersion?: string;
-  error?: string;
-}
-
-/**
  * MCP System progress update
  */
 interface MCPSystemProgress {
@@ -471,7 +429,6 @@ interface UpdateInfo {
 interface UpdateCheckResult {
   hasUpdates: boolean;
   mcpServers: UpdateInfo;
-  typingMind: UpdateInfo;
   checkedAt: string;
 }
 
@@ -486,6 +443,14 @@ interface UpdateResult {
 }
 
 /**
+ * Current-user identity setting (issue #181)
+ */
+interface CurrentUserSetting {
+  id: string;
+  displayName: string;
+}
+
+/**
  * Update preferences
  */
 interface UpdatePreferences {
@@ -495,7 +460,6 @@ interface UpdatePreferences {
   notifyOnlyIfUpdatesAvailable: boolean;
   skippedVersions?: {
     mcpServers?: string;
-    typingMind?: string;
   };
 }
 
@@ -516,7 +480,7 @@ enum WizardStep {
   WELCOME = 1,
   PREREQUISITES = 2,
   ENVIRONMENT = 3,
-  CLIENT_SELECTION = 4,
+  PLUGINS = 4,
   DOWNLOAD_SETUP = 5,
   SYSTEM_STARTUP = 6,
   COMPLETE = 7
@@ -535,9 +499,10 @@ interface WizardStepData {
     saved: boolean;
     configPath?: string;
   };
-  clients?: string[];
+  plugins?: {
+    workflow: boolean;
+  };
   downloads?: {
-    typingMindCompleted: boolean;
     dockerImagesCompleted: boolean;
   };
   systemStartup?: {
@@ -635,6 +600,52 @@ interface MigrationValidationResult {
  * This API is the only way the renderer can communicate with the main process
  */
 contextBridge.exposeInMainWorld('electronAPI', {
+  /**
+   * Generic IPC invoke method for any channel
+   */
+  invoke: (channel: string, ...args: any[]): Promise<any> => {
+    return ipcRenderer.invoke(channel, ...args);
+  },
+
+  /**
+   * Generic IPC on method for event listeners
+   * Note: We store wrapper functions in a WeakMap to enable proper cleanup with off()
+   */
+  on: (channel: string, callback: (...args: any[]) => void): void => {
+    const wrapper = (_event: any, ...args: any[]) => callback(...args);
+    // Store mapping between callback and wrapper for cleanup
+    if (!(window as any).__ipcListeners) {
+      (window as any).__ipcListeners = new Map();
+    }
+    if (!(window as any).__ipcListeners.has(channel)) {
+      (window as any).__ipcListeners.set(channel, new Map());
+    }
+    (window as any).__ipcListeners.get(channel).set(callback, wrapper);
+    ipcRenderer.on(channel, wrapper);
+  },
+
+  /**
+   * Remove a specific listener for a channel
+   */
+  off: (channel: string, callback: (...args: any[]) => void): void => {
+    // Retrieve the wrapper function from our mapping
+    if ((window as any).__ipcListeners?.has(channel)) {
+      const channelListeners = (window as any).__ipcListeners.get(channel);
+      const wrapper = channelListeners.get(callback);
+      if (wrapper) {
+        ipcRenderer.removeListener(channel, wrapper);
+        channelListeners.delete(callback);
+      }
+    }
+  },
+
+  /**
+   * Remove all listeners for a channel
+   */
+  removeAllListeners: (channel: string): void => {
+    ipcRenderer.removeAllListeners(channel);
+  },
+
   /**
    * Send a ping to the main process and receive a pong
    */
@@ -773,6 +784,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
       stack?: string
     ): Promise<void> => {
       return ipcRenderer.invoke('logger:open-github-issue', title, message, stack);
+    },
+
+    /**
+     * Get current console log level
+     */
+    getLogLevel: (): Promise<string> => {
+      return ipcRenderer.invoke('logger:get-log-level');
+    },
+
+    /**
+     * Set console log level
+     */
+    setLogLevel: (level: 'debug' | 'info' | 'warn' | 'error'): Promise<{ success: boolean; level: string }> => {
+      return ipcRenderer.invoke('logger:set-log-level', level);
+    },
+
+    /**
+     * Enable verbose logging (debug level + full env config logging)
+     */
+    enableVerbose: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('logger:enable-verbose');
+    },
+
+    /**
+     * Disable verbose logging (info level)
+     */
+    disableVerbose: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('logger:disable-verbose');
     },
 
     /**
@@ -966,6 +1005,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Open the Git download page in default browser
+     */
+    openGitDownloadPage: (): Promise<void> => {
+      return ipcRenderer.invoke('wizard:open-git-download');
+    },
+
+    /**
+     * Get Git download URL for current platform
+     */
+    getGitDownloadUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-git-download-url');
+    },
+
+    /**
      * Copy a command to the clipboard
      */
     copyCommand: (command: string): Promise<boolean> => {
@@ -984,6 +1037,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getExplanation: (): Promise<string> => {
       return ipcRenderer.invoke('wizard:get-explanation');
+    },
+
+    /**
+     * Get explanation of why Git is needed
+     */
+    getGitExplanation: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-git-explanation');
+    },
+
+    /**
+     * Open the Node.js download page in default browser
+     */
+    openNodeJsDownloadPage: (): Promise<void> => {
+      return ipcRenderer.invoke('wizard:open-nodejs-download');
+    },
+
+    /**
+     * Get Node.js download URL for current platform
+     */
+    getNodeJsDownloadUrl: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-nodejs-download-url');
+    },
+
+    /**
+     * Get explanation of why Node.js is needed
+     */
+    getNodeJsExplanation: (): Promise<string> => {
+      return ipcRenderer.invoke('wizard:get-nodejs-explanation');
     },
   },
 
@@ -1073,58 +1154,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Typing Mind Downloader API
+   * Typing Mind Auto-Configuration API (cloud connector)
    */
   typingMind: {
-    /**
-     * Download Typing Mind UI files from GitHub
-     */
-    download: (): Promise<TypingMindDownloadResult> => {
-      return ipcRenderer.invoke('typingmind:download');
-    },
-
-    /**
-     * Cancel ongoing download
-     */
-    cancelDownload: (): Promise<boolean> => {
-      return ipcRenderer.invoke('typingmind:cancel-download');
-    },
-
-    /**
-     * Check if Typing Mind is installed
-     */
-    isInstalled: (): Promise<boolean> => {
-      return ipcRenderer.invoke('typingmind:is-installed');
-    },
-
-    /**
-     * Get Typing Mind version information
-     */
-    getVersion: (): Promise<TypingMindMetadata> => {
-      return ipcRenderer.invoke('typingmind:get-version');
-    },
-
-    /**
-     * Uninstall Typing Mind
-     */
-    uninstall: (): Promise<TypingMindDownloadResult> => {
-      return ipcRenderer.invoke('typingmind:uninstall');
-    },
-
-    /**
-     * Check for Typing Mind updates
-     */
-    checkForUpdates: (): Promise<TypingMindUpdateCheck> => {
-      return ipcRenderer.invoke('typingmind:check-updates');
-    },
-
-    /**
-     * Get the installation path
-     */
-    getInstallPath: (): Promise<string> => {
-      return ipcRenderer.invoke('typingmind:get-install-path');
-    },
-
     /**
      * Auto-configure Typing Mind with MCP Connector settings
      */
@@ -1180,20 +1212,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openWindow: (url: string): Promise<{ success: boolean; error?: string }> => {
       return ipcRenderer.invoke('typingmind:open-window', url);
     },
-
-    /**
-     * Listen for Typing Mind download progress updates
-     */
-    onProgress: (callback: (progress: TypingMindProgress) => void): void => {
-      ipcRenderer.on('typingmind:progress', (_, progress) => callback(progress));
-    },
-
-    /**
-     * Remove Typing Mind progress listener
-     */
-    removeProgressListener: (): void => {
-      ipcRenderer.removeAllListeners('typingmind:progress');
-    },
   },
 
   /**
@@ -1247,6 +1265,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getConfigInstructions: (): Promise<string> => {
       return ipcRenderer.invoke('claude-desktop:get-config-instructions');
+    },
+  },
+
+  /**
+   * Claude Code CLI API
+   */
+  claudeCode: {
+    /**
+     * Get Claude Code CLI installation and authentication status
+     */
+    getStatus: (): Promise<{
+      installed: boolean;
+      version?: string;
+      loggedIn: boolean;
+      userName?: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke('claude-code:get-status');
+    },
+
+    /**
+     * Open Claude Code installation page in browser
+     */
+    openInstallPage: (): Promise<void> => {
+      return ipcRenderer.invoke('claude-code:open-install-page');
     },
   },
 
@@ -1361,7 +1404,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * Get service logs
      */
     getLogs: (
-      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector' | 'typing-mind',
+      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector',
       tail?: number
     ): Promise<ServiceLogsResult> => {
       return ipcRenderer.invoke('mcp-system:logs', serviceName, tail);
@@ -1426,6 +1469,57 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     showOpenDialog: (options: any): Promise<any> => {
       return ipcRenderer.invoke('dialog:show-open-dialog', options);
+    },
+  },
+
+  /**
+   * Project API
+   */
+  project: {
+    /**
+     * Initialize workspace structure with folders and optional genre pack
+     */
+    initializeWorkspace: (options: {
+      folderPath: string;
+      projectName: string;
+      genrePack?: string;
+    }): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('project:initialize-workspace', options);
+    },
+
+    /**
+     * List available genre packs
+     */
+    listGenrePacks: (): Promise<Array<{ id: string; name: string }>> => {
+      return ipcRenderer.invoke('project:list-genre-packs');
+    },
+  },
+
+  /**
+   * Bundled Plugins API
+   */
+  bundledPlugins: {
+    /**
+     * List all bundled example plugins
+     * Returns array of plugin info including installation status
+     */
+    list: (): Promise<any[]> => {
+      return ipcRenderer.invoke('bundled-plugins:list');
+    },
+
+    /**
+     * Install a bundled example plugin by ID
+     * Returns the plugin ID
+     */
+    install: (pluginId: string): Promise<string> => {
+      return ipcRenderer.invoke('bundled-plugins:install', pluginId);
+    },
+
+    /**
+     * Get the path to bundled plugins (for debugging)
+     */
+    getPath: (): Promise<string> => {
+      return ipcRenderer.invoke('bundled-plugins:get-path');
     },
   },
 
@@ -1601,6 +1695,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * App Settings API (issue #181 -- configured current-user identity)
+   */
+  appSettings: {
+    /**
+     * Get the configured current-user identity (defaults to 'rebecca' until changed)
+     */
+    getCurrentUser: (): Promise<CurrentUserSetting> => {
+      return ipcRenderer.invoke('app-settings:get-current-user');
+    },
+
+    /**
+     * Set the current-user identity
+     */
+    setCurrentUser: (user: CurrentUserSetting): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('app-settings:set-current-user', user);
+    },
+  },
+
+  /**
    * Updater API
    */
   updater: {
@@ -1619,13 +1732,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
-     * Check for Typing Mind updates
-     */
-    checkTypingMind: (): Promise<UpdateInfo> => {
-      return ipcRenderer.invoke('updater:check-typing-mind');
-    },
-
-    /**
      * Update all components
      */
     updateAll: (): Promise<UpdateResult> => {
@@ -1637,13 +1743,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateMCPServers: (): Promise<UpdateResult> => {
       return ipcRenderer.invoke('updater:update-mcp-servers');
-    },
-
-    /**
-     * Update Typing Mind
-     */
-    updateTypingMind: (): Promise<UpdateResult> => {
-      return ipcRenderer.invoke('updater:update-typing-mind');
     },
 
     /**
@@ -1949,7 +2048,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       WELCOME: 1,
       PREREQUISITES: 2,
       ENVIRONMENT: 3,
-      CLIENT_SELECTION: 4,
+      PLUGINS: 4,
       DOWNLOAD_SETUP: 5,
       SYSTEM_STARTUP: 6,
       COMPLETE: 7
@@ -2116,6 +2215,137 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeActionListener: (): void => {
       ipcRenderer.removeAllListeners('plugin-action');
     },
+
+    /**
+     * List all installed plugins with their detailed info
+     */
+    listInstalled: (): Promise<any[]> => {
+      return ipcRenderer.invoke('plugin:list-installed');
+    },
+
+    /**
+     * Update a plugin from a local folder
+     */
+    updateFromFolder: (pluginId: string, folderPath?: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:update-from-folder', pluginId, folderPath);
+    },
+
+    /**
+     * Open a plugin's folder in file explorer
+     */
+    openFolder: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:open-folder', pluginId);
+    },
+
+    /**
+     * Uninstall a plugin
+     */
+    uninstall: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin:uninstall', pluginId);
+    },
+
+    /**
+     * Get the filesystem path to a specific plugin
+     */
+    getPluginPath: (pluginId: string): Promise<string> => {
+      return ipcRenderer.invoke('plugin:get-path', pluginId);
+    },
+  },
+
+  /**
+   * Document API (Agents and Skills)
+   */
+  document: {
+    /**
+     * Read an agent file
+     */
+    readAgent: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-agent', name);
+    },
+
+    /**
+     * Write an agent file
+     */
+    writeAgent: (name: string, content: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-agent', name, content);
+    },
+
+    /**
+     * Read a skill file
+     */
+    readSkill: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-skill', name);
+    },
+
+    /**
+     * Write a skill file
+     */
+    writeSkill: (name: string, content: string, filePath?: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-skill', name, content, filePath);
+    },
+
+    /**
+     * Read an output-style file
+     */
+    readOutputStyle: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:read-output-style', name);
+    },
+
+    /**
+     * Write an output-style file
+     */
+    writeOutputStyle: (name: string, content: string): Promise<any> => {
+      return ipcRenderer.invoke('document:write-output-style', name, content);
+    },
+
+    /**
+     * Delete an output-style file
+     */
+    deleteOutputStyle: (name: string): Promise<any> => {
+      return ipcRenderer.invoke('document:delete-output-style', name);
+    },
+
+    /**
+     * Import output-style from single file
+     */
+    importOutputStyleFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-output-style-file');
+    },
+
+    /**
+     * Import output-styles from folder
+     */
+    importOutputStyleFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-output-style-folder');
+    },
+
+    /**
+     * Import agent from single file
+     */
+    importAgentFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-agent-file');
+    },
+
+    /**
+     * Import agents from folder
+     */
+    importAgentFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-agent-folder');
+    },
+
+    /**
+     * Import skill from single file
+     */
+    importSkillFile: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-skill-file');
+    },
+
+    /**
+     * Import skills from folder
+     */
+    importSkillFolder: (): Promise<any> => {
+      return ipcRenderer.invoke('document:import-skill-folder');
+    },
   },
 
   /**
@@ -2123,59 +2353,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   workflows: {
     /**
-     * List all workflows
+     * Get list of installed agents
      */
-    list: (): Promise<any[]> => {
-      return ipcRenderer.invoke('workflows:list');
+    getInstalledAgents: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-agents');
     },
 
     /**
-     * Get a specific workflow by ID
+     * Get list of installed skills
      */
-    get: (workflowId: string): Promise<any> => {
-      return ipcRenderer.invoke('workflows:get', workflowId);
+    getInstalledSkills: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-skills');
     },
 
     /**
-     * Execute a workflow
+     * Get list of installed output-styles
      */
-    execute: (workflowId: string, initialContext?: any): Promise<any> => {
-      return ipcRenderer.invoke('workflows:execute', workflowId, initialContext);
-    },
-
-    /**
-     * Cancel a running workflow
-     */
-    cancel: (runId: string): Promise<any> => {
-      return ipcRenderer.invoke('workflows:cancel', runId);
-    },
-
-    /**
-     * Get workflow execution history
-     */
-    getRuns: (workflowId: string, limit?: number): Promise<any[]> => {
-      return ipcRenderer.invoke('workflows:get-runs', workflowId, limit);
-    },
-
-    /**
-     * Delete a workflow
-     */
-    delete: (workflowId: string): Promise<any> => {
-      return ipcRenderer.invoke('workflows:delete', workflowId);
-    },
-
-    /**
-     * Create a new workflow
-     */
-    create: (workflow: any): Promise<any> => {
-      return ipcRenderer.invoke('workflows:create', workflow);
-    },
-
-    /**
-     * Update an existing workflow
-     */
-    update: (workflowId: string, updates: any): Promise<any> => {
-      return ipcRenderer.invoke('workflows:update', workflowId, updates);
+    getInstalledOutputStyles: (): Promise<string[]> => {
+      return ipcRenderer.invoke('workflow:get-installed-output-styles');
     },
   },
 
@@ -2202,6 +2397,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     close: (): Promise<void> => {
       return ipcRenderer.invoke('window:close');
+    },
+  },
+
+  /**
+   * Shell API for opening files/folders
+   */
+  shell: {
+    /**
+     * Open a file or folder in the default application
+     */
+    openPath: (path: string): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('shell:open-path', path);
     },
   },
 });

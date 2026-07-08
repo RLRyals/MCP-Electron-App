@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-5x7+Fr7Z6Ub7BSLHTXKduLQzBja6C/spTOXxOb62uYY='; style-src 'self' 'unsafe-inline'">
     <title>FictionLab</title>
     <!-- New Dashboard Layout Styles -->
     <link rel="stylesheet" href="styles/layout.css">
@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="styles/plugins-launcher.css">
     <link rel="stylesheet" href="styles/workflows.css">
     <link rel="stylesheet" href="styles/library.css">
+    <link rel="stylesheet" href="styles/reactflow.css">
+    <link rel="stylesheet" href="wizard.css">
+    <link rel="stylesheet" href="styles/plugin-install-wizard.css">
 
     <!-- Legacy Styles (still needed for content) -->
     <link rel="stylesheet" href="styles/database.css">
@@ -1464,6 +1467,26 @@
             </main>
         </div>
     </div>
+
+    <!-- Load React UMD builds first (sets window.React and window.ReactDOM) -->
+    <script src="vendor/react.umd.js"></script>
+    <script src="vendor/react-dom.umd.js"></script>
+    <!-- Expose jsxRuntime globally for @xyflow/react UMD build -->
+    <script src="vendor/jsx-runtime-setup.js"></script>
+    <script src="vendor/xyflow-react.umd.js"></script>
+
+    <!-- Import Maps -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "./vendor/react.js",
+            "react-dom": "./vendor/react-dom.js",
+            "react-dom/client": "./vendor/react-dom-client.js",
+            "react/jsx-runtime": "./vendor/react-jsx-runtime.js",
+            "@xyflow/react": "./vendor/xyflow-react.js"
+        }
+    }
+    </script>
 
     <script src="client-management-ui.js"></script>
     <script type="module" src="renderer.js"></script>

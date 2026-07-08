@@ -53,7 +53,6 @@ jobs:
       - name: Build Electron app
         run: npm run ${{ matrix.build_script }}
         env:
-          # Disable code signing for now (add certificates later)
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Generate checksums (Windows)

@@ -4,8 +4,10 @@
  * Cross-platform support for Windows, macOS, and Linux
  */
 
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as log from 'electron-log';
 
 const execAsync = promisify(exec);
@@ -56,13 +58,95 @@ async function executeCommand(
 }
 
 /**
- * Get environment variables with fixed PATH for macOS
- * Adds common locations for Docker and other tools
+ * Cache for the one-time `where`/`which docker` (or DOCKER_HOME override) lookup so
+ * getFixedEnv() - which runs on every exec call - doesn't re-shell-out each time.
+ */
+let cachedDockerCliResolution: { dir: string | null; source: string } | null = null;
+let loggedDockerCliResolution = false;
+
+/**
+ * Resolve the directory containing the `docker` binary beyond the hardcoded
+ * default-install guesses, so non-default installs (custom drive, portable
+ * install, symlinked binary, etc.) still get picked up.
+ *
+ * Resolution order:
+ * 1. `DOCKER_HOME` (or legacy `DOCKER_CLI_PATH`) env override, if set and it exists.
+ * 2. `where docker` (Windows) / `which docker` (macOS/Linux) - whatever the OS
+ *    would actually resolve on the current PATH right now.
+ */
+function resolveDockerCliDirectory(): { dir: string | null; source: string } {
+  if (cachedDockerCliResolution) {
+    return cachedDockerCliResolution;
+  }
+
+  const override = process.env.DOCKER_HOME || process.env.DOCKER_CLI_PATH;
+  if (override) {
+    try {
+      if (fs.existsSync(override)) {
+        cachedDockerCliResolution = { dir: override, source: `DOCKER_HOME/DOCKER_CLI_PATH override (${override})` };
+        return cachedDockerCliResolution;
+      }
+    } catch {
+      // ignore access errors, fall through
+    }
+  }
+
+  try {
+    const lookupCommand = process.platform === 'win32' ? 'where docker' : 'which docker';
+    const output = execSync(lookupCommand, { timeout: 3000, windowsHide: true, encoding: 'utf8' });
+    const firstMatch = output
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(line => line.length > 0);
+
+    if (firstMatch) {
+      cachedDockerCliResolution = { dir: path.dirname(firstMatch), source: `${lookupCommand} (${firstMatch})` };
+      return cachedDockerCliResolution;
+    }
+  } catch {
+    // docker not resolvable via where/which right now - fall back to hardcoded defaults
+  }
+
+  cachedDockerCliResolution = { dir: null, source: 'not found via DOCKER_HOME override or where/which docker' };
+  return cachedDockerCliResolution;
+}
+
+/**
+ * Get environment variables with fixed PATH
+ * Adds common locations for Docker and other tools on all platforms
  */
 export function getFixedEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  
-  if (process.platform === 'darwin') {
+  const currentPath = env.PATH || '';
+  const resolved = resolveDockerCliDirectory();
+
+  if (!loggedDockerCliResolution) {
+    loggedDockerCliResolution = true;
+    log.info(`Docker CLI PATH resolution: ${resolved.dir || 'none found beyond hardcoded defaults'} (source: ${resolved.source})`);
+  }
+
+  if (process.platform === 'win32') {
+    // Use %ProgramFiles% so this works regardless of install drive/locale
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programData = process.env.ProgramData || 'C:\\ProgramData';
+    const commonPaths = [
+      `${programFiles}\\Docker\\Docker\\resources\\bin`,
+      `${programFiles}\\Docker\\Docker`,
+      `${programData}\\DockerDesktop\\version-bin`,
+    ];
+
+    // Prefer whatever `where docker`/DOCKER_HOME actually resolved - it wins ties
+    // with non-default installs that the hardcoded guesses above would miss.
+    if (resolved.dir && !commonPaths.includes(resolved.dir)) {
+      commonPaths.unshift(resolved.dir);
+    }
+
+    // Append Docker paths that aren't already in PATH
+    const missingPaths = commonPaths.filter(p => !currentPath.includes(p));
+    if (missingPaths.length > 0) {
+      env.PATH = currentPath + ';' + missingPaths.join(';');
+    }
+  } else if (process.platform === 'darwin') {
     const commonPaths = [
       '/opt/homebrew/bin',
       '/usr/local/bin',
@@ -71,22 +155,20 @@ export function getFixedEnv(): NodeJS.ProcessEnv {
       '/usr/sbin',
       '/sbin'
     ];
-    
-    // Safety check for existing PATH
-    const currentPath = env.PATH || '';
-    
+
+    if (resolved.dir && !commonPaths.includes(resolved.dir)) {
+      commonPaths.unshift(resolved.dir);
+    }
+
     // Add paths if missing, prioritizing them
     // We rebuild the PATH to ensure our paths come first
     const newPath = commonPaths.reduce((acc, p) => {
-      // If path is already there, we don't strictly need to add it, 
-      // but prepending ensures we find our tools first.
-      // Simple strategy: Prepend common paths that aren't at the start.
       return `${p}:${acc}`;
     }, currentPath);
-    
+
     env.PATH = newPath;
   }
-  
+
   return env;
 }
 
@@ -120,6 +202,42 @@ function parseVersion(output: string, regex?: RegExp): string | undefined {
 }
 
 /**
+ * Check if Docker Desktop executable exists on disk.
+ * This is a fallback for when `docker --version` fails (e.g., Docker Desktop
+ * is installed but not running, and the CLI depends on the backend).
+ */
+function isDockerDesktopInstalledOnDisk(): boolean {
+  const platform = getPlatform();
+
+  const paths: string[] = [];
+  if (platform === 'windows') {
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    paths.push(`${programFiles}\\Docker\\Docker\\Docker Desktop.exe`);
+    paths.push(`${programFiles}\\Docker\\Docker\\resources\\bin\\docker.exe`);
+  } else if (platform === 'macos') {
+    paths.push('/Applications/Docker.app');
+    paths.push('/usr/local/bin/docker');
+  } else {
+    // Linux: check common docker binary locations
+    paths.push('/usr/bin/docker');
+    paths.push('/usr/local/bin/docker');
+  }
+
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        log.info(`Docker found on disk at: ${p}`);
+        return true;
+      }
+    } catch {
+      // ignore access errors
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check if Docker is installed
  */
 export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
@@ -135,7 +253,21 @@ export async function checkDockerInstalled(): Promise<PrerequisiteStatus> {
       version: version || 'unknown',
     };
   } catch (error: any) {
-    log.warn('Docker not installed or not in PATH:', error.message);
+    log.warn('Docker CLI check failed:', error.message);
+
+    // Fallback: check if Docker Desktop exists on disk.
+    // On Windows, `docker --version` can fail when Docker Desktop is installed
+    // but not running, because the CLI depends on the backend service.
+    if (isDockerDesktopInstalledOnDisk()) {
+      log.info('Docker Desktop found on disk (CLI not responding - likely not running)');
+      return {
+        installed: true,
+        version: 'unknown',
+        error: 'Docker is installed but the CLI is not responding. Docker Desktop may not be running.',
+      };
+    }
+
+    log.warn('Docker not installed (not found on disk either)');
     return {
       installed: false,
       error: 'Docker is not installed or not found in PATH',
@@ -318,6 +450,43 @@ export async function checkGit(): Promise<PrerequisiteStatus> {
 }
 
 /**
+ * Check if Node.js and npm are installed
+ */
+export async function checkNodeJs(): Promise<PrerequisiteStatus> {
+  log.info('Checking Node.js installation...');
+
+  try {
+    const nodeResult = await executeCommand('node --version');
+    const nodeVersion = parseVersion(nodeResult.stdout);
+
+    // Also check npm
+    try {
+      const npmResult = await executeCommand('npm --version');
+      const npmVersion = parseVersion(npmResult.stdout);
+
+      log.info(`Node.js installed: ${nodeVersion}, npm: ${npmVersion}`);
+      return {
+        installed: true,
+        version: `${nodeVersion} (npm ${npmVersion})`,
+      };
+    } catch (npmError: any) {
+      log.warn('npm not found:', npmError.message);
+      return {
+        installed: false,
+        version: nodeVersion,
+        error: 'Node.js is installed but npm is not found in PATH',
+      };
+    }
+  } catch (error: any) {
+    log.warn('Node.js not installed or not in PATH:', error.message);
+    return {
+      installed: false,
+      error: 'Node.js is not installed or not found in PATH',
+    };
+  }
+}
+
+/**
  * Check WSL status (Windows only)
  */
 export async function checkWSL(): Promise<PrerequisiteStatus> {
@@ -382,6 +551,7 @@ export async function checkWSL(): Promise<PrerequisiteStatus> {
 export async function checkAll(): Promise<{
   docker: PrerequisiteStatus;
   git: PrerequisiteStatus;
+  nodejs: PrerequisiteStatus;
   wsl?: PrerequisiteStatus;
   platform: string;
 }> {
@@ -392,6 +562,7 @@ export async function checkAll(): Promise<{
     platform,
     docker: await checkDockerRunning(),
     git: await checkGit(),
+    nodejs: await checkNodeJs(),
   };
 
   // Only check WSL on Windows
