@@ -8,7 +8,7 @@
 
 import * as React from 'react';
 import { useState } from 'react';
-import type { KanbanCard, KanbanColumn as KanbanColumnType } from '../../../types/kanban.js';
+import type { KanbanCard, KanbanColumn as KanbanColumnType, KanbanIdentity } from '../../../types/kanban.js';
 import type { ActiveWorkflowInstance } from '../../../types/workflow.js';
 import { KanbanCardTile } from './KanbanCardTile.js';
 
@@ -16,6 +16,8 @@ export interface KanbanColumnProps {
   column: KanbanColumnType;
   cards: KanbanCard[];
   workflowPhases: Map<string, ActiveWorkflowInstance>;
+  /** assignee id -> identity kind, for the human/persona/agent chip (issue #181 §4). Empty when list_identities isn't available yet. */
+  identityKindById?: Map<string, KanbanIdentity['kind']>;
   onSelectCard: (card: KanbanCard) => void;
   onQuickAdd: (statusKey: string, title: string) => void;
   onDropCard: (cardId: string, statusKey: string) => void;
@@ -26,6 +28,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   column,
   cards,
   workflowPhases,
+  identityKindById,
   onSelectCard,
   onQuickAdd,
   onDropCard,
@@ -138,6 +141,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             key={card.id}
             card={card}
             workflowPhase={card.workflow_registry_id ? workflowPhases.get(card.workflow_registry_id) : null}
+            identityKind={card.assignee ? identityKindById?.get(card.assignee) : undefined}
             onSelect={onSelectCard}
             onDragStart={(c) => setDraggingCardId(c.id)}
           />

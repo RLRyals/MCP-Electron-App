@@ -6,16 +6,24 @@
  */
 
 import * as React from 'react';
-import type { KanbanCard, KanbanReviewPolicy } from '../../../types/kanban.js';
+import type { KanbanCard, KanbanIdentity, KanbanReviewPolicy } from '../../../types/kanban.js';
 import { PRIORITY_COLORS } from '../../../types/kanban.js';
 import type { ActiveWorkflowInstance } from '../../../types/workflow.js';
 
 export interface KanbanCardTileProps {
   card: KanbanCard;
   workflowPhase?: ActiveWorkflowInstance | null;
+  /** The assignee's identity kind (human/persona/agent), when list_identities is available (issue #181 §4). */
+  identityKind?: KanbanIdentity['kind'];
   onSelect: (card: KanbanCard) => void;
   onDragStart: (card: KanbanCard) => void;
 }
+
+const IDENTITY_KIND_COLORS: Record<KanbanIdentity['kind'], string> = {
+  human: '#3b82f6',
+  persona: '#a855f7',
+  agent: '#10b981',
+};
 
 function dueChip(due_at: string | null, status: string): { label: string; color: string } | null {
   if (!due_at) return null;
@@ -35,7 +43,7 @@ function reviewBadge(policy: KanbanReviewPolicy): { label: string; color: string
     : { label: 'auto-done', color: '#6b7280' };
 }
 
-export const KanbanCardTile: React.FC<KanbanCardTileProps> = ({ card, workflowPhase, onSelect, onDragStart }) => {
+export const KanbanCardTile: React.FC<KanbanCardTileProps> = ({ card, workflowPhase, identityKind, onSelect, onDragStart }) => {
   const due = dueChip(card.due_at, card.status);
   const review = reviewBadge(card.review_policy);
 
@@ -119,6 +127,14 @@ export const KanbanCardTile: React.FC<KanbanCardTileProps> = ({ card, workflowPh
 
       <div style={{ ...rowStyle, fontSize: '10px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.5))' }}>
         {card.assignee && <span title="Assignee">👤 {card.assignee}</span>}
+        {card.assignee && identityKind && (
+          <span
+            title={`Identity kind: ${identityKind}`}
+            style={{ ...chipBase, fontSize: '9px', padding: '1px 5px', background: IDENTITY_KIND_COLORS[identityKind] }}
+          >
+            {identityKind}
+          </span>
+        )}
         {card.comment_count > 0 && <span title="Comments">💬 {card.comment_count}</span>}
         {card.link_count > 0 && <span title="Links">🔗 {card.link_count}</span>}
       </div>
