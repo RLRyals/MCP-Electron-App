@@ -494,7 +494,7 @@ export class PluginsLauncher implements View {
               </div>
             </div>
             <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap;">
-              <button class="plugin-folder-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Update from a local plugin folder" style="
+              <button class="plugin-folder-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Update this plugin in place from a local plugin folder" style="
                 background: var(--bg-quaternary, #3a3a3a);
                 color: var(--text-primary, #fff);
                 border: none;
@@ -502,7 +502,7 @@ export class PluginsLauncher implements View {
                 border-radius: 6px;
                 cursor: pointer;
                 font-size: 13px;
-              ">From Folder</button>
+              ">Update…</button>
               <button class="plugin-open-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Open plugin folder in file explorer" style="
                 background: var(--bg-quaternary, #3a3a3a);
                 color: var(--text-primary, #fff);
@@ -529,7 +529,12 @@ export class PluginsLauncher implements View {
         container.appendChild(card);
       }
 
-      // Add event listeners for "Update from Folder" buttons
+      // Add event listeners for "Update…" buttons.
+      // Flow lives in the main process (src/main/handlers/plugin-update-handlers.ts):
+      // pick folder -> validate (id + strictly-greater semver, refused before
+      // any file is touched) -> native confirm (current -> new version) ->
+      // atomic swap with .bak rollback -> native "Restart Now / Later" prompt.
+      // This handler just reflects whatever the main process reports back.
       container.querySelectorAll('.plugin-folder-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
@@ -544,29 +549,46 @@ export class PluginsLauncher implements View {
           if (statusEl) {
             statusEl.style.display = 'block';
             statusEl.style.color = 'var(--text-secondary, #888)';
-            statusEl.textContent = 'Select the plugin folder containing plugin.json...';
+            statusEl.textContent = 'Select the updated plugin folder containing plugin.json...';
           }
 
           try {
             const result = await (window as any).electronAPI.plugins.updateFromFolder(pluginId);
+
             if (result.cancelled) {
               button.disabled = false;
-              button.textContent = 'Update from Folder';
+              button.textContent = 'Update…';
               if (statusEl) statusEl.style.display = 'none';
               return;
             }
+
+            if (result.refused) {
+              // Refused before any file was touched: id mismatch, downgrade,
+              // or an invalid bundle. Nothing changed on disk.
+              if (statusEl) {
+                statusEl.style.color = 'var(--danger-color, #d32f2f)';
+                statusEl.textContent = result.message || 'Update refused.';
+              }
+              button.disabled = false;
+              button.textContent = 'Update…';
+              return;
+            }
+
             if (statusEl) {
               statusEl.style.color = 'var(--success-color, #4caf50)';
-              statusEl.textContent = result.message || 'Update successful! Restart FictionLab to apply changes.';
+              statusEl.textContent = result.message || 'Update successful.';
             }
-            button.textContent = 'Updated';
+            button.textContent = result.restarting ? 'Restarting…' : 'Updated';
+            // Leave the button disabled: either FictionLab is about to
+            // relaunch, or the swap is done and re-running it against the
+            // now-current version would just be refused as "not an upgrade".
           } catch (error: any) {
             if (statusEl) {
               statusEl.style.color = 'var(--danger-color, #d32f2f)';
               statusEl.textContent = `Update failed: ${error.message}`;
             }
             button.disabled = false;
-            button.textContent = 'Update from Folder';
+            button.textContent = 'Update…';
           }
         });
       });

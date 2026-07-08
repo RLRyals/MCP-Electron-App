@@ -64,6 +64,22 @@ export class PluginLoader {
           continue;
         }
 
+        // Skip update-swap bookkeeping directories (see plugin-update-swap.ts,
+        // issue #182): a `.bak` is the pre-update copy of a plugin kept around
+        // for crash rollback, and `.staging` is a not-yet-swapped-in update.
+        // Both are full copies of a real plugin (same id, own plugin.json),
+        // so without this guard they'd be "discovered" as duplicate plugins.
+        // Also skip the older ad-hoc `.backup-<timestamp>` naming in case any
+        // are still on disk from before this change.
+        if (
+          entry.name.endsWith('.bak') ||
+          entry.name.endsWith('.staging') ||
+          entry.name.includes('.backup-')
+        ) {
+          logWithCategory('debug', LogCategory.SYSTEM, `Skipping update-swap directory: ${entry.name}`);
+          continue;
+        }
+
         const pluginPath = path.join(this.pluginsDirectory, entry.name);
         const manifestPath = path.join(pluginPath, 'plugin.json');
 
