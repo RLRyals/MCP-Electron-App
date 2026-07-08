@@ -14,6 +14,17 @@
  * additionally force an immediate re-fetch (issue #179 §4 hard requirement,
  * independent of push/poll -- the board must never sit stale the way the
  * Active Workflows panel does per issue #178).
+ *
+ * Multi-board (GH issue #189): v1 hardcoded a single `dev-backlog` board key,
+ * so any other board in `fictionlab.kanban_boards` (e.g. `broadquill-business`)
+ * was unreachable -- it always rendered as a real-looking, silently empty
+ * board. The board list (`board:list-boards`, already wired through to the
+ * `list_boards` MCP tool -- no backend change needed) now drives a switcher:
+ * default to the last board the user picked (persisted in localStorage, same
+ * convention `fictionlab-active-view` already uses in renderer.ts), falling
+ * back to the first non-archived board (list_boards orders by created_at, so
+ * this is `dev-backlog` on existing installs -- single-board behavior is
+ * unchanged unless a second board exists).
  */
 
 import * as React from 'react';
@@ -36,8 +47,11 @@ import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflo
 import type { CurrentUserSetting } from '../../types/identity.js';
 
 const KANBAN_PLUGIN = 'plugin:fictionlab-kanban:';
-const BOARD_KEY = 'dev-backlog';
 const POLL_INTERVAL_MS = 5000;
+// Per-user "last selected board" persistence (issue #189). Same localStorage
+// convention renderer.ts already uses for `fictionlab-active-view` -- no new
+// backend/IPC plumbing needed, and it naturally lives per OS user profile.
+const LAST_BOARD_STORAGE_KEY = 'fictionlab-kanban-last-board';
 
 // Transient placeholder for the brief window before loadCurrentUser() resolves
 // the real value via `app-settings:get-current-user`. Deliberately NOT the
@@ -81,6 +95,17 @@ const filterButtonStyle = (active: boolean): React.CSSProperties => ({
   cursor: 'pointer',
 });
 
+const boardSwitcherStyle: React.CSSProperties = {
+  padding: '5px 10px',
+  fontSize: '12px',
+  borderRadius: '6px',
+  border: '1px solid var(--color-border, rgba(255,255,255,0.15))',
+  background: 'var(--color-bg-secondary, rgba(255,255,255,0.05))',
+  color: 'var(--color-text, rgba(255,255,255,0.9))',
+  cursor: 'pointer',
+  marginRight: '4px',
+};
+
 const boardStyle: React.CSSProperties = {
   display: 'flex',
   gap: '12px',
@@ -91,6 +116,8 @@ const boardStyle: React.CSSProperties = {
 };
 
 const KanbanApp: React.FC = () => {
+  const [boards, setBoards] = useState<KanbanBoard[]>([]);
+  const [boardKey, setBoardKeyRaw] = useState<string | null>(null);
   const [board, setBoard] = useState<KanbanBoard | null>(null);
   const [columns, setColumns] = useState<KanbanColumnType[]>([]);
   const [cards, setCards] = useState<KanbanCard[]>([]);
@@ -109,9 +136,59 @@ const KanbanApp: React.FC = () => {
   const assigneeFilterRef = useRef(assigneeFilter);
   const dueFilterRef = useRef(dueFilter);
   const currentUserRef = useRef(currentUser);
+  const boardKeyRef = useRef(boardKey);
   assigneeFilterRef.current = assigneeFilter;
   dueFilterRef.current = dueFilter;
   currentUserRef.current = currentUser;
+  boardKeyRef.current = boardKey;
+
+  // Switch boards: resets the card/column/selection state so a stale
+  // previous board never flashes, and persists the choice (issue #189
+  // acceptance criterion: selection survives an app restart).
+  const selectBoard = useCallback((key: string) => {
+    if (boardKeyRef.current !== key) {
+      setSelectedCardId(null);
+      setCards([]);
+      setColumns([]);
+    }
+    boardKeyRef.current = key;
+    setBoardKeyRaw(key);
+    try {
+      localStorage.setItem(LAST_BOARD_STORAGE_KEY, key);
+    } catch {
+      // best-effort -- persistence is a convenience, not correctness-critical
+    }
+  }, []);
+
+  // Load the board list once on mount. Defaults to the persisted
+  // last-selected board if it's still valid (exists and isn't archived),
+  // otherwise the first non-archived board (list_boards orders by
+  // created_at, so this is `dev-backlog` on any existing install).
+  const loadBoards = useCallback(async () => {
+    try {
+      const result = await invoke<{ boards: KanbanBoard[] }>('board:list-boards');
+      const nonArchived = (result?.boards || []).filter((b) => !b.is_archived);
+      setBoards(nonArchived);
+
+      let persisted: string | null = null;
+      try {
+        persisted = localStorage.getItem(LAST_BOARD_STORAGE_KEY);
+      } catch {
+        persisted = null;
+      }
+
+      const stillValid = !!persisted && nonArchived.some((b) => b.board_key === persisted);
+      const next = stillValid ? persisted : nonArchived[0]?.board_key ?? null;
+
+      if (next) {
+        selectBoard(next);
+      } else {
+        setError('No kanban boards found');
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load boards');
+    }
+  }, [selectBoard]);
 
   const resolveAssigneeParam = (filter: KanbanAssigneeFilter, mineId: string): string | undefined => {
     if (filter === 'mine') return mineId;
@@ -121,8 +198,10 @@ const KanbanApp: React.FC = () => {
   };
 
   const loadBoard = useCallback(async () => {
+    const key = boardKeyRef.current;
+    if (!key) return;
     try {
-      const result = await invoke<{ board: KanbanBoard; columns: KanbanColumnType[] }>('board:get-board', { board_key: BOARD_KEY });
+      const result = await invoke<{ board: KanbanBoard; columns: KanbanColumnType[] }>('board:get-board', { board_key: key });
       if (result?.board) {
         setBoard(result.board);
         setColumns([...(result.columns || [])].sort((a, b) => a.position - b.position));
@@ -133,8 +212,10 @@ const KanbanApp: React.FC = () => {
   }, []);
 
   const loadCards = useCallback(async () => {
+    const key = boardKeyRef.current;
+    if (!key) return;
     try {
-      const args: Record<string, any> = { board_key: BOARD_KEY, limit: 500 };
+      const args: Record<string, any> = { board_key: key, limit: 500 };
       const assignee = resolveAssigneeParam(assigneeFilterRef.current, currentUserRef.current.id);
       if (assignee !== undefined) args.assignee = assignee;
       if (dueFilterRef.current !== 'none') args.due_filter = dueFilterRef.current;
@@ -195,9 +276,12 @@ const KanbanApp: React.FC = () => {
     loadIdentities();
   }, [loadBoard, loadCards, loadWorkflowPhases, loadIdentities]);
 
-  // Initial load + re-load when filters (or the configured identity) change.
-  useEffect(() => { loadBoard(); }, [loadBoard]);
-  useEffect(() => { loadCards(); }, [loadCards, assigneeFilter, dueFilter, currentUser]);
+  // Initial board-list load (resolves boardKey), then board/cards load once a
+  // board is selected + re-load when filters, the configured identity, or the
+  // selected board change.
+  useEffect(() => { loadBoards(); }, [loadBoards]);
+  useEffect(() => { if (boardKey) loadBoard(); }, [loadBoard, boardKey]);
+  useEffect(() => { if (boardKey) loadCards(); }, [loadCards, boardKey, assigneeFilter, dueFilter, currentUser]);
   useEffect(() => { loadWorkflowPhases(); }, [loadWorkflowPhases]);
   useEffect(() => { loadCurrentUser(); }, [loadCurrentUser]);
   useEffect(() => { loadIdentities(); }, [loadIdentities]);
@@ -241,7 +325,9 @@ const KanbanApp: React.FC = () => {
   }, [refresh]);
 
   const handleQuickAdd = useCallback((statusKey: string, title: string) => {
-    invoke('board:create-card', { board_key: BOARD_KEY, title, status: statusKey })
+    const key = boardKeyRef.current;
+    if (!key) return;
+    invoke('board:create-card', { board_key: key, title, status: statusKey })
       .then(refresh)
       .catch((e: any) => setError(e?.message || 'Failed to create card'));
   }, [refresh]);
@@ -294,9 +380,22 @@ const KanbanApp: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={filterBarStyle}>
-        <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.5))', marginRight: '4px' }}>
-          {board?.name || 'Board'}
-        </span>
+        {boards.length > 1 ? (
+          <select
+            aria-label="Select board"
+            style={boardSwitcherStyle}
+            value={boardKey ?? ''}
+            onChange={(e) => selectBoard(e.target.value)}
+          >
+            {boards.map((b) => (
+              <option key={b.board_key} value={b.board_key}>{b.name}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.5))', marginRight: '4px' }}>
+            {board?.name || 'Board'}
+          </span>
+        )}
         <button style={filterButtonStyle(assigneeFilter === 'mine')} onClick={() => setAssigneeFilter('mine')}>Mine ({currentUser.displayName})</button>
         <button
           style={{ ...filterButtonStyle(false), padding: '5px 8px' }}
