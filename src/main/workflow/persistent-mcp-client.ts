@@ -1,16 +1,25 @@
 /**
  * Persistent MCP Client
  *
- * Maintains a single persistent Node.js process for the workflow-manager MCP server
- * to eliminate the 1-2 second process spawning overhead on every operation.
+ * Maintains a single persistent Node.js process for an MCP-Writing-Servers
+ * server (workflow-manager by default; any `src/mcps/<serverDir>/index.js`
+ * that supports MCP_STDIO_MODE, e.g. kanban-server, via the constructor's
+ * `serverDir` param) to eliminate the 1-2 second process spawning overhead
+ * on every operation.
  *
  * Key features:
- * - Spawn workflow-manager-server/index.js once on startup
+ * - Spawn <serverDir>/index.js once on startup
  * - Keep stdio connection open throughout app lifecycle
  * - Queue requests with unique IDs
  * - Parse responses asynchronously via stdout
  * - Auto-restart on crash with exponential backoff
  * - Graceful shutdown
+ *
+ * The high-level convenience methods below (importWorkflowDefinition,
+ * listActiveWorkflows, etc.) are workflow-manager-specific and simply go
+ * unused by a client constructed for a different serverDir (e.g. kanban) --
+ * only the generic callTool()/start()/shutdown()/isReady() surface is
+ * shared across servers.
  */
 
 import { spawn, ChildProcess } from 'child_process';
@@ -49,15 +58,21 @@ export class PersistentMCPClient {
   private stdoutBuffer: string = '';
   private databaseUrl: string | null = null;
 
-  constructor() {
-    // Path to workflow-manager MCP server
+  /**
+   * @param serverDir MCP-Writing-Servers `src/mcps/<serverDir>` folder to spawn
+   *   (its `index.js` must support `MCP_STDIO_MODE`, per workflow-manager-server
+   *   and kanban-server's shared pattern). Defaults to workflow-manager-server
+   *   for backward compatibility with existing callers.
+   */
+  constructor(serverDir: string = 'workflow-manager-server') {
+    // Path to the target MCP server
     const userDataPath = app.getPath('userData');
     const mcpServersDir = path.join(userDataPath, 'repositories', 'mcp-writing-servers');
     this.mcpServerPath = path.join(
       mcpServersDir,
       'src',
       'mcps',
-      'workflow-manager-server',
+      serverDir,
       'index.js'
     );
   }

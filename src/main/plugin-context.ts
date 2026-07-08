@@ -47,6 +47,46 @@ async function getWorkflowMCPClient(): Promise<PersistentMCPClient> {
   }
 }
 
+// Singleton instance of PersistentMCPClient for kanban-server stdio communication.
+// Same stdio-first treatment workflow-manager gets (S11 §4a / GH issue #179 §2:
+// "give kanban the same stdio treatment workflow-manager gets... rather than the
+// HTTP /api/tool-call branch"). A second singleton pair, mirroring
+// workflowMCPClient/getWorkflowMCPClient() above, rather than generalizing a
+// shared cache keyed by serverId -- called out in the issue as an acceptable v1
+// shortcut ("a minimally-duplicated second PersistentMCPClient instance").
+let kanbanMCPClient: PersistentMCPClient | null = null;
+let kanbanMCPClientStartPromise: Promise<void> | null = null;
+
+/**
+ * Get or create the singleton PersistentMCPClient for kanban-server.
+ * Uses stdio for low-latency communication, same as workflow-manager.
+ */
+async function getKanbanMCPClient(): Promise<PersistentMCPClient> {
+  if (kanbanMCPClient && kanbanMCPClient.isReady()) {
+    return kanbanMCPClient;
+  }
+
+  if (kanbanMCPClientStartPromise) {
+    await kanbanMCPClientStartPromise;
+    if (kanbanMCPClient) {
+      return kanbanMCPClient;
+    }
+  }
+
+  kanbanMCPClient = new PersistentMCPClient('kanban-server');
+  kanbanMCPClientStartPromise = kanbanMCPClient.start();
+
+  try {
+    await kanbanMCPClientStartPromise;
+    logWithCategory('info', LogCategory.SYSTEM, 'PersistentMCPClient started for kanban-server stdio communication');
+    return kanbanMCPClient;
+  } catch (error: any) {
+    kanbanMCPClient = null;
+    kanbanMCPClientStartPromise = null;
+    throw error;
+  }
+}
+
 import {
   PluginContext,
   PluginServices,
@@ -255,6 +295,7 @@ function createMCPConnectionManager(
         'review': 3007,
         'reporting': 3008,
         'author': 3009,
+        'kanban': 3015,
       };
 
       const port = serverPorts[serverId];
@@ -306,6 +347,25 @@ function createMCPConnectionManager(
         } catch (error: any) {
           logWithCategory('error', LogCategory.SYSTEM,
             `Plugin ${pluginId} workflow-manager stdio error:`, error);
+          throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
+        }
+      }
+
+      // Use stdio (PersistentMCPClient) for kanban-server -- same treatment as
+      // workflow-manager (S11 §4a / GH issue #179 §2: the proven path, rather
+      // than the HTTP /api/tool-call branch).
+      if (serverId === 'kanban') {
+        try {
+          logWithCategory('info', LogCategory.SYSTEM,
+            `Plugin ${pluginId} calling kanban-server tool via stdio: ${toolName}`, args);
+
+          const client = await getKanbanMCPClient();
+          const result = await client.callTool(toolName, args);
+
+          return result as T;
+        } catch (error: any) {
+          logWithCategory('error', LogCategory.SYSTEM,
+            `Plugin ${pluginId} kanban-server stdio error:`, error);
           throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
         }
       }
@@ -377,6 +437,16 @@ function createMCPConnectionManager(
         }
       }
 
+      // For kanban, same stdio ready-check as workflow-manager
+      if (serverId === 'kanban') {
+        try {
+          const client = await getKanbanMCPClient();
+          return client.isReady();
+        } catch {
+          return false;
+        }
+      }
+
       // For other servers, use HTTP health check
       const endpoint = this.getEndpoint(serverId);
       if (!endpoint) {
@@ -407,6 +477,28 @@ function createMCPConnectionManager(
             endpoint: 'stdio',
             status: running ? 'running' : 'stopped',
             tools: [], // Tools list not available via stdio without additional protocol
+          };
+        } catch (error) {
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: 'error',
+          };
+        }
+      }
+
+      // For kanban, same stdio client shape as workflow-manager
+      if (serverId === 'kanban') {
+        try {
+          const client = await getKanbanMCPClient();
+          const running = client.isReady();
+          return {
+            id: serverId,
+            name: serverId,
+            endpoint: 'stdio',
+            status: running ? 'running' : 'stopped',
+            tools: [],
           };
         } catch (error) {
           return {

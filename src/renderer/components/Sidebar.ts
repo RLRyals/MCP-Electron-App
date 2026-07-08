@@ -83,6 +83,11 @@ export class Sidebar {
       items.push({ id: 'workflows', label: 'Workflows', icon: '🔧', section: 'primary' });
     }
 
+    // Only include the kanban board if the kanban plugin is installed
+    if (this.installedPlugins.has('fictionlab-kanban')) {
+      items.push({ id: 'kanban', label: 'Board', icon: '📋', section: 'primary' });
+    }
+
     items.push(
       { id: 'plugins', label: 'Plugins', icon: '🔌', section: 'primary' },
       {
