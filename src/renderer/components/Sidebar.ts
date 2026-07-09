@@ -35,6 +35,8 @@ export class Sidebar {
   private listeners: Map<string, Set<Function>> = new Map();
   private pinnedPlugins: string[] = [];
   private installedPlugins: Set<string> = new Set();
+  private mobileToggleButton: HTMLButtonElement | null = null;
+  private readonly MOBILE_BREAKPOINT = 767;
 
   // Storage keys
   private readonly STORAGE_ACTIVE_VIEW = 'fictionlab-active-view';
@@ -60,6 +62,7 @@ export class Sidebar {
 
     this.render();
     this.attachEventListeners();
+    this.setupMobileToggle();
 
     // Load saved active view or use default
     const savedView = localStorage.getItem(this.STORAGE_ACTIVE_VIEW);
@@ -325,6 +328,10 @@ export class Sidebar {
     console.log('[Sidebar] Navigating to:', viewId);
     this.setActiveView(viewId);
     this.emit('navigate', viewId);
+
+    // On narrow/mobile viewports the sidebar is an off-canvas overlay;
+    // close it after a selection so the newly-active view is visible.
+    this.closeMobileMenu();
   }
 
   /**
@@ -574,10 +581,86 @@ export class Sidebar {
   }
 
   /**
+   * Create the fixed-position hamburger button used to open/close the
+   * sidebar on narrow (< 768px) viewports, where the sidebar is styled
+   * as an off-canvas overlay (see layout.css `.sidebar` mobile media query).
+   * The button lives outside `this.container` so it stays reachable even
+   * while the sidebar itself is translated off-screen.
+   */
+  private setupMobileToggle(): void {
+    if (this.mobileToggleButton) return; // Already set up
+
+    const button = document.createElement('button');
+    button.className = 'mobile-menu-toggle';
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Toggle navigation menu');
+    button.setAttribute('aria-controls', this.container.id || 'sidebar');
+    button.setAttribute('aria-expanded', 'false');
+    button.textContent = '☰';
+
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMobileMenu();
+    });
+
+    document.body.appendChild(button);
+    this.mobileToggleButton = button;
+
+    // Collapse the overlay automatically if the window is resized back
+    // to a desktop width while it happens to be open.
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > this.MOBILE_BREAKPOINT) {
+        this.closeMobileMenu();
+      }
+    });
+
+    // Tapping/clicking outside the open overlay should close it.
+    document.addEventListener('click', (e) => {
+      if (!this.container.classList.contains('open')) return;
+      const target = e.target as HTMLElement;
+      if (
+        !this.container.contains(target) &&
+        target !== this.mobileToggleButton &&
+        !this.mobileToggleButton?.contains(target)
+      ) {
+        this.closeMobileMenu();
+      }
+    });
+  }
+
+  /**
+   * Toggle the mobile off-canvas sidebar open/closed
+   */
+  private toggleMobileMenu(): void {
+    const isOpen = this.container.classList.toggle('open');
+    this.setMobileToggleState(isOpen);
+  }
+
+  /**
+   * Close the mobile off-canvas sidebar (no-op if already closed)
+   */
+  private closeMobileMenu(): void {
+    if (!this.container.classList.contains('open')) return;
+    this.container.classList.remove('open');
+    this.setMobileToggleState(false);
+  }
+
+  /**
+   * Sync the toggle button's icon/ARIA state with the sidebar's open state
+   */
+  private setMobileToggleState(isOpen: boolean): void {
+    if (!this.mobileToggleButton) return;
+    this.mobileToggleButton.setAttribute('aria-expanded', String(isOpen));
+    this.mobileToggleButton.textContent = isOpen ? '✕' : '☰';
+  }
+
+  /**
    * Destroy the sidebar
    */
   public destroy(): void {
     this.container.innerHTML = '';
     this.listeners.clear();
+    this.mobileToggleButton?.remove();
+    this.mobileToggleButton = null;
   }
 }
