@@ -75,6 +75,14 @@ const renderVariableBrowser = (props: Partial<VariableBrowserProps> = {}) => {
   return render(<VariableBrowser {...mockProps} {...props} />);
 };
 
+// VariableBrowser's onInsert handler announces to screen readers by
+// appending a role="status" div directly to document.body (not into the
+// React tree) and removing it itself via a 1000ms setTimeout -- see the
+// "should announce when variable is inserted" test below, which waits out
+// that real timeout so the node is gone before the test ends (instead of
+// force-removing it here, which would race the component's own delayed
+// removeChild and throw an uncaught NotFoundError in a later test).
+
 // ============================================================================
 // Automated Accessibility Tests
 // ============================================================================
@@ -433,18 +441,22 @@ describe('VariableBrowser - Keyboard Navigation', () => {
 
       const treeitems = screen.getAllByRole('treeitem');
       const firstItem = treeitems[0];
-
-      // Mock scrollIntoView
-      const scrollIntoViewMock = jest.fn();
-      firstItem.scrollIntoView = scrollIntoViewMock;
+      const secondItem = treeitems[1];
 
       firstItem.focus();
+
+      // Mock scrollIntoView on the item that will receive focus next --
+      // ArrowDown moves focus (and triggers the scroll-into-view effect) to
+      // secondItem, not firstItem, so the mock belongs there.
+      const scrollIntoViewMock = jest.fn();
+      secondItem.scrollIntoView = scrollIntoViewMock;
+
       await user.keyboard('{ArrowDown}');
 
       // Wait for effect to run
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Should have been called for the focused item
+      // Should have been called for the newly focused item
       expect(scrollIntoViewMock).toHaveBeenCalled();
     });
   });
@@ -488,20 +500,25 @@ describe('VariableBrowser - Search Accessibility', () => {
   });
 
   it('should announce search query to screen readers', async () => {
-    renderVariableBrowser();
+    const { container } = renderVariableBrowser();
     const user = userEvent.setup();
 
     const searchInput = screen.getByLabelText(/Search variables/i);
     await user.type(searchInput, 'market');
 
-    const announcement = screen.getByRole('status');
+    // Scope to this render's container, not the whole document: inserting a
+    // variable (in other tests) appends a separate, self-removing
+    // role="status" announcement directly to document.body, outside any
+    // render container, which would otherwise make this an ambiguous match
+    // if a prior test's announcement hasn't been cleaned up yet.
+    const announcement = within(container).getByRole('status');
     expect(announcement).toHaveTextContent(/Searching for: market/i);
   });
 
   it('should have aria-live region for search announcements', () => {
-    renderVariableBrowser();
+    const { container } = renderVariableBrowser();
 
-    const liveRegion = screen.getByRole('status');
+    const liveRegion = within(container).getByRole('status');
     expect(liveRegion).toHaveAttribute('aria-live', 'polite');
     expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
   });
@@ -513,15 +530,15 @@ describe('VariableBrowser - Search Accessibility', () => {
 
 describe('VariableBrowser - Screen Reader Support', () => {
   it('should hide decorative icons from screen readers', () => {
-    renderVariableBrowser();
+    const { container } = renderVariableBrowser();
 
     // Check that expand/collapse icons are hidden
-    const expandIcons = screen.container.querySelectorAll('.tree-expand-icon');
+    const expandIcons = container.querySelectorAll('.tree-expand-icon');
     expandIcons.forEach(icon => {
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     });
 
-    const itemIcons = screen.container.querySelectorAll('.tree-item-icon');
+    const itemIcons = container.querySelectorAll('.tree-item-icon');
     itemIcons.forEach(icon => {
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     });
@@ -547,9 +564,13 @@ describe('VariableBrowser - Screen Reader Support', () => {
       // Check that onInsert was called
       expect(mockProps.onInsert).toHaveBeenCalled();
 
-      // In real implementation, an announcement element is created
-      // We can't easily test the dynamic element creation in this test
-      // but the component does create a screen reader announcement
+      // The announcement div the component appends to document.body removes
+      // itself via a real 1000ms setTimeout. Wait it out here so the node is
+      // gone before this test ends -- otherwise it leaks into later tests
+      // (causing ambiguous "multiple status roles" matches) or, if force-
+      // removed externally, causes the component's own delayed removeChild
+      // to throw an uncaught NotFoundError during a later test.
+      await new Promise(resolve => setTimeout(resolve, 1100));
     }
   });
 
@@ -564,9 +585,9 @@ describe('VariableBrowser - Screen Reader Support', () => {
   });
 
   it('should have screen reader only class for hidden content', () => {
-    renderVariableBrowser();
+    const { container } = renderVariableBrowser();
 
-    const srOnlyElements = screen.container.querySelectorAll('.sr-only');
+    const srOnlyElements = container.querySelectorAll('.sr-only');
     expect(srOnlyElements.length).toBeGreaterThan(0);
 
     srOnlyElements.forEach(element => {
@@ -617,9 +638,19 @@ describe('VariableBrowser - Complex Tree Structures', () => {
     });
     const user = userEvent.setup();
 
-    // Expand to see array items
-    const sections = screen.getAllByRole('treeitem');
-    await user.click(sections[0]);
+    // Expand to see array items. Sections render in nodeOutputs-then-global
+    // order, so with the default mock's two node-output sections still
+    // present, "Global Variables" (which holds our arrayData) is not
+    // reliably sections[0] -- select it by its accessible name instead.
+    const globalSection = screen.getByRole('treeitem', { name: /Global Variables/i });
+    await user.click(globalSection);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // "items" is itself an expandable array node -- expand it too to reveal
+    // its [0]/[1]/[2] children.
+    const itemsNode = screen.getByRole('treeitem', { name: /^items/i });
+    await user.click(itemsNode);
 
     await new Promise(resolve => setTimeout(resolve, 100));
 

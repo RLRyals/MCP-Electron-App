@@ -136,10 +136,22 @@ describe('BuildPipelineOrchestrator', () => {
     jest.clearAllMocks();
     orchestrator = new BuildPipelineOrchestrator();
 
-    // Mock fs.readFile to return mock config
+    // Mock fs.readFile to return mock config.
     (fs.readFile as jest.Mock).mockResolvedValue(JSON.stringify(mockConfig));
     (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-    (fs.pathExists as jest.Mock).mockResolvedValue(false);
+
+    // fs.pathExists is used for two unrelated checks in the source: (1) does
+    // the config file exist (loadConfig), and (2) does a repo's clone path
+    // already exist (cloneRepositories, to decide skip-vs-clone). A single
+    // mockResolvedValue(...) can't satisfy both -- most describe blocks below
+    // have a nested beforeEach that calls loadConfig(mockConfigPath) and
+    // expects it to succeed (needs true for that path), while the cloning
+    // tests need repo paths to read as NOT already existing (false) so
+    // repositoryManager.cloneRepository actually gets called. Individual
+    // tests that want a repo to appear pre-cloned override this locally.
+    (fs.pathExists as jest.Mock).mockImplementation((checkPath: string) =>
+      Promise.resolve(checkPath === mockConfigPath)
+    );
   });
 
   afterEach(async () => {
@@ -166,10 +178,15 @@ describe('BuildPipelineOrchestrator', () => {
       await expect(orchestrator.loadConfig(mockConfigPath)).rejects.toThrow();
     });
 
-    it('should throw error if trying to execute without loading config', async () => {
-      await expect(orchestrator.executePipeline()).rejects.toThrow(
-        'Configuration not loaded'
-      );
+    it('should report failure if trying to execute without loading config', async () => {
+      // executePipeline() never rejects -- its outer try/catch always
+      // resolves a structured PipelineResult, with success:false and the
+      // error captured in `message` on failure (see the catch block at the
+      // end of executePipeline() in build-pipeline-orchestrator.ts).
+      const result = await orchestrator.executePipeline();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Configuration not loaded');
     });
   });
 
@@ -261,7 +278,7 @@ describe('BuildPipelineOrchestrator', () => {
       expect(templateIndex).toBeLessThan(appIndex);
     });
 
-    it('should detect and throw error on circular dependencies', async () => {
+    it('should detect and report failure on circular dependencies', async () => {
       // Create a config with circular dependency
       const circularConfig = {
         ...mockConfig,
@@ -285,7 +302,11 @@ describe('BuildPipelineOrchestrator', () => {
       (fs.readFile as jest.Mock).mockResolvedValue(JSON.stringify(circularConfig));
       await orchestrator.loadConfig(mockConfigPath);
 
-      await expect(orchestrator.executePipeline()).rejects.toThrow('Circular dependency');
+      // executePipeline() never rejects -- see the note on "should report
+      // failure if trying to execute without loading config" above.
+      const result = await orchestrator.executePipeline();
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Circular dependency');
     });
   });
 
@@ -352,10 +373,14 @@ describe('BuildPipelineOrchestrator', () => {
 
     it('should handle clone failures for optional repositories', async () => {
       const { repositoryManager } = require('../../src/main/repository-manager');
+      // cloneRepositories() only reacts to a rejected/thrown clone (it
+      // doesn't inspect a resolved value's .success) -- matches the real
+      // RepositoryManager.cloneRepository(), which throws/rejects on
+      // failure rather than resolving { success: false }.
       repositoryManager.cloneRepository.mockImplementation((url: string) => {
         const repo = mockConfig.repositories.find(r => r.url === url);
         if (repo?.id === 'typing-mind') {
-          return Promise.resolve({ success: false, error: 'Clone failed' });
+          return Promise.reject(new Error('Clone failed'));
         }
         return Promise.resolve({ success: true });
       });
@@ -376,10 +401,10 @@ describe('BuildPipelineOrchestrator', () => {
 
     it('should fail pipeline if required repository clone fails', async () => {
       const { repositoryManager } = require('../../src/main/repository-manager');
-      repositoryManager.cloneRepository.mockResolvedValue({
-        success: false,
-        error: 'Network error',
-      });
+      // See "should handle clone failures for optional repositories" above:
+      // cloneRepositories() only reacts to a rejected clone, not a resolved
+      // { success: false }.
+      repositoryManager.cloneRepository.mockRejectedValue(new Error('Network error'));
 
       const options: PipelineOptions = {
         selectedComponents: ['core-system'],
@@ -512,9 +537,15 @@ describe('BuildPipelineOrchestrator', () => {
       const { repositoryManager } = require('../../src/main/repository-manager');
 
       let cancelCalled = false;
+      // cancel() only sets a flag checked between clone-loop iterations (it
+      // doesn't abort an in-flight clone), so the first clone must resolve
+      // before the loop can observe the cancellation and stop before repo
+      // #2. This delay only needs to be long enough for the cancel() call
+      // below (fired at 100ms) to land first -- the original 5000ms exceeded
+      // Jest's own 5000ms default test timeout, failing every run.
       repositoryManager.cloneRepository.mockImplementation(() => {
         return new Promise((resolve) => {
-          setTimeout(() => resolve({ success: true }), 5000);
+          setTimeout(() => resolve({ success: true }), 300);
         });
       });
 
@@ -543,10 +574,10 @@ describe('BuildPipelineOrchestrator', () => {
 
     it('should collect errors from all phases', async () => {
       const { repositoryManager } = require('../../src/main/repository-manager');
-      repositoryManager.cloneRepository.mockResolvedValue({
-        success: false,
-        error: 'Clone failed',
-      });
+      // See "should handle clone failures for optional repositories" in the
+      // Repository Cloning Phase describe: cloneRepositories() only reacts
+      // to a rejected clone, not a resolved { success: false }.
+      repositoryManager.cloneRepository.mockRejectedValue(new Error('Clone failed'));
 
       const result = await orchestrator.executePipeline({
         selectedComponents: ['core-system'],

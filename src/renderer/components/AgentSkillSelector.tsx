@@ -50,6 +50,7 @@ export const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({
           style={styles.select}
           disabled
           title={`No ${type}s installed. Click Create or Import.`}
+          aria-label={`Select ${label}`}
         >
           <option>No {type}s installed. Click Create or Import.</option>
         </select>

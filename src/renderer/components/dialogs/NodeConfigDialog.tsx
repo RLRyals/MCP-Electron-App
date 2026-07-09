@@ -2145,7 +2145,11 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
 
         {/* Retry Configuration */}
         <div style={styles.fieldGroup}>
-          <h4 style={styles.sectionTitle}>Retry Configuration</h4>
+          {/* h3, not h4: this is the first section heading under the
+              dialog's own h2 title on the Advanced tab (same pattern as
+              the Context & Variables tab's h3) -- h4 here skipped a level
+              (axe heading-order). */}
+          <h3 style={styles.sectionTitle}>Retry Configuration</h3>
 
           <div style={styles.field}>
             <label htmlFor="max-retries" style={styles.label}>

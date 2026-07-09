@@ -24,6 +24,28 @@
  * isolatedModules: true on both projects' ts-jest transform skips full
  * type-checking during the test transform for faster runs; type errors are
  * still caught by `npm run build` (tsc).
+ *
+ * moduleNameMapper strips a trailing `.js` off relative imports before
+ * resolution. The source tree writes relative imports with an explicit
+ * `.js` extension pointing at `.ts`/`.tsx` siblings (e.g.
+ * `import { AgentSkillSelector } from '../AgentSkillSelector.js'` in
+ * src/renderer/components/dialogs/NodeConfigDialog.tsx) -- standard
+ * Node16/ESM-style TS authoring: `tsc` emits `AgentSkillSelector.js`
+ * alongside it, so the specifier is valid post-build. ts-jest transforms
+ * in-memory rather than from `dist`, so without this mapping Jest looks
+ * for a literal `AgentSkillSelector.js` on disk, finds only the `.tsx`
+ * source, and fails to resolve the module (issue #176 --
+ * NodeConfigDialog.a11y.test.tsx).
+ *
+ * renderer's setupFilesAfterEnv wires up src/setupTests.ts, which already
+ * existed (imports @testing-library/jest-dom, mocks matchMedia /
+ * IntersectionObserver / ResizeObserver / local & sessionStorage /
+ * window.electronAPI) but was never referenced by any jest config -- it
+ * predates jest.config.cjs entirely. Without it, every renderer test that
+ * uses a jest-dom matcher (toBeInTheDocument, toHaveAttribute, ...) throws
+ * "is not a function", and components that touch window.matchMedia or
+ * window.electronAPI at mount blow up on undefined. Root cause behind most
+ * of the *.a11y.test.tsx failures catalogued in issue #176.
  */
 module.exports = {
   projects: [
@@ -35,6 +57,9 @@ module.exports = {
         '<rootDir>/src/main/**/*.test.ts',
         '<rootDir>/tests/**/*.test.ts',
       ],
+      moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -52,6 +77,10 @@ module.exports = {
         '<rootDir>/src/renderer/**/*.test.ts',
         '<rootDir>/src/renderer/**/*.test.tsx',
       ],
+      setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+      moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
