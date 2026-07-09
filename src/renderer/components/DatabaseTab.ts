@@ -12,17 +12,20 @@
 import { databaseService } from '../services/databaseService.js';
 import { BackupManager } from './DatabaseAdmin/Backup/BackupManager.js';
 import { CRUDPanel } from './DatabaseAdmin/CRUD/CRUDPanel.js';
+import { SchemaExplorer } from './DatabaseAdmin/Schema/SchemaExplorer.js';
 
 export class DatabaseTab {
   private container: HTMLElement | null = null;
   private availableTables: string[] = [];
   private backupManager: BackupManager | null = null;
   private crudPanel: CRUDPanel | null = null;
-  private currentView: 'overview' | 'backup' = 'overview';
+  private schemaExplorer: SchemaExplorer | null = null;
+  private currentView: 'overview' | 'backup' | 'schema' = 'overview';
   private currentActiveTab: 'schema' | 'data' = 'data'; // Default to data view
 
   constructor() {
     this.backupManager = new BackupManager();
+    this.schemaExplorer = new SchemaExplorer();
   }
 
   /**
@@ -52,6 +55,8 @@ export class DatabaseTab {
 
     if (this.currentView === 'backup') {
       this.renderBackupView();
+    } else if (this.currentView === 'schema') {
+      this.renderSchemaView();
     } else {
       this.renderOverviewView();
     }
@@ -126,6 +131,40 @@ export class DatabaseTab {
   }
 
   /**
+   * Render schema explorer view (Issue #129)
+   */
+  private async renderSchemaView(): Promise<void> {
+    if (!this.container) return;
+
+    this.container.innerHTML = `
+      ${this.renderHeader()}
+      <div class="database-schema-view">
+        <div class="backup-view-header">
+          <button class="btn-back" id="back-to-overview-from-schema-btn">
+            <span class="btn-icon">←</span>
+            Back to Overview
+          </button>
+        </div>
+        <div id="schema-explorer-container" class="schema-explorer-container"></div>
+      </div>
+    `;
+
+    // Attach back button listener
+    const backBtn = document.getElementById('back-to-overview-from-schema-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.currentView = 'overview';
+        this.render();
+      });
+    }
+
+    // Initialize schema explorer
+    if (this.schemaExplorer) {
+      await this.schemaExplorer.initialize('schema-explorer-container');
+    }
+  }
+
+  /**
    * Render the header
    */
   private renderHeader(): string {
@@ -156,6 +195,10 @@ export class DatabaseTab {
         <button id="db-test-query" class="quick-action-btn-small" title="Test a simple query">
           <span class="action-icon">🔍</span>
           <span class="action-label">Test Query</span>
+        </button>
+        <button id="db-view-schema" class="quick-action-btn-small" title="Explore database schema">
+          <span class="action-icon">🗂️</span>
+          <span class="action-label">Schema</span>
         </button>
         <div class="spacer"></div>
         <button id="db-manage-backups" class="quick-action-btn-small primary" title="Manage database backups">
@@ -207,6 +250,11 @@ export class DatabaseTab {
     const manageBackupsBtn = document.getElementById('db-manage-backups');
     if (manageBackupsBtn) {
       manageBackupsBtn.addEventListener('click', () => this.handleManageBackups());
+    }
+
+    const viewSchemaBtn = document.getElementById('db-view-schema');
+    if (viewSchemaBtn) {
+      viewSchemaBtn.addEventListener('click', () => this.handleViewSchema());
     }
   }
 
@@ -283,6 +331,14 @@ export class DatabaseTab {
    */
   private async handleManageBackups(): Promise<void> {
     this.currentView = 'backup';
+    await this.render();
+  }
+
+  /**
+   * Handle view schema button click (Issue #129)
+   */
+  private async handleViewSchema(): Promise<void> {
+    this.currentView = 'schema';
     await this.render();
   }
 

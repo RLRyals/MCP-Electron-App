@@ -10,6 +10,7 @@
  */
 
 import { databaseService } from '../../../services/databaseService';
+import { parseQualifiedTableName } from './schema-utils';
 
 export interface ColumnInfo {
   name: string;
@@ -129,11 +130,21 @@ export class TableDetails {
 
   /**
    * Render header
+   *
+   * Shows the table's actual database schema as a badge next to its name
+   * (e.g. "fictionlab" or "public") rather than assuming every table lives
+   * in "public" -- `currentTable` may be schema-qualified (e.g.
+   * "fictionlab.workflow_definitions") or bare (e.g. "authors").
    */
   private renderHeader(): string {
+    const { dbSchema, shortName } = parseQualifiedTableName(this.currentTable || '');
+
     return `
       <div class="table-details-header">
-        <h4>${this.escapeHtml(this.currentTable || '')}</h4>
+        <div class="table-details-title">
+          <span class="schema-badge schema-badge-${this.escapeHtml(dbSchema)}">${this.escapeHtml(dbSchema)}</span>
+          <h4>${this.escapeHtml(shortName)}</h4>
+        </div>
         <div class="table-stats">
           ${this.currentSchema?.columns?.length ? `
             <span class="stat-item">
@@ -161,6 +172,12 @@ export class TableDetails {
 
   /**
    * Render columns tab
+   *
+   * db_get_schema's column objects carry no per-column PK/FK flags -- that
+   * info only exists in `constraints.primary_key` / `constraints.foreign_key`
+   * (see getPrimaryKeys()/getForeignKeys()). Resolve those once per render
+   * and cross-reference by column name so the Columns tab still highlights
+   * keys correctly against the real backend shape.
    */
   private renderColumnsTab(): string {
     if (!this.currentSchema?.columns || this.currentSchema.columns.length === 0) {
@@ -172,6 +189,8 @@ export class TableDetails {
     }
 
     const columns = this.currentSchema.columns;
+    const primaryKeyNames = new Set(this.getPrimaryKeys());
+    const foreignKeyNames = new Set(this.getForeignKeys().map(fk => fk.column));
 
     return `
       <div class="tab-content" data-tab="columns">
@@ -186,7 +205,7 @@ export class TableDetails {
             </tr>
           </thead>
           <tbody>
-            ${columns.map((col: any) => this.renderColumnRow(col)).join('')}
+            ${columns.map((col: any) => this.renderColumnRow(col, primaryKeyNames, foreignKeyNames)).join('')}
           </tbody>
         </table>
       </div>
@@ -196,14 +215,17 @@ export class TableDetails {
   /**
    * Render a single column row
    */
-  private renderColumnRow(column: any): string {
+  private renderColumnRow(column: any, primaryKeyNames: Set<string>, foreignKeyNames: Set<string>): string {
     const constraints: string[] = [];
 
-    if (column.isPrimaryKey || column.primary_key) {
+    // Prefer a per-column flag if a caller/schema shape provides one, but the
+    // real MCP database-admin server never does -- fall back to the
+    // constraints-derived name sets so keys still get highlighted correctly.
+    if (column.isPrimaryKey || column.primary_key || primaryKeyNames.has(column.name)) {
       constraints.push('<span class="badge badge-primary">PRIMARY KEY</span>');
     }
 
-    if (column.isForeignKey || column.foreign_key) {
+    if (column.isForeignKey || column.foreign_key || foreignKeyNames.has(column.name)) {
       constraints.push('<span class="badge badge-info">FOREIGN KEY</span>');
     }
 
@@ -365,9 +387,20 @@ export class TableDetails {
   }
 
   /**
-   * Get primary keys from schema
+   * Get primary keys from schema.
+   *
+   * The MCP database-admin server's db_get_schema groups constraints by type
+   * (`{ primary_key: [{ name, column, ... }], foreign_key: [...], ... }`) --
+   * column objects themselves carry no isPrimaryKey/primary_key flag. Read
+   * that grouped shape first; a flat per-column-flag fallback is kept for
+   * forward/alternate-shape compatibility, not because the real server uses it.
    */
   private getPrimaryKeys(): string[] {
+    const grouped = this.currentSchema?.constraints?.primary_key;
+    if (Array.isArray(grouped) && grouped.length > 0) {
+      return grouped.map((pk: any) => pk.column || pk.columnName).filter(Boolean);
+    }
+
     if (!this.currentSchema?.columns) return [];
 
     return this.currentSchema.columns
@@ -376,25 +409,49 @@ export class TableDetails {
   }
 
   /**
-   * Get foreign keys from schema
+   * Get foreign keys from schema.
+   *
+   * Same grouped-constraints shape as getPrimaryKeys(). Note: the current
+   * db_get_schema query (MCP-Writing-Servers) doesn't join to
+   * information_schema.constraint_column_usage, so it reports the FK's own
+   * column but not what it references -- shown honestly rather than invented.
    */
   private getForeignKeys(): Array<{ column: string; references: string }> {
-    if (!this.currentSchema?.columns) return [];
-
     const foreignKeys: Array<{ column: string; references: string }> = [];
 
-    for (const col of this.currentSchema.columns) {
-      if (col.isForeignKey || col.foreign_key) {
-        const ref = col.foreignKeyRef || col.foreign_key_ref || {};
-        foreignKeys.push({
-          column: col.name,
-          references: `${ref.table || '?'}.${ref.column || '?'}`,
-        });
+    const grouped = this.currentSchema?.constraints?.foreign_key;
+    if (Array.isArray(grouped)) {
+      for (const fk of grouped) {
+        const column = fk.column || fk.columnName || '?';
+        const references =
+          fk.referencedTable && fk.referencedColumn
+            ? `${fk.referencedTable}.${fk.referencedColumn}`
+            : '(target not reported by server)';
+        foreignKeys.push({ column, references });
       }
     }
 
-    // Also check constraints if available
-    if (this.currentSchema.constraints) {
+    if (foreignKeys.length > 0) {
+      return foreignKeys;
+    }
+
+    // Fallback: tolerate a flatter/alternate schema shape with per-column FK
+    // metadata (not what the real server currently returns).
+    if (this.currentSchema?.columns) {
+      for (const col of this.currentSchema.columns) {
+        if (col.isForeignKey || col.foreign_key) {
+          const ref = col.foreignKeyRef || col.foreign_key_ref || {};
+          foreignKeys.push({
+            column: col.name,
+            references: `${ref.table || '?'}.${ref.column || '?'}`,
+          });
+        }
+      }
+    }
+
+    if (Array.isArray(this.currentSchema?.constraints)) {
+      // Tolerate a flat constraints array shape too, in case a future/alternate
+      // server version returns one instead of the grouped object.
       for (const constraint of this.currentSchema.constraints) {
         if (constraint.type === 'FOREIGN KEY' || constraint.constraintType === 'FOREIGN KEY') {
           foreignKeys.push({

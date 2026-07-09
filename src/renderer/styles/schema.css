@@ -139,6 +139,68 @@
 }
 
 /* ===========================
+   Schema Badges & Groups
+   =========================== */
+
+/* Labels each table with the real Postgres schema it lives in (as reported
+   by db_list_tables) -- never assumed to be "public". */
+.schema-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.schema-badge-public {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.schema-badge-fictionlab {
+  background: rgba(0, 212, 170, 0.25);
+  color: #00D4AA;
+  border: 1px solid rgba(0, 212, 170, 0.5);
+}
+
+/* Any other/unknown schema name falls back to an accent color distinct from
+   both public and fictionlab, so a new schema is still visibly labeled. */
+.schema-badge:not(.schema-badge-public):not(.schema-badge-fictionlab) {
+  background: rgba(255, 193, 7, 0.2);
+  color: #FFC107;
+  border: 1px solid rgba(255, 193, 7, 0.5);
+}
+
+.schema-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.schema-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+
+.schema-group-count {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.table-details-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ===========================
    Table List
    =========================== */
 
@@ -189,9 +251,14 @@
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.record-count {
+.record-count,
+.column-count,
+.table-size {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
 }
