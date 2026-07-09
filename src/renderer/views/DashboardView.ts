@@ -7,6 +7,7 @@
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
 import { DashboardTab } from '../components/DashboardTab.js';
+import { cleanupDashboard, exportDashboardDiagnosticReport, updateSystemStatus } from '../dashboard-handlers.js';
 
 export class DashboardView implements View {
   private container: HTMLElement | null = null;
@@ -51,6 +52,17 @@ export class DashboardView implements View {
     }
     this.dashboardTab = null;
     this.container = null;
+
+    // Stop dashboard-handlers.ts's status polling / progress listener.
+    // Without this, navigating to another view left a 5-second interval
+    // (and its IPC progress listener) running forever in the background --
+    // cleanupDashboard() already existed for exactly this purpose but was
+    // never wired up to a view lifecycle hook.
+    try {
+      cleanupDashboard();
+    } catch (error) {
+      console.error('[DashboardView] Failed to clean up dashboard handlers:', error);
+    }
   }
 
   /**
@@ -61,12 +73,20 @@ export class DashboardView implements View {
 
     switch (actionId) {
       case 'refresh':
-        // Trigger dashboard refresh
+        // Trigger an immediate status refresh (same call the 5s polling
+        // loop makes) rather than only firing an event nobody listened for.
         window.dispatchEvent(new CustomEvent('dashboard-refresh'));
+        updateSystemStatus().catch((error) => {
+          console.error('[DashboardView] Refresh failed:', error);
+        });
         break;
       case 'export':
-        // Trigger export functionality
+        // Export a diagnostic report via the same IPC call the Setup/Logs
+        // views use, rather than only firing an event nobody listened for.
         window.dispatchEvent(new CustomEvent('dashboard-export'));
+        exportDashboardDiagnosticReport().catch((error) => {
+          console.error('[DashboardView] Export failed:', error);
+        });
         break;
       default:
         console.warn('[DashboardView] Unknown action:', actionId);

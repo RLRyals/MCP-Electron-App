@@ -1556,3 +1556,25 @@ export function cleanupDashboard(): void {
   stopStatusPolling();
   window.electronAPI.mcpSystem.removeProgressListener();
 }
+
+/**
+ * Export a diagnostic report for the Dashboard's top-bar "Export Report"
+ * action. Reuses the same `logger.exportDiagnosticReport` IPC call the
+ * Setup/Logs views use, but standalone (no dependence on a DOM button
+ * living outside the dashboard) so it can be invoked directly from
+ * DashboardView.handleAction('export').
+ */
+export async function exportDashboardDiagnosticReport(): Promise<void> {
+  try {
+    const result = await window.electronAPI.logger.exportDiagnosticReport();
+
+    if (result.success) {
+      showNotification(`Diagnostic report exported to: ${result.path}`, 'success');
+    } else {
+      showNotification(`Failed to export report: ${result.error}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error exporting diagnostic report:', error);
+    showNotification('Failed to export diagnostic report', 'error');
+  }
+}
