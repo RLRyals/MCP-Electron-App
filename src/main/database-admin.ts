@@ -440,17 +440,36 @@ export async function checkConnection(): Promise<DatabaseOperationResult> {
   try {
     const baseUrl = await getMCPServerUrl();
 
-    // Try a simple health check or list tables
-    const response = await axios.get(`${baseUrl}/health`, {
-      timeout: 5000,
-    }).catch(() => {
-      // If /health doesn't exist, try calling a simple tool
-      return callMCPTool('db_list_tables', {});
-    });
+    // Try a simple health check first.
+    try {
+      const response = await axios.get(`${baseUrl}/health`, {
+        timeout: 5000,
+      });
+      if (response.status >= 200 && response.status < 300) {
+        return {
+          success: true,
+          message: 'Connected to database administration server',
+        };
+      }
+    } catch {
+      // /health may not exist on this server version -- fall through to the
+      // tool-call fallback below instead of failing outright.
+    }
+
+    // If /health doesn't exist (or didn't respond OK), fall back to calling a
+    // real, cheap tool so we actually confirm the server is reachable instead
+    // of assuming success just because a request was attempted.
+    const fallback = await callMCPTool('db_list_tables', {});
+    if (fallback.success) {
+      return {
+        success: true,
+        message: 'Connected to database administration server',
+      };
+    }
 
     return {
-      success: true,
-      message: 'Connected to database administration server',
+      success: false,
+      error: fallback.error || 'Cannot connect to database administration server',
     };
   } catch (error: any) {
     return {
