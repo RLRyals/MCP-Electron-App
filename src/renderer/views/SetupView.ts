@@ -8,7 +8,7 @@ import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
 import { initializeSetupTab } from '../components/SetupTab.js';
 import { loadEnvConfig, setupEnvConfigListeners } from '../env-config-handlers.js';
-import { loadClientOptions, setupClientSelectionListeners } from '../client-selection-handlers.js';
+import { loadClientOptions, setupClientSelectionListeners, setupClaudeDesktopListeners } from '../client-selection-handlers.js';
 
 export class SetupView implements View {
   private container: HTMLElement | null = null;
@@ -37,6 +37,8 @@ export class SetupView implements View {
       setupClientSelectionListeners();
       loadClientOptions();
 
+      setupClaudeDesktopListeners();
+
       console.log('[SetupView] Form event listeners attached');
     } catch (error) {
       console.error('[SetupView] Failed to initialize setup:', error);
@@ -59,6 +61,7 @@ export class SetupView implements View {
         ${this.renderUpdateTools()}
         ${this.renderPrerequisites()}
         ${this.renderClientSelection()}
+        ${this.renderClaudeDesktopConfig()}
         ${this.renderEnvConfig()}
       </div>
     `;
@@ -113,6 +116,7 @@ export class SetupView implements View {
               MCP-Writing-Servers
               <span class="tooltip" title="Update the MCP Writing Servers repository via git pull">ⓘ</span>
             </label>
+            <div id="mcp-servers-current-version" style="margin-bottom: 8px; font-size: 0.9rem; opacity: 0.9;">Current Version: Loading...</div>
             <button type="button" class="test-button" id="update-mcp-servers" title="Pull latest changes from MCP-Writing-Servers repository">Update MCP-Writing-Servers</button>
             <div id="mcp-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
           </div>
@@ -166,6 +170,15 @@ export class SetupView implements View {
             <div class="prereq-detail" id="wsl-detail">Checking...</div>
             <div class="prereq-error" id="wsl-error" style="display: none;"></div>
           </div>
+
+          <div class="prereq-item" id="disk-space-item">
+            <h3>
+              <span class="status-icon loading" id="disk-space-status-icon"></span>
+              Disk Space
+            </h3>
+            <div class="prereq-detail" id="disk-space-detail">Checking...</div>
+            <div class="prereq-error" id="disk-space-error" style="display: none;"></div>
+          </div>
         </div>
 
         <button class="test-button" id="check-prerequisites" title="Verify that Docker Desktop and Git are properly installed and running on your system">Check Prerequisites</button>
@@ -200,6 +213,40 @@ export class SetupView implements View {
         </div>
 
         <div class="client-selection-status" id="client-selection-status"></div>
+      </div>
+    `;
+  }
+
+  private renderClaudeDesktopConfig(): string {
+    return `
+      <div class="env-config-card" id="claude-desktop-card">
+        <h2>Claude Desktop</h2>
+        <p style="margin-bottom: 20px; opacity: 0.9;">
+          Automatically configure Claude Desktop with your MCP server settings, or manage the configuration manually.
+        </p>
+
+        <div class="form-group">
+          <label>
+            Status
+            <span class="tooltip" title="Whether Claude Desktop's MCP configuration file has been set up">ⓘ</span>
+          </label>
+          <div id="claude-desktop-status-text" style="font-size: 0.95rem; font-weight: 500;">Checking...</div>
+        </div>
+
+        <div class="client-selection-actions" style="justify-content: flex-start; margin-top: 15px;">
+          <button type="button" class="test-button" id="claude-desktop-auto-config-btn" title="Automatically write MCP server settings into Claude Desktop's config file">Auto-Configure Claude Desktop</button>
+          <button type="button" class="test-button" id="claude-desktop-open-folder-btn" title="Open the folder containing Claude Desktop's config file">Open Config Folder</button>
+          <button type="button" class="test-button" id="claude-desktop-reset-btn" style="display: none;" title="Remove all MCP server settings from Claude Desktop's config">Reset Configuration</button>
+        </div>
+
+        <div id="claude-desktop-config-preview" style="display: none; margin-top: 15px;">
+          <label>Current Configuration</label>
+          <pre id="claude-desktop-config-content" class="error-stack"></pre>
+        </div>
+
+        <p style="margin-top: 15px; font-size: 0.85rem; opacity: 0.85;">
+          Don't have Claude Desktop yet? <a href="#" id="claude-desktop-download-link">Download it here</a>.
+        </p>
       </div>
     `;
   }
