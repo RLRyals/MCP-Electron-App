@@ -12,17 +12,22 @@
 import { databaseService } from '../services/databaseService.js';
 import { BackupManager } from './DatabaseAdmin/Backup/BackupManager.js';
 import { CRUDPanel } from './DatabaseAdmin/CRUD/CRUDPanel.js';
+import { BatchPanel } from './DatabaseAdmin/Batch/BatchPanel.js';
 
 export class DatabaseTab {
   private container: HTMLElement | null = null;
   private availableTables: string[] = [];
   private backupManager: BackupManager | null = null;
   private crudPanel: CRUDPanel | null = null;
-  private currentView: 'overview' | 'backup' = 'overview';
+  private batchPanel: BatchPanel | null = null;
+  private currentView: 'overview' | 'backup' | 'batch' = 'overview';
   private currentActiveTab: 'schema' | 'data' = 'data'; // Default to data view
 
   constructor() {
     this.backupManager = new BackupManager();
+    this.batchPanel = new BatchPanel({
+      onStatusChange: (message, type) => console.log(`[Batch] [${type}] ${message}`),
+    });
   }
 
   /**
@@ -52,6 +57,8 @@ export class DatabaseTab {
 
     if (this.currentView === 'backup') {
       this.renderBackupView();
+    } else if (this.currentView === 'batch') {
+      this.renderBatchView();
     } else {
       this.renderOverviewView();
     }
@@ -126,6 +133,39 @@ export class DatabaseTab {
   }
 
   /**
+   * Render batch operations view (issue #128)
+   */
+  private renderBatchView(): void {
+    if (!this.container) return;
+
+    this.container.innerHTML = `
+      ${this.renderHeader()}
+      <div class="database-batch-view">
+        <div class="backup-view-header">
+          <button class="btn-back" id="back-to-overview-from-batch-btn">
+            <span class="btn-icon">←</span>
+            Back to Overview
+          </button>
+        </div>
+        <div id="batch-panel-container"></div>
+      </div>
+    `;
+
+    const backBtn = document.getElementById('back-to-overview-from-batch-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.currentView = 'overview';
+        this.render();
+      });
+    }
+
+    const batchContainer = document.getElementById('batch-panel-container');
+    if (batchContainer && this.batchPanel) {
+      this.batchPanel.initialize(batchContainer);
+    }
+  }
+
+  /**
    * Render the header
    */
   private renderHeader(): string {
@@ -156,6 +196,10 @@ export class DatabaseTab {
         <button id="db-test-query" class="quick-action-btn-small" title="Test a simple query">
           <span class="action-icon">🔍</span>
           <span class="action-label">Test Query</span>
+        </button>
+        <button id="db-batch-operations" class="quick-action-btn-small" title="Bulk insert, update, or delete records">
+          <span class="action-icon">📦</span>
+          <span class="action-label">Batch Ops</span>
         </button>
         <div class="spacer"></div>
         <button id="db-manage-backups" class="quick-action-btn-small primary" title="Manage database backups">
@@ -207,6 +251,11 @@ export class DatabaseTab {
     const manageBackupsBtn = document.getElementById('db-manage-backups');
     if (manageBackupsBtn) {
       manageBackupsBtn.addEventListener('click', () => this.handleManageBackups());
+    }
+
+    const batchOpsBtn = document.getElementById('db-batch-operations');
+    if (batchOpsBtn) {
+      batchOpsBtn.addEventListener('click', () => this.handleBatchOperations());
     }
   }
 
@@ -283,6 +332,14 @@ export class DatabaseTab {
    */
   private async handleManageBackups(): Promise<void> {
     this.currentView = 'backup';
+    await this.render();
+  }
+
+  /**
+   * Handle batch operations button click (issue #128)
+   */
+  private async handleBatchOperations(): Promise<void> {
+    this.currentView = 'batch';
     await this.render();
   }
 
