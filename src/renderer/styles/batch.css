@@ -1,0 +1,795 @@
+/**
+ * Batch Operations Styles (issue #128)
+ * Bulk Insert / Bulk Update / Bulk Delete panels rendered inside the
+ * Database tab's "Batch Ops" view. Follows the dark-glass conventions
+ * already established in database.css / crud.css (rgba panels, #00D4AA
+ * accent, 6-12px radii) so the batch view doesn't look bolted-on.
+ */
+
+/* Batch view wrapper (parallels .database-backup-view in database.css) */
+.database-batch-view {
+  width: 100%;
+}
+
+/* ===================
+   BatchPanel container
+   =================== */
+.batch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.batch-panel-header h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.3rem;
+  color: #fff;
+}
+
+.batch-panel-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.batch-panel-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0;
+}
+
+.batch-tab-button {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.batch-tab-button:hover {
+  color: #fff;
+}
+
+.batch-tab-button.active {
+  color: #00D4AA;
+  border-bottom-color: #00D4AA;
+}
+
+.batch-panel-content {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.batch-panel-tab-content {
+  display: none;
+}
+
+.batch-panel-tab-content.active {
+  display: block;
+}
+
+.batch-panel-status {
+  min-height: 1.2em;
+  font-size: 0.9rem;
+  padding: 0 4px;
+}
+
+.batch-panel-status.success {
+  color: #4ade80;
+}
+
+.batch-panel-status.error {
+  color: #f87171;
+}
+
+.batch-panel-status.info {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ===================
+   Shared form controls (Insert / Update / Delete)
+   =================== */
+.form-select {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: rgba(0, 212, 170, 0.5);
+}
+
+.action-button.danger {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fff;
+}
+
+.action-button.danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.35);
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-button.small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+/* ===================
+   Batch Insert
+   =================== */
+.batch-insert-header,
+.batch-update-header,
+.batch-delete-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.batch-insert-header h3,
+.batch-update-header h3,
+.batch-delete-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.batch-insert-mode-selector {
+  display: flex;
+  gap: 6px;
+}
+
+.mode-button {
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.mode-button:hover {
+  color: #fff;
+}
+
+.mode-button.active {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+  color: #fff;
+}
+
+.batch-insert-table-selector,
+.batch-update-table-selector,
+.batch-delete-table-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.batch-insert-table-selector label,
+.batch-update-table-selector label,
+.batch-delete-table-selector label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.batch-insert-mode-panel {
+  display: none;
+}
+
+.batch-insert-mode-panel.active {
+  display: block;
+}
+
+.batch-insert-content {
+  margin-bottom: 15px;
+}
+
+/* Manual entry grid */
+.manual-entry-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.manual-entry-count {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.manual-grid-wrapper {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.manual-entry-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.manual-entry-table th,
+.manual-entry-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.manual-entry-table th {
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.manual-cell-input {
+  width: 100%;
+  min-width: 90px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.delete-row-button {
+  background: transparent;
+  border: none;
+  color: rgba(248, 113, 113, 0.8);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 8px;
+}
+
+.delete-row-button:hover {
+  color: #f87171;
+}
+
+.empty-grid {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 20px !important;
+}
+
+/* JSON paste mode */
+.json-paste-instructions {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+
+.json-paste-instructions code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.json-paste-area {
+  width: 100%;
+  min-height: 160px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.json-error {
+  color: #f87171;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.json-success {
+  color: #4ade80;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+/* Column mapping */
+.batch-column-mapping {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+}
+
+.batch-column-mapping h4 {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  color: #00D4AA;
+}
+
+.column-mapping-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 10px;
+}
+
+.column-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.source-column {
+  min-width: 120px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.mapping-arrow {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.target-column-select {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+/* Batch size configuration */
+.batch-size-config {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.batch-size-config label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.batch-size-input {
+  width: 90px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.batch-size-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Actions rows */
+.batch-insert-actions,
+.batch-update-actions,
+.batch-delete-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+/* ===================
+   Progress + results (shared by Insert / Update / Delete)
+   =================== */
+.batch-progress {
+  margin-bottom: 15px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00D4AA, #00b894);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.batch-results-summary {
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.batch-results-summary.success {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.batch-results-summary.partial {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.batch-results-summary h4 {
+  margin: 0 0 10px 0;
+  color: #fff;
+}
+
+.results-stats {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.stat-value.success {
+  color: #4ade80;
+}
+
+.stat-value.error {
+  color: #f87171;
+}
+
+.results-errors {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.results-errors h5 {
+  margin: 0 0 6px 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.results-errors ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.more-errors {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+}
+
+/* ===================
+   Batch Update / Batch Delete: where-conditions + selection preview
+   =================== */
+.batch-update-section,
+.batch-delete-section {
+  margin-bottom: 20px;
+}
+
+.batch-update-section h4,
+.batch-delete-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 0.95rem;
+  color: #00D4AA;
+}
+
+.where-hint,
+.update-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 10px;
+}
+
+.condition-row,
+.update-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.condition-column,
+.condition-operator,
+.update-field-column {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.condition-value,
+.update-field-value {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 100px;
+}
+
+.field-equals {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.delete-condition-button,
+.delete-field-button {
+  background: transparent;
+  border: none;
+  color: rgba(248, 113, 113, 0.8);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 8px;
+}
+
+.delete-condition-button:hover,
+.delete-field-button:hover {
+  color: #f87171;
+}
+
+.selection-preview,
+.changes-preview {
+  margin-top: 10px;
+}
+
+.preview-info {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 8px;
+}
+
+.preview-error {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.preview-more,
+.preview-summary {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+}
+
+.empty-preview {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+  padding: 10px 0;
+}
+
+.preview-table-wrapper,
+.changes-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.preview-table,
+.changes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.preview-table th,
+.preview-table td,
+.changes-table th,
+.changes-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.preview-table th,
+.changes-table th {
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+  position: sticky;
+  top: 0;
+}
+
+.change-item {
+  margin-bottom: 12px;
+}
+
+.change-header {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+}
+
+.old-value {
+  color: #f87171;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.new-value {
+  color: #4ade80;
+}
+
+/* Delete-specific warning banner */
+.delete-warning-banner {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ===================
+   CSV Uploader
+   =================== */
+.csv-upload-area {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.csv-upload-area:hover,
+.csv-upload-area.csv-dragover {
+  border-color: rgba(0, 212, 170, 0.5);
+  background: rgba(0, 212, 170, 0.05);
+}
+
+.csv-upload-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.csv-upload-text {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+.csv-upload-link {
+  color: #00D4AA;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.csv-upload-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.csv-preview {
+  margin-top: 15px;
+}
+
+.csv-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.csv-preview-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.csv-file-details {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.csv-warning {
+  font-size: 0.8rem;
+  color: #fbbf24;
+  white-space: pre-line;
+  margin-bottom: 8px;
+}
+
+.csv-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.csv-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.csv-preview-table th,
+.csv-preview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.csv-preview-table th {
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+  position: sticky;
+  top: 0;
+}
+
+.csv-preview-more {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 6px 4px;
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .condition-row,
+  .update-field-row {
+    flex-wrap: wrap;
+  }
+
+  .results-stats {
+    gap: 15px;
+  }
+}
