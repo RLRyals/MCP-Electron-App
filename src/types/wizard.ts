@@ -10,10 +10,9 @@ export enum WizardStep {
   WELCOME = 1,
   PREREQUISITES = 2,
   ENVIRONMENT = 3,
-  PLUGINS = 4,
-  DOWNLOAD_SETUP = 5,
-  SYSTEM_STARTUP = 6,
-  COMPLETE = 7
+  DOWNLOAD_SETUP = 4,
+  SYSTEM_STARTUP = 5,
+  COMPLETE = 6
 }
 
 /**
@@ -33,12 +32,7 @@ export interface WizardStepData {
     configPath?: string;
   };
 
-  // Step 4: Plugins
-  plugins?: {
-    workflow: boolean;
-  };
-
-  // Step 5: Download & setup
+  // Step 4: Download & setup
   buildPipeline?: {
     completed: boolean;
     clonedRepositories?: string[];
@@ -50,7 +44,7 @@ export interface WizardStepData {
     dockerImagesCompleted: boolean;
   };
 
-  // Step 6: System startup
+  // Step 5: System startup
   systemStartup?: {
     started: boolean;
     healthy: boolean;
