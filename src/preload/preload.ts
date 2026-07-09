@@ -2217,6 +2217,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Resolve a plugin's renderer bundle (manifest entry.renderer) to an
+     * importable file:// URL. Used by the plugin-view loader
+     * (src/renderer/services/pluginViewLoader.ts) to dynamically import
+     * plugin-shipped views into the main window.
+     */
+    getRendererUrl: (pluginId: string): Promise<{ pluginId: string; url: string }> => {
+      return ipcRenderer.invoke('plugin:get-renderer-url', pluginId);
+    },
+
+    /**
      * List all plugins
      */
     list: (): Promise<any[]> => {

@@ -2308,6 +2308,50 @@ function setupIPC(): void {
     }
   });
 
+  // Resolve a plugin's renderer BUNDLE (manifest entry.renderer — a
+  // self-contained browser ES module) to an importable file:// URL. This is
+  // the universal loading path behind plugin-provided views
+  // (src/renderer/services/pluginViewLoader.ts; fictionlab-workflow#8): the
+  // renderer dynamically import()s the returned URL and registers the
+  // bundle's default-exported view class under the manifest's ui.mainView id.
+  registerHandler('plugin:get-renderer-url', "", async (_event, pluginId: string) => {
+    try {
+      const pluginRegistry = pluginManager.getRegistry();
+      const plugin = pluginRegistry?.getPlugin(pluginId);
+
+      if (!plugin) {
+        throw new Error(`Plugin ${pluginId} not found`);
+      }
+
+      const rendererEntry = plugin.manifest?.entry?.renderer;
+      if (!rendererEntry) {
+        throw new Error(`Plugin ${pluginId} declares no renderer bundle (manifest entry.renderer)`);
+      }
+
+      const pluginDir = path.resolve(plugin.context.plugin.installPath);
+      const bundlePath = path.resolve(pluginDir, rendererEntry);
+
+      // Containment: only ever serve a file from inside the plugin's own
+      // install directory, no matter what the manifest says.
+      const relative = path.relative(pluginDir, bundlePath);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error(`Plugin ${pluginId} renderer entry escapes its install directory: ${rendererEntry}`);
+      }
+
+      if (!fs.existsSync(bundlePath)) {
+        throw new Error(`Plugin ${pluginId} renderer bundle not found at: ${bundlePath}`);
+      }
+
+      // Same file:// idiom plugin-views.ts / PluginContainer already use.
+      const url = `file:///${bundlePath.replace(/\\/g, '/')}`;
+      logWithCategory('info', LogCategory.SYSTEM, `Plugin renderer bundle URL resolved: ${pluginId} -> ${url}`);
+      return { pluginId, url };
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.SYSTEM, `Failed to get plugin renderer URL for ${pluginId}: ${error.message}`);
+      throw error;
+    }
+  });
+
   // DEPRECATED: Old plugin:show-view handler (kept for backward compatibility)
   registerHandler('plugin:show-view', "", async (_event, pluginId: string, viewName: string) => {
     try {

@@ -40,7 +40,18 @@ export interface PluginManifest {
     /** Main process entry point (relative to plugin directory) */
     main: string;
 
-    /** Renderer process bundle (optional, relative to plugin directory) */
+    /**
+     * Renderer process bundle (optional, relative to plugin directory).
+     *
+     * A single self-contained browser ES module (bundle your dependencies,
+     * including React — the host does not provide them to plugin bundles).
+     * The host imports it at runtime in the main window and registers its
+     * DEFAULT EXPORT — a view class implementing the host's View contract
+     * ({ mount(container), unmount?(), handleAction?(id),
+     * getTopBarConfig?() }) — under the view id named by `ui.mainView`.
+     * Declare `ui.mainView` whenever this is set, or the host has no id to
+     * register the view under.
+     */
     renderer?: string;
   };
 
@@ -118,8 +129,24 @@ export interface PluginPermissions {
  * Defines how the plugin integrates with FictionLab's UI
  */
 export interface PluginUIConfig {
-  /** Main view component identifier */
+  /**
+   * Main view component identifier. When the manifest also declares
+   * `entry.renderer`, the host registers that bundle's default-exported view
+   * class under this id (ViewRouter navigation + sidebar entry).
+   */
   mainView?: string;
+
+  /**
+   * Sidebar/navigation label for the main view (e.g. "Board").
+   * Falls back to the plugin `name` when omitted.
+   */
+  mainViewLabel?: string;
+
+  /**
+   * Sidebar/navigation icon (emoji) for the main view (e.g. "📋").
+   * Falls back to a generic plugin icon when omitted.
+   */
+  mainViewIcon?: string;
 
   /** Menu items to add */
   menuItems?: Array<{
