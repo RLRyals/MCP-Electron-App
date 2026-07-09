@@ -391,6 +391,14 @@ interface ElectronAPI {
     openConfigFolder: () => Promise<void>;
     getConfigInstructions: () => Promise<string>;
   };
+  dockerImages: {
+    checkDiskSpace: () => Promise<{
+      available: boolean;
+      freeSpace: number;
+      requiredSpace: number;
+      error?: string;
+    }>;
+  };
   updater: {
     checkAll: () => Promise<any>;
     checkMCPServers: () => Promise<any>;

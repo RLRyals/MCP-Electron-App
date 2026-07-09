@@ -96,6 +96,25 @@ async function loadSetupTabData(): Promise<void> {
   } catch (error) {
     console.error('Error loading Setup Tab data:', error);
   }
+
+  await loadMCPServersVersion();
+}
+
+/**
+ * Load and display the current MCP-Writing-Servers version (non-mutating check,
+ * distinct from the "Update MCP-Writing-Servers" button which also pulls changes)
+ */
+async function loadMCPServersVersion(): Promise<void> {
+  const versionElement = document.getElementById('mcp-servers-current-version');
+  if (!versionElement) return;
+
+  try {
+    const updateCheck = await window.electronAPI.updater.checkMCPServers();
+    versionElement.textContent = `Current Version: ${updateCheck.currentVersion || 'unknown'}`;
+  } catch (error) {
+    console.error('Error loading MCP-Writing-Servers version:', error);
+    versionElement.textContent = 'Current Version: unavailable';
+  }
 }
 
 /**
@@ -111,7 +130,7 @@ export async function checkPrerequisites(): Promise<void> {
     button.textContent = 'Checking...';
 
     // Reset all icons to loading state
-    ['docker', 'git', 'wsl'].forEach(name => {
+    ['docker', 'git', 'wsl', 'disk-space'].forEach(name => {
       const iconElement = document.getElementById(`${name}-status-icon`);
       const detailElement = document.getElementById(`${name}-detail`);
       if (iconElement) {
@@ -130,8 +149,11 @@ export async function checkPrerequisites(): Promise<void> {
       wslItem.style.display = platformInfo.platform === 'windows' ? 'block' : 'none';
     }
 
-    // Check all prerequisites
-    const results = await window.electronAPI.prerequisites.checkAll();
+    // Check all prerequisites (disk space runs concurrently - it's a separate API)
+    const [results] = await Promise.all([
+      window.electronAPI.prerequisites.checkAll(),
+      checkDiskSpace(),
+    ]);
 
     console.log('Prerequisites check results:', results);
 
@@ -147,7 +169,7 @@ export async function checkPrerequisites(): Promise<void> {
     console.error('Error checking prerequisites:', error);
 
     // Show error state
-    ['docker', 'git', 'wsl'].forEach(name => {
+    ['docker', 'git', 'wsl', 'disk-space'].forEach(name => {
       const iconElement = document.getElementById(`${name}-status-icon`);
       const detailElement = document.getElementById(`${name}-detail`);
       if (iconElement) {
@@ -204,6 +226,45 @@ function updatePrereqUI(
     } else {
       errorElement.style.display = 'none';
     }
+  }
+}
+
+/**
+ * Check available disk space (bytes -> human-readable GB), reusing the same
+ * `docker-images:check-disk-space` sizing electron already uses to validate the
+ * bundled Docker images will fit before extraction.
+ */
+async function checkDiskSpace(): Promise<void> {
+  const iconElement = document.getElementById('disk-space-status-icon');
+  const detailElement = document.getElementById('disk-space-detail');
+  const errorElement = document.getElementById('disk-space-error');
+
+  if (!iconElement || !detailElement || !errorElement) return;
+
+  try {
+    const result = await window.electronAPI.dockerImages.checkDiskSpace();
+    iconElement.classList.remove('loading', 'success', 'error');
+
+    const freeGB = (result.freeSpace / 1024 ** 3).toFixed(1);
+    const requiredGB = (result.requiredSpace / 1024 ** 3).toFixed(1);
+
+    if (result.available) {
+      iconElement.classList.add('success');
+      detailElement.textContent = `${freeGB} GB free (${requiredGB} GB recommended)`;
+      errorElement.style.display = 'none';
+    } else {
+      iconElement.classList.add('error');
+      detailElement.textContent = `Low disk space: ${freeGB} GB free`;
+      errorElement.textContent = result.error || `At least ${requiredGB} GB is recommended for Docker images`;
+      errorElement.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Error checking disk space:', error);
+    iconElement.classList.remove('loading', 'success');
+    iconElement.classList.add('error');
+    detailElement.textContent = 'Check failed';
+    errorElement.textContent = error instanceof Error ? error.message : String(error);
+    errorElement.style.display = 'block';
   }
 }
 
