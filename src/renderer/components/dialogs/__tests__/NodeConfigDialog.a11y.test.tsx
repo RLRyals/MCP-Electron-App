@@ -28,6 +28,11 @@ const mockPlanningNode: WorkflowNode = {
   position: { x: 100, y: 100 },
   agent: 'market-research-agent',
   skill: 'trend-analysis',
+  // Required for agent-type nodes (validate() in NodeConfigDialog.tsx
+  // rejects a missing/blank prompt with "Prompt is required for agent
+  // nodes"). Without it, every save attempt fails validation silently.
+  prompt: 'Research the target market and audience for this project.',
+  gate: false,
   provider: {
     name: 'anthropic',
     model: 'claude-sonnet-4-5',
@@ -249,8 +254,12 @@ describe('NodeConfigDialog - ARIA Attributes', () => {
       await user.click(saveButton);
 
       expect(nameInput).toHaveAttribute('aria-describedby', 'node-name-error');
-      const errorMessage = screen.getByRole('alert', { name: /Node name is required/i });
+      // role="alert" has ARIA nameFrom:author -- its accessible name isn't
+      // computed from text content, so getByRole('alert', { name }) can
+      // never match. Query by the rendered text and assert role/id on it.
+      const errorMessage = screen.getByText(/Node name is required/i);
       expect(errorMessage).toHaveAttribute('id', 'node-name-error');
+      expect(errorMessage).toHaveAttribute('role', 'alert');
     });
 
     it('should have accessible labels for all form inputs', () => {
@@ -289,9 +298,15 @@ describe('NodeConfigDialog - ARIA Attributes', () => {
       const saveButton = screen.getByText('Save Changes');
       await user.click(saveButton);
 
-      // Error message should have role="alert" which implicitly has aria-live="assertive"
-      const errorMessage = screen.getByRole('alert');
-      expect(errorMessage).toHaveAttribute('aria-live', 'polite');
+      // There are two role="alert" elements once a field is invalid: the
+      // always-mounted general screen-reader announcer (errorAnnouncerRef)
+      // and the per-field inline error message -- both explicitly set
+      // aria-live="polite" (overriding role="alert"'s implicit assertive).
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.length).toBeGreaterThan(0);
+      alerts.forEach(alert => {
+        expect(alert).toHaveAttribute('aria-live', 'polite');
+      });
     });
   });
 
@@ -460,6 +475,14 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
       renderDialog();
       const user = userEvent.setup();
 
+      // The Escape/Ctrl+Enter handler is attached to a dialog container
+      // that only receives the keydown if focus is inside it. Name-input
+      // auto-focus is deliberately delayed 100ms on mount (see "should
+      // auto-focus name input on mount"), so without waiting for it here,
+      // the key event fires against document.body and never bubbles into
+      // the dialog.
+      await new Promise(resolve => setTimeout(resolve, 150));
+
       await user.keyboard('{Escape}');
 
       expect(mockProps.onCancel).toHaveBeenCalled();
@@ -468,6 +491,8 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
     it('should save with Ctrl+Enter', async () => {
       renderDialog();
       const user = userEvent.setup();
+
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       await user.keyboard('{Control>}{Enter}{/Control}');
 
@@ -603,8 +628,10 @@ describe('NodeConfigDialog - Screen Reader Support', () => {
   it('should provide screen-reader-only text for required indicators', () => {
     renderDialog();
 
-    const requiredIndicator = screen.getByLabelText('required');
-    expect(requiredIndicator).toBeInTheDocument();
+    // Multiple fields (name, agent, prompt, provider) are required, so
+    // there's an sr-only "required" indicator on each -- not just one.
+    const requiredIndicators = screen.getAllByLabelText('required');
+    expect(requiredIndicators.length).toBeGreaterThan(0);
   });
 
   it('should have proper heading hierarchy', () => {
@@ -628,8 +655,11 @@ describe('NodeConfigDialog - Mode Toggles', () => {
     const contextTab = screen.getByRole('tab', { name: /Context/i });
     await user.click(contextTab);
 
-    const simpleButton = screen.getByText('Simple');
-    const advancedButton = screen.getByText('Advanced');
+    // getByText('Advanced') is ambiguous -- it also matches the "Advanced"
+    // *tab* button (aria-selected, not aria-pressed). Query by role/name/
+    // pressed state instead, which only matches actual toggle buttons.
+    const simpleButton = screen.getByRole('button', { name: 'Simple', pressed: true });
+    const advancedButton = screen.getByRole('button', { name: 'Advanced', pressed: false });
 
     expect(simpleButton).toHaveAttribute('aria-pressed', 'true');
     expect(advancedButton).toHaveAttribute('aria-pressed', 'false');
@@ -642,12 +672,12 @@ describe('NodeConfigDialog - Mode Toggles', () => {
     const contextTab = screen.getByRole('tab', { name: /Context/i });
     await user.click(contextTab);
 
-    const advancedButton = screen.getByText('Advanced');
+    const advancedButton = screen.getByRole('button', { name: 'Advanced', pressed: false });
     await user.click(advancedButton);
 
     expect(advancedButton).toHaveAttribute('aria-pressed', 'true');
 
-    const simpleButton = screen.getByText('Simple');
+    const simpleButton = screen.getByRole('button', { name: 'Simple', pressed: false });
     expect(simpleButton).toHaveAttribute('aria-pressed', 'false');
   });
 });

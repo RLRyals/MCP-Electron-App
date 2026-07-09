@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { ProviderSelector, ProviderSelectorProps } from '../ProviderSelector';
@@ -15,9 +15,17 @@ import type { LLMProviderConfig } from '../../../types/llm-providers';
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
 
-// Mock window.electron
+// Mock window.electronAPI -- this is the actual global the preload script
+// exposes (contextBridge.exposeInMainWorld('electronAPI', ...) in
+// src/preload/preload.ts) and what ProviderSelector.tsx calls
+// (window.electronAPI.invoke(...)). This file previously mocked a
+// nonexistent `window.electron` (singular), which meant
+// handleTestConnection actually hit src/setupTests.ts's global
+// window.electronAPI stub (mockResolvedValue(undefined)) instead of this
+// suite's own mock, making tests that need to control the resolved
+// value/timing of the "test connection" call flaky or wrong.
 global.window = Object.create(window);
-Object.defineProperty(window, 'electron', {
+Object.defineProperty(window, 'electronAPI', {
   value: {
     invoke: jest.fn(),
   },
@@ -146,7 +154,10 @@ describe('ProviderSelector - Dropdown Accessibility', () => {
 
     const select = screen.getByLabelText(/LLM Provider/i);
     expect(select).toHaveAttribute('id', 'provider-select');
-    expect(select).toHaveAttribute('role', 'combobox');
+    // Native <select> elements have an implicit ARIA role of "combobox" --
+    // there's no explicit role="combobox" DOM attribute to assert on. Verify
+    // the implicit role is exposed correctly instead.
+    expect(screen.getByRole('combobox', { name: /LLM Provider/i })).toBe(select);
   });
 
   it('should have accessible option groups', () => {
@@ -260,20 +271,28 @@ describe('ProviderSelector - Slider Accessibility', () => {
 
     it('should support keyboard navigation', async () => {
       const user = userEvent.setup();
-      const slider = screen.getByLabelText(/Temperature:/i);
+      const slider = screen.getByLabelText(/Temperature:/i) as HTMLInputElement;
 
-      const initialValue = slider.getAttribute('value');
+      // getAttribute('value') reflects the initial HTML attribute, not the
+      // live value of a controlled range input -- read the `.value`
+      // property to observe the post-interaction value.
+      const initialValue = slider.value;
 
       await user.click(slider);
       await user.keyboard('{ArrowRight}');
 
-      const newValue = slider.getAttribute('value');
+      const newValue = slider.value;
       expect(newValue).not.toBe(initialValue);
     });
   });
 
   describe('Top P Slider (OpenAI providers)', () => {
     beforeEach(async () => {
+      // The outer describe's beforeEach already rendered a default-provider
+      // instance and expanded its Advanced Settings panel; without tearing
+      // it down first, this describe's own render leaves two mounted
+      // instances (two "Advanced Settings" toggles) in the DOM at once.
+      cleanup();
       renderProviderSelector({ selectedProvider: mockProviders[1] });
       const advancedToggle = screen.getByText(/Advanced Settings/i);
       await userEvent.click(advancedToggle);
@@ -473,7 +492,7 @@ describe('ProviderSelector - Provider Info Display', () => {
   });
 
   it('should disable test button during testing', async () => {
-    (window.electron.invoke as jest.Mock).mockImplementation(() =>
+    (window.electronAPI.invoke as jest.Mock).mockImplementation(() =>
       new Promise(resolve => setTimeout(() => resolve({ valid: true }), 1000))
     );
 
@@ -487,7 +506,7 @@ describe('ProviderSelector - Provider Info Display', () => {
   });
 
   it('should announce status changes to screen readers', async () => {
-    (window.electron.invoke as jest.Mock).mockResolvedValue({ valid: true });
+    (window.electronAPI.invoke as jest.Mock).mockResolvedValue({ valid: true });
 
     renderProviderSelector();
     const user = userEvent.setup();
@@ -495,10 +514,14 @@ describe('ProviderSelector - Provider Info Display', () => {
     const testButton = screen.getByText(/Test Connection/i);
     await user.click(testButton);
 
-    // Wait for status to update
-    await screen.findByText(/Verified/i);
+    // renderValidationStatus() is also called once per <option> in the
+    // provider dropdown (to show a badge next to each provider's name), so
+    // once status is "verified" there are multiple "Verified" matches in
+    // the document -- scope the query to the Status row specifically.
+    const statusRow = screen.getByText(/Status:/i).closest('div') as HTMLElement;
 
-    const verifiedStatus = screen.getByText(/Verified/i);
+    // Wait for status to update
+    const verifiedStatus = await within(statusRow).findByText(/Verified/i);
     expect(verifiedStatus).toBeInTheDocument();
   });
 });
@@ -533,6 +556,12 @@ describe('ProviderSelector - Keyboard Navigation', () => {
 
     const providerSelect = screen.getByLabelText(/LLM Provider/i);
     providerSelect.focus();
+
+    // With a provider selected (the default mock), a "Test Connection"
+    // button renders between the provider select and the model select --
+    // it's next in tab order before reaching Model.
+    await user.keyboard('{Tab}');
+    expect(document.activeElement).toBe(screen.getByText(/Test Connection/i));
 
     await user.keyboard('{Tab}');
     expect(document.activeElement).toBe(screen.getByLabelText(/Model/i));
@@ -596,8 +625,10 @@ describe('ProviderSelector - Dynamic Content', () => {
       selectedProvider: mockProviders[0],
     });
 
-    // Initially dropdown
-    expect(screen.getByLabelText(/Model/i)).toHaveAttribute('role', 'combobox');
+    // Initially dropdown -- native <select> has an implicit combobox role
+    // rather than an explicit role attribute (see the Dropdown
+    // Accessibility suite's "proper select element attributes" test).
+    expect(screen.getByRole('combobox', { name: /Model/i })).toBeInTheDocument();
 
     rerender(
       <ProviderSelector
@@ -661,7 +692,7 @@ describe('ProviderSelector - Visual Indicators', () => {
   });
 
   it('should show status badges accessibly', async () => {
-    (window.electron.invoke as jest.Mock).mockResolvedValue({ valid: true });
+    (window.electronAPI.invoke as jest.Mock).mockResolvedValue({ valid: true });
 
     renderProviderSelector();
     const user = userEvent.setup();
@@ -669,9 +700,12 @@ describe('ProviderSelector - Visual Indicators', () => {
     const testButton = screen.getByText(/Test Connection/i);
     await user.click(testButton);
 
-    await screen.findByText(/Verified/i);
-
-    const verifiedBadge = screen.getByText(/Verified/i);
+    // renderValidationStatus() also renders a badge per <option> in the
+    // provider dropdown, so once status is "verified" there are multiple
+    // "Verified" matches -- scope to the Status row (see the "should
+    // announce status changes to screen readers" test above).
+    const statusRow = screen.getByText(/Status:/i).closest('div') as HTMLElement;
+    const verifiedBadge = await within(statusRow).findByText(/Verified/i);
     expect(verifiedBadge).toBeVisible();
   });
 });

@@ -132,7 +132,7 @@ describe('AgentNodeConfig - Accessibility', () => {
       );
 
       // Agent input
-      expect(screen.getByLabelText(/Agent/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Agent/i)).toBeInTheDocument();
 
       // Skill input
       expect(screen.getByLabelText(/Skill/i)).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('AgentNodeConfig - Accessibility', () => {
       const agentLabel = container.querySelector('label[for="agent-input"]');
       expect(agentLabel).toBeInTheDocument();
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('id', 'agent-input');
     });
 
@@ -169,7 +169,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('aria-required', 'true');
 
       const providerInput = screen.getByLabelText(/LLM Provider/i);
@@ -200,7 +200,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('aria-describedby', 'agent-error');
 
       const errorMessage = screen.getByText('Agent is required');
@@ -216,7 +216,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('aria-invalid', 'true');
     });
 
@@ -267,7 +267,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('aria-describedby', 'agent-help');
 
       const helpText = screen.getByText(/The agent defines the AI behavior/i);
@@ -283,7 +283,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       const describedBy = agentInput.getAttribute('aria-describedby');
 
       // Should reference the error message
@@ -413,8 +413,14 @@ describe('AgentNodeConfig - Accessibility', () => {
       expect(conditionInput).toHaveAttribute('aria-invalid', 'true');
       expect(conditionInput).toHaveAttribute('aria-describedby', 'gate-condition-error');
 
-      const errorMessage = screen.getByRole('alert', { name: /Gate condition is required/i });
+      // Note: role="alert" has ARIA nameFrom:author -- its accessible name is
+      // NOT computed from text content, so getByRole('alert', { name }) can
+      // never match here. Query by the rendered text instead (consistent with
+      // the "should announce errors with role=alert" test's toHaveTextContent
+      // check above) and assert the role/id on that element.
+      const errorMessage = screen.getByText(/Gate condition is required/i);
       expect(errorMessage).toHaveAttribute('id', 'gate-condition-error');
+      expect(errorMessage).toHaveAttribute('role', 'alert');
     });
   });
 
@@ -445,7 +451,7 @@ describe('AgentNodeConfig - Accessibility', () => {
       );
       const user = userEvent.setup();
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       await user.type(agentInput, 'new-agent');
 
       expect(mockOnChange).toHaveBeenCalled();
@@ -495,7 +501,7 @@ describe('AgentNodeConfig - Accessibility', () => {
         />
       );
 
-      const agentInput = screen.getByLabelText(/Agent/i);
+      const agentInput = screen.getByLabelText(/^Agent/i);
       expect(agentInput).toHaveAttribute('placeholder', 'e.g., series-architect-agent');
 
       const skillInput = screen.getByLabelText(/Skill/i);
@@ -572,7 +578,7 @@ describe('Config Panels - General Accessibility Patterns', () => {
     );
     const user = userEvent.setup();
 
-    const agentInput = screen.getByLabelText(/Agent/i);
+    const agentInput = screen.getByLabelText(/^Agent/i);
     await user.click(agentInput);
 
     expect(document.activeElement).toBe(agentInput);
@@ -608,7 +614,7 @@ describe('Config Panels - Visual Error States', () => {
       />
     );
 
-    const agentInput = screen.getByLabelText(/Agent/i);
+    const agentInput = screen.getByLabelText(/^Agent/i);
 
     // Input should have error styling (checked via aria-invalid)
     expect(agentInput).toHaveAttribute('aria-invalid', 'true');
@@ -623,7 +629,7 @@ describe('Config Panels - Visual Error States', () => {
       />
     );
 
-    const agentInput = screen.getByLabelText(/Agent/i);
+    const agentInput = screen.getByLabelText(/^Agent/i);
     expect(agentInput).toHaveAttribute('aria-invalid', 'true');
 
     // Re-render without error

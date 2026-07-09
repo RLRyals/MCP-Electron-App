@@ -54,6 +54,11 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 } as any;
 
+// jsdom doesn't implement scrollIntoView -- components that call it on focus
+// (e.g. VariableBrowser's roving-tabindex keyboard navigation) throw
+// "element.scrollIntoView is not a function" without this stub.
+window.HTMLElement.prototype.scrollIntoView = jest.fn();
+
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

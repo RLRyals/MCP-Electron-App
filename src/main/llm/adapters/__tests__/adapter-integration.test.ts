@@ -39,7 +39,13 @@ describe('Adapter Integration Tests', () => {
       mockSetup: () => void;
     }> = [];
 
-    beforeAll(() => {
+    // Populated synchronously (not in beforeAll) because describe.each(adapters)
+    // below runs at suite-COLLECTION time, before any beforeAll/beforeEach
+    // hook ever executes. With the population deferred to beforeAll, `adapters`
+    // was still `[]` when describe.each read it, so Jest failed the whole file
+    // with "`.each` called with an empty Array of table data" before a single
+    // test could run.
+    (() => {
       // Claude API Adapter
       const claudeAdapter = new ClaudeAPIAdapter();
       const claudeProvider: ClaudeAPIProvider = {
@@ -136,7 +142,7 @@ describe('Adapter Integration Tests', () => {
           GoogleGenerativeAI.mockImplementation(() => mockGenAI);
         },
       });
-    });
+    })();
 
     describe.each(adapters)('$name', ({ name, adapter, provider, mockSetup }) => {
       beforeEach(() => {

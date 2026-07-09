@@ -291,7 +291,14 @@ describe('LLMProviderManager', () => {
       const mockLoadAdapters = jest.spyOn(newManager as any, 'loadAdapters');
       mockLoadAdapters.mockResolvedValue([]);
 
-      await newManager.executePrompt(provider, 'Test', {});
+      // With no adapters loaded, executePrompt correctly rejects looking up
+      // 'claude-code-cli' -- that's not what this test is checking. The
+      // point is that calling executePrompt() while uninitialized triggers
+      // auto-initialize (setting `initialized`) as a side effect, even
+      // though the subsequent adapter lookup then fails.
+      await expect(newManager.executePrompt(provider, 'Test', {})).rejects.toThrow(
+        'No adapter found for provider type: claude-code-cli'
+      );
 
       expect((newManager as any).initialized).toBe(true);
     });
