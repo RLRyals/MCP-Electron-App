@@ -1414,6 +1414,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     /**
+     * Start, stop, or restart a single named service within the stack
+     * (issue #124 -- per-service controls on the Services tab), rather than
+     * the whole system.
+     */
+    controlService: (
+      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector',
+      action: 'start' | 'stop' | 'restart'
+    ): Promise<MCPSystemOperationResult> => {
+      return ipcRenderer.invoke('mcp-system:control-service', serviceName, action);
+    },
+
+    /**
+     * Get live CPU/memory usage for a single service's container
+     * (issue #124 -- resource usage monitoring). Resolves to null if the
+     * container isn't running or stats aren't available.
+     */
+    getResourceUsage: (
+      serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector'
+    ): Promise<{ cpuPercent: string; memoryUsage: string; memoryPercent: string } | null> => {
+      return ipcRenderer.invoke('mcp-system:resource-usage', serviceName);
+    },
+
+    /**
      * Get MCP working directory path
      */
     getWorkingDirectory: (): Promise<string> => {

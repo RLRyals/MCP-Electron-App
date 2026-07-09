@@ -1,36 +1,25 @@
 /**
- * ServicesTab Component
+ * ServicesTab Component (issue #124)
  * Comprehensive service management interface for all FictionLab services
  *
  * Features:
- * - PostgreSQL database management with connection details and controls
- * - MCP Servers monitoring and management
- * - Typing Mind service control with browser launcher
- * - Docker Desktop lifecycle management
- * - Per-service log viewing
- * - Resource usage monitoring
- * - Health status indicators
+ * - PostgreSQL database management with connection details and real controls
+ * - Individual MCP server management (Connector + Writing Servers): status,
+ *   port, start/stop/restart, and per-server logs
+ * - Typing Mind card: cloud app status via its local MCP Connector dependency
+ * - Docker Desktop lifecycle management with real version info
+ * - Per-service log viewing (with credential redaction)
+ * - Real resource usage monitoring via `docker stats`
+ * - Start All / Stop All / Restart All top-bar actions (window events
+ *   dispatched by ServicesView)
+ * - Ports settings section with conflict checking
  */
-
-interface ServiceStatus {
-  running: boolean;
-  healthy: boolean;
-  status: string;
-  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
-}
 
 interface ContainerHealth {
   name: string;
   status: string;
   health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
   running: boolean;
-}
-
-interface MCPSystemStatus {
-  running: boolean;
-  healthy: boolean;
-  containers: ContainerHealth[];
-  message: string;
 }
 
 interface ServiceUrls {
@@ -54,6 +43,69 @@ interface EnvConfig {
 }
 
 /**
+ * Shape of one entry from mcpSystem.getDetailedStatus().services
+ */
+interface DetailedServiceStatusEntry {
+  serviceName: string;
+  containerName: string;
+  status: 'starting' | 'running' | 'healthy' | 'unhealthy' | 'stopped' | 'missing';
+  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
+  url?: string;
+  port?: number;
+  message: string;
+}
+
+/**
+ * Live per-container resource usage from mcpSystem.getResourceUsage()
+ */
+interface ResourceUsage {
+  cpuPercent: string;
+  memoryUsage: string;
+  memoryPercent: string;
+}
+
+/**
+ * Services that can be individually controlled via mcpSystem.controlService
+ */
+type ControlledService = 'postgres' | 'mcp-writing-servers' | 'mcp-connector';
+
+type ServiceAction = 'start' | 'stop' | 'restart';
+
+const ACTION_PROGRESS_LABEL: Record<ServiceAction, string> = {
+  start: 'Starting',
+  stop: 'Stopping',
+  restart: 'Restarting',
+};
+
+function pastTense(action: ServiceAction): string {
+  return action === 'stop' ? 'stopped' : `${action}ed`;
+}
+
+/**
+ * Container names as reported by getDetailedStatus, keyed by service id.
+ */
+const SERVICE_CONTAINERS: Record<ControlledService, string> = {
+  'postgres': 'fictionlab-postgres',
+  'mcp-connector': 'fictionlab-mcp-connector',
+  'mcp-writing-servers': 'fictionlab-mcp-servers',
+};
+
+/**
+ * The two individually-managed MCP servers shown in the MCP Servers card.
+ * elementPrefix matches the ids in ServicesView markup
+ * (`<prefix>-status-badge`, `<prefix>-port-info`, `<prefix>-resource-usage`,
+ * `<prefix>-start|stop|restart|view-logs`).
+ */
+const MCP_SERVERS: Array<{
+  service: 'mcp-connector' | 'mcp-writing-servers';
+  elementPrefix: string;
+  displayName: string;
+}> = [
+  { service: 'mcp-connector', elementPrefix: 'mcp-connector', displayName: 'MCP Connector' },
+  { service: 'mcp-writing-servers', elementPrefix: 'mcp-writing-servers', displayName: 'MCP Writing Servers' },
+];
+
+/**
  * A single row in the Ports settings table
  */
 interface PortRowDefinition {
@@ -74,17 +126,24 @@ const PORT_ROWS: PortRowDefinition[] = [
   { key: 'WORKFLOW_MANAGER_PORT', name: 'Workflow Manager' },
 ];
 
-interface DockerStatus {
-  running: boolean;
-  healthy: boolean;
-  message: string;
-  error?: string;
-}
-
 export class ServicesTab {
   private updateInterval: NodeJS.Timeout | null = null;
   private readonly REFRESH_INTERVAL = 5000; // 5 seconds
   private lastSuggestedPortsConfig: EnvConfig | null = null;
+  private dockerVersion: string | null = null;
+
+  // Bound top-bar action handlers (ServicesView dispatches these window
+  // events from its TopBar actions). Kept as fields so cleanup() can
+  // remove exactly the listeners initialize() added.
+  private readonly onStartAllEvent = (): void => {
+    void this.handleSystemAction('start');
+  };
+  private readonly onStopAllEvent = (): void => {
+    void this.handleSystemAction('stop');
+  };
+  private readonly onRestartAllEvent = (): void => {
+    void this.handleSystemAction('restart');
+  };
 
   constructor() {
     console.log('ServicesTab component initialized');
@@ -99,6 +158,9 @@ export class ServicesTab {
     try {
       // Setup event listeners
       this.setupEventListeners();
+
+      // Docker version rarely changes; fetch once and cache
+      await this.loadDockerVersion();
 
       // Load initial service status
       await this.refreshAllServices();
@@ -123,7 +185,7 @@ export class ServicesTab {
     // PostgreSQL controls
     this.setupPostgresListeners();
 
-    // MCP Servers controls
+    // Individual MCP server controls (Connector + Writing Servers)
     this.setupMCPServersListeners();
 
     // Typing Mind controls
@@ -137,6 +199,11 @@ export class ServicesTab {
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.refreshAllServices());
     }
+
+    // Top-bar Start All / Stop All / Restart All actions (issue #124)
+    window.addEventListener('services-start-all', this.onStartAllEvent);
+    window.addEventListener('services-stop-all', this.onStopAllEvent);
+    window.addEventListener('services-restart-all', this.onRestartAllEvent);
 
     // Ports section controls
     this.setupPortsListeners();
@@ -404,37 +471,51 @@ export class ServicesTab {
     const viewLogsBtn = document.getElementById('postgres-view-logs');
     const viewConnectionBtn = document.getElementById('postgres-view-connection');
 
-    if (startBtn) startBtn.addEventListener('click', () => this.handlePostgresStart());
-    if (stopBtn) stopBtn.addEventListener('click', () => this.handlePostgresStop());
-    if (restartBtn) restartBtn.addEventListener('click', () => this.handlePostgresRestart());
+    if (startBtn) startBtn.addEventListener('click', () => this.handleServiceControl('postgres', 'PostgreSQL', 'start'));
+    if (stopBtn) stopBtn.addEventListener('click', () => this.handleServiceControl('postgres', 'PostgreSQL', 'stop'));
+    if (restartBtn) restartBtn.addEventListener('click', () => this.handleServiceControl('postgres', 'PostgreSQL', 'restart'));
     if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('postgres', 'PostgreSQL'));
     if (viewConnectionBtn) viewConnectionBtn.addEventListener('click', () => this.handleShowConnectionDetails());
   }
 
   /**
-   * Setup MCP Servers service listeners
+   * Setup per-server listeners for the MCP Servers card (issue #124):
+   * each of the two servers gets its own start/stop/restart/logs controls,
+   * plus the card-level aggregate health check.
    */
   private setupMCPServersListeners(): void {
-    const startBtn = document.getElementById('mcp-servers-start');
-    const stopBtn = document.getElementById('mcp-servers-stop');
-    const restartBtn = document.getElementById('mcp-servers-restart');
-    const viewLogsBtn = document.getElementById('mcp-servers-view-logs');
-    const healthCheckBtn = document.getElementById('mcp-servers-health-check');
+    for (const server of MCP_SERVERS) {
+      const startBtn = document.getElementById(`${server.elementPrefix}-start`);
+      const stopBtn = document.getElementById(`${server.elementPrefix}-stop`);
+      const restartBtn = document.getElementById(`${server.elementPrefix}-restart`);
+      const viewLogsBtn = document.getElementById(`${server.elementPrefix}-view-logs`);
 
-    if (startBtn) startBtn.addEventListener('click', () => this.handleMCPServersStart());
-    if (stopBtn) stopBtn.addEventListener('click', () => this.handleMCPServersStop());
-    if (restartBtn) restartBtn.addEventListener('click', () => this.handleMCPServersRestart());
-    if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('mcp-writing-servers', 'MCP Servers'));
+      if (startBtn) startBtn.addEventListener('click', () => this.handleServiceControl(server.service, server.displayName, 'start'));
+      if (stopBtn) stopBtn.addEventListener('click', () => this.handleServiceControl(server.service, server.displayName, 'stop'));
+      if (restartBtn) restartBtn.addEventListener('click', () => this.handleServiceControl(server.service, server.displayName, 'restart'));
+      if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs(server.service, server.displayName));
+    }
+
+    const healthCheckBtn = document.getElementById('mcp-servers-health-check');
     if (healthCheckBtn) healthCheckBtn.addEventListener('click', () => this.handleMCPServersHealthCheck());
   }
 
   /**
-   * Setup Typing Mind service listeners
+   * Setup Typing Mind service listeners. Typing Mind itself is a cloud web
+   * app; its lifecycle controls act on the local MCP Connector it depends on.
    */
   private setupTypingMindListeners(): void {
+    const startBtn = document.getElementById('typing-mind-start');
+    const stopBtn = document.getElementById('typing-mind-stop');
+    const restartBtn = document.getElementById('typing-mind-restart');
+    const viewLogsBtn = document.getElementById('typing-mind-view-logs');
     const openBrowserBtn = document.getElementById('typing-mind-open-browser');
     const configureBtn = document.getElementById('typing-mind-configure');
 
+    if (startBtn) startBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'start'));
+    if (stopBtn) stopBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'stop'));
+    if (restartBtn) restartBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'restart'));
+    if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('mcp-connector', 'MCP Connector (Typing Mind)'));
     if (openBrowserBtn) openBrowserBtn.addEventListener('click', () => this.handleOpenTypingMind());
     if (configureBtn) configureBtn.addEventListener('click', () => this.handleConfigureTypingMind());
   }
@@ -455,15 +536,79 @@ export class ServicesTab {
   }
 
   /**
+   * Start / stop / restart a single service via the per-service control IPC
+   * (issue #124 -- replaces the old "use the Dashboard" placeholder handlers).
+   */
+  private async handleServiceControl(
+    service: ControlledService,
+    displayName: string,
+    action: ServiceAction
+  ): Promise<void> {
+    try {
+      this.showNotification(`${ACTION_PROGRESS_LABEL[action]} ${displayName}...`, 'info');
+
+      const result = await window.electronAPI.mcpSystem.controlService(service, action);
+
+      if (result.success) {
+        this.showNotification(`${displayName} ${pastTense(action)} successfully`, 'success');
+      } else {
+        this.showNotification(`Failed to ${action} ${displayName}: ${result.error || result.message}`, 'error');
+      }
+
+      await this.refreshAllServices();
+    } catch (error) {
+      console.error(`Error during ${action} of ${displayName}:`, error);
+      this.showNotification(`Failed to ${action} ${displayName}`, 'error');
+    }
+  }
+
+  /**
+   * Start / stop / restart the whole MCP system. Wired to the top bar's
+   * Start All / Stop All / Restart All actions via window events.
+   */
+  private async handleSystemAction(action: ServiceAction): Promise<void> {
+    try {
+      this.showNotification(`${ACTION_PROGRESS_LABEL[action]} all services...`, 'info');
+
+      const api = window.electronAPI.mcpSystem;
+      const result = action === 'start'
+        ? await api.start()
+        : action === 'stop'
+          ? await api.stop()
+          : await api.restart();
+
+      if (result.success) {
+        this.showNotification(`All services ${pastTense(action)} successfully`, 'success');
+      } else {
+        this.showNotification(`Failed to ${action} services: ${result.message}`, 'error');
+      }
+
+      await this.refreshAllServices();
+    } catch (error) {
+      console.error(`Error during system ${action}:`, error);
+      this.showNotification(`Failed to ${action} services`, 'error');
+    }
+  }
+
+  /**
    * Refresh all services status
    */
   private async refreshAllServices(): Promise<void> {
     try {
-      // Update all service cards
-      await this.updatePostgreSQLCard();
-      await this.updateMCPServersCard();
-      await this.updateTypingMindCard();
-      await this.updateDockerCard();
+      // One status + one config fetch shared by all cards
+      const [detailed, config] = await Promise.all([
+        window.electronAPI.mcpSystem.getDetailedStatus(),
+        window.electronAPI.envConfig.getConfig() as Promise<EnvConfig>,
+      ]);
+
+      const services: DetailedServiceStatusEntry[] = detailed?.services ?? [];
+
+      await Promise.all([
+        this.updatePostgreSQLCard(services, config),
+        this.updateMCPServersCard(services),
+        this.updateTypingMindCard(services),
+        this.updateDockerCard(),
+      ]);
 
       // Update last refresh timestamp
       this.updateLastRefreshTime();
@@ -473,137 +618,210 @@ export class ServicesTab {
   }
 
   /**
-   * Update PostgreSQL service card
+   * Find a service's detailed status entry by its container name
    */
-  private async updatePostgreSQLCard(): Promise<void> {
+  private findService(
+    services: DetailedServiceStatusEntry[],
+    service: ControlledService
+  ): DetailedServiceStatusEntry | undefined {
+    return services.find(s => s.containerName === SERVICE_CONTAINERS[service]);
+  }
+
+  /**
+   * Whether a detailed status entry represents a container that is up
+   * (running in any state, including still starting or unhealthy)
+   */
+  private isServiceUp(entry: DetailedServiceStatusEntry | undefined): boolean {
+    if (!entry) return false;
+    return entry.status === 'healthy'
+      || entry.status === 'running'
+      || entry.status === 'starting'
+      || entry.status === 'unhealthy';
+  }
+
+  /**
+   * Apply a status badge (text + class) for a detailed status entry
+   */
+  private applyStatusBadge(elementId: string, entry: DetailedServiceStatusEntry | undefined): void {
+    const badge = document.getElementById(elementId);
+    if (!badge) return;
+
+    if (!entry || entry.status === 'missing' || entry.status === 'stopped') {
+      badge.className = 'service-status-badge status-offline';
+      badge.textContent = 'Offline';
+    } else if (entry.status === 'healthy') {
+      badge.className = 'service-status-badge status-healthy';
+      badge.textContent = 'Healthy';
+    } else if (entry.status === 'running') {
+      badge.className = 'service-status-badge status-healthy';
+      badge.textContent = 'Running';
+    } else if (entry.status === 'starting') {
+      badge.className = 'service-status-badge status-starting';
+      badge.textContent = 'Starting';
+    } else {
+      badge.className = 'service-status-badge status-offline';
+      badge.textContent = 'Unhealthy';
+    }
+  }
+
+  /**
+   * Render real resource usage into an element. Fetches live CPU/memory via
+   * `docker stats` when the service is up (issue #124 -- replaces the old
+   * hardcoded placeholder numbers).
+   */
+  private async updateResourceUsage(
+    elementId: string,
+    service: ControlledService,
+    isUp: boolean
+  ): Promise<void> {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (!isUp) {
+      el.innerHTML = '<div class="resource-item">Not running</div>';
+      return;
+    }
+
     try {
-      const status = await window.electronAPI.mcpSystem.getStatus();
-      const config = await window.electronAPI.envConfig.getConfig();
+      const usage: ResourceUsage | null = await window.electronAPI.mcpSystem.getResourceUsage(service);
 
-      const container = status.containers.find(c => c.name.includes('postgres'));
-
-      const statusBadge = document.getElementById('postgres-status-badge');
-      const portDisplay = document.getElementById('postgres-port-info');
-      const versionDisplay = document.getElementById('postgres-version-info');
-      const resourceDisplay = document.getElementById('postgres-resource-usage');
-
-      if (statusBadge) {
-        if (container?.running && container.health === 'healthy') {
-          statusBadge.className = 'service-status-badge status-healthy';
-          statusBadge.textContent = 'Healthy';
-        } else if (container?.running) {
-          statusBadge.className = 'service-status-badge status-starting';
-          statusBadge.textContent = 'Starting';
-        } else {
-          statusBadge.className = 'service-status-badge status-offline';
-          statusBadge.textContent = 'Offline';
-        }
-      }
-
-      if (portDisplay) {
-        portDisplay.textContent = `Port: ${config.POSTGRES_PORT}`;
-      }
-
-      if (versionDisplay) {
-        versionDisplay.textContent = 'Version: PostgreSQL 17';
-      }
-
-      // Update resource usage (simulated for now)
-      if (resourceDisplay && container?.running) {
-        resourceDisplay.innerHTML = `
+      if (usage) {
+        el.innerHTML = `
           <div class="resource-item">
             <span>CPU:</span>
-            <span class="resource-value">~2%</span>
+            <span class="resource-value">${this.escapeHtml(usage.cpuPercent)}</span>
           </div>
           <div class="resource-item">
             <span>Memory:</span>
-            <span class="resource-value">~128MB</span>
+            <span class="resource-value">${this.escapeHtml(usage.memoryUsage)} (${this.escapeHtml(usage.memoryPercent)})</span>
           </div>
         `;
-      } else if (resourceDisplay) {
-        resourceDisplay.innerHTML = '<div class="resource-item">Not running</div>';
+      } else {
+        el.innerHTML = '<div class="resource-item">Usage unavailable</div>';
       }
+    } catch (error) {
+      console.error(`Error fetching resource usage for ${service}:`, error);
+      el.innerHTML = '<div class="resource-item">Usage unavailable</div>';
+    }
+  }
+
+  /**
+   * Update PostgreSQL service card: status badge, connection info
+   * (host / port / database), live resource usage, and control states.
+   */
+  private async updatePostgreSQLCard(
+    services: DetailedServiceStatusEntry[],
+    config: EnvConfig
+  ): Promise<void> {
+    try {
+      const entry = this.findService(services, 'postgres');
+      const isUp = this.isServiceUp(entry);
+
+      this.applyStatusBadge('postgres-status-badge', entry);
+
+      const hostDisplay = document.getElementById('postgres-host-info');
+      const portDisplay = document.getElementById('postgres-port-info');
+      const databaseDisplay = document.getElementById('postgres-database-info');
+
+      if (hostDisplay) hostDisplay.textContent = 'Host: localhost';
+      if (portDisplay) portDisplay.textContent = `Port: ${config.POSTGRES_PORT}`;
+      if (databaseDisplay) databaseDisplay.textContent = `Database: ${config.POSTGRES_DB}`;
+
+      await this.updateResourceUsage('postgres-resource-usage', 'postgres', isUp);
 
       // Enable/disable controls based on status
-      this.updateServiceControls('postgres', container?.running || false);
+      this.updateServiceControls('postgres', isUp);
     } catch (error) {
       console.error('Error updating PostgreSQL card:', error);
     }
   }
 
   /**
-   * Update MCP Servers service card
+   * Update the MCP Servers card: per-server rows (status badge, port, live
+   * resource usage, control states) plus the aggregate card badge.
    */
-  private async updateMCPServersCard(): Promise<void> {
+  private async updateMCPServersCard(services: DetailedServiceStatusEntry[]): Promise<void> {
     try {
-      const status = await window.electronAPI.mcpSystem.getStatus();
-      const config = await window.electronAPI.envConfig.getConfig();
+      const entries = MCP_SERVERS.map(server => ({
+        server,
+        entry: this.findService(services, server.service),
+      }));
 
-      const container = status.containers.find(c =>
-        c.name.includes('mcp-writing-servers') || c.name.includes('mcp-connector')
-      );
+      // Aggregate badge: healthy only when every server is healthy
+      const aggregateBadge = document.getElementById('mcp-servers-status-badge');
+      if (aggregateBadge) {
+        const upCount = entries.filter(({ entry }) => this.isServiceUp(entry)).length;
+        const healthyCount = entries.filter(({ entry }) => entry?.status === 'healthy' || entry?.status === 'running').length;
 
-      const statusBadge = document.getElementById('mcp-servers-status-badge');
-      const portDisplay = document.getElementById('mcp-servers-port-info');
-      const versionDisplay = document.getElementById('mcp-servers-version-info');
-      const resourceDisplay = document.getElementById('mcp-servers-resource-usage');
-
-      if (statusBadge) {
-        if (container?.running && container.health === 'healthy') {
-          statusBadge.className = 'service-status-badge status-healthy';
-          statusBadge.textContent = 'Healthy';
-        } else if (container?.running) {
-          statusBadge.className = 'service-status-badge status-starting';
-          statusBadge.textContent = 'Starting';
+        if (healthyCount === entries.length) {
+          aggregateBadge.className = 'service-status-badge status-healthy';
+          aggregateBadge.textContent = 'Healthy';
+        } else if (upCount > 0) {
+          aggregateBadge.className = 'service-status-badge status-starting';
+          aggregateBadge.textContent = 'Degraded';
         } else {
-          statusBadge.className = 'service-status-badge status-offline';
-          statusBadge.textContent = 'Offline';
+          aggregateBadge.className = 'service-status-badge status-offline';
+          aggregateBadge.textContent = 'Offline';
         }
       }
 
-      if (portDisplay) {
-        portDisplay.textContent = `Connector Port: ${config.MCP_CONNECTOR_PORT} | HTTP/SSE Port: ${config.HTTP_SSE_PORT}`;
-      }
+      // Per-server rows
+      await Promise.all(entries.map(async ({ server, entry }) => {
+        const isUp = this.isServiceUp(entry);
 
-      if (versionDisplay) {
-        versionDisplay.textContent = 'Version: Latest';
-      }
+        this.applyStatusBadge(`${server.elementPrefix}-status-badge`, entry);
 
-      // Update resource usage
-      if (resourceDisplay && container?.running) {
-        resourceDisplay.innerHTML = `
-          <div class="resource-item">
-            <span>CPU:</span>
-            <span class="resource-value">~1%</span>
-          </div>
-          <div class="resource-item">
-            <span>Memory:</span>
-            <span class="resource-value">~64MB</span>
-          </div>
-        `;
-      } else if (resourceDisplay) {
-        resourceDisplay.innerHTML = '<div class="resource-item">Not running</div>';
-      }
+        const portDisplay = document.getElementById(`${server.elementPrefix}-port-info`);
+        if (portDisplay) {
+          portDisplay.textContent = entry?.port !== undefined ? `Port: ${entry.port}` : 'Port: --';
+        }
 
-      // Enable/disable controls based on status
-      this.updateServiceControls('mcp-servers', container?.running || false);
+        await this.updateResourceUsage(`${server.elementPrefix}-resource-usage`, server.service, isUp);
+
+        this.updateServiceControls(server.elementPrefix, isUp);
+      }));
     } catch (error) {
       console.error('Error updating MCP Servers card:', error);
     }
   }
 
   /**
-   * Update Typing Mind service card (cloud link only — no local container)
+   * Update Typing Mind card. Typing Mind is a cloud web app -- its status
+   * reflects the local MCP Connector it depends on.
    */
-  private async updateTypingMindCard(): Promise<void> {
+  private async updateTypingMindCard(services: DetailedServiceStatusEntry[]): Promise<void> {
     try {
-      const urls = await window.electronAPI.mcpSystem.getUrls();
+      const connector = this.findService(services, 'mcp-connector');
+      const isUp = this.isServiceUp(connector);
 
+      const badge = document.getElementById('typing-mind-status-badge');
+      if (badge) {
+        if (connector?.status === 'healthy' || connector?.status === 'running') {
+          badge.className = 'service-status-badge status-healthy';
+          badge.textContent = 'Ready';
+        } else if (connector?.status === 'starting') {
+          badge.className = 'service-status-badge status-starting';
+          badge.textContent = 'Starting';
+        } else {
+          badge.className = 'service-status-badge status-offline';
+          badge.textContent = 'Offline';
+        }
+      }
+
+      const urls: ServiceUrls = await window.electronAPI.mcpSystem.getUrls();
       const urlDisplay = document.getElementById('typing-mind-url-info');
-
       if (urlDisplay) {
         urlDisplay.textContent = urls.typingMind || 'https://www.typingmind.com';
       }
+
+      const portDisplay = document.getElementById('typing-mind-port-info');
+      if (portDisplay) {
+        portDisplay.textContent = connector?.port !== undefined
+          ? `Connector Port: ${connector.port}`
+          : 'Connector Port: --';
+      }
+
+      this.updateServiceControls('typing-mind', isUp);
     } catch (error) {
       console.error('Error updating Typing Mind card:', error);
     }
@@ -617,7 +835,6 @@ export class ServicesTab {
       const status = await window.electronAPI.docker.healthCheck();
 
       const statusBadge = document.getElementById('docker-status-badge');
-      const versionDisplay = document.getElementById('docker-version-info');
       const healthDisplay = document.getElementById('docker-health-info');
 
       if (statusBadge) {
@@ -633,9 +850,7 @@ export class ServicesTab {
         }
       }
 
-      if (versionDisplay) {
-        versionDisplay.textContent = 'Docker Desktop';
-      }
+      this.renderDockerVersion();
 
       if (healthDisplay) {
         healthDisplay.textContent = status.message;
@@ -645,6 +860,33 @@ export class ServicesTab {
       this.updateServiceControls('docker-service', status.running);
     } catch (error) {
       console.error('Error updating Docker card:', error);
+    }
+  }
+
+  /**
+   * Fetch and cache the real Docker version (issue #124 -- replaces the
+   * hardcoded "Docker Desktop" placeholder).
+   */
+  private async loadDockerVersion(): Promise<void> {
+    try {
+      const status = await window.electronAPI.prerequisites.getDockerVersion();
+      this.dockerVersion = status?.version || null;
+    } catch (error) {
+      console.error('Error fetching Docker version:', error);
+      this.dockerVersion = null;
+    }
+    this.renderDockerVersion();
+  }
+
+  /**
+   * Render the cached Docker version into the Docker card
+   */
+  private renderDockerVersion(): void {
+    const versionDisplay = document.getElementById('docker-version-info');
+    if (versionDisplay) {
+      versionDisplay.textContent = this.dockerVersion
+        ? `Version: Docker ${this.dockerVersion}`
+        : 'Version: unknown';
     }
   }
 
@@ -662,63 +904,31 @@ export class ServicesTab {
   }
 
   /**
-   * Handle PostgreSQL start
-   */
-  private async handlePostgresStart(): Promise<void> {
-    this.showNotification('PostgreSQL is managed as part of the full system. Use Dashboard to start all services.', 'info');
-  }
-
-  /**
-   * Handle PostgreSQL stop
-   */
-  private async handlePostgresStop(): Promise<void> {
-    this.showNotification('PostgreSQL is managed as part of the full system. Use Dashboard to stop all services.', 'info');
-  }
-
-  /**
-   * Handle PostgreSQL restart
-   */
-  private async handlePostgresRestart(): Promise<void> {
-    this.showNotification('PostgreSQL is managed as part of the full system. Use Dashboard to restart all services.', 'info');
-  }
-
-  /**
-   * Handle MCP Servers start
-   */
-  private async handleMCPServersStart(): Promise<void> {
-    this.showNotification('MCP Servers are managed as part of the full system. Use Dashboard to start all services.', 'info');
-  }
-
-  /**
-   * Handle MCP Servers stop
-   */
-  private async handleMCPServersStop(): Promise<void> {
-    this.showNotification('MCP Servers are managed as part of the full system. Use Dashboard to stop all services.', 'info');
-  }
-
-  /**
-   * Handle MCP Servers restart
-   */
-  private async handleMCPServersRestart(): Promise<void> {
-    this.showNotification('MCP Servers are managed as part of the full system. Use Dashboard to restart all services.', 'info');
-  }
-
-  /**
-   * Handle MCP Servers health check
+   * Handle MCP Servers health check: per-server status summary in a dialog
    */
   private async handleMCPServersHealthCheck(): Promise<void> {
     try {
-      const status = await window.electronAPI.mcpSystem.getStatus();
-      const container = status.containers.find(c =>
-        c.name.includes('mcp-writing-servers') || c.name.includes('mcp-connector')
-      );
+      const detailed = await window.electronAPI.mcpSystem.getDetailedStatus();
+      const services: DetailedServiceStatusEntry[] = detailed?.services ?? [];
 
-      if (container) {
-        const healthMsg = `Status: ${container.status}\nHealth: ${container.health}\nRunning: ${container.running}`;
-        this.showNotification(healthMsg, container.health === 'healthy' ? 'success' : 'info');
-      } else {
-        this.showNotification('MCP Servers container not found', 'error');
-      }
+      const lines = MCP_SERVERS.map(server => {
+        const entry = this.findService(services, server.service);
+        if (!entry) {
+          return `${server.displayName}: container not found`;
+        }
+        return `${server.displayName}\n  Status: ${entry.status}\n  Health: ${entry.health}\n  ${entry.message}`;
+      });
+
+      const allHealthy = MCP_SERVERS.every(server => {
+        const entry = this.findService(services, server.service);
+        return entry?.status === 'healthy' || entry?.status === 'running';
+      });
+
+      this.showLogsDialog('MCP Servers Health Check', lines.join('\n\n'));
+      this.showNotification(
+        allHealthy ? 'All MCP servers are healthy' : 'Some MCP servers are not healthy',
+        allHealthy ? 'success' : 'info'
+      );
     } catch (error) {
       console.error('Error checking MCP Servers health:', error);
       this.showNotification('Failed to check health status', 'error');
@@ -731,18 +941,15 @@ export class ServicesTab {
   private async handleOpenTypingMind(): Promise<void> {
     try {
       const urls = await window.electronAPI.mcpSystem.getUrls();
+      const url = urls.typingMind || 'https://www.typingmind.com';
 
-      if (urls.typingMind) {
-        // Use the Typing Mind window opener from the API
-        const result = await (window.electronAPI as any).typingMind.openWindow(urls.typingMind);
+      // Use the Typing Mind window opener from the API
+      const result = await window.electronAPI.typingMind.openWindow(url);
 
-        if (result.success) {
-          this.showNotification('Opening Typing Mind...', 'info');
-        } else {
-          this.showNotification(`Failed to open Typing Mind: ${result.error}`, 'error');
-        }
+      if (result.success) {
+        this.showNotification('Opening Typing Mind...', 'info');
       } else {
-        this.showNotification('Typing Mind is not running', 'error');
+        this.showNotification(`Failed to open Typing Mind: ${result.error}`, 'error');
       }
     } catch (error) {
       console.error('Error opening Typing Mind:', error);
@@ -780,6 +987,7 @@ export class ServicesTab {
 
       if (result.success) {
         this.showNotification('Docker Desktop started successfully!', 'success');
+        await this.loadDockerVersion();
         await this.refreshAllServices();
       } else {
         this.showNotification(`Failed to start Docker: ${result.error || result.message}`, 'error');
@@ -820,6 +1028,7 @@ export class ServicesTab {
 
       if (result.success) {
         this.showNotification('Docker Desktop restarted successfully!', 'success');
+        await this.loadDockerVersion();
         await this.refreshAllServices();
       } else {
         this.showNotification(`Failed to restart Docker: ${result.error || result.message}`, 'error');
@@ -892,7 +1101,7 @@ export class ServicesTab {
 
       if (result.success) {
         const redactedLogs = this.redactSensitiveInfo(result.logs);
-        this.showLogsDialog(displayName, redactedLogs);
+        this.showLogsDialog(`${displayName} Logs`, redactedLogs);
       } else {
         this.showNotification(`Failed to get logs: ${result.error}`, 'error');
       }
@@ -1029,10 +1238,17 @@ postgresql://${config.POSTGRES_USER}:********@localhost:${config.POSTGRES_PORT}/
   }
 
   /**
-   * Cleanup when navigating away from tab
+   * Cleanup when navigating away from tab: stops the auto-refresh interval
+   * and removes the window-level top-bar action listeners (issue #124 --
+   * previously the interval and listeners leaked across navigations).
    */
   public cleanup(): void {
     this.stopAutoRefresh();
+
+    window.removeEventListener('services-start-all', this.onStartAllEvent);
+    window.removeEventListener('services-stop-all', this.onStopAllEvent);
+    window.removeEventListener('services-restart-all', this.onRestartAllEvent);
+
     console.log('ServicesTab cleanup complete');
   }
 }

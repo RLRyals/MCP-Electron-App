@@ -1141,6 +1141,24 @@ function setupIPC(): void {
     return await mcpSystem.checkPortConflicts();
   });
 
+  // issue #124: per-service start/stop/restart for the Services tab
+  registerHandler('mcp-system:control-service', "", async (
+    _event,
+    serviceName: mcpSystem.ManagedServiceName,
+    action: 'start' | 'stop' | 'restart'
+  ) => {
+    logWithCategory('info', LogCategory.DOCKER, `IPC: ${action} service ${serviceName}...`);
+    return await mcpSystem.controlService(serviceName, action);
+  });
+
+  // issue #124: per-service live resource usage (CPU/memory) for the Services tab
+  registerHandler('mcp-system:resource-usage', "", async (
+    _event,
+    serviceName: mcpSystem.ManagedServiceName
+  ) => {
+    return await mcpSystem.getContainerResourceUsage(serviceName);
+  });
+
   registerHandler('mcp-system:working-directory', "", async () => {
     return mcpSystem.getMCPWorkingDirectoryPath();
   });
