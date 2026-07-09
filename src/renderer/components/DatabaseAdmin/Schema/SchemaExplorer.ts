@@ -12,19 +12,34 @@
 import { databaseService, DatabaseOperationResult } from '../../../services/databaseService';
 import { TableDetails } from './TableDetails';
 import { RelationshipDiagram } from './RelationshipDiagram';
+import { parseQualifiedTableName } from './schema-utils';
+
+export { parseQualifiedTableName };
 
 export interface TableMetadata {
+  /** Table name as returned by the backend -- schema-qualified for non-public
+   *  schemas (e.g. "fictionlab.workflow_definitions"), bare for public (e.g. "authors"). */
   name: string;
+  /** Actual Postgres schema this table lives in ("public", "fictionlab", ...).
+   *  Always read from the backend -- never assumed. */
+  dbSchema: string;
+  tableType?: string;
+  comment?: string | null;
   recordCount?: number;
+  columnCount?: number;
+  sizeHuman?: string;
   lastUpdated?: string;
+  /** Detailed schema info (columns/constraints/indexes) from db_get_schema, lazily loaded + cached. */
   schema?: any;
-  columns?: any[];
   relationships?: any[];
 }
 
 export interface SchemaCache {
   tables: Map<string, TableMetadata>;
-  relationships: any[];
+  /** db_get_relationships is scoped to a single table (returns that table's
+   *  parents/children) -- there is no bulk "every relationship" tool -- so
+   *  the cache is keyed per table rather than holding one flat list. */
+  relationshipsByTable: Map<string, any[]>;
   lastRefresh: Date;
 }
 
@@ -43,7 +58,7 @@ export class SchemaExplorer {
   constructor() {
     this.cache = {
       tables: new Map(),
-      relationships: [],
+      relationshipsByTable: new Map(),
       lastRefresh: new Date(),
     };
   }
@@ -141,7 +156,13 @@ export class SchemaExplorer {
   }
 
   /**
-   * Render table list items
+   * Render table list items, grouped by their actual database schema.
+   *
+   * The MCP database-admin server backs onto a Postgres instance with more
+   * than one schema in active use (e.g. "fictionlab" alongside the legacy
+   * "public" schema). db_list_tables reports each table's real schema --
+   * we group and label by that reported value rather than assuming every
+   * table lives in "public".
    */
   private renderTableList(): string {
     if (this.isLoading) {
@@ -160,20 +181,47 @@ export class SchemaExplorer {
       return '<div class="empty-message">No tables match search</div>';
     }
 
-    return filtered.map(table => `
+    // Group by the schema the backend actually reported for each table.
+    const bySchema = new Map<string, TableMetadata[]>();
+    for (const table of filtered) {
+      const group = bySchema.get(table.dbSchema) || [];
+      group.push(table);
+      bySchema.set(table.dbSchema, group);
+    }
+
+    const schemaNames = Array.from(bySchema.keys()).sort();
+
+    return schemaNames.map(schemaName => `
+      <div class="schema-group" data-schema="${this.escapeHtml(schemaName)}">
+        <div class="schema-group-header">
+          <span class="schema-badge schema-badge-${this.escapeHtml(schemaName)}">${this.escapeHtml(schemaName)}</span>
+          <span class="schema-group-count">${bySchema.get(schemaName)!.length} table${bySchema.get(schemaName)!.length === 1 ? '' : 's'}</span>
+        </div>
+        ${bySchema.get(schemaName)!.map(table => this.renderTableListItem(table)).join('')}
+      </div>
+    `).join('');
+  }
+
+  /**
+   * Render a single table's sidebar entry
+   */
+  private renderTableListItem(table: TableMetadata): string {
+    const { shortName } = parseQualifiedTableName(table.name);
+
+    return `
       <div class="table-list-item ${this.selectedTable === table.name ? 'selected' : ''}"
            data-table="${this.escapeHtml(table.name)}">
         <div class="table-item-header">
           <span class="table-icon">📊</span>
-          <span class="table-name">${this.escapeHtml(table.name)}</span>
+          <span class="table-name">${this.escapeHtml(shortName)}</span>
         </div>
-        ${table.recordCount !== undefined ? `
-          <div class="table-item-meta">
-            <span class="record-count">${table.recordCount} rows</span>
-          </div>
-        ` : ''}
+        <div class="table-item-meta">
+          ${table.recordCount !== undefined ? `<span class="record-count">${table.recordCount} rows</span>` : ''}
+          ${table.columnCount !== undefined ? `<span class="column-count">${table.columnCount} cols</span>` : ''}
+          ${table.sizeHuman ? `<span class="table-size">${this.escapeHtml(table.sizeHuman)}</span>` : ''}
+        </div>
       </div>
-    `).join('');
+    `;
   }
 
   /**
@@ -224,7 +272,13 @@ export class SchemaExplorer {
   }
 
   /**
-   * Load tables from database
+   * Load tables from database.
+   *
+   * db_list_tables returns an array of table *objects*
+   * (`{ name, schema, type, comment, column_count, size_bytes, size_human }`),
+   * not bare strings -- `name` is only schema-qualified for non-public
+   * schemas. Each object's own `schema` field is preserved into the cache so
+   * the UI can label tables by their real schema instead of assuming public.
    */
   private async loadTables(): Promise<void> {
     this.isLoading = true;
@@ -234,15 +288,19 @@ export class SchemaExplorer {
       const result = await databaseService.listTables();
 
       if (result.success && result.data) {
-        const tables = result.data.tables || result.data;
-        const tableNames = Array.isArray(tables) ? tables : [];
+        const rawTables = result.data.tables || result.data;
+        const tableInfos = Array.isArray(rawTables) ? rawTables : [];
 
         // Load metadata for each table
-        for (const tableName of tableNames) {
-          await this.loadTableMetadata(tableName);
+        for (const tableInfo of tableInfos) {
+          this.loadTableMetadata(tableInfo);
         }
 
-        console.log(`Loaded ${tableNames.length} tables`);
+        // Row counts require a separate query per table -- fetch them
+        // concurrently so a large table list doesn't serialize N round trips.
+        await Promise.all(tableInfos.map((tableInfo: any) => this.loadRecordCount(this.tableInfoName(tableInfo))));
+
+        console.log(`Loaded ${tableInfos.length} tables`);
       } else {
         console.error('Failed to load tables:', result.error);
       }
@@ -255,28 +313,56 @@ export class SchemaExplorer {
   }
 
   /**
-   * Load metadata for a single table
+   * Extract the table name from either a raw table-info object or a plain string
+   * (defensive: tolerates a server returning bare name strings).
    */
-  private async loadTableMetadata(tableName: string): Promise<void> {
+  private tableInfoName(tableInfo: any): string {
+    return typeof tableInfo === 'string' ? tableInfo : tableInfo?.name;
+  }
+
+  /**
+   * Store the metadata db_list_tables already gave us for a single table.
+   * Merges onto any existing cache entry so a previously-loaded detailed
+   * schema (from db_get_schema) survives a table-list refresh.
+   */
+  private loadTableMetadata(tableInfo: any): void {
+    const name = this.tableInfoName(tableInfo);
+    if (!name) return;
+
+    const existing = this.cache.tables.get(name);
+    const dbSchema = tableInfo?.schema || parseQualifiedTableName(name).dbSchema;
+
+    const metadata: TableMetadata = {
+      ...existing,
+      name,
+      dbSchema,
+      tableType: tableInfo?.type,
+      comment: tableInfo?.comment ?? null,
+      columnCount: tableInfo?.column_count,
+      sizeHuman: tableInfo?.size_human,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    this.cache.tables.set(name, metadata);
+  }
+
+  /**
+   * Fetch and store the accurate row count for a single table (via a cheap
+   * COUNT query -- see databaseService.getCount()).
+   */
+  private async loadRecordCount(tableName: string): Promise<void> {
+    if (!tableName) return;
+
     try {
-      // Get record count
-      const countResult = await databaseService.getCount(tableName);
-
-      // Store in cache
-      const metadata: TableMetadata = {
-        name: tableName,
-        recordCount: countResult,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      this.cache.tables.set(tableName, metadata);
+      const recordCount = await databaseService.getCount(tableName);
+      const existing = this.cache.tables.get(tableName);
+      if (existing) {
+        existing.recordCount = recordCount;
+        this.cache.tables.set(tableName, existing);
+        this.updateTableList();
+      }
     } catch (error: any) {
-      console.error(`Error loading metadata for ${tableName}:`, error.message);
-
-      // Store basic info even if metadata fetch fails
-      this.cache.tables.set(tableName, {
-        name: tableName,
-      });
+      console.error(`Error loading record count for ${tableName}:`, error.message);
     }
   }
 
@@ -300,7 +386,10 @@ export class SchemaExplorer {
 
       if (result.success && result.data) {
         // Update cache
-        const metadata = this.cache.tables.get(tableName) || { name: tableName };
+        const metadata = this.cache.tables.get(tableName) || {
+          name: tableName,
+          dbSchema: parseQualifiedTableName(tableName).dbSchema,
+        };
         metadata.schema = result.data;
         this.cache.tables.set(tableName, metadata);
 
@@ -314,31 +403,97 @@ export class SchemaExplorer {
   }
 
   /**
-   * Load relationships for all tables (with caching)
+   * Load relationships for a single table (with caching).
+   *
+   * db_get_relationships is scoped to ONE table -- it returns that table's
+   * `parents` (tables it holds foreign keys to) and `children` (tables that
+   * hold a foreign key back to it), not a whole-database relationship list;
+   * there is no bulk "all relationships" tool. `table` is also a required
+   * argument server-side, so this must always be called with a real table name.
    */
-  private async loadRelationships(): Promise<any[]> {
-    // Return cached relationships if available
-    if (this.cache.relationships.length > 0) {
-      return this.cache.relationships;
+  private async loadRelationships(tableName: string): Promise<any[]> {
+    if (!tableName) return [];
+
+    const cached = this.cache.relationshipsByTable.get(tableName);
+    if (cached) {
+      return cached;
     }
 
     try {
-      const result = await databaseService.getRelationships();
+      const result = await databaseService.getRelationships(tableName);
 
       if (result.success && result.data) {
-        const relationships = result.data.relationships || result.data || [];
-        this.cache.relationships = Array.isArray(relationships) ? relationships : [];
-        return this.cache.relationships;
+        const relationships = this.parseTableRelationships(tableName, result.data);
+        this.cache.relationshipsByTable.set(tableName, relationships);
+        return relationships;
       }
     } catch (error: any) {
-      console.error('Error loading relationships:', error.message);
+      console.error(`Error loading relationships for ${tableName}:`, error.message);
     }
 
     return [];
   }
 
   /**
-   * Filter tables based on search term
+   * Convert db_get_relationships' `{ parents, children }` shape (see
+   * RelationshipMapper.getRelationships in MCP-Writing-Servers) into the
+   * flat `{ from, to }` list RelationshipDiagram renders.
+   *  - parents: this table holds the foreign key ("from" = this table)
+   *  - children: the other table holds the foreign key ("from" = that table)
+   */
+  private parseTableRelationships(tableName: string, data: any): any[] {
+    const relationships: any[] = [];
+
+    for (const parent of data.parents || []) {
+      relationships.push({
+        from: { table: tableName, column: parent.column },
+        to: { table: parent.references_table, column: parent.references_column },
+        type: 'one-to-many',
+      });
+    }
+
+    for (const child of data.children || []) {
+      relationships.push({
+        from: { table: child.table, column: child.column },
+        to: { table: tableName, column: child.references_column },
+        type: 'one-to-many',
+      });
+    }
+
+    return relationships;
+  }
+
+  /**
+   * Collect the schemas needed to render an ERD focused on `focusTable`:
+   * the focus table itself plus every table directly related to it (its
+   * db_get_relationships parents/children). Deliberately scoped rather than
+   * loading every table's schema -- with dozens of tables in the database
+   * that would mean dozens of extra db_get_schema round trips just to draw
+   * one table's neighborhood.
+   */
+  private async buildErdSchemas(focusTable: string, relationships: any[]): Promise<Map<string, any>> {
+    const relatedTableNames = new Set<string>([focusTable]);
+    for (const rel of relationships) {
+      if (rel.from?.table) relatedTableNames.add(rel.from.table);
+      if (rel.to?.table) relatedTableNames.add(rel.to.table);
+    }
+
+    const tableSchemas = new Map<string, any>();
+    for (const name of relatedTableNames) {
+      const schema = await this.loadTableSchema(name);
+      if (schema) {
+        tableSchemas.set(name, schema);
+      }
+    }
+
+    return tableSchemas;
+  }
+
+  /**
+   * Filter tables based on search term.
+   * Matches against the full qualified name (e.g. "fictionlab.workflow_definitions"),
+   * the short table name, and the schema name -- so searching "fictionlab" surfaces
+   * that whole group and searching a bare table name still works regardless of schema.
    */
   private filterTables(tables: TableMetadata[]): TableMetadata[] {
     if (!this.searchTerm) {
@@ -346,9 +501,14 @@ export class SchemaExplorer {
     }
 
     const term = this.searchTerm.toLowerCase();
-    return tables.filter(table =>
-      table.name.toLowerCase().includes(term)
-    );
+    return tables.filter(table => {
+      const { shortName } = parseQualifiedTableName(table.name);
+      return (
+        table.name.toLowerCase().includes(term) ||
+        shortName.toLowerCase().includes(term) ||
+        table.dbSchema.toLowerCase().includes(term)
+      );
+    });
   }
 
   /**
@@ -393,21 +553,8 @@ export class SchemaExplorer {
     if (this.viewMode === 'table-details' && this.tableDetails) {
       await this.tableDetails.displayTable(tableName, schema);
     } else if (this.viewMode === 'erd' && this.relationshipDiagram) {
-      // For ERD, we need to load all relationships
-      const relationships = await this.loadRelationships();
-
-      // Get all table schemas for ERD
-      const tableSchemas = new Map<string, any>();
-      for (const [name, metadata] of this.cache.tables) {
-        if (!metadata.schema) {
-          await this.loadTableSchema(name);
-        }
-        const updatedMetadata = this.cache.tables.get(name);
-        if (updatedMetadata?.schema) {
-          tableSchemas.set(name, updatedMetadata.schema);
-        }
-      }
-
+      const relationships = await this.loadRelationships(tableName);
+      const tableSchemas = await this.buildErdSchemas(tableName, relationships);
       await this.relationshipDiagram.displayDiagram(tableSchemas, relationships, tableName);
     }
   }
@@ -438,20 +585,8 @@ export class SchemaExplorer {
 
     // If switching to ERD and we have a selected table, display it
     if (mode === 'erd' && this.selectedTable && this.relationshipDiagram) {
-      const relationships = await this.loadRelationships();
-
-      // Get all table schemas
-      const tableSchemas = new Map<string, any>();
-      for (const [name, metadata] of this.cache.tables) {
-        if (!metadata.schema) {
-          await this.loadTableSchema(name);
-        }
-        const updatedMetadata = this.cache.tables.get(name);
-        if (updatedMetadata?.schema) {
-          tableSchemas.set(name, updatedMetadata.schema);
-        }
-      }
-
+      const relationships = await this.loadRelationships(this.selectedTable);
+      const tableSchemas = await this.buildErdSchemas(this.selectedTable, relationships);
       await this.relationshipDiagram.displayDiagram(tableSchemas, relationships, this.selectedTable);
     } else if (mode === 'table-details' && this.selectedTable && this.tableDetails) {
       const schema = await this.loadTableSchema(this.selectedTable);
@@ -466,7 +601,7 @@ export class SchemaExplorer {
     // Clear cache
     this.cache = {
       tables: new Map(),
-      relationships: [],
+      relationshipsByTable: new Map(),
       lastRefresh: new Date(),
     };
 
@@ -512,7 +647,7 @@ export class SchemaExplorer {
       this.relationshipDiagram.destroy();
     }
     this.cache.tables.clear();
-    this.cache.relationships = [];
+    this.cache.relationshipsByTable.clear();
     console.log('SchemaExplorer destroyed');
   }
 }

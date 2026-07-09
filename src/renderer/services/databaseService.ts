@@ -206,9 +206,13 @@ export class DatabaseService {
   }
 
   /**
-   * Get table relationships
+   * Get a table's foreign key relationships (its parents/children).
+   *
+   * `table` is required -- the underlying db_get_relationships MCP tool is
+   * scoped to a single table (there is no "get every relationship in the
+   * database" tool) and rejects a missing/empty table name server-side.
    */
-  async getRelationships(table?: string): Promise<DatabaseOperationResult> {
+  async getRelationships(table: string): Promise<DatabaseOperationResult> {
     return window.electronAPI.databaseAdmin.getRelationships({ table });
   }
 
@@ -254,11 +258,21 @@ export class DatabaseService {
 
   /**
    * Get count of records in a table
+   *
+   * Passes `limit: 1` so the admin server computes an accurate total via a
+   * COUNT(*) query instead of fetching every row just to measure the
+   * response length. Reads `total_count` (the field the MCP database-admin
+   * tool actually returns, e.g. `{ table, count, total_count, records }`),
+   * falling back to `totalCount`/`count` for resilience against older or
+   * alternate response shapes.
    */
   async getCount(table: string, where?: Record<string, any>): Promise<number> {
-    const result = await this.queryRecords({ table, where });
-    if (result.success && result.data?.totalCount !== undefined) {
-      return result.data.totalCount;
+    const result = await this.queryRecords({ table, where, limit: 1 });
+    if (result.success && result.data) {
+      const data = result.data;
+      if (data.total_count !== undefined) return data.total_count;
+      if (data.totalCount !== undefined) return data.totalCount;
+      if (data.count !== undefined) return data.count;
     }
     return 0;
   }

@@ -286,6 +286,19 @@
   transform: translateX(-3px);
 }
 
+/* Schema Explorer View Styles (Issue #129) */
+.database-schema-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.schema-explorer-container {
+  flex: 1;
+  min-height: 500px;
+}
+
 /* Responsive Design */
 @media (max-width: 900px) {
   .database-layout {

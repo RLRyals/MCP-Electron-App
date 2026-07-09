@@ -50,7 +50,10 @@ export class RelationshipDiagram {
   private highlightedTable: string | null = null;
 
   // Layout constants
-  private readonly TABLE_WIDTH = 200;
+  // Wide enough to fit schema-qualified names (e.g. "fictionlab.workflow_definitions")
+  // without the header text overflowing the node -- tables aren't assumed to
+  // all live in the (short) "public" namespace.
+  private readonly TABLE_WIDTH = 220;
   private readonly ROW_HEIGHT = 25;
   private readonly HEADER_HEIGHT = 35;
   private readonly PADDING = 50;
@@ -120,6 +123,20 @@ export class RelationshipDiagram {
     // Parse from explicit relationships array
     if (Array.isArray(relationships)) {
       for (const rel of relationships) {
+        // A caller (SchemaExplorer) may already hand these in this class's own
+        // Relationship shape (`{ from: { table, column }, to: { table, column } }`)
+        // -- use it directly rather than looking for flat from_table/fromTable
+        // keys that would never match and silently drop every relationship.
+        if (rel?.from && typeof rel.from === 'object' && rel?.to && typeof rel.to === 'object') {
+          parsed.push({
+            from: { table: rel.from.table || '', column: rel.from.column || '' },
+            to: { table: rel.to.table || '', column: rel.to.column || '' },
+            type: rel.type || 'one-to-many',
+          });
+          continue;
+        }
+
+        // Flat/alternate shape fallback.
         parsed.push({
           from: {
             table: rel.from_table || rel.fromTable || rel.table || '',
@@ -157,8 +174,26 @@ export class RelationshipDiagram {
         }
       }
 
-      // Check constraints
-      if (schema.constraints) {
+      // Check constraints. The real db_get_schema response groups constraints
+      // by type (`{ primary_key: [...], foreign_key: [...], ... }`) rather
+      // than a flat iterable array -- iterating it directly used to throw
+      // "constraints is not iterable" as soon as any schema with real
+      // constraints was passed in. A flat-array shape is still tolerated for
+      // forward/alternate-shape compatibility.
+      if (Array.isArray(schema.constraints?.foreign_key)) {
+        for (const fk of schema.constraints.foreign_key) {
+          if (fk.references_table || fk.referencedTable) {
+            parsed.push({
+              from: { table: tableName, column: fk.column || fk.columnName || '' },
+              to: {
+                table: fk.references_table || fk.referencedTable || '',
+                column: fk.references_column || fk.referencedColumn || '',
+              },
+              type: 'one-to-many',
+            });
+          }
+        }
+      } else if (Array.isArray(schema.constraints)) {
         for (const constraint of schema.constraints) {
           if (constraint.type === 'FOREIGN KEY' || constraint.constraintType === 'FOREIGN KEY') {
             parsed.push({
@@ -452,7 +487,7 @@ export class RelationshipDiagram {
           fill="white"
           font-weight="bold"
           font-size="14"
-        >${this.escapeHtml(table.name)}</text>
+        ><title>${this.escapeHtml(table.name)}</title>${this.escapeHtml(this.formatTableName(table.name))}</text>
 
         <!-- Columns -->
         ${table.columns.map((col, idx) => this.renderColumn(table, col, idx)).join('')}
@@ -506,6 +541,20 @@ export class RelationshipDiagram {
       return type.substring(0, 12) + '...';
     }
     return type;
+  }
+
+  /**
+   * Format a (possibly schema-qualified) table name for the node header.
+   * Long qualified names (e.g. "fictionlab.workflow_definitions") are
+   * truncated to fit the node width; the full name is still available via
+   * the SVG <title> tooltip so accuracy isn't lost, only display space.
+   */
+  private formatTableName(name: string): string {
+    const maxChars = 22;
+    if (name.length > maxChars) {
+      return name.substring(0, maxChars - 3) + '...';
+    }
+    return name;
   }
 
   /**

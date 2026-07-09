@@ -12,6 +12,7 @@
 import { databaseService } from '../services/databaseService.js';
 import { BackupManager } from './DatabaseAdmin/Backup/BackupManager.js';
 import { CRUDPanel } from './DatabaseAdmin/CRUD/CRUDPanel.js';
+import { SchemaExplorer } from './DatabaseAdmin/Schema/SchemaExplorer.js';
 import { BatchPanel } from './DatabaseAdmin/Batch/BatchPanel.js';
 
 export class DatabaseTab {
@@ -19,12 +20,14 @@ export class DatabaseTab {
   private availableTables: string[] = [];
   private backupManager: BackupManager | null = null;
   private crudPanel: CRUDPanel | null = null;
+  private schemaExplorer: SchemaExplorer | null = null;
   private batchPanel: BatchPanel | null = null;
-  private currentView: 'overview' | 'backup' | 'batch' = 'overview';
+  private currentView: 'overview' | 'backup' | 'schema' | 'batch' = 'overview';
   private currentActiveTab: 'schema' | 'data' = 'data'; // Default to data view
 
   constructor() {
     this.backupManager = new BackupManager();
+    this.schemaExplorer = new SchemaExplorer();
     this.batchPanel = new BatchPanel({
       onStatusChange: (message, type) => console.log(`[Batch] [${type}] ${message}`),
     });
@@ -57,6 +60,8 @@ export class DatabaseTab {
 
     if (this.currentView === 'backup') {
       this.renderBackupView();
+    } else if (this.currentView === 'schema') {
+      this.renderSchemaView();
     } else if (this.currentView === 'batch') {
       this.renderBatchView();
     } else {
@@ -133,6 +138,40 @@ export class DatabaseTab {
   }
 
   /**
+   * Render schema explorer view (Issue #129)
+   */
+  private async renderSchemaView(): Promise<void> {
+    if (!this.container) return;
+
+    this.container.innerHTML = `
+      ${this.renderHeader()}
+      <div class="database-schema-view">
+        <div class="backup-view-header">
+          <button class="btn-back" id="back-to-overview-from-schema-btn">
+            <span class="btn-icon">←</span>
+            Back to Overview
+          </button>
+        </div>
+        <div id="schema-explorer-container" class="schema-explorer-container"></div>
+      </div>
+    `;
+
+    // Attach back button listener
+    const backBtn = document.getElementById('back-to-overview-from-schema-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.currentView = 'overview';
+        this.render();
+      });
+    }
+
+    // Initialize schema explorer
+    if (this.schemaExplorer) {
+      await this.schemaExplorer.initialize('schema-explorer-container');
+    }
+  }
+
+  /**
    * Render batch operations view (issue #128)
    */
   private renderBatchView(): void {
@@ -197,6 +236,10 @@ export class DatabaseTab {
           <span class="action-icon">🔍</span>
           <span class="action-label">Test Query</span>
         </button>
+        <button id="db-view-schema" class="quick-action-btn-small" title="Explore database schema">
+          <span class="action-icon">🗂️</span>
+          <span class="action-label">Schema</span>
+        </button>
         <button id="db-batch-operations" class="quick-action-btn-small" title="Bulk insert, update, or delete records">
           <span class="action-icon">📦</span>
           <span class="action-label">Batch Ops</span>
@@ -251,6 +294,11 @@ export class DatabaseTab {
     const manageBackupsBtn = document.getElementById('db-manage-backups');
     if (manageBackupsBtn) {
       manageBackupsBtn.addEventListener('click', () => this.handleManageBackups());
+    }
+
+    const viewSchemaBtn = document.getElementById('db-view-schema');
+    if (viewSchemaBtn) {
+      viewSchemaBtn.addEventListener('click', () => this.handleViewSchema());
     }
 
     const batchOpsBtn = document.getElementById('db-batch-operations');
@@ -332,6 +380,14 @@ export class DatabaseTab {
    */
   private async handleManageBackups(): Promise<void> {
     this.currentView = 'backup';
+    await this.render();
+  }
+
+  /**
+   * Handle view schema button click (Issue #129)
+   */
+  private async handleViewSchema(): Promise<void> {
+    this.currentView = 'schema';
     await this.render();
   }
 
