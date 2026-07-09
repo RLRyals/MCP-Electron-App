@@ -42,7 +42,8 @@ jobs:
 
       - name: Note pre-existing test failures
         if: steps.full_tests.outcome == 'failure'
-        run: echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+        run: |
+          echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
 
       - name: Build Windows app
         run: npm run package:win
@@ -107,7 +108,8 @@ jobs:
 
       - name: Note pre-existing test failures
         if: steps.full_tests.outcome == 'failure'
-        run: echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+        run: |
+          echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
 
       - name: Build macOS app
         run: npm run package:mac
@@ -165,7 +167,8 @@ jobs:
 
       - name: Note pre-existing test failures
         if: steps.full_tests.outcome == 'failure'
-        run: echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+        run: |
+          echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
 
       - name: Build Linux app
         run: npm run package:linux
