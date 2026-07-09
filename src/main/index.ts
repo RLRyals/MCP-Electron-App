@@ -378,6 +378,14 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Chromium throttles timers (setInterval/setTimeout) in backgrounded
+      // renderers. The Active Workflows panel's 5s refresh poll and the
+      // workflow canvas's poll fallback (issue #178) both rely on a renderer
+      // setInterval; without this, minimizing the window or leaving it
+      // unfocused while a workflow runs elsewhere (e.g. driven by an
+      // external Claude Code session) can silently stall those polls until
+      // the window regains focus.
+      backgroundThrottling: false,
     },
     show: false, // Don't show until ready
   });

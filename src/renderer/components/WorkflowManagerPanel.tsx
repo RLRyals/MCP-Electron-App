@@ -40,6 +40,9 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
 }) => {
   const [activeWorkflows, setActiveWorkflows] = useState<ActiveWorkflowInstance[]>([]);
   const [selectedActiveWorkflow, setSelectedActiveWorkflow] = useState<ActiveWorkflowInstance | null>(null);
+  // Tracks whether the last workflow:list-active call failed (see issue #178) -
+  // surfaces MCP/connection failures instead of silently showing a stale/empty list.
+  const [hasConnectionError, setHasConnectionError] = useState(false);
   const [sectionsExpanded, setSectionsExpanded] = useState({
     available: true,
     active: true,
@@ -93,6 +96,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
 
       if (Array.isArray(result)) {
         setActiveWorkflows(result);
+        setHasConnectionError(false);
       }
     } catch (error) {
       console.error('[WorkflowManagerPanel] Failed to load active workflows:', error);
@@ -138,11 +142,19 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
 
     electronAPI.on('workflow:instance-updated', handleWorkflowUpdate);
 
+    // Surface workflow:list-active failures (see issue #178) instead of
+    // leaving a broken MCP connection indistinguishable from "nothing running"
+    const handleListActiveError = () => {
+      setHasConnectionError(true);
+    };
+    electronAPI.on('workflow:list-active-error', handleListActiveError);
+
     // Poll every 5 seconds as backup
     const pollInterval = setInterval(loadActiveWorkflows, 5000);
 
     return () => {
       electronAPI.off('workflow:instance-updated', handleWorkflowUpdate);
+      electronAPI.off('workflow:list-active-error', handleListActiveError);
       clearInterval(pollInterval);
     };
   }, [isOpen, loadActiveWorkflows]);
@@ -354,6 +366,20 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
           isExpanded={sectionsExpanded.active}
           onToggle={() => toggleSection('active')}
         >
+          {hasConnectionError && (
+            <div
+              style={{
+                ...emptyStateStyle,
+                color: '#f87171',
+                textAlign: 'left',
+                padding: '6px 12px',
+                fontSize: '11px',
+              }}
+              title="workflow:list-active failed - the workflow server may be unreachable or still starting. Active workflow status may be stale. See the main-process log for details."
+            >
+              Connection issue — status may be stale
+            </div>
+          )}
           {activeWorkflows.length === 0 ? (
             <div style={emptyStateStyle}>
               No active workflows

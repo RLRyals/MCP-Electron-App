@@ -23,7 +23,7 @@ import { WorkflowCreateDialog } from '../components/WorkflowCreateDialog.js';
 import { ProjectCreationDialog } from '../components/ProjectCreationDialog.js';
 import { WorkflowManagerPanel } from '../components/WorkflowManagerPanel.js';
 import { getActiveSeriesId, appState } from '../store/app-state.js';
-import type { WorkflowUpdate, NodeStatusInfo } from '../../types/workflow.js';
+import type { WorkflowUpdate, NodeStatusInfo, ActiveWorkflowInstance } from '../../types/workflow.js';
 import type { Project } from '../../types/project.js';
 
 // Plugin IPC channel prefix for workflow plugin
@@ -343,6 +343,78 @@ const WorkflowsApp: React.FC = () => {
     return () => {
       electronAPI.off('workflow:instance-updated', handleInstanceUpdated);
     };
+  }, []);
+
+  // Poll fallback for canvas sync (issue #178).
+  //
+  // The push channel above (workflow:instance-updated) only fires from
+  // broadcastWorkflowUpdate(), which is only called by the Electron-IPC
+  // workflow:pause/resume/cancel/jump-to-node/register-active/update-progress/
+  // mark-node-started/mark-node-completed handlers in workflow-handlers.ts.
+  // A workflow driven by an external Claude Code session (the common case -
+  // see persistent-mcp-client.ts's registerActiveWorkflow() 'claude_code'
+  // source, and the run-workflow skill) calls the workflow-manager-server MCP
+  // tools directly and never goes through those IPC handlers, so the push
+  // channel never fires for it. The canvas then never moves on its own -
+  // only clicking an active-workflow card (handleSelectActiveWorkflow above)
+  // re-derives activeNodeId/executionStatus from data the sidebar's 5s poll
+  // already fetched. This effect gives the canvas that same poll, on the
+  // same cadence, so it doesn't depend on a click to catch up.
+  useEffect(() => {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI || !electronAPI.invoke) return;
+
+    const applyProgress = (match: ActiveWorkflowInstance) => {
+      setActiveNodeId(match.currentNodeId || null);
+      setExecutionStatus(prev => {
+        const newMap = new Map(prev);
+        for (const nodeId of match.completedNodeIds || []) {
+          newMap.set(nodeId, { status: 'completed' });
+        }
+        if (match.currentNodeId) {
+          newMap.set(match.currentNodeId, { status: 'in_progress' });
+        }
+        return newMap;
+      });
+    };
+
+    const pollCanvasProgress = async () => {
+      try {
+        const result = await electronAPI.invoke('workflow:list-active');
+        if (!Array.isArray(result)) return;
+
+        if (activeRegistryIdRef.current) {
+          // Already connected to an instance - refresh its progress from the poll,
+          // same as the push handler would if it had fired.
+          const match = result.find((w: ActiveWorkflowInstance) => w.id === activeRegistryIdRef.current);
+          if (match) applyProgress(match);
+          return;
+        }
+
+        // Not connected yet - auto-connect to a running root instance of the
+        // selected workflow definition, mirroring handleInstanceUpdated's
+        // push-based auto-connect match rule (status running, no parent).
+        const selected = selectedWorkflowRef.current;
+        if (!selected) return;
+
+        const match = result.find((w: ActiveWorkflowInstance) =>
+          w.status === 'running' && !w.parentWorkflowId && w.workflowId === selected.id
+        );
+        if (!match) return;
+
+        activeRegistryIdRef.current = match.id;
+        trackedRegistryIdsRef.current = new Set([match.id]);
+        setActiveRegistryId(match.id);
+        applyProgress(match);
+      } catch (error) {
+        console.error('[WorkflowsViewReact] Canvas progress poll failed:', error);
+      }
+    };
+
+    pollCanvasProgress();
+    const pollInterval = setInterval(pollCanvasProgress, 5000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const handleSelectWorkflow = async (workflowId: string) => {
