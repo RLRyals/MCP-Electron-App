@@ -217,6 +217,20 @@ body {
   }
 }
 
+/* Smooth transition played on #content-area every time ViewRouter mounts a
+   new view (see ViewRouter.playViewTransition()), so switching between
+   Dashboard/Setup/Database/Services/Logs fades and slides in rather than
+   popping in instantly. */
+.content-area.view-transition-enter {
+  animation: fadeIn var(--transition-normal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-area.view-transition-enter {
+    animation: none;
+  }
+}
+
 /* ========================================
    Responsive Breakpoints
    ======================================== */

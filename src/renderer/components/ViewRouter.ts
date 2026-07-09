@@ -176,6 +176,9 @@ export class ViewRouter {
       // Clear loading state after successful mount
       // (view.mount already populated container with its content)
 
+      // Play a smooth fade/slide-in transition on the freshly-mounted content
+      this.playViewTransition();
+
       this.currentViewId = viewId;
 
       // Update history
@@ -358,6 +361,18 @@ export class ViewRouter {
    */
   public getCurrentViewId(): string | null {
     return this.currentViewId;
+  }
+
+  /**
+   * Replay the content area's fade/slide-in transition (see the
+   * `.content-area.view-transition-enter` rule in layout.css).
+   * Removing the class, forcing a reflow, then re-adding it lets the
+   * CSS animation restart on every navigation instead of only once.
+   */
+  private playViewTransition(): void {
+    this.container.classList.remove('view-transition-enter');
+    void this.container.offsetWidth; // force reflow to restart the animation
+    this.container.classList.add('view-transition-enter');
   }
 
   /**
