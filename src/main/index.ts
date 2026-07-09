@@ -432,6 +432,7 @@ import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handl
 import { registerWorkflowHandlers } from './handlers/workflow-handlers';
 import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers';
 import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
+import { registerLinkHandlers } from './handlers/link-handlers';
 
 /**
  * Build the README.md dropped into a newly-initialized project root
@@ -499,6 +500,10 @@ function setupIPC(): void {
 
   // Register genre pack handlers
   registerGenrePackHandlers();
+
+  // Register app:open-external / app:reveal-in-folder (issue #198 --
+  // Kanban card links, issue_ref, and body URLs)
+  registerLinkHandlers();
 
   // Example IPC handler - ping/pong
   registerHandler('ping', "Health-check ping/pong", async () => {
