@@ -255,6 +255,7 @@ interface BackupResult {
   path?: string;
   size?: number;
   error?: string;
+  canceled?: boolean;
 }
 
 interface RestoreResult {
@@ -270,11 +271,19 @@ interface BackupMetadata {
   size: number;
   database: string;
   compressed: boolean;
+  source: 'app' | 'scheduled-task';
 }
 
 interface ListBackupsResult {
   success: boolean;
   backups: BackupMetadata[];
+  error?: string;
+}
+
+interface ValidateBackupResult {
+  success: boolean;
+  valid: boolean;
+  message: string;
   error?: string;
 }
 
@@ -372,7 +381,7 @@ interface ElectronAPI {
     removeProgressListener: () => void;
   };
   databaseBackup: {
-    create: (customPath?: string, compressed?: boolean) => Promise<BackupResult>;
+    create: (customPath?: string, compressed?: boolean, tables?: string[]) => Promise<BackupResult>;
     restore: (backupPath: string, dropExisting?: boolean) => Promise<RestoreResult>;
     list: () => Promise<ListBackupsResult>;
     delete: (backupPath: string) => Promise<BackupResult>;
@@ -380,6 +389,8 @@ interface ElectronAPI {
     selectRestoreFile: () => Promise<string | null>;
     getDirectory: () => Promise<string>;
     openDirectory: () => Promise<void>;
+    validate: (backupPath: string) => Promise<ValidateBackupResult>;
+    download: (sourcePath: string) => Promise<BackupResult>;
   };
   databaseAdmin: {
     checkConnection: () => Promise<any>;

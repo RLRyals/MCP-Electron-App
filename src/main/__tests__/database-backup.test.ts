@@ -66,6 +66,14 @@ beforeEach(() => {
   });
   mockedFs.ensureDir.mockResolvedValue(undefined as any);
   mockedFs.pathExists.mockResolvedValue(true as any);
+  // Point the "scheduled task" directory at a fake path by default so tests
+  // that don't care about it (most of them) see it as present-but-empty via
+  // the shared readdir mock, instead of touching a real C:\Backups\fictionlab.
+  process.env.FICTIONLAB_SCHEDULED_BACKUP_DIR = 'C:/fake-scheduled-backups';
+});
+
+afterEach(() => {
+  delete process.env.FICTIONLAB_SCHEDULED_BACKUP_DIR;
 });
 
 describe('createBackup', () => {
@@ -128,6 +136,42 @@ describe('createBackup', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('container not found');
+    expect(mockedFs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('scopes the pg_dump command to specific tables via repeated -t flags (table-level backup, issue #130)', async () => {
+    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
+    mockedFs.writeFile.mockResolvedValue(undefined as any);
+    mockedFs.stat.mockResolvedValue({ size: 2048 } as any);
+
+    const result = await databaseBackup.createBackup(undefined, true, ['characters', 'scenes']);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('characters');
+    expect(result.message).toContain('scenes');
+
+    const [command] = mockExecAsync.mock.calls[0];
+    expect(command).toContain('-t "characters"');
+    expect(command).toContain('-t "scenes"');
+  });
+
+  it('runs a full backup (no -t flags) when tables is an empty array', async () => {
+    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
+    mockedFs.writeFile.mockResolvedValue(undefined as any);
+    mockedFs.stat.mockResolvedValue({ size: 2048 } as any);
+
+    await databaseBackup.createBackup(undefined, true, []);
+
+    const [command] = mockExecAsync.mock.calls[0];
+    expect(command).not.toContain('-t ');
+  });
+
+  it('rejects an unsafe table name without ever invoking pg_dump (injection guard)', async () => {
+    const result = await databaseBackup.createBackup(undefined, true, ['characters; DROP TABLE users; --']);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid table name');
+    expect(mockExecAsync).not.toHaveBeenCalled();
     expect(mockedFs.writeFile).not.toHaveBeenCalled();
   });
 });
@@ -211,7 +255,9 @@ describe('listBackups', () => {
     expect(result.backups).toHaveLength(2);
     expect(result.backups[0].filename).toBe('mcp_writing_db_2026-02-01.sql.gz');
     expect(result.backups[0].compressed).toBe(true);
+    expect(result.backups[0].source).toBe('app');
     expect(result.backups[1].compressed).toBe(false);
+    expect(result.backups[1].source).toBe('app');
   });
 
   it('returns an empty, successful result when the directory has no backups', async () => {
@@ -230,6 +276,95 @@ describe('listBackups', () => {
     expect(result.success).toBe(false);
     expect(result.backups).toEqual([]);
     expect(result.error).toContain('EACCES');
+  });
+});
+
+describe('listBackups -- scheduled-task merge (issue #130)', () => {
+  const APP_DIR_MARKER = 'fake-userdata';
+  const SCHEDULED_DIR = 'C:/fake-scheduled-backups';
+
+  it('merges backups from the app dir and the scheduled-task dir, tagging each source', async () => {
+    mockedFs.readdir.mockImplementation(async (dir: any) => {
+      const dirStr = String(dir);
+      if (dirStr.includes(APP_DIR_MARKER)) {
+        return ['mcp_writing_db_2026-01-01.sql'] as any;
+      }
+      if (dirStr === SCHEDULED_DIR) {
+        return [
+          'fictionlab-mcp_writing_db-20260201-030000.dump',
+          'fictionlab-globals-20260201-030000.sql', // must be excluded
+          'backup-log.txt', // must be excluded
+        ] as any;
+      }
+      return [] as any;
+    });
+    mockedFs.stat.mockImplementation(async (p: any) => {
+      const pathStr = String(p);
+      if (pathStr.includes('2026-01-01')) return { mtime: new Date('2026-01-01'), size: 111 } as any;
+      return { mtime: new Date('2026-02-01'), size: 222 } as any;
+    });
+
+    const result = await databaseBackup.listBackups();
+
+    expect(result.success).toBe(true);
+    expect(result.backups).toHaveLength(2);
+
+    const scheduled = result.backups.find(b => b.source === 'scheduled-task');
+    expect(scheduled).toBeDefined();
+    expect(scheduled?.filename).toBe('fictionlab-mcp_writing_db-20260201-030000.dump');
+    expect(scheduled?.database).toBe('mcp_writing_db');
+    expect(scheduled?.compressed).toBe(true);
+
+    const appBackup = result.backups.find(b => b.source === 'app');
+    expect(appBackup).toBeDefined();
+    expect(appBackup?.filename).toBe('mcp_writing_db_2026-01-01.sql');
+
+    // Newest first regardless of source
+    expect(result.backups[0].source).toBe('scheduled-task');
+  });
+
+  it('does not fail listBackups when the scheduled-task directory does not exist', async () => {
+    mockedFs.pathExists.mockImplementation(async (p: any) => {
+      // App dir existence check (ensureBackupDirectory) should still say "true"-equivalent;
+      // fs-extra's ensureDir doesn't call pathExists, so this only affects the scheduled dir check.
+      return String(p) !== SCHEDULED_DIR;
+    });
+    mockedFs.readdir.mockResolvedValue(['mcp_writing_db_2026-01-01.sql'] as any);
+    mockedFs.stat.mockResolvedValue({ mtime: new Date('2026-01-01'), size: 100 } as any);
+
+    const result = await databaseBackup.listBackups();
+
+    expect(result.success).toBe(true);
+    expect(result.backups).toHaveLength(1);
+    expect(result.backups[0].source).toBe('app');
+  });
+
+  it('does not fail listBackups when the scheduled-task directory cannot be read', async () => {
+    mockedFs.readdir.mockImplementation(async (dir: any) => {
+      if (String(dir) === SCHEDULED_DIR) {
+        throw new Error('EACCES: permission denied');
+      }
+      return ['mcp_writing_db_2026-01-01.sql'] as any;
+    });
+    mockedFs.stat.mockResolvedValue({ mtime: new Date('2026-01-01'), size: 100 } as any);
+
+    const result = await databaseBackup.listBackups();
+
+    expect(result.success).toBe(true);
+    expect(result.backups).toHaveLength(1);
+    expect(result.backups[0].source).toBe('app');
+  });
+});
+
+describe('getScheduledTaskBackupDirectory', () => {
+  it('defaults to C:\\Backups\\fictionlab when no override is set', () => {
+    delete process.env.FICTIONLAB_SCHEDULED_BACKUP_DIR;
+    expect(databaseBackup.getScheduledTaskBackupDirectory()).toBe('C:\\Backups\\fictionlab');
+  });
+
+  it('honors the FICTIONLAB_SCHEDULED_BACKUP_DIR override', () => {
+    process.env.FICTIONLAB_SCHEDULED_BACKUP_DIR = 'D:/custom/path';
+    expect(databaseBackup.getScheduledTaskBackupDirectory()).toBe('D:/custom/path');
   });
 });
 
@@ -290,5 +425,138 @@ describe('save/open dialogs', () => {
 describe('getBackupDirectoryPath', () => {
   it('resolves under the Electron userData directory', () => {
     expect(databaseBackup.getBackupDirectoryPath()).toBe(require('path').join('C:/fake-userdata', 'backups'));
+  });
+});
+
+describe('validateBackupFile (issue #130)', () => {
+  it('reports missing files as invalid without erroring', async () => {
+    mockedFs.pathExists.mockResolvedValue(false as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/missing.dump');
+
+    expect(result.success).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('not found');
+  });
+
+  it('reports empty files as invalid', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 0 } as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/empty.sql');
+
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('empty');
+  });
+
+  it('accepts a .dump file with a valid PGDMP header', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from('PGDMP' + '\x00'.repeat(20)) as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/good.dump');
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a .dump file with a bad header', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from('NOT A DUMP FILE AT ALL') as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/corrupt.dump');
+
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('custom-format header');
+  });
+
+  it('accepts a .gz file with a valid gzip header', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from([0x1f, 0x8b, 0x08, 0x00]) as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/good.sql.gz');
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a .gz file without a gzip header', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from('plain text, not gzip') as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/corrupt.sql.gz');
+
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('gzip header');
+  });
+
+  it('accepts a plain .sql file with the standard pg_dump header comment', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from('--\n-- PostgreSQL database dump\n--\n\nSET statement_timeout = 0;\n') as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/good.sql');
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a plain .sql file that does not look like a pg_dump backup', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockResolvedValue(Buffer.from('this is just some random text file') as any);
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/notreally.sql');
+
+    expect(result.valid).toBe(false);
+  });
+
+  it('returns a failure result (not a throw) if reading the file errors', async () => {
+    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+    mockedFs.readFile.mockRejectedValue(new Error('EIO'));
+
+    const result = await databaseBackup.validateBackupFile('C:/backups/broken.dump');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('EIO');
+  });
+});
+
+describe('downloadBackup (issue #130)', () => {
+  it('copies the backup to the chosen location and returns its new path/size', async () => {
+    mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: 'D:/exports/mine.sql.gz' });
+    mockedFs.copy.mockResolvedValue(undefined as any);
+    mockedFs.stat.mockResolvedValue({ size: 4096 } as any);
+
+    const result = await databaseBackup.downloadBackup('C:/backups/mcp_writing_db_2026-01-01.sql.gz');
+
+    expect(result.success).toBe(true);
+    expect(result.path).toBe('D:/exports/mine.sql.gz');
+    expect(result.size).toBe(4096);
+    expect(mockedFs.copy).toHaveBeenCalledWith('C:/backups/mcp_writing_db_2026-01-01.sql.gz', 'D:/exports/mine.sql.gz');
+  });
+
+  it('returns a canceled (not error) result when the save dialog is dismissed', async () => {
+    mockShowSaveDialog.mockResolvedValue({ canceled: true });
+
+    const result = await databaseBackup.downloadBackup('C:/backups/mine.sql.gz');
+
+    expect(result.success).toBe(false);
+    expect(result.canceled).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(mockedFs.copy).not.toHaveBeenCalled();
+  });
+
+  it('fails without prompting a dialog if the source backup no longer exists', async () => {
+    mockedFs.pathExists.mockResolvedValue(false as any);
+
+    const result = await databaseBackup.downloadBackup('C:/backups/gone.sql.gz');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
+    expect(mockShowSaveDialog).not.toHaveBeenCalled();
+  });
+
+  it('returns a failure result (not a throw) if the copy fails', async () => {
+    mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: 'D:/exports/mine.sql.gz' });
+    mockedFs.copy.mockRejectedValue(new Error('disk full'));
+
+    const result = await databaseBackup.downloadBackup('C:/backups/mine.sql.gz');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('disk full');
   });
 });

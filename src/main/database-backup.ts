@@ -24,6 +24,8 @@ export interface BackupResult {
   path?: string;
   size?: number;
   error?: string;
+  /** True when the user dismissed a file picker instead of a real failure */
+  canceled?: boolean;
 }
 
 /**
@@ -45,6 +47,14 @@ export interface BackupMetadata {
   size: number;
   database: string;
   compressed: boolean;
+  /**
+   * Where this backup came from:
+   *  - 'app': created via this app's Backup Manager (userData/backups)
+   *  - 'scheduled-task': written by the separate "FictionLab DB Daily Backup"
+   *    Windows Scheduled Task (C:\Backups\fictionlab). This app only reads
+   *    from that directory -- it never writes to or manages the task itself.
+   */
+  source: 'app' | 'scheduled-task';
 }
 
 /**
@@ -53,6 +63,16 @@ export interface BackupMetadata {
 export interface ListBackupsResult {
   success: boolean;
   backups: BackupMetadata[];
+  error?: string;
+}
+
+/**
+ * Result of a lightweight backup integrity check
+ */
+export interface ValidateResult {
+  success: boolean;
+  valid: boolean;
+  message: string;
   error?: string;
 }
 
@@ -83,17 +103,39 @@ function generateBackupFilename(database: string, compressed: boolean = true): s
 }
 
 /**
+ * Validate a Postgres table name is a safe, unquoted identifier.
+ * Table names are passed to pg_dump via shell exec, so this rejects anything
+ * that isn't a plain identifier (guards against shell/SQL injection).
+ */
+function isValidTableIdentifier(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+/**
  * Create a database backup
  * @param customPath Optional custom path for the backup file
  * @param compressed Whether to compress the backup (default: true)
+ * @param tables Optional list of table names to scope the backup to (table-level backup).
+ *               Omit or pass an empty array for a full database backup.
  */
 export async function createBackup(
   customPath?: string,
-  compressed: boolean = true
+  compressed: boolean = true,
+  tables?: string[]
 ): Promise<BackupResult> {
   logWithCategory('info', LogCategory.SYSTEM, 'Starting database backup...');
 
   try {
+    // Validate table names up front (before touching the filesystem or Docker)
+    let tableArgs = '';
+    if (tables && tables.length > 0) {
+      const invalidTable = tables.find((t) => !isValidTableIdentifier(t));
+      if (invalidTable) {
+        throw new Error(`Invalid table name: "${invalidTable}"`);
+      }
+      tableArgs = tables.map((t) => ` -t "${t}"`).join('');
+    }
+
     // Ensure backup directory exists
     await ensureBackupDirectory();
 
@@ -120,10 +162,10 @@ export async function createBackup(
     let dumpCommand: string;
     if (compressed) {
       // Custom format with compression (can be restored with pg_restore)
-      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -Fc -Z 9 -d ${database}`;
+      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -Fc -Z 9 -d ${database}${tableArgs}`;
     } else {
       // Plain SQL format
-      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -d ${database}`;
+      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -d ${database}${tableArgs}`;
     }
 
     logWithCategory('info', LogCategory.SYSTEM, `Executing: ${dumpCommand.replace(password, '****')}`);
@@ -152,9 +194,13 @@ export async function createBackup(
 
     logWithCategory('info', LogCategory.SYSTEM, `Backup completed successfully: ${backupPath} (${sizeInMB} MB)`);
 
+    const tableSuffix = tables && tables.length > 0
+      ? ` [${tables.length} table${tables.length !== 1 ? 's' : ''}: ${tables.join(', ')}]`
+      : '';
+
     return {
       success: true,
-      message: `Backup created successfully: ${filename} (${sizeInMB} MB)`,
+      message: `Backup created successfully: ${filename} (${sizeInMB} MB)${tableSuffix}`,
       path: backupPath,
       size: stats.size,
     };
@@ -287,7 +333,81 @@ export async function restoreBackup(
 }
 
 /**
- * List all available backups in the backup directory
+ * Directory used by the separate "FictionLab DB Daily Backup" Windows Scheduled Task
+ * (pg_dump of the fictionlab-postgres container / mcp_writing_db database, superuser
+ * `writer`, trust-auth local -- see shared/scripts/backup-fictionlab-db.ps1).
+ *
+ * This app NEVER writes here and never manages the scheduled task itself -- it only
+ * reads this directory so those backups can be browsed and restored from the same
+ * list as backups the app creates. Configurable via FICTIONLAB_SCHEDULED_BACKUP_DIR
+ * for non-default installs and tests.
+ */
+export function getScheduledTaskBackupDirectory(): string {
+  return process.env.FICTIONLAB_SCHEDULED_BACKUP_DIR || 'C:\\Backups\\fictionlab';
+}
+
+/**
+ * Parse a scheduled-task backup filename, e.g. `fictionlab-mcp_writing_db-20260101-030000.dump`.
+ * Returns null for anything that isn't a per-database dump -- in particular the task's
+ * `fictionlab-globals-*.sql` (roles-only, not a database backup) and `backup-log.txt`
+ * are intentionally excluded so they never show up as restorable "backups".
+ */
+function parseScheduledTaskFilename(filename: string): { database: string } | null {
+  if (!filename.endsWith('.dump')) return null;
+  const match = filename.match(/^fictionlab-(.+)-\d{8}-\d{6}\.dump$/);
+  return match ? { database: match[1] } : null;
+}
+
+/**
+ * List backups written by the "FictionLab DB Daily Backup" scheduled task.
+ * Read-only, best-effort: a missing directory (e.g. on a machine where the task
+ * hasn't run yet) or an unreadable directory yields an empty list rather than
+ * failing the whole listBackups() call.
+ */
+async function listScheduledTaskBackups(): Promise<BackupMetadata[]> {
+  const dir = getScheduledTaskBackupDirectory();
+  const backups: BackupMetadata[] = [];
+
+  if (!(await fs.pathExists(dir))) {
+    return backups;
+  }
+
+  try {
+    const files = await fs.readdir(dir);
+
+    for (const filename of files) {
+      const parsed = parseScheduledTaskFilename(filename);
+      if (!parsed) continue;
+
+      try {
+        const filePath = path.join(dir, filename);
+        const stats = await fs.stat(filePath);
+
+        backups.push({
+          filename,
+          path: filePath,
+          createdAt: stats.mtime.toISOString(),
+          size: stats.size,
+          database: parsed.database,
+          compressed: true, // scheduled task always dumps in custom format (-Fc)
+          source: 'scheduled-task',
+        });
+      } catch (error) {
+        logWithCategory('warn', LogCategory.SYSTEM, `Failed to get metadata for scheduled-task backup: ${filename}`);
+      }
+    }
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.SYSTEM, `Failed to read scheduled-task backup directory: ${error.message || error}`);
+  }
+
+  return backups;
+}
+
+/**
+ * List all available backups: the app's own (userData/backups) plus the ones
+ * written by the separate "FictionLab DB Daily Backup" Windows Scheduled Task
+ * (C:\Backups\fictionlab), merged into a single newest-first list. Each entry's
+ * `source` field distinguishes the two so the UI can label them accordingly.
  */
 export async function listBackups(): Promise<ListBackupsResult> {
   logWithCategory('info', LogCategory.SYSTEM, 'Listing available backups...');
@@ -320,16 +440,25 @@ export async function listBackups(): Promise<ListBackupsResult> {
           size: stats.size,
           database,
           compressed: filename.endsWith('.gz'),
+          source: 'app',
         });
       } catch (error) {
         logWithCategory('warn', LogCategory.SYSTEM, `Failed to get metadata for backup: ${filename}`);
       }
     }
 
+    // Merge in the scheduled task's backups so both sources show up in one list
+    const scheduledBackups = await listScheduledTaskBackups();
+    backups.push(...scheduledBackups);
+
     // Sort by creation date (newest first)
     backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    logWithCategory('info', LogCategory.SYSTEM, `Found ${backups.length} backup(s)`);
+    logWithCategory(
+      'info',
+      LogCategory.SYSTEM,
+      `Found ${backups.length} backup(s) (${backups.length - scheduledBackups.length} app, ${scheduledBackups.length} scheduled-task)`
+    );
 
     return {
       success: true,
@@ -454,4 +583,111 @@ export async function openBackupDirectory(): Promise<void> {
   const backupDir = getBackupDirectory();
   await shell.openPath(backupDir);
   logWithCategory('info', LogCategory.SYSTEM, `Opened backup directory: ${backupDir}`);
+}
+
+/**
+ * Lightweight integrity check for a backup file, based on its format signature.
+ * Deliberately does NOT shell out to Docker/pg_restore -- it's meant to be a fast,
+ * safe check the UI can run without touching the live database or container:
+ *  - .dump  (pg_dump custom format): must start with the "PGDMP" magic bytes
+ *  - .gz    (gzip-compressed plain SQL): must start with the gzip magic bytes (0x1f 0x8b)
+ *  - .sql   (plain SQL): looks for the standard pg_dump header comment
+ */
+export async function validateBackupFile(backupPath: string): Promise<ValidateResult> {
+  logWithCategory('info', LogCategory.SYSTEM, `Validating backup: ${backupPath}`);
+
+  try {
+    if (!await fs.pathExists(backupPath)) {
+      return { success: true, valid: false, message: 'Backup file not found' };
+    }
+
+    const stats = await fs.stat(backupPath);
+    if (stats.size === 0) {
+      return { success: true, valid: false, message: 'Backup file is empty' };
+    }
+
+    const buffer = await fs.readFile(backupPath);
+    const lower = backupPath.toLowerCase();
+
+    if (lower.endsWith('.dump')) {
+      const isValid = buffer.subarray(0, 5).toString('ascii') === 'PGDMP';
+      return {
+        success: true,
+        valid: isValid,
+        message: isValid
+          ? 'Valid pg_dump custom-format backup (PGDMP header present)'
+          : 'File does not have a valid pg_dump custom-format header',
+      };
+    }
+
+    if (lower.endsWith('.gz')) {
+      const isValid = buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b;
+      return {
+        success: true,
+        valid: isValid,
+        message: isValid
+          ? 'Valid gzip-compressed backup (gzip header present)'
+          : 'File does not have a valid gzip header',
+      };
+    }
+
+    // Plain .sql -- look for the standard pg_dump header comment near the top of the file
+    const head = buffer.subarray(0, 4096).toString('utf-8');
+    const isValid = /postgresql database dump/i.test(head) || head.trimStart().startsWith('--');
+    return {
+      success: true,
+      valid: isValid,
+      message: isValid
+        ? 'Valid plain SQL backup (pg_dump header present)'
+        : 'File does not look like a pg_dump plain SQL backup',
+    };
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to validate backup', { error: errorMessage });
+    return { success: false, valid: false, message: 'Failed to validate backup', error: errorMessage };
+  }
+}
+
+/**
+ * Copy a backup file to a user-chosen location (native save dialog).
+ * Used by the "Download" action so backups can be exported off the machine.
+ */
+export async function downloadBackup(sourcePath: string): Promise<BackupResult> {
+  logWithCategory('info', LogCategory.SYSTEM, `Downloading backup: ${sourcePath}`);
+
+  try {
+    if (!await fs.pathExists(sourcePath)) {
+      throw new Error(`Backup file not found: ${sourcePath}`);
+    }
+
+    const defaultFilename = path.basename(sourcePath);
+    const result = await dialog.showSaveDialog({
+      title: 'Download Database Backup',
+      defaultPath: path.join(app.getPath('downloads'), defaultFilename),
+      filters: [
+        { name: 'Backup Files', extensions: ['gz', 'sql', 'dump'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, message: 'Download canceled', canceled: true };
+    }
+
+    await fs.copy(sourcePath, result.filePath);
+    const stats = await fs.stat(result.filePath);
+
+    logWithCategory('info', LogCategory.SYSTEM, `Backup downloaded to: ${result.filePath}`);
+
+    return {
+      success: true,
+      message: `Backup downloaded to ${result.filePath}`,
+      path: result.filePath,
+      size: stats.size,
+    };
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    logWithCategory('error', LogCategory.SYSTEM, 'Failed to download backup', { error: errorMessage });
+    return { success: false, message: 'Failed to download backup', error: errorMessage };
+  }
 }

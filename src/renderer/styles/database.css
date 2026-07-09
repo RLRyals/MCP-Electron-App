@@ -311,12 +311,867 @@
   .quick-actions-bar {
     flex-wrap: wrap;
   }
-  
+
   .spacer {
     display: none;
   }
-  
+
   .quick-action-btn-small {
     flex: 1 0 40%;
+  }
+}
+
+/* ============================================================
+   Backup Management UI (issue #130)
+   Styles for BackupManager / BackupList / BackupWizard, and the
+   shared button/toast primitives those components rely on.
+   ============================================================ */
+
+/* Shared button primitives */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: rgba(0, 212, 170, 0.25);
+  border-color: rgba(0, 212, 170, 0.5);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: rgba(0, 212, 170, 0.4);
+  border-color: rgba(0, 212, 170, 0.7);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.btn-danger {
+  background: rgba(220, 53, 69, 0.25);
+  border-color: rgba(220, 53, 69, 0.55);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.4);
+  border-color: rgba(220, 53, 69, 0.75);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-small {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+/* Backup Manager */
+.backup-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.backup-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.header-title h2 {
+  margin: 0 0 4px 0;
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.header-title p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.backup-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.loading-spinner,
+.progress-spinner,
+.progress-banner-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #00D4AA;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+.backup-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Backup List */
+.backup-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.backup-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(0, 212, 170, 0.5);
+}
+
+.backup-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.backup-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.backup-empty-state .empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  opacity: 0.6;
+}
+
+.backup-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 15px;
+}
+
+.backup-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.backup-card:hover {
+  border-color: rgba(0, 212, 170, 0.3);
+}
+
+.backup-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.backup-icon {
+  font-size: 1.5rem;
+}
+
+.backup-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.backup-title h4 {
+  margin: 0 0 3px 0;
+  font-size: 0.95rem;
+  color: #fff;
+  overflow-wrap: break-word;
+}
+
+.backup-database {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.backup-card-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backup-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.badge-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.badge-value {
+  color: #fff;
+  font-weight: 500;
+}
+
+.backup-badge-type.badge-compressed {
+  background: rgba(0, 212, 170, 0.15);
+}
+
+.backup-badge-type.badge-plain {
+  background: rgba(255, 193, 7, 0.15);
+}
+
+.backup-badge-source {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.backup-badge-source.badge-source-app {
+  background: rgba(0, 212, 170, 0.2);
+  color: #00D4AA;
+}
+
+.backup-badge-source.badge-source-scheduled {
+  background: rgba(139, 92, 246, 0.2);
+  color: #b794f6;
+}
+
+.backup-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.backup-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backup-action-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.backup-action-btn.btn-restore:hover {
+  background: rgba(0, 212, 170, 0.2);
+  border-color: rgba(0, 212, 170, 0.4);
+}
+
+.backup-action-btn.btn-delete:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: rgba(220, 53, 69, 0.4);
+}
+
+/* Backup Wizard / Restore Wizard (modal) */
+.backup-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.backup-wizard-modal {
+  background: #1a1f2e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.wizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wizard-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.wizard-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.wizard-close-btn:hover {
+  color: #fff;
+}
+
+.wizard-steps {
+  display: flex;
+  padding: 15px 22px;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.5;
+}
+
+.wizard-step.active,
+.wizard-step.completed {
+  opacity: 1;
+}
+
+.step-number {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #fff;
+}
+
+.wizard-step.active .step-number {
+  background: #00D4AA;
+  color: #0a0e17;
+  font-weight: 700;
+}
+
+.wizard-step.completed .step-number {
+  background: rgba(0, 212, 170, 0.4);
+}
+
+.step-label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.wizard-content {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.wizard-content h3 {
+  margin: 0 0 6px 0;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.wizard-content > p,
+.section-description {
+  margin: 0 0 15px 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+}
+
+.wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wizard-nav-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* Backup type / table selection (BackupWizard) */
+.backup-type-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.backup-type-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backup-type-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.backup-type-option.selected {
+  border-color: rgba(0, 212, 170, 0.5);
+  background: rgba(0, 212, 170, 0.08);
+}
+
+.backup-type-option.option-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.option-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+}
+
+.option-icon {
+  font-size: 1.3rem;
+}
+
+.option-details strong {
+  display: block;
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 3px;
+}
+
+.option-details p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8rem;
+}
+
+.table-selection-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.selected-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
+.table-selection-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 15px;
+}
+
+.table-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.table-checkbox-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.empty-message {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  padding: 10px;
+}
+
+.config-section {
+  margin-bottom: 18px;
+}
+
+.config-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.config-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 7px;
+  color: #fff;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: rgba(0, 212, 170, 0.5);
+}
+
+.config-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.config-input-group .config-input {
+  flex: 1;
+}
+
+.config-hint {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+}
+
+.config-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Confirmation summary (BackupWizard step 3) */
+.backup-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+}
+
+.backup-summary h4,
+.selected-tables-preview h5 {
+  margin: 0 0 10px 0;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.summary-list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+}
+
+.summary-list li {
+  margin-bottom: 4px;
+}
+
+.selected-tables-preview {
+  margin-top: 15px;
+}
+
+.tables-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.table-tag {
+  padding: 3px 9px;
+  background: rgba(0, 212, 170, 0.15);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #00D4AA;
+}
+
+.backup-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  margin-top: 15px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Restore Wizard specifics */
+.restore-wizard-section {
+  margin-bottom: 20px;
+}
+
+.restore-wizard-section:last-child {
+  margin-bottom: 0;
+}
+
+.restore-backup-info {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 12px 15px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 0.85rem;
+}
+
+.info-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.info-value {
+  color: #fff;
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.restore-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.restore-option:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.restore-option .option-content strong {
+  display: block;
+  color: #fff;
+  font-size: 0.88rem;
+  margin-bottom: 3px;
+}
+
+.restore-option .option-content p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.restore-option .option-content p.warning {
+  color: #ffb74d;
+}
+
+.restore-warning-box {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  border-radius: 8px;
+}
+
+.warning-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.warning-content strong {
+  display: block;
+  color: #ff8a80;
+  margin-bottom: 4px;
+}
+
+.warning-content p {
+  margin: 3px 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.82rem;
+}
+
+.restore-confirm-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px dashed rgba(220, 53, 69, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+.restore-confirm-checkbox input {
+  margin-top: 2px;
+}
+
+/* Toast notifications */
+.backup-toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 14px 20px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  max-width: 400px;
+  animation: toast-slide-in 0.25s ease;
+}
+
+@keyframes toast-slide-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.backup-toast.toast-fade-out {
+  animation: toast-fade-out 0.3s ease forwards;
+}
+
+@keyframes toast-fade-out {
+  to { opacity: 0; transform: translateY(10px); }
+}
+
+.backup-toast.toast-success {
+  background: rgba(0, 180, 120, 0.95);
+}
+
+.backup-toast.toast-error {
+  background: rgba(220, 53, 69, 0.95);
+}
+
+.backup-toast.toast-info {
+  background: rgba(60, 130, 220, 0.95);
+}
+
+/* Progress banner (elapsed-time indicator for create/restore/download/validate) */
+.backup-progress-banner {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(20, 24, 34, 0.95);
+  border: 1px solid rgba(0, 212, 170, 0.4);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.85rem;
+  z-index: 2100;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.backup-progress-banner .progress-banner-spinner {
+  width: 16px;
+  height: 16px;
+  margin-bottom: 0;
+  border-width: 2px;
+}
+
+.backup-progress-banner .progress-banner-elapsed {
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .backup-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-manager-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: stretch;
+  }
+
+  .header-actions .btn-primary,
+  .header-actions .btn-secondary {
+    flex: 1;
+    justify-content: center;
   }
 }
