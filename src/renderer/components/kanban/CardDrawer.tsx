@@ -20,6 +20,7 @@ import {
 } from '../../../types/kanban.js';
 import type { ActiveWorkflowInstance } from '../../../types/workflow.js';
 import type { CurrentUserSetting } from '../../../types/identity.js';
+import { parseGithubIssueRef, resolveLinkUrl, linkifyBody } from './link-utils.js';
 
 const KANBAN_PLUGIN = 'plugin:fictionlab-kanban:';
 
@@ -39,11 +40,42 @@ export interface CardDrawerProps {
   onClose: () => void;
   /** Called after any mutation succeeds, so the parent board can re-fetch immediately. */
   onMutated: () => void;
+  /**
+   * Swap the drawer to a different card id (issue #198 -- `card`-type
+   * links). Optional so existing embeddings of CardDrawer that don't wire
+   * this up keep working; `card` links just render as plain text without it.
+   */
+  onNavigateToCard?: (cardId: string) => void;
 }
 
 async function invoke<T = any>(channel: string, args?: any): Promise<T> {
   const electronAPI = (window as any).electronAPI;
   return electronAPI.invoke(`${KANBAN_PLUGIN}${channel}`, args);
+}
+
+/**
+ * Open an http(s) URL in the system default browser (issue #198). This is a
+ * host-owned (un-prefixed) channel -- same idiom as
+ * `app-settings:get-current-user` in KanbanViewReact.tsx -- handled by
+ * `src/main/handlers/link-handlers.ts`, which is the ONLY thing that
+ * actually calls `shell.openExternal` and rejects anything that isn't a
+ * well-formed http/https URL. Throws on rejection so callers can surface it.
+ */
+async function openExternal(url: string): Promise<void> {
+  const electronAPI = (window as any).electronAPI;
+  if (!electronAPI?.invoke) throw new Error('Electron API not available');
+  await electronAPI.invoke('app:open-external', url);
+}
+
+/**
+ * Reveal a file in the system file manager (issue #198 -- `file`-type
+ * links). Handled by the same main-process module, which confirms the path
+ * exists before calling `shell.showItemInFolder` -- never opens/executes it.
+ */
+async function revealInFolder(path: string): Promise<void> {
+  const electronAPI = (window as any).electronAPI;
+  if (!electronAPI?.invoke) throw new Error('Electron API not available');
+  await electronAPI.invoke('app:reveal-in-folder', path);
 }
 
 const panelStyle: React.CSSProperties = {
@@ -105,10 +137,23 @@ const primaryButtonStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, currentUser, identities, onClose, onMutated }) => {
+/** Clickable card link / linkified-body-URL style (issue #198). */
+const linkStyle: React.CSSProperties = {
+  color: 'var(--color-accent, #00D4AA)',
+  textDecoration: 'underline',
+  cursor: 'pointer',
+  wordBreak: 'break-all',
+};
+
+export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, currentUser, identities, onClose, onMutated, onNavigateToCard }) => {
   const [detail, setDetail] = useState<KanbanCardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Existence check for `card`-type links (issue #198 plan §1): a link whose
+  // referenced card was since deleted/archived-away falls back to plain
+  // text instead of a dead-end click. `undefined` = not checked yet (link
+  // renders as clickable optimistically while the check is in flight).
+  const [cardLinkExists, setCardLinkExists] = useState<Record<string, boolean>>({});
 
   const [titleDraft, setTitleDraft] = useState('');
   const [bodyDraft, setBodyDraft] = useState('');
@@ -130,6 +175,7 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setCardLinkExists({});
     try {
       const result = await invoke<KanbanCardDetail>('board:get-card', { card_id: cardId });
       if (!result?.card) {
@@ -154,6 +200,52 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
   }, [cardId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Resolve `card`-type link existence (issue #198 plan §1) so a link to a
+  // since-deleted card falls back to plain text rather than a dead click.
+  // Best-effort: any lookup failure is treated as "doesn't exist" so the
+  // link never dangles silently clickable.
+  useEffect(() => {
+    const cardLinks = (detail?.links || []).filter((l) => l.link_type === 'card');
+    const unchecked = cardLinks.filter((l) => !(l.ref in cardLinkExists));
+    if (unchecked.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        unchecked.map(async (link) => {
+          try {
+            const result = await invoke<KanbanCardDetail>('board:get-card', { card_id: link.ref });
+            return [link.ref, !!result?.card] as const;
+          } catch {
+            return [link.ref, false] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setCardLinkExists((prev) => {
+        const next = { ...prev };
+        for (const [ref, exists] of results) next[ref] = exists;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [detail?.links, cardLinkExists]);
+
+  const handleOpenExternal = useCallback(async (url: string) => {
+    try {
+      await openExternal(url);
+    } catch (e: any) {
+      setError(e?.message || `Failed to open ${url}`);
+    }
+  }, []);
+
+  const handleRevealFile = useCallback(async (path: string) => {
+    try {
+      await revealInFolder(path);
+    } catch (e: any) {
+      setError(e?.message || `Failed to reveal ${path}`);
+    }
+  }, []);
 
   const runMutation = async (fn: () => Promise<any>) => {
     setSaving(true);
@@ -189,6 +281,10 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
   }
 
   const card = detail.card;
+  // The "Open" affordance next to Issue ref (issue #198 plan §2): shown only
+  // when the current draft value parses as `owner/repo#123` or a full
+  // GitHub issue/PR URL.
+  const issueRefUrl = parseGithubIssueRef(issueRefDraft);
   const assigneeIdentityKind = card.assignee
     ? identities.find((i) => i.id === card.assignee)?.kind
     : undefined;
@@ -391,7 +487,23 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
           <input style={{ ...inputStyle, marginBottom: '10px' }} value={specRefDraft} onChange={(e) => setSpecRefDraft(e.target.value)} onBlur={saveFieldChanges} />
 
           <label style={labelStyle}>Issue ref</label>
-          <input style={inputStyle} value={issueRefDraft} onChange={(e) => setIssueRefDraft(e.target.value)} onBlur={saveFieldChanges} />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              style={inputStyle}
+              value={issueRefDraft}
+              onChange={(e) => setIssueRefDraft(e.target.value)}
+              onBlur={saveFieldChanges}
+            />
+            {issueRefUrl && (
+              <button
+                style={buttonStyle}
+                onClick={() => handleOpenExternal(issueRefUrl)}
+                title={issueRefUrl}
+              >
+                Open
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Body */}
@@ -410,7 +522,24 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
               style={{ whiteSpace: 'pre-wrap', fontSize: '13px', cursor: 'text', minHeight: '40px' }}
               onClick={() => setEditingBody(true)}
             >
-              {bodyDraft || <span style={{ color: 'var(--color-text-tertiary, rgba(255,255,255,0.4))' }}>Click to add a body...</span>}
+              {bodyDraft ? (
+                linkifyBody(bodyDraft).map((segment, i) =>
+                  segment.type === 'url' ? (
+                    <a
+                      key={i}
+                      href="#"
+                      style={linkStyle}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenExternal(segment.value); }}
+                    >
+                      {segment.value}
+                    </a>
+                  ) : (
+                    <React.Fragment key={i}>{segment.value}</React.Fragment>
+                  )
+                )
+              ) : (
+                <span style={{ color: 'var(--color-text-tertiary, rgba(255,255,255,0.4))' }}>Click to add a body...</span>
+              )}
             </div>
           )}
         </div>
@@ -419,11 +548,53 @@ export const CardDrawer: React.FC<CardDrawerProps> = ({ cardId, workflowPhase, c
         <div style={sectionStyle}>
           <label style={labelStyle}>Links</label>
           {detail.links.length === 0 && <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary, rgba(255,255,255,0.4))' }}>None</div>}
-          {detail.links.map((link) => (
-            <div key={link.id} style={{ fontSize: '12px', marginBottom: '4px' }}>
-              <span style={{ opacity: 0.6 }}>[{link.link_type}]</span> {link.label || link.ref}
-            </div>
-          ))}
+          {detail.links.map((link) => {
+            const displayText = link.label || link.ref;
+            const url = resolveLinkUrl(link.link_type, link.ref);
+            let content: React.ReactNode;
+            if (link.link_type === 'card') {
+              const exists = cardLinkExists[link.ref];
+              content = exists === false ? (
+                <span title="This card no longer exists">{displayText}</span>
+              ) : (
+                <a
+                  href="#"
+                  style={linkStyle}
+                  onClick={(e) => { e.preventDefault(); onNavigateToCard?.(link.ref); }}
+                >
+                  {displayText}
+                </a>
+              );
+            } else if (link.link_type === 'file') {
+              content = (
+                <a
+                  href="#"
+                  style={linkStyle}
+                  title="Reveal in folder"
+                  onClick={(e) => { e.preventDefault(); handleRevealFile(link.ref); }}
+                >
+                  {displayText}
+                </a>
+              );
+            } else if (url) {
+              content = (
+                <a
+                  href="#"
+                  style={linkStyle}
+                  onClick={(e) => { e.preventDefault(); handleOpenExternal(url); }}
+                >
+                  {displayText}
+                </a>
+              );
+            } else {
+              content = <span>{displayText}</span>;
+            }
+            return (
+              <div key={link.id} style={{ fontSize: '12px', marginBottom: '4px' }}>
+                <span style={{ opacity: 0.6 }}>[{link.link_type}]</span> {content}
+              </div>
+            );
+          })}
           <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
             <select style={{ ...inputStyle, flex: '0 0 90px' }} value={linkType} onChange={(e) => setLinkType(e.target.value as KanbanLinkType)}>
               <option value="url">url</option>

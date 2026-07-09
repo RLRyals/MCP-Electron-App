@@ -338,6 +338,11 @@ const KanbanApp: React.FC = () => {
       .catch((e: any) => setError(e?.message || 'Failed to move card'));
   }, [refresh, currentUser]);
 
+  // Looked up only for the live workflow-phase tie-in below -- deliberately
+  // NOT used to gate whether the drawer renders (see selectedCardId usage
+  // further down): a `card`-type link (issue #198) can point at a card that
+  // the current assignee/due filter excludes from `cards`, and the drawer
+  // must still be able to open it by id via its own board:get-card fetch.
   const selectedCard = selectedCardId ? cards.find((c) => c.id === selectedCardId) || null : null;
 
   const agentOptions = Array.from(
@@ -482,14 +487,15 @@ const KanbanApp: React.FC = () => {
         )}
       </div>
 
-      {selectedCard && (
+      {selectedCardId && (
         <CardDrawer
-          cardId={selectedCard.id}
-          workflowPhase={selectedCard.workflow_registry_id ? workflowPhases.get(selectedCard.workflow_registry_id) || null : null}
+          cardId={selectedCardId}
+          workflowPhase={selectedCard?.workflow_registry_id ? workflowPhases.get(selectedCard.workflow_registry_id) || null : null}
           currentUser={currentUser}
           identities={identities}
           onClose={() => setSelectedCardId(null)}
           onMutated={refresh}
+          onNavigateToCard={(cardId) => setSelectedCardId(cardId)}
         />
       )}
     </div>
