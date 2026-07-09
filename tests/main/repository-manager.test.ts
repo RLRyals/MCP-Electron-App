@@ -14,6 +14,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { EventEmitter } from 'events';
 import { RepositoryManager } from '../../src/main/repository-manager';
 import {
   RepositoryError,
@@ -21,6 +22,62 @@ import {
   CloneOptions,
   RepoStatus,
 } from '../../src/types/repository';
+
+/**
+ * Issue #185: `cloneRepository()` shells out to a real `git` binary via
+ * `child_process.spawn`. Several tests below call it with syntactically
+ * valid but non-existent remote URLs (github.com/gitlab.com placeholders).
+ * Unmocked, that spawns a real `git clone` against those hosts -- against
+ * gitlab.com in particular, Git Credential Manager pops an interactive
+ * "Connect to GitLab" OS dialog with nothing in the test to dismiss it,
+ * hanging the run indefinitely and leaving orphaned git/GCM processes.
+ *
+ * Mocking `spawn` here means no test in this file ever touches the network
+ * or spawns a real `git clone`. `exec` is mocked too (used for the
+ * `git --version` / disk-space prerequisite checks that run before every
+ * clone attempt) so no real `git` process is spawned at all. Everything
+ * else -- including `execSync`, used only for an unrelated one-time Docker
+ * CLI PATH lookup -- is left as the real implementation via requireActual.
+ *
+ * The mocked failure is phrased as an authentication error so it classifies
+ * as a non-retryable error (see ErrorHandler/RetryStrategy); a message that
+ * classified as retryable would make RepositoryManager's built-in retry
+ * logic sleep for several real seconds per test.
+ */
+jest.mock('child_process', () => ({
+  ...jest.requireActual('child_process'),
+  exec: jest.fn(
+    (
+      _command: string,
+      optionsOrCallback: any,
+      callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void
+    ) => {
+      const cb = typeof optionsOrCallback === 'function' ? optionsOrCallback : callback;
+      process.nextTick(() => cb?.(null, { stdout: 'git version 2.42.0', stderr: '' }));
+    }
+  ),
+  spawn: jest.fn(() => {
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter;
+      stderr: EventEmitter;
+      kill: jest.Mock;
+    };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = jest.fn();
+
+    // Fail fast on the next tick -- no real process, no network, no prompt.
+    process.nextTick(() => {
+      child.stderr.emit(
+        'data',
+        Buffer.from("fatal: Authentication failed (mocked - no network access in tests)\n")
+      );
+      child.emit('close', 128);
+    });
+
+    return child;
+  }),
+}));
 
 describe('RepositoryManager', () => {
   let repoManager: RepositoryManager;
@@ -56,39 +113,31 @@ describe('RepositoryManager', () => {
       }
     });
 
-    test('should accept valid HTTPS URLs', async () => {
+    test('should accept valid HTTPS URLs', () => {
       const validUrls = [
         'https://github.com/user/repo.git',
         'http://github.com/user/repo.git',
         'https://gitlab.com/user/repo.git',
       ];
 
-      // Note: This test validates URL format only, actual cloning would require network
+      // Assert URL validation alone passes. Deliberately does NOT call
+      // cloneRepository() -- even though these hosts/paths don't resolve to
+      // a real repo, they are well-formed URLs that would sail past
+      // validateUrl() into a real `git clone` subprocess (see the
+      // child_process mock comment above for why that hung the suite).
       for (const url of validUrls) {
-        // This will fail at the Git check or network stage, but URL validation should pass
-        try {
-          await repoManager.cloneRepository(url, path.join(testDir, 'repo'));
-        } catch (error) {
-          // URL validation should pass, error should be from Git or network
-          expect(error).not.toBeInstanceOf(RepositoryError);
-        }
+        expect(() => repoManager.validateUrl(url)).not.toThrow();
       }
     });
 
-    test('should accept valid SSH URLs', async () => {
+    test('should accept valid SSH URLs', () => {
       const validUrls = [
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
       ];
 
       for (const url of validUrls) {
-        // This will fail at the Git check or network stage, but URL validation should pass
-        try {
-          await repoManager.cloneRepository(url, path.join(testDir, 'repo'));
-        } catch (error) {
-          // URL validation should pass, error should be from Git or network
-          expect(error).not.toBeInstanceOf(RepositoryError);
-        }
+        expect(() => repoManager.validateUrl(url)).not.toThrow();
       }
     });
 

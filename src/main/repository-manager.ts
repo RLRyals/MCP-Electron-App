@@ -609,8 +609,13 @@ export class RepositoryManager {
 
   /**
    * Validate URL format
+   *
+   * Public so tests can assert validation behavior directly without going
+   * through cloneRepository() -- which would otherwise spawn a real `git`
+   * process against the (possibly network-reachable) URL just to prove the
+   * format check passed. See tests/main/repository-manager.test.ts (#185).
    */
-  private validateUrl(url: string): void {
+  public validateUrl(url: string): void {
     if (!url || url.trim().length === 0) {
       throw new RepositoryError(
         RepositoryErrorType.INVALID_URL,
