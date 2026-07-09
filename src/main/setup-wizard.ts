@@ -206,7 +206,6 @@ export async function markWizardComplete(): Promise<{ success: boolean; error?: 
       WizardStep.WELCOME,
       WizardStep.PREREQUISITES,
       WizardStep.ENVIRONMENT,
-      WizardStep.PLUGINS,
       WizardStep.DOWNLOAD_SETUP,
       WizardStep.SYSTEM_STARTUP,
       WizardStep.COMPLETE
@@ -254,8 +253,8 @@ export async function getWizardProgress(): Promise<number> {
     return 100;
   }
 
-  // Calculate based on current step (7 total steps)
-  const totalSteps = 7;
+  // Calculate based on current step (6 total steps)
+  const totalSteps = 6;
   const progress = ((state.currentStep - 1) / totalSteps) * 100;
 
   return Math.round(progress);
@@ -284,7 +283,6 @@ export function getStepName(step: WizardStep): string {
     [WizardStep.WELCOME]: 'Welcome',
     [WizardStep.PREREQUISITES]: 'Prerequisites Check',
     [WizardStep.ENVIRONMENT]: 'Environment Configuration',
-    [WizardStep.PLUGINS]: 'Plugin Selection',
     [WizardStep.DOWNLOAD_SETUP]: 'Download & Setup',
     [WizardStep.SYSTEM_STARTUP]: 'System Startup',
     [WizardStep.COMPLETE]: 'Setup Complete'
@@ -301,7 +299,6 @@ export function getStepDescription(step: WizardStep): string {
     [WizardStep.WELCOME]: 'Welcome to MCP Writing System setup',
     [WizardStep.PREREQUISITES]: 'Checking system requirements',
     [WizardStep.ENVIRONMENT]: 'Configuring database and services',
-    [WizardStep.PLUGINS]: 'Choose optional plugins',
     [WizardStep.DOWNLOAD_SETUP]: 'Downloading and preparing components',
     [WizardStep.SYSTEM_STARTUP]: 'Starting MCP services',
     [WizardStep.COMPLETE]: 'Setup complete!'
@@ -344,13 +341,9 @@ export async function canProceedToNextStep(currentStep: WizardStep): Promise<{
       }
       return { canProceed: true };
 
-    case WizardStep.PLUGINS:
-      // Plugins are optional, can always proceed
-      return { canProceed: true };
-
     case WizardStep.DOWNLOAD_SETUP:
       // Check that build pipeline and downloads are complete
-      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: plugins=${JSON.stringify(state.data.plugins)}, buildPipeline=${JSON.stringify(state.data.buildPipeline)}, downloads=${JSON.stringify(state.data.downloads)}`);
+      logWithCategory('debug', LogCategory.SYSTEM, `Validating DOWNLOAD_SETUP: buildPipeline=${JSON.stringify(state.data.buildPipeline)}, downloads=${JSON.stringify(state.data.downloads)}`);
 
       // If build pipeline is marked as completed, allow proceeding
       // This is the primary indicator that the build has finished successfully
