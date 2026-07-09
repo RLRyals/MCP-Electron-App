@@ -216,6 +216,28 @@ interface MCPSystemStatus {
   message: string;
 }
 
+// issue #124: per-service detail used by the Services tab's individual server rows
+interface DetailedServiceStatus {
+  serviceName: string;
+  containerName: string;
+  status: 'starting' | 'running' | 'healthy' | 'unhealthy' | 'stopped' | 'missing';
+  health: 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown';
+  url?: string;
+  port?: number;
+  message: string;
+}
+
+interface DetailedSystemStatus {
+  overall: {
+    running: boolean;
+    healthy: boolean;
+    ready: boolean;
+    message: string;
+  };
+  services: DetailedServiceStatus[];
+  timestamp: Date;
+}
+
 interface ServiceLogsResult {
   success: boolean;
   logs: string;
@@ -338,9 +360,13 @@ interface ElectronAPI {
     stop: () => Promise<MCPSystemOperationResult>;
     restart: () => Promise<MCPSystemOperationResult>;
     getStatus: () => Promise<MCPSystemStatus>;
+    getDetailedStatus: () => Promise<DetailedSystemStatus>;
     getUrls: () => Promise<ServiceUrls>;
     getLogs: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', tail?: number) => Promise<ServiceLogsResult>;
     checkPorts: () => Promise<PortConflictResult>;
+    // issue #124: per-service controls + resource usage on the Services tab
+    controlService: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector', action: 'start' | 'stop' | 'restart') => Promise<MCPSystemOperationResult>;
+    getResourceUsage: (serviceName: 'postgres' | 'mcp-writing-servers' | 'mcp-connector') => Promise<{ cpuPercent: string; memoryUsage: string; memoryPercent: string } | null>;
     getWorkingDirectory: () => Promise<string>;
     onProgress: (callback: (progress: MCPSystemProgress) => void) => void;
     removeProgressListener: () => void;

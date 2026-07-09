@@ -1903,6 +1903,134 @@ export async function viewServiceLogs(
 }
 
 /**
+ * Individually-controllable services within the docker-compose stack
+ * (issue #124 -- Services tab per-service controls).
+ */
+export type ManagedServiceName = 'postgres' | 'mcp-writing-servers' | 'mcp-connector';
+
+const MANAGED_SERVICE_CONTAINER_MAP: Record<ManagedServiceName, string> = {
+  'postgres': 'fictionlab-postgres',
+  'mcp-writing-servers': 'fictionlab-mcp-servers',
+  'mcp-connector': 'fictionlab-mcp-connector',
+};
+
+const MANAGED_SERVICE_ACTIONS = ['start', 'stop', 'restart'] as const;
+
+/**
+ * Runtime guard for IPC-supplied service-control arguments. TypeScript
+ * types are erased at runtime, and both values are interpolated into a
+ * shell command by execDockerCompose, so they MUST be validated against
+ * explicit whitelists here. Returns an error message, or null when safe.
+ * Exported for tests.
+ */
+export function validateServiceControlRequest(
+  serviceName: string,
+  action: string
+): string | null {
+  if (!(MANAGED_SERVICE_ACTIONS as readonly string[]).includes(action)) {
+    return `Invalid service action "${action}". Allowed: ${MANAGED_SERVICE_ACTIONS.join(', ')}`;
+  }
+  if (!Object.prototype.hasOwnProperty.call(MANAGED_SERVICE_CONTAINER_MAP, serviceName)) {
+    return `Unknown service "${serviceName}". Allowed: ${Object.keys(MANAGED_SERVICE_CONTAINER_MAP).join(', ')}`;
+  }
+  return null;
+}
+
+/**
+ * Start, stop, or restart a single named service within the docker-compose
+ * stack, rather than the whole system (issue #124). Uses
+ * `docker compose <action> <service>` scoped to just that service.
+ */
+export async function controlService(
+  serviceName: ManagedServiceName,
+  action: 'start' | 'stop' | 'restart'
+): Promise<SystemOperationResult> {
+  logWithCategory('info', LogCategory.DOCKER, `Service control: ${action} ${serviceName}`);
+
+  const validationError = validateServiceControlRequest(serviceName, action);
+  if (validationError) {
+    logWithCategory('warn', LogCategory.DOCKER, `Rejected service control request: ${validationError}`);
+    return {
+      success: false,
+      message: validationError,
+      error: validationError,
+    };
+  }
+
+  try {
+    const composeFile = getDockerComposeFilePath('core');
+
+    if (!await fs.pathExists(composeFile)) {
+      throw new Error(`docker-compose.yml not found at ${composeFile}`);
+    }
+
+    await execDockerCompose(composeFile, action, [serviceName]);
+
+    const verbPast = action === 'stop' ? 'stopped' : `${action}ed`;
+    return {
+      success: true,
+      message: `${serviceName} ${verbPast} successfully`,
+    };
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.DOCKER, `Failed to ${action} ${serviceName}`, error);
+    return {
+      success: false,
+      message: `Failed to ${action} ${serviceName}`,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Live CPU/memory usage for a single container, read via `docker stats`
+ * (issue #124 -- resource usage monitoring).
+ */
+export interface ContainerResourceUsage {
+  cpuPercent: string;
+  memoryUsage: string;
+  memoryPercent: string;
+}
+
+/**
+ * Get live resource usage for a managed service's container.
+ * Returns null if the container isn't running or stats can't be read
+ * (e.g. Docker unavailable) -- callers should treat null as "not available".
+ */
+export async function getContainerResourceUsage(
+  serviceName: ManagedServiceName
+): Promise<ContainerResourceUsage | null> {
+  // Same runtime guard as controlService: the name reaches a shell command.
+  if (validateServiceControlRequest(serviceName, 'start') !== null) {
+    logWithCategory('warn', LogCategory.DOCKER, `Rejected resource-usage request for unknown service "${serviceName}"`);
+    return null;
+  }
+
+  const containerName = MANAGED_SERVICE_CONTAINER_MAP[serviceName];
+
+  try {
+    const { stdout } = await execAsync(
+      `docker stats --no-stream --format "{{json .}}" ${containerName}`
+    );
+
+    if (!stdout.trim()) {
+      return null;
+    }
+
+    // docker stats prints one JSON object per line; we only asked for one container
+    const stats = JSON.parse(stdout.trim().split('\n')[0]);
+
+    return {
+      cpuPercent: stats.CPUPerc,
+      memoryUsage: stats.MemUsage,
+      memoryPercent: stats.MemPerc,
+    };
+  } catch (error) {
+    logWithCategory('warn', LogCategory.DOCKER, `Failed to get resource usage for ${containerName}`, error);
+    return null;
+  }
+}
+
+/**
  * Save startup metadata
  */
 async function saveStartupMetadata(): Promise<void> {

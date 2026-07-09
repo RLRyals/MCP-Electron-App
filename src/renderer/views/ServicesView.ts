@@ -1,15 +1,20 @@
 /**
  * ServicesView
- * Wrapper for existing ServicesTab component
+ * Wrapper for the ServicesTab component
  * Implements View interface for ViewRouter compatibility
+ *
+ * Content rewrite for issue #124 -- detailed per-service controls for
+ * PostgreSQL, the two MCP servers (Connector + Writing Servers), Typing
+ * Mind, and Docker Desktop, plus the pre-existing Ports settings section.
  */
 
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
-import { initializeServicesTab } from '../components/ServicesTab.js';
+import { ServicesTab, initializeServicesTab } from '../components/ServicesTab.js';
 
 export class ServicesView implements View {
   private container: HTMLElement | null = null;
+  private servicesTab: ServicesTab | null = null;
 
   /**
    * Mount the services view
@@ -20,9 +25,9 @@ export class ServicesView implements View {
     // Render the full services HTML content
     container.innerHTML = this.renderServicesHTML();
 
-    // Initialize the existing services functionality
+    // Initialize the services functionality
     try {
-      await initializeServicesTab();
+      this.servicesTab = await initializeServicesTab();
       console.log('[ServicesView] Services tab initialized');
     } catch (error) {
       console.error('[ServicesView] Failed to initialize services:', error);
@@ -107,6 +112,10 @@ export class ServicesView implements View {
     `;
   }
 
+  /**
+   * PostgreSQL Card: status, connection info (host/port/database), lifecycle
+   * controls, logs, connection details, and live resource usage.
+   */
   private renderPostgreSQLCard(): string {
     return `
       <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
@@ -118,8 +127,9 @@ export class ServicesView implements View {
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
+            <div class="service-detail" id="postgres-host-info">Host: localhost</div>
             <div class="service-detail" id="postgres-port-info">Port: 5432</div>
-            <div class="service-detail" id="postgres-version-info">Version: PostgreSQL 17</div>
+            <div class="service-detail" id="postgres-database-info">Database: --</div>
           </div>
           <div class="service-info" style="margin-bottom: 15px;">
             <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
@@ -139,6 +149,11 @@ export class ServicesView implements View {
     `;
   }
 
+  /**
+   * MCP Servers Card: aggregate status plus individual rows for the MCP
+   * Connector and MCP Writing Servers -- each with its own status, port,
+   * start/stop/restart controls, view-logs button, and resource usage.
+   */
   private renderMCPServersCard(): string {
     return `
       <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
@@ -150,27 +165,56 @@ export class ServicesView implements View {
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
-            <div class="service-detail" id="mcp-servers-port-info">Connector Port: 50880</div>
-            <div class="service-detail" id="mcp-servers-version-info">Version: Latest</div>
-          </div>
-          <div class="service-info" style="margin-bottom: 15px;">
-            <h5 style="margin-bottom: 5px; font-size: 0.9rem; opacity: 0.9;">Resource Usage</h5>
-            <div id="mcp-servers-resource-usage" style="font-size: 0.85rem; opacity: 0.9;">
-              <div class="resource-item">Not running</div>
+            <h5 style="margin-bottom: 8px; font-size: 0.9rem; opacity: 0.9;">Individual Servers</h5>
+
+            <div id="mcp-connector-row" style="border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <strong style="font-size: 0.9rem;">MCP Connector</strong>
+                <span id="mcp-connector-status-badge" class="service-status-badge status-offline">Offline</span>
+              </div>
+              <div class="service-detail" id="mcp-connector-port-info">Port: --</div>
+              <div id="mcp-connector-resource-usage" style="font-size: 0.8rem; opacity: 0.9; margin-top: 4px;">
+                <div class="resource-item">Not running</div>
+              </div>
+              <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                <button id="mcp-connector-start" class="service-action-btn" title="Start MCP Connector">Start</button>
+                <button id="mcp-connector-stop" class="service-action-btn" title="Stop MCP Connector">Stop</button>
+                <button id="mcp-connector-restart" class="service-action-btn" title="Restart MCP Connector">Restart</button>
+                <button id="mcp-connector-view-logs" class="service-action-btn" title="View MCP Connector logs">View Logs</button>
+              </div>
+            </div>
+
+            <div id="mcp-writing-servers-row" style="border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <strong style="font-size: 0.9rem;">MCP Writing Servers</strong>
+                <span id="mcp-writing-servers-status-badge" class="service-status-badge status-offline">Offline</span>
+              </div>
+              <div class="service-detail" id="mcp-writing-servers-port-info">Port: --</div>
+              <div id="mcp-writing-servers-resource-usage" style="font-size: 0.8rem; opacity: 0.9; margin-top: 4px;">
+                <div class="resource-item">Not running</div>
+              </div>
+              <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                <button id="mcp-writing-servers-start" class="service-action-btn" title="Start MCP Writing Servers">Start</button>
+                <button id="mcp-writing-servers-stop" class="service-action-btn" title="Stop MCP Writing Servers">Stop</button>
+                <button id="mcp-writing-servers-restart" class="service-action-btn" title="Restart MCP Writing Servers">Restart</button>
+                <button id="mcp-writing-servers-view-logs" class="service-action-btn" title="View MCP Writing Servers logs">View Logs</button>
+              </div>
             </div>
           </div>
+
           <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <button id="mcp-servers-start" class="service-action-btn" title="Start MCP Servers">Start</button>
-            <button id="mcp-servers-stop" class="service-action-btn" title="Stop MCP Servers">Stop</button>
-            <button id="mcp-servers-restart" class="service-action-btn" title="Restart MCP Servers">Restart</button>
-            <button id="mcp-servers-view-logs" class="service-action-btn" title="View MCP Servers logs">View Logs</button>
-            <button id="mcp-servers-health-check" class="service-action-btn" title="Check health status">Health Check</button>
+            <button id="mcp-servers-health-check" class="service-action-btn" title="Check health status of all MCP servers">Health Check</button>
           </div>
         </div>
       </div>
     `;
   }
 
+  /**
+   * Typing Mind Card: Typing Mind itself is a cloud web app with nothing
+   * local to run, so its status/start/stop/restart/logs reflect the local
+   * MCP Connector it depends on to reach FictionLab's MCP servers.
+   */
   private renderTypingMindCard(): string {
     return `
       <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
@@ -178,12 +222,22 @@ export class ServicesView implements View {
           <div class="service-name">
             <h4>Typing Mind</h4>
           </div>
+          <span id="typing-mind-status-badge" class="service-status-badge status-offline">Not Configured</span>
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
             <div class="service-detail" id="typing-mind-url-info">https://www.typingmind.com</div>
+            <div class="service-detail" id="typing-mind-port-info">Connector Port: --</div>
           </div>
+          <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 10px;">
+            Typing Mind runs in the cloud. Start/Stop/Restart and Logs below control the local
+            MCP Connector that Typing Mind talks to.
+          </p>
           <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button id="typing-mind-start" class="service-action-btn" title="Start the MCP Connector">Start</button>
+            <button id="typing-mind-stop" class="service-action-btn" title="Stop the MCP Connector">Stop</button>
+            <button id="typing-mind-restart" class="service-action-btn" title="Restart the MCP Connector">Restart</button>
+            <button id="typing-mind-view-logs" class="service-action-btn" title="View MCP Connector logs">View Logs</button>
             <button id="typing-mind-open-browser" class="service-action-btn" title="Open in browser">Open Browser</button>
             <button id="typing-mind-configure" class="service-action-btn" title="Configure Typing Mind">Configure</button>
           </div>
@@ -203,7 +257,7 @@ export class ServicesView implements View {
         </div>
         <div class="service-card-body">
           <div class="service-info" style="margin-bottom: 15px;">
-            <div class="service-detail" id="docker-version-info">Docker Desktop</div>
+            <div class="service-detail" id="docker-version-info">Version: Checking...</div>
             <div class="service-detail" id="docker-health-info">Status: Checking...</div>
           </div>
           <div class="service-info" style="margin-bottom: 15px;">
@@ -226,6 +280,10 @@ export class ServicesView implements View {
    * Unmount the services view
    */
   async unmount(): Promise<void> {
+    if (this.servicesTab) {
+      this.servicesTab.cleanup();
+    }
+    this.servicesTab = null;
     this.container = null;
   }
 
