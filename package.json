@@ -29,7 +29,8 @@
     "test:integration": "jest --testPathPatterns=integration",
     "test:a11y": "jest --testPathPatterns=a11y",
     "test:a11y:watch": "jest --watch --testPathPatterns=a11y",
-    "test:ci": "jest --config jest.config.ci.cjs"
+    "test:ci": "jest --config jest.config.ci.cjs",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -51,6 +52,7 @@
     "vm2": "^3.10.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",

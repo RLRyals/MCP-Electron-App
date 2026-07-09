@@ -9,8 +9,8 @@
  * - Sample data preview
  */
 
-import { databaseService } from '../../../services/databaseService';
-import { parseQualifiedTableName } from './schema-utils';
+import { databaseService } from '../../../services/databaseService.js';
+import { parseQualifiedTableName } from './schema-utils.js';
 
 export interface ColumnInfo {
   name: string;

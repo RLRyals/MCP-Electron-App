@@ -9,10 +9,10 @@
  * - Record counts and metadata display
  */
 
-import { databaseService, DatabaseOperationResult } from '../../../services/databaseService';
-import { TableDetails } from './TableDetails';
-import { RelationshipDiagram } from './RelationshipDiagram';
-import { parseQualifiedTableName } from './schema-utils';
+import { databaseService, DatabaseOperationResult } from '../../../services/databaseService.js';
+import { TableDetails } from './TableDetails.js';
+import { RelationshipDiagram } from './RelationshipDiagram.js';
+import { parseQualifiedTableName } from './schema-utils.js';
 
 export { parseQualifiedTableName };
 
