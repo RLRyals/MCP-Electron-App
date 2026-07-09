@@ -3,7 +3,7 @@
  * Handles bulk update operations with record selection and preview
  */
 
-import { databaseService, BatchUpdateParams, QueryParams } from '../../../services/databaseService';
+import { databaseService, BatchUpdateParams, QueryParams } from '../../../services/databaseService.js';
 
 export interface BatchUpdateResult {
   success: boolean;

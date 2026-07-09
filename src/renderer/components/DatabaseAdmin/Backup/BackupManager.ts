@@ -204,14 +204,16 @@ export class BackupManager {
    * Handle backup creation
    */
   private async handleCreateBackup(options: BackupOptions): Promise<void> {
-    this.showInfo('Creating backup...');
+    const stopTimer = this.showProgress(
+      options.type === 'tables' ? `Creating backup of ${options.tables?.length || 0} table(s)...` : 'Creating full backup...'
+    );
 
     try {
-      // Note: Current backend only supports full database backups
-      // Table-level backup would require backend enhancement
+      const tables = options.type === 'tables' ? options.tables : undefined;
       const result = await window.electronAPI.databaseBackup.create(
         options.customPath,
-        options.compressed
+        options.compressed,
+        tables
       );
 
       if (result.success) {
@@ -222,6 +224,8 @@ export class BackupManager {
       }
     } catch (error: any) {
       this.showError('Error creating backup: ' + error.message);
+    } finally {
+      stopTimer();
     }
   }
 
@@ -248,7 +252,8 @@ export class BackupManager {
           createdAt: new Date().toISOString(),
           size: 0,
           database: 'unknown',
-          compressed: filePath.endsWith('.gz'),
+          compressed: filePath.endsWith('.gz') || filePath.endsWith('.dump'),
+          source: 'app',
         };
         this.restoreStep = 1;
         this.showRestoreWizardDialog();
@@ -321,22 +326,22 @@ export class BackupManager {
         </div>
 
         <div class="restore-wizard-section">
-          <h3>Conflict Resolution</h3>
-          <p class="section-description">Choose how to handle existing data</p>
+          <h3>Restore Mode</h3>
+          <p class="section-description">Both options are destructive to any tables included in this backup -- there is no non-destructive "merge".</p>
 
           <label class="restore-option">
             <input type="radio" name="restore-mode" value="merge" checked />
             <div class="option-content">
-              <strong>Merge with existing data</strong>
-              <p>Add backup data to existing database (safer option)</p>
+              <strong>Restore In-Place</strong>
+              <p class="warning">⚠️ Tables present in this backup are dropped and replaced with the backup's contents. Databases/tables NOT in this backup are left untouched.</p>
             </div>
           </label>
 
           <label class="restore-option">
             <input type="radio" name="restore-mode" value="replace" />
             <div class="option-content">
-              <strong>Replace existing database</strong>
-              <p class="warning">⚠️ This will DELETE all current data and replace it with backup</p>
+              <strong>Full Replace</strong>
+              <p class="warning">⚠️ Drops and recreates the ENTIRE database first, then restores from backup. ALL current data is permanently lost, including anything not in this backup.</p>
             </div>
           </label>
         </div>
@@ -345,11 +350,18 @@ export class BackupManager {
           <div class="restore-warning-box">
             <div class="warning-icon">⚠️</div>
             <div class="warning-content">
-              <strong>Important:</strong>
+              <strong>This is a destructive operation.</strong>
               <p>Make sure the MCP system is stopped or no active connections are using the database before restoring.</p>
-              <p>It's recommended to create a backup of the current database before proceeding.</p>
+              <p>It's strongly recommended to create a fresh backup of the current database before proceeding.</p>
             </div>
           </div>
+        </div>
+
+        <div class="restore-wizard-section">
+          <label class="restore-confirm-checkbox">
+            <input type="checkbox" id="restore-confirm-checkbox" />
+            <span>I understand this will overwrite existing data and cannot be undone.</span>
+          </label>
         </div>
       </div>
     `;
@@ -362,7 +374,7 @@ export class BackupManager {
     return `
       <div class="wizard-footer">
         <button class="btn-secondary" id="restore-wizard-cancel-btn">Cancel</button>
-        <button class="btn-primary" id="restore-wizard-confirm-btn">
+        <button class="btn-danger" id="restore-wizard-confirm-btn" disabled>
           <span class="btn-icon">↻</span>
           Restore Database
         </button>
@@ -380,8 +392,17 @@ export class BackupManager {
     const cancelBtn = document.getElementById('restore-wizard-cancel-btn');
     cancelBtn?.addEventListener('click', () => this.hideRestoreWizard());
 
-    const confirmBtn = document.getElementById('restore-wizard-confirm-btn');
+    const confirmBtn = document.getElementById('restore-wizard-confirm-btn') as HTMLButtonElement | null;
     confirmBtn?.addEventListener('click', () => this.handleRestoreConfirm());
+
+    // The destructive restore action stays disabled until the user explicitly
+    // acknowledges the "cannot be undone" checkbox.
+    const confirmCheckbox = document.getElementById('restore-confirm-checkbox') as HTMLInputElement | null;
+    confirmCheckbox?.addEventListener('change', () => {
+      if (confirmBtn) {
+        confirmBtn.disabled = !confirmCheckbox.checked;
+      }
+    });
   }
 
   /**
@@ -401,6 +422,13 @@ export class BackupManager {
   private async handleRestoreConfirm(): Promise<void> {
     if (!this.selectedRestoreBackup) return;
 
+    // Defense in depth: the button is already disabled until this is checked,
+    // but never proceed with a destructive restore without it.
+    const confirmCheckbox = document.getElementById('restore-confirm-checkbox') as HTMLInputElement | null;
+    if (!confirmCheckbox?.checked) {
+      return;
+    }
+
     const modeRadios = document.querySelectorAll('input[name="restore-mode"]');
     let dropExisting = false;
     modeRadios.forEach(radio => {
@@ -409,15 +437,18 @@ export class BackupManager {
       }
     });
 
-    // Confirm if replacing
-    if (dropExisting) {
-      if (!confirm('Are you sure you want to REPLACE the entire database? This will DELETE all current data!')) {
-        return;
-      }
+    // Restore is ALWAYS destructive to overlapping data -- always require an
+    // explicit native confirmation on top of the checkbox, worded for the chosen mode.
+    const confirmMessage = dropExisting
+      ? 'This will DROP AND RECREATE the entire database, permanently deleting ALL current data, then restore from the selected backup. This cannot be undone. Continue?'
+      : 'This will restore in-place: tables in the selected backup are dropped and replaced with the backup\'s contents. This cannot be undone. Continue?';
+
+    if (!confirm(confirmMessage)) {
+      return;
     }
 
     this.hideRestoreWizard();
-    this.showInfo('Restoring database...');
+    const stopTimer = this.showProgress('Restoring database...');
 
     try {
       const result = await window.electronAPI.databaseBackup.restore(
@@ -432,44 +463,59 @@ export class BackupManager {
       }
     } catch (error: any) {
       this.showError('Error restoring database: ' + error.message);
+    } finally {
+      stopTimer();
     }
   }
 
   /**
-   * Handle backup download
+   * Handle backup download -- copies the backup file to a user-chosen location
+   * via a native save dialog (see database-backup:download IPC handler).
    */
   private async handleDownload(backup: BackupMetadata): Promise<void> {
+    const stopTimer = this.showProgress(`Downloading ${backup.filename}...`);
+
     try {
-      const savePath = await window.electronAPI.databaseBackup.selectSaveLocation();
-      if (!savePath) return;
+      const result = await window.electronAPI.databaseBackup.download(backup.path);
 
-      this.showInfo('Copying backup to selected location...');
+      if (result.canceled) {
+        // User dismissed the save dialog -- not an error, nothing to report.
+        return;
+      }
 
-      // Copy the backup file to the selected location
-      // Note: Would need to add a copy IPC handler or use native file system
-      // For now, show the path to the user
-      this.showInfo(`Backup location: ${backup.path}`);
+      if (result.success) {
+        this.showSuccess(result.message || `Backup downloaded to ${result.path}`);
+      } else {
+        this.showError('Download failed: ' + (result.error || 'Unknown error'));
+      }
     } catch (error: any) {
       this.showError('Error downloading backup: ' + error.message);
+    } finally {
+      stopTimer();
     }
   }
 
   /**
-   * Handle backup validation
+   * Handle backup validation -- runs the backend's format-signature integrity
+   * check (PGDMP/gzip/pg_dump-header) rather than just checking file size client-side.
    */
   private async handleValidate(backup: BackupMetadata): Promise<void> {
-    this.showInfo('Validating backup integrity...');
+    const stopTimer = this.showProgress(`Validating ${backup.filename}...`);
 
     try {
-      // Basic validation: check if file exists and has content
-      // More advanced validation would require backend support
-      if (backup.size === 0) {
-        this.showError('Backup file appears to be empty');
+      const result = await window.electronAPI.databaseBackup.validate(backup.path);
+
+      if (!result.success) {
+        this.showError('Validation error: ' + (result.error || 'Unknown error'));
+      } else if (result.valid) {
+        this.showSuccess(result.message || 'Backup file validation passed');
       } else {
-        this.showSuccess('Backup file validation passed');
+        this.showError(result.message || 'Backup file failed validation');
       }
     } catch (error: any) {
       this.showError('Error validating backup: ' + error.message);
+    } finally {
+      stopTimer();
     }
   }
 
@@ -527,6 +573,43 @@ export class BackupManager {
    */
   private showInfo(message: string): void {
     this.showToast('info', message);
+  }
+
+  /**
+   * Show a persistent progress banner with a live elapsed-time counter for a
+   * long-running operation (backup create/restore/download/validate). pg_dump
+   * and pg_restore don't expose byte-level progress over the exec channel this
+   * app uses, so this is an honest indeterminate indicator (spinner + elapsed
+   * seconds) rather than a fake percentage bar.
+   *
+   * Returns a function that stops the timer and removes the banner; always
+   * call it in a `finally` block.
+   */
+  private showProgress(message: string): () => void {
+    const banner = document.createElement('div');
+    banner.className = 'backup-progress-banner';
+    banner.innerHTML = `
+      <span class="progress-banner-spinner"></span>
+      <span class="progress-banner-message">${this.escapeHtml(message)}</span>
+      <span class="progress-banner-elapsed">0s</span>
+    `;
+    document.body.appendChild(banner);
+
+    const startedAt = Date.now();
+    const elapsedEl = banner.querySelector('.progress-banner-elapsed');
+    const intervalId = window.setInterval(() => {
+      if (elapsedEl) {
+        elapsedEl.textContent = `${Math.round((Date.now() - startedAt) / 1000)}s`;
+      }
+    }, 1000);
+
+    let stopped = false;
+    return () => {
+      if (stopped) return;
+      stopped = true;
+      window.clearInterval(intervalId);
+      banner.remove();
+    };
   }
 
   /**

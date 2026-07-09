@@ -1164,9 +1164,19 @@ function setupIPC(): void {
   });
 
   // Database Backup/Restore IPC handlers
-  registerHandler('database-backup:create', "", async (_, customPath?: string, compressed?: boolean) => {
+  registerHandler('database-backup:create', "", async (_, customPath?: string, compressed?: boolean, tables?: string[]) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Creating database backup...');
-    return await databaseBackup.createBackup(customPath, compressed);
+    return await databaseBackup.createBackup(customPath, compressed, tables);
+  });
+
+  registerHandler('database-backup:validate', "", async (_, backupPath: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Validating backup ${backupPath}...`);
+    return await databaseBackup.validateBackupFile(backupPath);
+  });
+
+  registerHandler('database-backup:download', "", async (_, sourcePath: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Downloading backup ${sourcePath}...`);
+    return await databaseBackup.downloadBackup(sourcePath);
   });
 
   registerHandler('database-backup:restore', "", async (_, backupPath: string, dropExisting?: boolean) => {

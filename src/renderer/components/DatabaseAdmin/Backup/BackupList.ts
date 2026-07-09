@@ -16,6 +16,8 @@ export interface BackupMetadata {
   size: number;
   database: string;
   compressed: boolean;
+  /** 'app' = created via this app's Backup Manager; 'scheduled-task' = the Windows "FictionLab DB Daily Backup" task */
+  source: 'app' | 'scheduled-task';
 }
 
 export interface BackupListCallbacks {
@@ -70,7 +72,8 @@ export class BackupList {
       this.filteredBackups = this.backups.filter(backup =>
         backup.filename.toLowerCase().includes(this.searchQuery) ||
         backup.database.toLowerCase().includes(this.searchQuery) ||
-        this.formatDate(backup.createdAt).toLowerCase().includes(this.searchQuery)
+        this.formatDate(backup.createdAt).toLowerCase().includes(this.searchQuery) ||
+        this.sourceLabel(backup.source).toLowerCase().includes(this.searchQuery)
       );
     }
     this.updateDisplay();
@@ -144,6 +147,11 @@ export class BackupList {
     const timeFormatted = this.formatTime(backup.createdAt);
     const typeLabel = backup.compressed ? 'Compressed' : 'Plain SQL';
     const typeClass = backup.compressed ? 'badge-compressed' : 'badge-plain';
+    const sourceLabel = this.sourceLabel(backup.source);
+    const sourceClass = backup.source === 'scheduled-task' ? 'badge-source-scheduled' : 'badge-source-app';
+    const sourceTitle = backup.source === 'scheduled-task'
+      ? 'Written by the Windows "FictionLab DB Daily Backup" scheduled task (C:\\Backups\\fictionlab)'
+      : 'Created from this app\'s Backup Manager';
 
     return `
       <div class="backup-card" data-backup-path="${this.escapeHtml(backup.path)}">
@@ -152,6 +160,9 @@ export class BackupList {
           <div class="backup-title">
             <h4>${this.escapeHtml(backup.filename)}</h4>
             <span class="backup-database">${this.escapeHtml(backup.database)}</span>
+          </div>
+          <div class="backup-badge backup-badge-source ${sourceClass}" title="${this.escapeHtml(sourceTitle)}">
+            ${sourceLabel}
           </div>
         </div>
 
@@ -246,6 +257,13 @@ export class BackupList {
         this.callbacks.onDelete(backup);
         break;
     }
+  }
+
+  /**
+   * Human-readable label for a backup's source
+   */
+  private sourceLabel(source: BackupMetadata['source']): string {
+    return source === 'scheduled-task' ? 'Scheduled Task' : 'App';
   }
 
   /**

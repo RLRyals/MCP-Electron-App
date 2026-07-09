@@ -3,8 +3,8 @@
  * Handles bulk insert operations with CSV, manual entry, and JSON input
  */
 
-import { CSVUploader, CSVParseResult } from './CSVUploader';
-import { databaseService, BatchInsertParams } from '../../../services/databaseService';
+import { CSVUploader, CSVParseResult } from './CSVUploader.js';
+import { databaseService, BatchInsertParams } from '../../../services/databaseService.js';
 
 export interface BatchInsertResult {
   success: boolean;
@@ -95,6 +95,13 @@ export class BatchInsert {
           <h4>Column Mapping</h4>
           <div class="column-mapping-hint">Map source columns to table columns:</div>
           <div id="column-mapping-grid"></div>
+        </div>
+
+        <div class="batch-size-config">
+          <label for="batch-insert-batch-size">Batch size:</label>
+          <input type="number" id="batch-insert-batch-size" class="batch-size-input"
+            min="1" max="1000" value="${this.options.batchSize ?? this.DEFAULT_BATCH_SIZE}">
+          <span class="batch-size-hint">Records sent per transaction</span>
         </div>
 
         <div class="batch-insert-actions">
@@ -577,6 +584,19 @@ export class BatchInsert {
   }
 
   /**
+   * Read the user-configured batch size (falls back to the default if the
+   * input is missing, empty, or out of range).
+   */
+  private getConfiguredBatchSize(): number {
+    const input = document.getElementById('batch-insert-batch-size') as HTMLInputElement | null;
+    const parsed = input ? parseInt(input.value, 10) : NaN;
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return this.options.batchSize || this.DEFAULT_BATCH_SIZE;
+    }
+    return Math.min(parsed, 1000);
+  }
+
+  /**
    * Perform batch insert with progress tracking
    */
   private async performBatchInsert(records: Array<Record<string, any>>): Promise<void> {
@@ -589,7 +609,7 @@ export class BatchInsert {
     if (progressDiv) progressDiv.style.display = 'block';
     if (resultsDiv) resultsDiv.style.display = 'none';
 
-    const batchSize = this.options.batchSize || this.DEFAULT_BATCH_SIZE;
+    const batchSize = this.getConfiguredBatchSize();
     const totalRecords = records.length;
     let processedCount = 0;
     let successCount = 0;

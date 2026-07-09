@@ -378,6 +378,8 @@ interface BackupResult {
   path?: string;
   size?: number;
   error?: string;
+  /** True when the user dismissed a file picker instead of a real failure */
+  canceled?: boolean;
 }
 
 /**
@@ -399,6 +401,8 @@ interface BackupMetadata {
   size: number;
   database: string;
   compressed: boolean;
+  /** 'app' = created via this app; 'scheduled-task' = the Windows "FictionLab DB Daily Backup" task */
+  source: 'app' | 'scheduled-task';
 }
 
 /**
@@ -407,6 +411,16 @@ interface BackupMetadata {
 interface ListBackupsResult {
   success: boolean;
   backups: BackupMetadata[];
+  error?: string;
+}
+
+/**
+ * Backup integrity validation result
+ */
+interface ValidateBackupResult {
+  success: boolean;
+  valid: boolean;
+  message: string;
   error?: string;
 }
 
@@ -1657,10 +1671,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   databaseBackup: {
     /**
-     * Create a database backup
+     * Create a database backup. Pass `tables` to scope the backup to specific
+     * tables instead of the full database.
      */
-    create: (customPath?: string, compressed?: boolean): Promise<BackupResult> => {
-      return ipcRenderer.invoke('database-backup:create', customPath, compressed);
+    create: (customPath?: string, compressed?: boolean, tables?: string[]): Promise<BackupResult> => {
+      return ipcRenderer.invoke('database-backup:create', customPath, compressed, tables);
     },
 
     /**
@@ -1710,6 +1725,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openDirectory: (): Promise<void> => {
       return ipcRenderer.invoke('database-backup:open-directory');
+    },
+
+    /**
+     * Lightweight integrity check for a backup file (format signature check;
+     * does not touch Docker or the live database).
+     */
+    validate: (backupPath: string): Promise<ValidateBackupResult> => {
+      return ipcRenderer.invoke('database-backup:validate', backupPath);
+    },
+
+    /**
+     * Copy a backup file to a user-chosen location (native save dialog).
+     */
+    download: (sourcePath: string): Promise<BackupResult> => {
+      return ipcRenderer.invoke('database-backup:download', sourcePath);
     },
   },
 
