@@ -737,6 +737,24 @@ export function registerWorkflowHandlers() {
     });
   }
 
+  /**
+   * Surface a workflow:list-active failure to every renderer window.
+   *
+   * Without this, a broken/never-started workflow-manager-server child
+   * process (e.g. its repo hasn't been cloned into userData/repositories
+   * yet on a fresh install, or DATABASE_URL is unreachable) is invisible:
+   * listActiveWorkflows() and this handler both swallow the error and
+   * resolve to [], which looks identical to "no active workflows" in the
+   * UI (see issue #178). Broadcasting lets the renderer distinguish
+   * "genuinely idle" from "can't reach the workflow server" instead of
+   * silently showing a stale/empty list forever.
+   */
+  function broadcastListActiveError(message: string) {
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('workflow:list-active-error', { message, timestamp: new Date().toISOString() });
+    });
+  }
+
   // List all active workflows
   registerHandler('workflow:list-active', "List active workflow instances", async () => {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: List active workflows');
@@ -748,6 +766,7 @@ export function registerWorkflowHandlers() {
       return (result || []).map(mapActiveWorkflow);
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: List active workflows failed', { error: error.message });
+      broadcastListActiveError(error.message || 'Unknown error');
       // Return empty array on error - MCP tools may not be implemented yet
       return [];
     }
