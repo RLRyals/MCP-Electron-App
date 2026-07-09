@@ -28,7 +28,8 @@
     "test:unit": "jest --testPathPatterns=__tests__",
     "test:integration": "jest --testPathPatterns=integration",
     "test:a11y": "jest --testPathPatterns=a11y",
-    "test:a11y:watch": "jest --watch --testPathPatterns=a11y"
+    "test:a11y:watch": "jest --watch --testPathPatterns=a11y",
+    "test:ci": "jest --config jest.config.ci.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
