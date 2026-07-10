@@ -23,11 +23,19 @@ interface AllPrerequisitesResult {
   platform: string;
 }
 
-interface UpdateCheckResult {
-  hasUpdate: boolean;
+/**
+ * FictionLab app self-update check result (issue #213). Mirrors
+ * `AppUpdateCheckResult` from src/main/app-updater.ts / the preload bridge.
+ */
+interface AppUpdateCheckResult {
+  status: 'up-to-date' | 'update-available' | 'no-releases' | 'error';
   currentVersion: string;
   latestVersion?: string;
-  message: string;
+  releaseUrl?: string;
+  releaseNotes?: string;
+  publishedAt?: string;
+  assets?: Array<{ name: string; downloadUrl: string; size?: number }>;
+  error?: string;
 }
 
 interface GitPullResult {
@@ -350,10 +358,10 @@ async function handleCheckFictionLabUpdates(): Promise<void> {
       statusDiv.style.color = '#FFB84D';
     }
 
-    // Check if update API is available
-    if (!(window.electronAPI as any).updates?.checkForUpdates) {
+    // Guard for renderer builds/tests running against an older preload that
+    // hasn't picked up the `updates` bridge yet.
+    if (!window.electronAPI.updates?.checkForUpdates) {
       const version = await window.electronAPI.getAppVersion();
-      showNotification('Automatic update checking not yet implemented', 'info');
       if (statusDiv) {
         statusDiv.textContent = `Current version: ${version} - Check GitHub for latest releases`;
         statusDiv.style.color = '#FFB84D';
@@ -363,23 +371,40 @@ async function handleCheckFictionLabUpdates(): Promise<void> {
 
     showNotification('Checking for FictionLab updates...', 'info');
 
-    // Check for FictionLab updates
-    const result = await (window.electronAPI as any).updates.checkForUpdates();
+    const result = (await window.electronAPI.updates.checkForUpdates()) as AppUpdateCheckResult;
 
-    if (result.hasUpdate) {
-      if (statusDiv) {
-        statusDiv.textContent = `Update available: ${result.latestVersion}`;
-        statusDiv.style.color = '#FFB84D';
-      }
+    switch (result.status) {
+      case 'no-releases':
+        if (statusDiv) {
+          statusDiv.textContent = `No published releases yet — current version ${result.currentVersion}`;
+          statusDiv.style.color = '#FFB84D';
+        }
+        break;
 
-      // Show update dialog
-      showUpdateDialog(result);
-    } else {
-      showNotification('FictionLab is up to date!', 'success');
-      if (statusDiv) {
-        statusDiv.textContent = `Up to date (${result.currentVersion})`;
-        statusDiv.style.color = '#00D4AA';
-      }
+      case 'update-available':
+        if (statusDiv) {
+          statusDiv.textContent = `Update available: ${result.latestVersion}`;
+          statusDiv.style.color = '#FFB84D';
+        }
+        showUpdateDialog(result);
+        break;
+
+      case 'up-to-date':
+        showNotification('FictionLab is up to date!', 'success');
+        if (statusDiv) {
+          statusDiv.textContent = `You're up to date (${result.currentVersion})`;
+          statusDiv.style.color = '#00D4AA';
+        }
+        break;
+
+      case 'error':
+      default:
+        showNotification(`Failed to check for updates: ${result.error || 'Unknown error'}`, 'error');
+        if (statusDiv) {
+          statusDiv.textContent = `Failed to check for updates: ${result.error || 'Unknown error'}`;
+          statusDiv.style.color = '#f44336';
+        }
+        break;
     }
 
   } catch (error) {
@@ -398,9 +423,12 @@ async function handleCheckFictionLabUpdates(): Promise<void> {
 /**
  * Show update dialog for FictionLab
  */
-function showUpdateDialog(updateInfo: UpdateCheckResult): void {
+function showUpdateDialog(updateInfo: AppUpdateCheckResult): void {
   const dialog = document.createElement('div');
   dialog.className = 'error-dialog'; // Reuse error dialog styles
+  const notesHtml = updateInfo.releaseNotes
+    ? `<p><strong>Release Notes:</strong></p><pre class="error-stack">${escapeHtml(updateInfo.releaseNotes)}</pre>`
+    : '';
   dialog.innerHTML = `
     <div class="error-dialog-backdrop"></div>
     <div class="error-dialog-content">
@@ -408,9 +436,9 @@ function showUpdateDialog(updateInfo: UpdateCheckResult): void {
       <p>A new version of FictionLab is available!</p>
       <p><strong>Current Version:</strong> ${updateInfo.currentVersion}</p>
       <p><strong>Latest Version:</strong> ${updateInfo.latestVersion}</p>
-      <p>${updateInfo.message}</p>
+      ${notesHtml}
       <div class="error-dialog-buttons">
-        <button id="download-update" class="button primary">Download Update</button>
+        <button id="download-update" class="button primary">View Release</button>
         <button id="close-update-dialog" class="button">Later</button>
       </div>
     </div>
@@ -424,9 +452,14 @@ function showUpdateDialog(updateInfo: UpdateCheckResult): void {
 
   if (downloadButton) {
     downloadButton.addEventListener('click', () => {
-      // Note: Electron app self-updates are not yet implemented
-      // Users should download updates manually from the releases page
-      showNotification('Please download the latest version from the releases page', 'info');
+      // v1 scope: no in-app installer download, just open the release page
+      // in the default browser via the existing app:open-external channel
+      // (the same http(s)-only gate used by Kanban card links, issue #198).
+      if (updateInfo.releaseUrl) {
+        void (window.electronAPI as any).invoke('app:open-external', updateInfo.releaseUrl);
+      } else {
+        showNotification('No release URL available', 'error');
+      }
       document.body.removeChild(dialog);
     });
   }
@@ -436,6 +469,16 @@ function showUpdateDialog(updateInfo: UpdateCheckResult): void {
       document.body.removeChild(dialog);
     });
   }
+}
+
+/**
+ * Minimal HTML-escape for interpolating untrusted release-notes text into
+ * the dialog's innerHTML.
+ */
+function escapeHtml(value: string): string {
+  const div = document.createElement('div');
+  div.textContent = value;
+  return div.innerHTML;
 }
 
 /**

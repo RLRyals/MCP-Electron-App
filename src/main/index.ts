@@ -22,6 +22,7 @@ import * as mcpSystem from './mcp-system';
 import * as databaseBackup from './database-backup';
 import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
+import * as appUpdater from './app-updater';
 import * as setupWizard from './setup-wizard';
 import * as appSettings from './app-settings';
 import type { CurrentUserSetting } from '../types/identity';
@@ -1338,6 +1339,12 @@ function setupIPC(): void {
   registerHandler('updater:set-preferences', "", async (_, prefs: updater.UpdatePreferences) => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Setting update preferences...');
     return await updater.setUpdatePreferences(prefs);
+  });
+
+  // App Update IPC handler (issue #213 -- FictionLab app self-update check via GitHub Releases)
+  registerHandler('updates:check-for-updates', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for FictionLab app updates...');
+    return await appUpdater.checkForAppUpdate();
   });
 
   // App Settings IPC handlers (issue #181 -- configured current-user identity)

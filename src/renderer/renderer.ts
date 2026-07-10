@@ -449,6 +449,18 @@ interface ElectronAPI {
     onAutoCheckComplete: (callback: (result: any) => void) => void;
     removeCheckListeners: () => void;
   };
+  updates?: {
+    checkForUpdates: () => Promise<{
+      status: 'up-to-date' | 'update-available' | 'no-releases' | 'error';
+      currentVersion: string;
+      latestVersion?: string;
+      releaseUrl?: string;
+      releaseNotes?: string;
+      publishedAt?: string;
+      assets?: Array<{ name: string; downloadUrl: string; size?: number }>;
+      error?: string;
+    }>;
+  };
 }
 
 // Access the API exposed through preload script

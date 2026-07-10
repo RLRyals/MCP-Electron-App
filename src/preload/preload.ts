@@ -488,6 +488,21 @@ interface UpdateProgress {
 }
 
 /**
+ * FictionLab app self-update check result (issue #213 -- GitHub Releases,
+ * distinct from the MCP-Writing-Servers `UpdateCheckResult` above).
+ */
+interface AppUpdateCheckResult {
+  status: 'up-to-date' | 'update-available' | 'no-releases' | 'error';
+  currentVersion: string;
+  latestVersion?: string;
+  releaseUrl?: string;
+  releaseNotes?: string;
+  publishedAt?: string;
+  assets?: Array<{ name: string; downloadUrl: string; size?: number }>;
+  error?: string;
+}
+
+/**
  * Wizard step enum
  */
 enum WizardStep {
@@ -1842,6 +1857,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeCheckListeners: (): void => {
       ipcRenderer.removeAllListeners('updater:check-complete');
       ipcRenderer.removeAllListeners('updater:auto-check-complete');
+    },
+  },
+
+  /**
+   * App Update API (issue #213 -- FictionLab app self-update check via
+   * GitHub Releases on this repo, separate from the `updater` namespace
+   * above which checks MCP-Writing-Servers)
+   */
+  updates: {
+    /**
+     * Check GitHub Releases for a newer published build of this app
+     */
+    checkForUpdates: (): Promise<AppUpdateCheckResult> => {
+      return ipcRenderer.invoke('updates:check-for-updates');
     },
   },
 
