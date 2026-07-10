@@ -4,8 +4,8 @@
  * Implements View interface for ViewRouter compatibility
  *
  * Content rewrite for issue #124 -- detailed per-service controls for
- * PostgreSQL, the two MCP servers (Connector + Writing Servers), Typing
- * Mind, and Docker Desktop, plus the pre-existing Ports settings section.
+ * PostgreSQL, the two MCP servers (Connector + Writing Servers), and
+ * Docker Desktop, plus the pre-existing Ports settings section.
  */
 
 import type { View } from '../components/ViewRouter.js';
@@ -57,7 +57,6 @@ export class ServicesView implements View {
           <div class="service-cards" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
             ${this.renderPostgreSQLCard()}
             ${this.renderMCPServersCard()}
-            ${this.renderTypingMindCard()}
             ${this.renderDockerCard()}
           </div>
 
@@ -204,42 +203,6 @@ export class ServicesView implements View {
 
           <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
             <button id="mcp-servers-health-check" class="service-action-btn" title="Check health status of all MCP servers">Health Check</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * Typing Mind Card: Typing Mind itself is a cloud web app with nothing
-   * local to run, so its status/start/stop/restart/logs reflect the local
-   * MCP Connector it depends on to reach FictionLab's MCP servers.
-   */
-  private renderTypingMindCard(): string {
-    return `
-      <div class="service-card" style="border: 2px solid rgba(255, 255, 255, 0.2);">
-        <div class="service-card-header">
-          <div class="service-name">
-            <h4>Typing Mind</h4>
-          </div>
-          <span id="typing-mind-status-badge" class="service-status-badge status-offline">Not Configured</span>
-        </div>
-        <div class="service-card-body">
-          <div class="service-info" style="margin-bottom: 15px;">
-            <div class="service-detail" id="typing-mind-url-info">https://www.typingmind.com</div>
-            <div class="service-detail" id="typing-mind-port-info">Connector Port: --</div>
-          </div>
-          <p style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 10px;">
-            Typing Mind runs in the cloud. Start/Stop/Restart and Logs below control the local
-            MCP Connector that Typing Mind talks to.
-          </p>
-          <div class="service-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <button id="typing-mind-start" class="service-action-btn" title="Start the MCP Connector">Start</button>
-            <button id="typing-mind-stop" class="service-action-btn" title="Stop the MCP Connector">Stop</button>
-            <button id="typing-mind-restart" class="service-action-btn" title="Restart the MCP Connector">Restart</button>
-            <button id="typing-mind-view-logs" class="service-action-btn" title="View MCP Connector logs">View Logs</button>
-            <button id="typing-mind-open-browser" class="service-action-btn" title="Open in browser">Open Browser</button>
-            <button id="typing-mind-configure" class="service-action-btn" title="Configure Typing Mind">Configure</button>
           </div>
         </div>
       </div>

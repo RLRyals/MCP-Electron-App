@@ -6,7 +6,6 @@
  * - PostgreSQL database management with connection details and real controls
  * - Individual MCP server management (Connector + Writing Servers): status,
  *   port, start/stop/restart, and per-server logs
- * - Typing Mind card: cloud app status via its local MCP Connector dependency
  * - Docker Desktop lifecycle management with real version info
  * - Per-service log viewing (with credential redaction)
  * - Real resource usage monitoring via `docker stats`
@@ -23,7 +22,6 @@ interface ContainerHealth {
 }
 
 interface ServiceUrls {
-  typingMind?: string;
   mcpConnector?: string;
   postgres?: string;
 }
@@ -187,9 +185,6 @@ export class ServicesTab {
 
     // Individual MCP server controls (Connector + Writing Servers)
     this.setupMCPServersListeners();
-
-    // Typing Mind controls
-    this.setupTypingMindListeners();
 
     // Docker Desktop controls
     this.setupDockerListeners();
@@ -501,26 +496,6 @@ export class ServicesTab {
   }
 
   /**
-   * Setup Typing Mind service listeners. Typing Mind itself is a cloud web
-   * app; its lifecycle controls act on the local MCP Connector it depends on.
-   */
-  private setupTypingMindListeners(): void {
-    const startBtn = document.getElementById('typing-mind-start');
-    const stopBtn = document.getElementById('typing-mind-stop');
-    const restartBtn = document.getElementById('typing-mind-restart');
-    const viewLogsBtn = document.getElementById('typing-mind-view-logs');
-    const openBrowserBtn = document.getElementById('typing-mind-open-browser');
-    const configureBtn = document.getElementById('typing-mind-configure');
-
-    if (startBtn) startBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'start'));
-    if (stopBtn) stopBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'stop'));
-    if (restartBtn) restartBtn.addEventListener('click', () => this.handleServiceControl('mcp-connector', 'MCP Connector', 'restart'));
-    if (viewLogsBtn) viewLogsBtn.addEventListener('click', () => this.handleViewLogs('mcp-connector', 'MCP Connector (Typing Mind)'));
-    if (openBrowserBtn) openBrowserBtn.addEventListener('click', () => this.handleOpenTypingMind());
-    if (configureBtn) configureBtn.addEventListener('click', () => this.handleConfigureTypingMind());
-  }
-
-  /**
    * Setup Docker Desktop listeners
    */
   private setupDockerListeners(): void {
@@ -606,7 +581,6 @@ export class ServicesTab {
       await Promise.all([
         this.updatePostgreSQLCard(services, config),
         this.updateMCPServersCard(services),
-        this.updateTypingMindCard(services),
         this.updateDockerCard(),
       ]);
 
@@ -786,48 +760,6 @@ export class ServicesTab {
   }
 
   /**
-   * Update Typing Mind card. Typing Mind is a cloud web app -- its status
-   * reflects the local MCP Connector it depends on.
-   */
-  private async updateTypingMindCard(services: DetailedServiceStatusEntry[]): Promise<void> {
-    try {
-      const connector = this.findService(services, 'mcp-connector');
-      const isUp = this.isServiceUp(connector);
-
-      const badge = document.getElementById('typing-mind-status-badge');
-      if (badge) {
-        if (connector?.status === 'healthy' || connector?.status === 'running') {
-          badge.className = 'service-status-badge status-healthy';
-          badge.textContent = 'Ready';
-        } else if (connector?.status === 'starting') {
-          badge.className = 'service-status-badge status-starting';
-          badge.textContent = 'Starting';
-        } else {
-          badge.className = 'service-status-badge status-offline';
-          badge.textContent = 'Offline';
-        }
-      }
-
-      const urls: ServiceUrls = await window.electronAPI.mcpSystem.getUrls();
-      const urlDisplay = document.getElementById('typing-mind-url-info');
-      if (urlDisplay) {
-        urlDisplay.textContent = urls.typingMind || 'https://www.typingmind.com';
-      }
-
-      const portDisplay = document.getElementById('typing-mind-port-info');
-      if (portDisplay) {
-        portDisplay.textContent = connector?.port !== undefined
-          ? `Connector Port: ${connector.port}`
-          : 'Connector Port: --';
-      }
-
-      this.updateServiceControls('typing-mind', isUp);
-    } catch (error) {
-      console.error('Error updating Typing Mind card:', error);
-    }
-  }
-
-  /**
    * Update Docker Desktop service card
    */
   private async updateDockerCard(): Promise<void> {
@@ -932,48 +864,6 @@ export class ServicesTab {
     } catch (error) {
       console.error('Error checking MCP Servers health:', error);
       this.showNotification('Failed to check health status', 'error');
-    }
-  }
-
-  /**
-   * Handle opening Typing Mind in browser
-   */
-  private async handleOpenTypingMind(): Promise<void> {
-    try {
-      const urls = await window.electronAPI.mcpSystem.getUrls();
-      const url = urls.typingMind || 'https://www.typingmind.com';
-
-      // Use the Typing Mind window opener from the API
-      const result = await window.electronAPI.typingMind.openWindow(url);
-
-      if (result.success) {
-        this.showNotification('Opening Typing Mind...', 'info');
-      } else {
-        this.showNotification(`Failed to open Typing Mind: ${result.error}`, 'error');
-      }
-    } catch (error) {
-      console.error('Error opening Typing Mind:', error);
-      this.showNotification('Failed to open Typing Mind', 'error');
-    }
-  }
-
-  /**
-   * Handle configuring Typing Mind
-   */
-  private async handleConfigureTypingMind(): Promise<void> {
-    try {
-      this.showNotification('Configuring Typing Mind...', 'info');
-
-      const result = await window.electronAPI.typingMind.autoConfigure();
-
-      if (result.success) {
-        this.showNotification('Typing Mind configured successfully!', 'success');
-      } else {
-        this.showNotification(`Configuration failed: ${result.message}`, 'error');
-      }
-    } catch (error) {
-      console.error('Error configuring Typing Mind:', error);
-      this.showNotification('Failed to configure Typing Mind', 'error');
     }
   }
 
