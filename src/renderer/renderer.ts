@@ -6,7 +6,6 @@
 
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
-import { initializeDashboard, setupDashboardHandlers } from './dashboard-handlers.js';
 // NEW: Dashboard redesign imports
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
@@ -985,12 +984,6 @@ async function init(): Promise<void> {
   // Initialize plugin handlers (still needed)
   initializePluginHandlers();
 
-  // Ensure dashboard handlers are available globally
-  // This executes the module code that sets window.setupDashboardHandlers
-  if (setupDashboardHandlers) {
-    (window as any).setupDashboardHandlers = setupDashboardHandlers;
-  }
-
   // NEW: Initialize the new dashboard components
   const sidebar = new Sidebar({
     container: document.getElementById('sidebar')!,
@@ -1351,9 +1344,10 @@ async function init(): Promise<void> {
     // Don't show notification - this is not critical
   });
 
-  // NOTE: Dashboard initialization moved to DashboardTab.initialize()
-  // This ensures event listeners are attached after the DOM is rendered
-  // The old initializeDashboard() call here was running before the dashboard buttons existed
+  // NOTE: Dashboard initialization (issue #214) now happens inside
+  // DashboardView.mount() -- DashboardApp (DashboardViewReact.tsx) owns its
+  // own data fetching/subscriptions once ViewRouter mounts it, same as any
+  // other React view.
 
   // Set up Docker control event listeners
   const startButton = document.getElementById('start-docker');
