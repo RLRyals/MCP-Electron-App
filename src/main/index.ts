@@ -2943,6 +2943,26 @@ app.whenReady().then(async () => {
     app.setAppUserModelId('net.fictionlab.studio');
   }
 
+  // E2E SMOKE TEST MODE (Issue #208): the Playwright smoke test only verifies that
+  // the renderer boots and the window renders without console errors (the #186
+  // blue-screen bug class) - it does not stand up Docker/Postgres. Skip the Docker
+  // readiness gate, first-run wizard routing, database pool init, migrations check,
+  // and plugin discovery entirely and go straight to the main window so the smoke
+  // test isn't blocked by backend prerequisites it never claims to satisfy.
+  if (process.env.FICTIONLAB_E2E_SMOKE === '1') {
+    logWithCategory('info', LogCategory.SYSTEM,
+      'FICTIONLAB_E2E_SMOKE=1 set - skipping Docker/DB/wizard gates, launching main window directly');
+    setupIPC();
+    createMenu();
+    createWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+    return;
+  }
+
   // CRITICAL: Check Docker before initializing database and MCP client
   // Docker is a core dependency - MCP servers run in Docker containers
   try {

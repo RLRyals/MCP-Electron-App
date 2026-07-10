@@ -45,6 +45,14 @@ jobs:
         run: |
           echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
 
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install chromium --with-deps
+
+      - name: Run Electron E2E smoke test (issue #208)
+        run: |
+          npm run test:e2e
+
       - name: Build Windows app
         run: npm run package:win
         env:

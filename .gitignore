@@ -65,6 +65,12 @@ userlist.txt
 coverage/
 .nyc_output/
 
+# Playwright E2E (issue #208)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # Optional npm cache directory
 .npm
 
