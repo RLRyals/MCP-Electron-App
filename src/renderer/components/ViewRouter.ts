@@ -46,10 +46,19 @@ export class ViewRouter {
   private maxHistorySize: number = 20;
   private initPromise: Promise<void> | null = null;
 
-  // Plugin-dependent views
+  // Plugin-dependent views: view id -> plugin id that provides it.
+  // 'workflows' is still host-bundled (WorkflowsViewReact) so it stays
+  // hardcoded; plugin-shipped views (renderer bundles, e.g. the kanban
+  // board from fictionlab-kanban) are added dynamically from their
+  // manifests via registerPluginViewRequirement().
   private pluginRequiredViews: Map<string, string> = new Map([
-    ['workflows', 'fictionlab-workflow'],
-    ['kanban', 'fictionlab-kanban']
+    ['workflows', 'fictionlab-workflow']
+  ]);
+
+  // Human-readable labels for plugin-provided views (from ui.mainViewLabel),
+  // used by the "plugin required" screen and top-bar title fallback.
+  private pluginViewLabels: Map<string, string> = new Map([
+    ['workflows', 'Workflows']
   ]);
 
   constructor(options: ViewRouterOptions) {
@@ -124,7 +133,34 @@ export class ViewRouter {
    */
   public registerView(viewId: string, ViewClass: ViewClass): void {
     this.viewClasses.set(viewId, ViewClass);
+    // A re-registration (e.g. a plugin update swapped in a new bundle) must
+    // not keep serving an instance of the old class.
+    this.viewInstances.delete(viewId);
     console.log('[ViewRouter] Registered view:', viewId);
+  }
+
+  /**
+   * Unregister a view entirely (class + cached instance). Used when the
+   * plugin providing a view is uninstalled/deactivated. Callers should
+   * navigate away first if this is the current view.
+   */
+  public unregisterView(viewId: string): void {
+    this.viewClasses.delete(viewId);
+    this.viewInstances.delete(viewId);
+    console.log('[ViewRouter] Unregistered view:', viewId);
+  }
+
+  /**
+   * Record that a view id is provided by a plugin (from its manifest's
+   * ui.mainView). Navigating to the id while the plugin's view isn't
+   * registered then shows a helpful "plugin required" screen instead of a
+   * generic error, and the label feeds the top-bar title fallback.
+   */
+  public registerPluginViewRequirement(viewId: string, pluginId: string, label?: string): void {
+    this.pluginRequiredViews.set(viewId, pluginId);
+    if (label) {
+      this.pluginViewLabels.set(viewId, label);
+    }
   }
 
   /**
@@ -286,7 +322,6 @@ export class ViewRouter {
     const titles: Record<string, string> = {
       'dashboard': 'Dashboard',
       'workflows': 'Workflows',
-      'kanban': 'Board',
       'library': 'Library',
       'plugins': 'Plugins',
       'settings-setup': 'Setup',
@@ -297,7 +332,10 @@ export class ViewRouter {
       'about': 'About',
     };
 
-    return titles[viewId] || viewId;
+    // Plugin-provided views carry their label in the manifest
+    // (ui.mainViewLabel) — see registerPluginViewRequirement(). Their view
+    // classes usually also provide getTopBarConfig(), which wins over this.
+    return titles[viewId] || this.pluginViewLabels.get(viewId) || viewId;
   }
 
   /**
@@ -406,11 +444,7 @@ export class ViewRouter {
    * Show a plugin required view
    */
   private showPluginRequiredView(viewId: string, pluginId: string): void {
-    const viewNames: Record<string, string> = {
-      'workflows': 'Workflows',
-      'kanban': 'Board'
-    };
-    const viewName = viewNames[viewId] || viewId;
+    const viewName = this.pluginViewLabels.get(viewId) || viewId;
 
     this.container.innerHTML = `
       <div class="error-message">

@@ -35,6 +35,11 @@ export class Sidebar {
   private listeners: Map<string, Set<Function>> = new Map();
   private pinnedPlugins: string[] = [];
   private installedPlugins: Set<string> = new Set();
+  // Navigation entries contributed by plugin-provided views (manifest
+  // ui.mainView + entry.renderer, loaded by pluginViewLoader — e.g. the
+  // kanban board). Set via setPluginNavItems(); only successfully-loaded
+  // views appear here, so a broken bundle never leaves a dead sidebar entry.
+  private pluginNavItems: Array<{ id: string; label: string; icon: string }> = [];
   private mobileToggleButton: HTMLButtonElement | null = null;
   private readonly MOBILE_BREAKPOINT = 767;
 
@@ -86,9 +91,12 @@ export class Sidebar {
       items.push({ id: 'workflows', label: 'Workflows', icon: '🔧', section: 'primary' });
     }
 
-    // Only include the kanban board if the kanban plugin is installed
-    if (this.installedPlugins.has('fictionlab-kanban')) {
-      items.push({ id: 'kanban', label: 'Board', icon: '📋', section: 'primary' });
+    // Plugin-provided views (universal path — nothing here is
+    // plugin-specific): one primary entry per successfully-loaded plugin
+    // view, labeled/iconed from the plugin manifest.
+    for (const pluginView of this.pluginNavItems) {
+      if (items.some((item) => item.id === pluginView.id)) continue;
+      items.push({ id: pluginView.id, label: pluginView.label, icon: pluginView.icon, section: 'primary' });
     }
 
     items.push(
@@ -578,6 +586,25 @@ export class Sidebar {
    */
   public isPluginInstalled(pluginId: string): boolean {
     return this.installedPlugins.has(pluginId);
+  }
+
+  /**
+   * Replace the plugin-provided view entries (see pluginNavItems) and
+   * re-render. Called by renderer.ts after pluginViewLoader syncs — at
+   * startup and again on every plugin install/uninstall/state change.
+   */
+  public setPluginNavItems(items: Array<{ id: string; label: string; icon: string }>): void {
+    this.pluginNavItems = items;
+
+    this.navigationTree = this.createNavigationTree();
+    this.render();
+    this.attachEventListeners();
+
+    if (this.activeViewId) {
+      this.setActiveView(this.activeViewId);
+    }
+
+    console.log('[Sidebar] Plugin view entries updated:', items.map((i) => i.id));
   }
 
   /**

@@ -12,7 +12,7 @@ import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { ViewRouter } from './components/ViewRouter.js';
 import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
-import { KanbanViewReact } from './views/KanbanViewReact.js';
+import { syncPluginProvidedViews } from './services/pluginViewLoader.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
 // import { createDashboardTab } from './components/DashboardTab.js'; // No longer used with new ViewRouter
@@ -1026,13 +1026,18 @@ async function init(): Promise<void> {
     console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
   }
 
-  // KanbanViewReact requires fictionlab-kanban plugin
-  if (sidebar.isPluginInstalled('fictionlab-kanban')) {
-    viewRouter.registerView('kanban', KanbanViewReact);
-    console.log('[Renderer] KanbanViewReact registered (plugin installed)');
-  } else {
-    console.log('[Renderer] KanbanViewReact not registered (plugin not installed)');
-  }
+  // Plugin-provided views (universal path, fictionlab-workflow#8): any
+  // active plugin whose manifest declares entry.renderer + ui.mainView gets
+  // its renderer bundle imported and its view registered by id — the kanban
+  // board (fictionlab-kanban) loads this way. Sidebar entries appear only
+  // for views whose bundle actually loaded, so a missing/broken bundle
+  // degrades to "no entry", never a blank window.
+  const syncPluginViews = async () => {
+    const result = await syncPluginProvidedViews(viewRouter);
+    sidebar.setPluginNavItems(result.views.map((v) => ({ id: v.viewId, label: v.label, icon: v.icon })));
+    return result;
+  };
+  await syncPluginViews();
 
   // Listen for plugin state changes and update navigation
   const electronAPI = (window as any).electronAPI;
@@ -1064,26 +1069,31 @@ async function init(): Promise<void> {
         viewRouter.clearCache('workflows');
       }
 
-      // Re-register plugin-dependent views
-      if (sidebar.isPluginInstalled('fictionlab-kanban')) {
-        const wasRegistered = viewRouter['viewClasses'].has('kanban');
-        if (!wasRegistered) {
-          viewRouter.registerView('kanban', KanbanViewReact);
-          console.log('[Renderer] KanbanViewReact registered after plugin install');
-        }
+      // Re-sync plugin-provided views (imports newly-available renderer
+      // bundles, unregisters ones whose plugin went away).
+      const { added, removed } = await syncPluginViews();
 
-        // If we're currently trying to view the board but it was showing
-        // "Plugin Required", re-navigate now that the plugin is ready
-        const currentViewId = viewRouter['currentViewId'];
-        const savedView = localStorage.getItem('fictionlab-active-view');
-        if (savedView === 'kanban' && (!currentViewId || currentViewId !== 'kanban' || !wasRegistered)) {
-          console.log('[Renderer] Re-navigating to kanban after plugin activation');
-          await viewRouter.navigateTo('kanban');
-        }
-      } else {
-        // Remove kanban view if plugin was uninstalled
-        viewRouter.clearCache('kanban');
+      // If we're currently trying to show a view that was stuck on
+      // "Plugin Required" and its bundle just loaded, re-navigate to it.
+      const savedView = localStorage.getItem('fictionlab-active-view');
+      const currentViewId = viewRouter.getCurrentViewId();
+      if (savedView && added.includes(savedView) && currentViewId !== savedView) {
+        console.log('[Renderer] Re-navigating to plugin view after activation:', savedView);
+        await viewRouter.navigateTo(savedView);
       }
+
+      // If the view we're on was just unregistered, don't strand the user.
+      if (currentViewId && removed.includes(currentViewId)) {
+        await viewRouter.navigateTo('dashboard');
+      }
+    });
+
+    // Plugins can request navigation to one of their views through the
+    // plugin API's ui.showView(viewId) (see src/main/plugin-context.ts).
+    electronAPI.on('plugin:show-view', async (data: { pluginId: string; viewId: string }) => {
+      if (!data?.viewId) return;
+      console.log('[Renderer] Plugin requested view:', data.pluginId, data.viewId);
+      await viewRouter.navigateTo(data.viewId);
     });
   }
 
@@ -1202,11 +1212,10 @@ async function init(): Promise<void> {
       console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
     }
 
-    // Register kanban view if the kanban plugin was installed
-    if (pluginId === 'fictionlab-kanban' && sidebar.isPluginInstalled('fictionlab-kanban')) {
-      viewRouter.registerView('kanban', KanbanViewReact);
-      console.log('[Renderer] KanbanViewReact registered after plugin installation');
-    }
+    // Load any renderer bundle the newly-installed plugin provides and
+    // register its view + sidebar entry (universal path — see
+    // pluginViewLoader).
+    await syncPluginViews();
   });
 
   // Listen for plugin uninstallation events to update the UI
@@ -1223,8 +1232,11 @@ async function init(): Promise<void> {
       await viewRouter.navigateTo('dashboard');
     }
 
-    // If kanban plugin was uninstalled and user is on the board view, navigate away
-    if (pluginId === 'fictionlab-kanban' && viewRouter.getCurrentViewId() === 'kanban') {
+    // Unregister any plugin-provided views the uninstalled plugin was
+    // serving, and don't strand the user on one of them.
+    const { removed } = await syncPluginViews();
+    const currentViewId = viewRouter.getCurrentViewId();
+    if (currentViewId && removed.includes(currentViewId)) {
       await viewRouter.navigateTo('dashboard');
     }
   });

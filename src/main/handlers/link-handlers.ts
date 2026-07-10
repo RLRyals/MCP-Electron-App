@@ -32,8 +32,9 @@ export interface LinkHandlerResult {
 
 /**
  * True when `value` parses as a well-formed http or https URL. Used both to
- * gate `app:open-external` here and (mirrored, renderer-side, in
- * `src/renderer/components/kanban/link-utils.ts`) to decide whether a card
+ * gate `app:open-external` here and (mirrored in the fictionlab-kanban
+ * plugin's renderer bundle, `src/renderer/components/link-utils.ts` in
+ * fictionlab-workflow) to decide whether a card
  * link is even rendered as clickable in the first place -- this is the
  * authoritative check since it runs in the process that actually calls
  * `shell.openExternal`.
@@ -92,7 +93,8 @@ export async function revealFileInFolder(
  * Register the `app:open-external` and `app:reveal-in-folder` IPC handlers.
  * Host-owned (un-prefixed) channels -- called directly via the renderer's
  * generic `electronAPI.invoke`, same idiom as `app-settings:get-current-user`
- * (see KanbanViewReact.tsx), not routed through the kanban plugin prefix.
+ * (as the fictionlab-kanban plugin's board view does), not routed through
+ * a plugin channel prefix.
  */
 export function registerLinkHandlers(): void {
   ipcMain.handle('app:open-external', async (_event, url: unknown) => {

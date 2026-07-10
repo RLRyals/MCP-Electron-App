@@ -5,7 +5,7 @@
  * Wraps FictionLab services with permission enforcement and plugin-specific APIs.
  */
 
-import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
+import { app, ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import { Pool, PoolClient } from 'pg';
@@ -890,7 +890,14 @@ function createPluginUI(
 
     showView(viewId: string): void {
       logWithCategory('info', LogCategory.SYSTEM, `Plugin ${pluginId} requested view: ${viewId}`);
-      // Implementation would show the view in the main window
+      // Ask the renderer's ViewRouter to navigate to the view. Broadcast to
+      // every window (same idiom the plugins' own update push channels use);
+      // renderer.ts listens on 'plugin:show-view'.
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+          win.webContents.send('plugin:show-view', { pluginId, viewId });
+        }
+      });
     },
 
     showNotification(notification: PluginNotification): void {
