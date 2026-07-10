@@ -1,28 +1,32 @@
 /**
- * Regression tests for DashboardView's wiring to dashboard-handlers.ts
- * (issue #132: Migrate Dashboard Card to Dashboard Tab).
+ * Regression tests for DashboardView's wiring (issue #214: Dashboard
+ * cockpit).
  *
- * DashboardView is the thin View-interface wrapper ViewRouter mounts for the
- * `dashboard` route; it delegates real content to DashboardTab, which in turn
- * defers system-status polling and button handling to dashboard-handlers.ts.
- * Two real gaps existed in that wrapper:
+ * DashboardView is now a thin View-interface wrapper -- like
+ * WorkflowsViewReact, but split into a wrapper (this file's subject) +
+ * content component (DashboardViewReact.tsx's DashboardApp) because the
+ * issue explicitly specified mounting DashboardApp "through the existing
+ * DashboardView wrapper" rather than folding the View class directly into
+ * the .tsx file the way WorkflowsViewReact does. It creates a ReactDOM
+ * root in mount() and tears it down in unmount(), and forwards top-bar
+ * actions: 'refresh' dispatches a 'dashboard-refresh' CustomEvent that
+ * DashboardApp's panels + SystemStrip subscribe to, 'export' calls
+ * dashboard-handlers.ts's exportDashboardDiagnosticReport() (the one piece
+ * of the old dashboard-handlers.ts surface DashboardView itself still
+ * depends on).
  *
- *  - dashboard-handlers.ts exports cleanupDashboard() specifically documented
- *    as "called when navigating away" (it stops the 5s status-polling
- *    setInterval and removes an IPC progress listener), but nothing ever
- *    called it -- so leaving the Dashboard view left status polling running
- *    forever in the background instead of stopping with the view.
- *  - The top-bar "Refresh" and "Export Report" actions only dispatched
- *    CustomEvents that nothing listened for -- clicking them did nothing.
- *
- * dashboard-handlers.ts is mocked wholesale so these tests can assert on the
- * wiring itself without needing a full window.electronAPI IPC surface (that
- * surface is exercised by dashboard-handlers' own callers, not here).
+ * DashboardViewReact.js is mocked wholesale (real DashboardApp render
+ * behavior is covered by its own panel/strip component tests under
+ * src/renderer/components/dashboard/__tests__/) so these tests can assert
+ * on the wrapper's plumbing in isolation, same rationale the pre-#214
+ * version of this file used for dashboard-handlers.js.
  */
 
+jest.mock('../DashboardViewReact.js', () => ({
+  DashboardApp: () => null,
+}));
+
 jest.mock('../../dashboard-handlers.js', () => ({
-  cleanupDashboard: jest.fn(),
-  updateSystemStatus: jest.fn().mockResolvedValue(undefined),
   exportDashboardDiagnosticReport: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -40,38 +44,33 @@ describe('DashboardView', () => {
   });
 
   afterEach(async () => {
-    // Always tear down, even for tests that mount but don't explicitly
-    // unmount, so DashboardTab's real setInterval doesn't leak between tests.
     await view.unmount();
     document.body.innerHTML = '';
   });
 
-  it('mounts a #dashboard-card container for DashboardTab to render into', async () => {
+  it('mounts a React root into the content-area container', async () => {
     await view.mount(container);
-    expect(container.querySelector('#dashboard-card')).not.toBeNull();
+    // The mocked DashboardApp renders null, but React still claims the
+    // container as its root (no leftover static markup from the old
+    // DashboardTab innerHTML stack).
+    expect(container.innerHTML).toBe('');
   });
 
-  it('stops dashboard-handlers status polling on unmount', async () => {
+  it('unmounts the React root cleanly, including when called twice', async () => {
     await view.mount(container);
-    await view.unmount();
-
-    expect(dashboardHandlers.cleanupDashboard).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not throw if cleanupDashboard itself throws', async () => {
-    (dashboardHandlers.cleanupDashboard as jest.Mock).mockImplementationOnce(() => {
-      throw new Error('boom');
-    });
-
-    await view.mount(container);
+    await expect(view.unmount()).resolves.toBeUndefined();
     await expect(view.unmount()).resolves.toBeUndefined();
   });
 
-  it('triggers a real status refresh on the "refresh" top-bar action', async () => {
+  it('dispatches a dashboard-refresh CustomEvent on the "refresh" top-bar action', async () => {
     await view.mount(container);
+    const listener = jest.fn();
+    window.addEventListener('dashboard-refresh', listener);
+
     view.handleAction('refresh');
 
-    expect(dashboardHandlers.updateSystemStatus).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener('dashboard-refresh', listener);
   });
 
   it('triggers a real diagnostic export on the "export" top-bar action', async () => {
