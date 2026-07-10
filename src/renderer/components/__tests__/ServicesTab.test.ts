@@ -44,10 +44,6 @@ interface MockAPI {
   prerequisites: {
     getDockerVersion: jest.Mock;
   };
-  typingMind: {
-    openWindow: jest.Mock;
-    autoConfigure: jest.Mock;
-  };
 }
 
 const CONFIG_FIXTURE = {
@@ -111,7 +107,6 @@ function makeMockAPI(): MockAPI {
       restart: jest.fn().mockResolvedValue({ success: true, message: 'restarted' }),
       getDetailedStatus: jest.fn().mockResolvedValue(makeDetailedStatusFixture()),
       getUrls: jest.fn().mockResolvedValue({
-        typingMind: 'https://www.typingmind.com',
         mcpConnector: 'http://localhost:50880',
         postgres: 'postgres://fictionlab_user:****@localhost:5432/fictionlab',
       }),
@@ -138,10 +133,6 @@ function makeMockAPI(): MockAPI {
     },
     prerequisites: {
       getDockerVersion: jest.fn().mockResolvedValue({ installed: true, running: true, version: '27.4.0' }),
-    },
-    typingMind: {
-      openWindow: jest.fn().mockResolvedValue({ success: true }),
-      autoConfigure: jest.fn().mockResolvedValue({ success: true }),
     },
   };
 }
@@ -192,14 +183,13 @@ describe('Services tab (issue #124)', () => {
     return el;
   }
 
-  it('renders all four service cards, both MCP server rows, and the ports table', async () => {
+  it('renders all three service cards, both MCP server rows, and the ports table', async () => {
     await mountView();
 
     expect(container.textContent).toContain('PostgreSQL Database');
     expect(container.textContent).toContain('MCP Servers');
     expect(container.textContent).toContain('MCP Connector');
     expect(container.textContent).toContain('MCP Writing Servers');
-    expect(container.textContent).toContain('Typing Mind');
     expect(container.textContent).toContain('Docker Desktop');
 
     const portRows = document.querySelectorAll('#ports-table-body tr');
@@ -276,11 +266,6 @@ describe('Services tab (issue #124)', () => {
     button('mcp-connector-stop').click();
     await flushPromises();
     expect(api.mcpSystem.controlService).toHaveBeenCalledWith('mcp-connector', 'stop');
-
-    // Typing Mind's lifecycle buttons act on its local MCP Connector dependency
-    button('typing-mind-restart').click();
-    await flushPromises();
-    expect(api.mcpSystem.controlService).toHaveBeenCalledWith('mcp-connector', 'restart');
   });
 
   it('opens a per-server logs dialog with credentials redacted', async () => {
@@ -307,17 +292,6 @@ describe('Services tab (issue #124)', () => {
 
     expect(api.prerequisites.getDockerVersion).toHaveBeenCalled();
     expect(text('docker-version-info')).toBe('Version: Docker 27.4.0');
-  });
-
-  it('reflects the MCP Connector state on the Typing Mind card and opens the browser', async () => {
-    await mountView();
-
-    expect(text('typing-mind-status-badge')).toBe('Ready');
-    expect(text('typing-mind-port-info')).toBe('Connector Port: 50880');
-
-    button('typing-mind-open-browser').click();
-    await flushPromises();
-    expect(api.typingMind.openWindow).toHaveBeenCalledWith('https://www.typingmind.com');
   });
 
   it('handles the top bar Start All / Stop All / Restart All window events', async () => {
