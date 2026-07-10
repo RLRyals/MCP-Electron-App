@@ -197,7 +197,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
   const errorStyle: React.CSSProperties = {
     padding: '12px',
     background: '#fef2f2',
-    border: '1px solid #ef4444',
+    border: '1px solid var(--status-error)',
     borderRadius: '6px',
     color: '#991b1b',
     fontSize: '14px',
@@ -219,7 +219,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 0.2s ease',
-    background: variant === 'primary' ? '#3b82f6' : '#e5e7eb',
+    background: variant === 'primary' ? 'var(--status-running)' : '#e5e7eb',
     color: variant === 'primary' ? 'white' : '#374151',
     opacity: disabled ? 0.5 : 1,
   });
@@ -291,7 +291,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
               <div style={{
                 marginTop: '8px',
                 fontSize: '12px',
-                color: '#6b7280',
+                color: 'var(--status-neutral)',
                 wordBreak: 'break-all'
               }}>
                 Selected: {folderPath}
@@ -313,7 +313,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
                 Initialize workspace structure
               </span>
             </label>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginLeft: '24px', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--status-neutral)', marginLeft: '24px', marginTop: '4px' }}>
               Creates .claude/, outputs/, and series-planning/ directories
             </div>
           </div>
@@ -333,7 +333,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
                   <option key={pack.id} value={pack.id}>{pack.name}</option>
                 ))}
               </select>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--status-neutral)', marginTop: '4px' }}>
                 Copies genre-specific templates to your project
               </div>
             </div>

@@ -82,7 +82,7 @@ export const WorkflowCreateDialog: React.FC<WorkflowCreateDialogProps> = ({ onCr
     fontSize: '14px',
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    background: primary ? '#3b82f6' : '#ffffff',
+    background: primary ? 'var(--status-running)' : '#ffffff',
     color: primary ? '#ffffff' : '#374151',
     border: primary ? 'none' : '1px solid #d1d5db',
     opacity: disabled ? 0.6 : 1,
@@ -94,7 +94,7 @@ export const WorkflowCreateDialog: React.FC<WorkflowCreateDialogProps> = ({ onCr
         <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>
           🆕 New Workflow
         </div>
-        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--status-neutral)', marginBottom: '20px' }}>
           Creates an empty workflow. Add nodes and edges on the canvas, then Start or Export when ready.
         </div>
 

@@ -251,7 +251,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
       // Determine edge color based on status and selection
       let strokeColor = '#d1d5db'; // default gray
       if (isSelected) {
-        strokeColor = '#3b82f6'; // blue when selected
+        strokeColor = 'var(--status-running)'; // blue when selected
       } else if (sourceStatus === 'completed') {
         strokeColor = '#4ade80'; // green when completed
       }
@@ -1008,7 +1008,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
             top: '10px',
             left: '10px',
             padding: '10px 16px',
-            background: '#10b981',
+            background: 'var(--status-success)',
             color: 'white',
             border: 'none',
             borderRadius: '6px',
@@ -1067,7 +1067,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
               top: '10px',
               left: '120px',
               padding: '10px 16px',
-              background: '#ef4444',
+              background: 'var(--status-error)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -1199,7 +1199,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
                     onChange={(e) => setEditingEdge({ ...editingEdge, condition: e.target.value })}
                     placeholder="e.g., $.score >= 70"
                   />
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--status-neutral)', marginTop: '4px' }}>
                     Use JSONPath expressions like: $.score &gt;= 70, $.status == 'approved'
                   </div>
                 </div>
@@ -1262,7 +1262,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     fontSize: '24px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     cursor: 'pointer',
     padding: '4px 8px',
     transition: 'color 0.2s',
@@ -1327,7 +1327,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',

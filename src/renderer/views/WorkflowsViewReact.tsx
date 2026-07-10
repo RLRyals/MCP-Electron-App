@@ -724,19 +724,20 @@ const WorkflowsApp: React.FC = () => {
   };
 
   // Styles
+  // Dark-token palette (was hardcoded light theme #ffffff/#f9fafb/etc. - see issue #215)
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    background: '#ffffff',
+    background: 'var(--color-bg-primary)',
   };
 
   const toolbarStyle: React.CSSProperties = {
     display: 'flex',
     gap: '12px',
     padding: '16px',
-    borderBottom: '1px solid #e5e7eb',
-    background: '#f9fafb',
+    borderBottom: '1px solid var(--color-border)',
+    background: 'var(--color-bg-secondary)',
   };
 
   const buttonStyle = (variant: 'primary' | 'secondary' | 'success' = 'secondary', disabled = false): React.CSSProperties => ({
@@ -745,9 +746,9 @@ const WorkflowsApp: React.FC = () => {
     fontSize: '14px',
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    background: variant === 'primary' ? '#3b82f6' : variant === 'success' ? '#10b981' : '#ffffff',
-    color: variant === 'primary' || variant === 'success' ? '#ffffff' : '#374151',
-    border: variant === 'primary' || variant === 'success' ? 'none' : '1px solid #d1d5db',
+    background: variant === 'primary' ? 'var(--color-accent)' : variant === 'success' ? 'var(--status-success)' : 'var(--color-bg-tertiary)',
+    color: variant === 'primary' || variant === 'success' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
+    border: variant === 'primary' || variant === 'success' ? 'none' : '1px solid var(--color-border)',
     opacity: disabled ? 0.5 : 1,
     transition: 'all 0.2s ease',
   });
@@ -829,19 +830,19 @@ const WorkflowsApp: React.FC = () => {
               <div style={{
                 marginBottom: '16px',
                 padding: '12px',
-                background: '#f3f4f6',
+                background: 'var(--color-bg-tertiary)',
                 borderRadius: '8px',
                 flexShrink: 0,
               }}>
-                <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', color: 'var(--color-text-primary)' }}>
                   {String(selectedWorkflow.name || 'Unnamed Workflow')}
                 </div>
                 {selectedWorkflow.description && typeof selectedWorkflow.description === 'string' && (
-                  <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                  <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                     {selectedWorkflow.description}
                   </div>
                 )}
-                <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>
                   Version {String(selectedWorkflow.version || '1.0')} • {selectedWorkflow.graph_json?.nodes?.length || 0} nodes
                 </div>
               </div>
@@ -884,7 +885,7 @@ const WorkflowsApp: React.FC = () => {
                   );
                 } catch (error) {
                   console.error('[WorkflowsViewReact] Error rendering WorkflowCanvas:', error);
-                  return <div style={{ padding: '20px', color: 'red' }}>Error rendering workflow: {String(error)}</div>;
+                  return <div style={{ padding: '20px', color: 'var(--status-error)' }}>Error rendering workflow: {String(error)}</div>;
                 }
               })()}
               </div>
@@ -895,7 +896,7 @@ const WorkflowsApp: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              color: '#9ca3af',
+              color: 'var(--color-text-tertiary)',
               fontSize: '14px',
             }}>
               Select a workflow from the panel to visualize

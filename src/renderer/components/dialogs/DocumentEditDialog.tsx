@@ -196,14 +196,14 @@ const styles: Record<string, React.CSSProperties> = {
   filePath: {
     marginTop: '4px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     fontFamily: 'Consolas, Monaco, monospace',
   },
   closeButton: {
     background: 'transparent',
     border: 'none',
     fontSize: '24px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     cursor: 'pointer',
     padding: '4px 8px',
     transition: 'color 0.2s',
@@ -244,7 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   unsavedIndicator: {
     fontSize: '13px',
-    color: '#f59e0b',
+    color: 'var(--status-warning)',
     fontWeight: 600,
   },
   cancelButton: {
@@ -263,7 +263,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -272,7 +272,7 @@ const styles: Record<string, React.CSSProperties> = {
   hint: {
     padding: '12px 24px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textAlign: 'center',
     borderTop: '1px solid #e5e7eb',
   },

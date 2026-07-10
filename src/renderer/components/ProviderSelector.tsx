@@ -516,7 +516,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   providerInfoLabel: {
     fontWeight: 600,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   providerInfoValue: {
     color: '#374151',
@@ -529,7 +529,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2px 8px',
     borderRadius: '4px',
     background: '#f3f4f6',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   statusVerified: {
     background: '#d1fae5',
@@ -581,12 +581,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '11px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '4px',
   },
   helpText: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     background: '#f9fafb',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',

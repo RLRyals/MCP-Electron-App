@@ -84,7 +84,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     padding: '8px 12px',
     marginTop: '16px',
     marginBottom: '8px',
@@ -95,8 +95,8 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     marginBottom: '8px',
     borderRadius: '6px',
     cursor: 'pointer',
-    background: isSelected ? '#3b82f6' : 'white',
-    border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
+    background: isSelected ? 'var(--status-running)' : 'white',
+    border: `1px solid ${isSelected ? 'var(--status-running)' : '#e5e7eb'}`,
     color: isSelected ? 'white' : '#1f2937',
     transition: 'box-shadow 0.2s ease',
     boxShadow: isSelected ? '0 2px 8px rgba(59, 130, 246, 0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
@@ -111,7 +111,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
 
   const workflowMetaStyle = (isSelected: boolean): React.CSSProperties => ({
     fontSize: '11px',
-    color: isSelected ? 'rgba(255,255,255,0.8)' : '#6b7280',
+    color: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--status-neutral)',
     marginBottom: '6px',
   });
 
@@ -127,7 +127,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     padding: '2px 8px',
     borderRadius: '12px',
     background: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb',
-    color: isSelected ? 'white' : '#6b7280',
+    color: isSelected ? 'white' : 'var(--status-neutral)',
   });
 
   const badgeStyle = (isSelected: boolean): React.CSSProperties => ({
@@ -135,7 +135,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     padding: '2px 6px',
     borderRadius: '4px',
     background: isSelected ? 'rgba(255,255,255,0.2)' : '#f3f4f6',
-    color: isSelected ? 'white' : '#6b7280',
+    color: isSelected ? 'white' : 'var(--status-neutral)',
     fontWeight: 600,
     display: 'inline-block',
     marginLeft: '6px',
@@ -154,7 +154,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     borderRadius: '4px',
     border: '1px solid #d1d5db',
     background: 'white',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   };
@@ -178,9 +178,9 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
     fontSize: '11px',
     borderRadius: '12px',
     cursor: 'pointer',
-    background: isActive ? '#3b82f6' : '#f3f4f6',
-    color: isActive ? 'white' : '#6b7280',
-    border: isActive ? '1px solid #3b82f6' : '1px solid #e5e7eb',
+    background: isActive ? 'var(--status-running)' : '#f3f4f6',
+    color: isActive ? 'white' : 'var(--status-neutral)',
+    border: isActive ? '1px solid var(--status-running)' : '1px solid #e5e7eb',
     transition: 'all 0.2s ease',
   });
 
@@ -217,7 +217,7 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
       {/* Tag Filter */}
       {availableTags.length > 0 && (
         <div style={filterContainerStyle}>
-          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: '#6b7280' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '8px', color: 'var(--status-neutral)' }}>
             FILTER BY TAG
           </div>
           <div>

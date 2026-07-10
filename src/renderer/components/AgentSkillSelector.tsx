@@ -25,7 +25,7 @@ export const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({
       width: '100%',
       padding: '8px 12px',
       fontSize: '14px',
-      border: error ? '1px solid #ef4444' : '1px solid #d1d5db',
+      border: error ? '1px solid var(--status-error)' : '1px solid #d1d5db',
       borderRadius: '6px',
       backgroundColor: isDisabled ? '#f3f4f6' : 'white',
       color: isDisabled ? '#9ca3af' : '#1f2937',
@@ -34,11 +34,11 @@ export const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({
       transition: 'border-color 0.2s'
     } as React.CSSProperties,
     selectFocus: {
-      borderColor: '#3b82f6'
+      borderColor: 'var(--status-running)'
     } as React.CSSProperties,
     helperText: {
       fontSize: '12px',
-      color: '#6b7280',
+      color: 'var(--status-neutral)',
       marginTop: '4px'
     } as React.CSSProperties
   };
@@ -68,11 +68,11 @@ export const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({
       onChange={(e) => onChange(e.target.value)}
       onFocus={(e) => {
         if (!error) {
-          e.target.style.borderColor = '#3b82f6';
+          e.target.style.borderColor = 'var(--status-running)';
         }
       }}
       onBlur={(e) => {
-        e.target.style.borderColor = error ? '#ef4444' : '#d1d5db';
+        e.target.style.borderColor = error ? 'var(--status-error)' : '#d1d5db';
       }}
       required={required}
       aria-label={`Select ${label}`}

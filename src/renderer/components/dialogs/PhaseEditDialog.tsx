@@ -338,7 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     fontSize: '24px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     cursor: 'pointer',
     padding: '4px 8px',
     transition: 'color 0.2s',
@@ -420,11 +420,11 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: 'var(--status-error)',
   },
   errorText: {
     fontSize: '12px',
-    color: '#ef4444',
+    color: 'var(--status-error)',
     marginTop: '4px',
   },
   checkboxField: {
@@ -466,7 +466,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -475,7 +475,7 @@ const styles: Record<string, React.CSSProperties> = {
   hint: {
     padding: '12px 24px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textAlign: 'center',
     borderTop: '1px solid #e5e7eb',
   },

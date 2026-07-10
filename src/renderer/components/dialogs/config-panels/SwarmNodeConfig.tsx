@@ -155,6 +155,6 @@ const styles: Record<string, React.CSSProperties> = {
   cardHeader: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' },
   cardIndex: { fontSize: '12px', fontWeight: 700, color: '#d97706', minWidth: '24px' },
   nameInput: { flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #d1d5db', fontSize: '13px' },
-  removeButton: { padding: '2px 8px', borderRadius: '4px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#ef4444', fontSize: '12px', cursor: 'pointer' },
+  removeButton: { padding: '2px 8px', borderRadius: '4px', border: '1px solid #fca5a5', background: '#fef2f2', color: 'var(--status-error)', fontSize: '12px', cursor: 'pointer' },
   cardBody: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' },
 };

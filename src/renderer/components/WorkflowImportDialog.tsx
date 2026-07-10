@@ -174,7 +174,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
     background: '#f3f4f6',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     fontFamily: 'monospace',
     wordBreak: 'break-all' as const,
     marginBottom: '12px',
@@ -188,7 +188,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 0.2s ease',
-    background: variant === 'primary' ? '#3b82f6' : variant === 'danger' ? '#ef4444' : '#e5e7eb',
+    background: variant === 'primary' ? 'var(--status-running)' : variant === 'danger' ? 'var(--status-error)' : '#e5e7eb',
     color: variant === 'primary' || variant === 'danger' ? 'white' : '#374151',
     opacity: disabled ? 0.5 : 1,
   });
@@ -204,7 +204,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
     padding: '16px',
     borderRadius: '8px',
     background: success ? '#ecfdf5' : '#fef2f2',
-    border: `1px solid ${success ? '#10b981' : '#ef4444'}`,
+    border: `1px solid ${success ? 'var(--status-success)' : 'var(--status-error)'}`,
     marginTop: '16px',
   });
 
@@ -223,7 +223,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
 
   const listStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     paddingLeft: '20px',
     marginTop: '8px',
   };
@@ -257,7 +257,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
               <div style={{
                 padding: '10px 12px',
                 background: '#fef3c7',
-                border: '1px solid #f59e0b',
+                border: '1px solid var(--status-warning)',
                 borderRadius: '6px',
                 marginBottom: '12px',
                 fontSize: '13px',
@@ -280,7 +280,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
                 padding: '10px 12px',
                 fontSize: '14px',
                 fontWeight: 600,
-                border: '2px solid #3b82f6',
+                border: '2px solid var(--status-running)',
                 borderRadius: '6px',
                 boxSizing: 'border-box' as const,
                 marginBottom: '4px'
@@ -288,7 +288,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
             />
             <div style={{
               fontSize: '11px',
-              color: '#6b7280',
+              color: 'var(--status-neutral)',
               marginBottom: '16px'
             }}>
               This is what you'll see in your workflow list
@@ -309,7 +309,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
                 borderRadius: '6px',
                 fontFamily: 'monospace',
                 boxSizing: 'border-box' as const,
-                color: '#6b7280'
+                color: 'var(--status-neutral)'
               }}
             />
             <div style={{
@@ -328,7 +328,7 @@ export const WorkflowImportDialog: React.FC<WorkflowImportDialogProps> = ({
             background: '#f3f4f6',
             borderRadius: '8px',
             fontSize: '13px',
-            color: '#6b7280',
+            color: 'var(--status-neutral)',
           }}>
             <div style={{ marginBottom: '8px' }}>
               <strong>Expected folder structure:</strong>

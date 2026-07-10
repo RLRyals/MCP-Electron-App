@@ -272,11 +272,11 @@ const styles: Record<string, React.CSSProperties> = {
   helperText: {
     fontWeight: 400,
     fontSize: '13px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   helperTextBlock: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '2px',
   },
   input: {
@@ -305,7 +305,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: 'var(--status-error)',
     boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.1)',
   },
   textarea: {
@@ -334,7 +334,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   errorText: {
     fontSize: '12px',
-    color: '#ef4444',
+    color: 'var(--status-error)',
     fontWeight: 500,
   },
   checkboxLabel: {

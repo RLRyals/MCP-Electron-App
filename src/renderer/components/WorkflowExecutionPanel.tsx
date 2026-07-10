@@ -1100,7 +1100,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: {
     marginTop: '4px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   closeButton: {
     padding: '8px 12px',
@@ -1108,7 +1108,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontSize: '20px',
     cursor: 'pointer',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     transition: 'color 0.2s ease',
   },
   errorBanner: {
@@ -1212,7 +1212,7 @@ const styles: Record<string, React.CSSProperties> = {
   phaseAgent: {
     marginTop: '4px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   phaseDescription: {
     marginTop: '8px',
@@ -1320,7 +1320,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sendButton: {
     padding: '10px 20px',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
@@ -1342,7 +1342,7 @@ const styles: Record<string, React.CSSProperties> = {
   approveButton: {
     flex: 1,
     padding: '12px 24px',
-    background: '#10b981',
+    background: 'var(--status-success)',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
@@ -1379,7 +1379,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s ease',
   },
   historyItemSelected: {
-    borderColor: '#3b82f6',
+    borderColor: 'var(--status-running)',
     background: '#eff6ff',
   },
   historyItemHeader: {
@@ -1399,7 +1399,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyItemAgent: {
     fontSize: '11px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   historyItemOutput: {
     marginTop: '8px',
@@ -1485,7 +1485,7 @@ const styles: Record<string, React.CSSProperties> = {
   dialogDescription: {
     margin: '0 0 16px 0',
     fontSize: '13px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     lineHeight: '1.5',
   },
   dialogTextarea: {
@@ -1552,7 +1552,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontSize: '20px',
     cursor: 'pointer',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     padding: '0 4px',
   },
   userInputPrompt: {
@@ -1613,7 +1613,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   userInputSubmitBtn: {
     padding: '8px 16px',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     color: 'white',
     border: 'none',
     borderRadius: '4px',
@@ -1625,7 +1625,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px',
     marginBottom: '12px',
     background: '#fee2e2',
-    border: '1px solid #ef4444',
+    border: '1px solid var(--status-error)',
     borderRadius: '6px',
     color: '#dc2626',
     fontSize: '14px',
@@ -1635,7 +1635,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px',
     marginBottom: '12px',
     background: '#dbeafe',
-    border: '1px solid #3b82f6',
+    border: '1px solid var(--status-running)',
     borderRadius: '6px',
     color: '#1e40af',
     fontSize: '13px',
@@ -1644,7 +1644,7 @@ const styles: Record<string, React.CSSProperties> = {
   characterCounter: {
     marginTop: '6px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textAlign: 'right' as const,
   },
   characterCounterWarning: {

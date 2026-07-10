@@ -382,11 +382,11 @@ const styles: Record<string, React.CSSProperties> = {
   helperText: {
     fontWeight: 400,
     fontSize: '13px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   helperTextBlock: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '2px',
   },
   input: {
@@ -424,12 +424,12 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: 'var(--status-error)',
     boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.1)',
   },
   errorText: {
     fontSize: '12px',
-    color: '#ef4444',
+    color: 'var(--status-error)',
     fontWeight: 500,
   },
   checkboxLabel: {
@@ -471,7 +471,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   optionValue: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   optionInputs: {
     display: 'flex',
@@ -483,7 +483,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -494,7 +494,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 12px',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#ef4444',
+    color: 'var(--status-error)',
     background: 'white',
     border: '1px solid #fecaca',
     borderRadius: '4px',
