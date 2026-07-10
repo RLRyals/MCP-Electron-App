@@ -11,6 +11,11 @@ on:
         required: true
         type: string
 
+# The default GITHUB_TOKEN is read-only in this repo; creating the release
+# (softprops/action-gh-release) needs contents: write.
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Build Windows
@@ -305,7 +310,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
           files: |
-            release-assets/windows/*.exe
+            release-assets/windows/**/*.exe
             release-assets/windows/checksums-windows.txt
             release-assets/macos/*.dmg
             release-assets/macos/*.zip
