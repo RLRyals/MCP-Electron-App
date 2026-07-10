@@ -774,7 +774,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     fontSize: '24px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     cursor: 'pointer',
     padding: '4px 8px',
     transition: 'color 0.2s',
@@ -792,7 +792,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '32px',
     borderRadius: '50%',
     background: '#f3f4f6',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -801,11 +801,11 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
   },
   stepDotActive: {
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     color: 'white',
   },
   stepDotCompleted: {
-    background: '#10b981',
+    background: 'var(--status-success)',
     color: 'white',
   },
   content: {
@@ -827,7 +827,7 @@ const styles: Record<string, React.CSSProperties> = {
   stepDescription: {
     margin: 0,
     fontSize: '14px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   providerGrid: {
     display: 'grid',
@@ -846,7 +846,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'white',
   },
   providerCardSelected: {
-    borderColor: '#3b82f6',
+    borderColor: 'var(--status-running)',
     background: '#eff6ff',
   },
   radioHidden: {
@@ -867,7 +867,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   providerDescription: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textAlign: 'center',
     lineHeight: 1.4,
   },
@@ -902,7 +902,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: 'var(--status-error)',
   },
   passwordField: {
     display: 'flex',
@@ -986,7 +986,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -1032,7 +1032,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 16px',
     fontSize: '13px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     background: 'transparent',
     border: '1px solid #d1d5db',
     borderRadius: '6px',
@@ -1060,14 +1060,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   summaryLabel: {
     fontWeight: 600,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
   summaryValue: {
     color: '#1f2937',
   },
   errorText: {
     fontSize: '12px',
-    color: '#ef4444',
+    color: 'var(--status-error)',
   },
   footer: {
     display: 'flex',
@@ -1082,7 +1082,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 20px',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     background: 'white',
     border: '1px solid #d1d5db',
     borderRadius: '6px',
@@ -1105,7 +1105,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -1116,7 +1116,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#10b981',
+    background: 'var(--status-success)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -1125,7 +1125,7 @@ const styles: Record<string, React.CSSProperties> = {
   hint: {
     padding: '12px 24px',
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textAlign: 'center',
     borderTop: '1px solid #e5e7eb',
   },

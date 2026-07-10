@@ -151,7 +151,7 @@ export const PhaseNode = ({ data }: NodeProps) => {
 
   const agentStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginBottom: '2px',
   };
 
@@ -246,7 +246,7 @@ export const PhaseNode = ({ data }: NodeProps) => {
       )}
 
       {nodeData.phase.gate && (
-        <div style={{ fontSize: '11px', color: '#f59e0b', marginBottom: '4px' }}>
+        <div style={{ fontSize: '11px', color: 'var(--status-warning)', marginBottom: '4px' }}>
           🚪 Quality Gate
         </div>
       )}
@@ -308,7 +308,7 @@ const editButtonStyle: React.CSSProperties = {
 
 const subWorkflowLinkStyle: React.CSSProperties = {
   fontSize: '11px',
-  color: '#3b82f6',
+  color: 'var(--status-running)',
   marginBottom: '4px',
   cursor: 'pointer',
   textDecoration: 'underline',

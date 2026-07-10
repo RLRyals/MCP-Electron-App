@@ -151,14 +151,14 @@ export const LoopBackEdge = ({
   // Style for loop-back edges: dashed with distinct color
   const edgeStyle = {
     ...style,
-    stroke: selected ? '#3b82f6' : strokeColor,
+    stroke: selected ? 'var(--status-running)' : strokeColor,
     strokeWidth: selected ? 3 : 2.5,
     strokeDasharray: isBackward ? '6 4' : undefined, // Dashed only for backward edges
   };
 
   // Generate unique marker ID for this edge's color
   const markerId = `loop-arrow-${id}`;
-  const currentColor = selected ? '#3b82f6' : strokeColor;
+  const currentColor = selected ? 'var(--status-running)' : strokeColor;
 
   return (
     <>
@@ -200,11 +200,11 @@ export const LoopBackEdge = ({
               pointerEvents: 'all',
               fontSize: 11,
               fontWeight: 600,
-              color: selected ? '#3b82f6' : strokeColor,
+              color: selected ? 'var(--status-running)' : strokeColor,
               background: 'white',
               padding: '3px 8px',
               borderRadius: 10,
-              border: `1.5px solid ${selected ? '#3b82f6' : strokeColor}`,
+              border: `1.5px solid ${selected ? 'var(--status-running)' : strokeColor}`,
               whiteSpace: 'nowrap',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             }}

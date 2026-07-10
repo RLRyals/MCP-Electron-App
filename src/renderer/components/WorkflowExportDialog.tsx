@@ -218,7 +218,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
 
   const subtitleStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginBottom: '24px',
   };
 
@@ -236,7 +236,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
 
   const descriptionStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '4px',
     lineHeight: '1.5',
   };
@@ -247,7 +247,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
     background: '#f3f4f6',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     fontFamily: 'monospace',
     wordBreak: 'break-all' as const,
     marginTop: '8px',
@@ -261,7 +261,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 0.2s ease',
-    background: variant === 'primary' ? '#3b82f6' : variant === 'success' ? '#10b981' : '#e5e7eb',
+    background: variant === 'primary' ? 'var(--status-running)' : variant === 'success' ? 'var(--status-success)' : '#e5e7eb',
     color: variant === 'primary' || variant === 'success' ? 'white' : '#374151',
     opacity: disabled ? 0.5 : 1,
   });
@@ -324,7 +324,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
     padding: '16px',
     borderRadius: '8px',
     background: success ? '#ecfdf5' : '#fef2f2',
-    border: `1px solid ${success ? '#10b981' : '#ef4444'}`,
+    border: `1px solid ${success ? 'var(--status-success)' : 'var(--status-error)'}`,
     marginTop: '16px',
   });
 
@@ -343,7 +343,7 @@ export const WorkflowExportDialog: React.FC<WorkflowExportDialogProps> = ({
 
   const fileListStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '8px',
   };
 

@@ -133,7 +133,7 @@ metadata:
       border: 'none',
       fontSize: '20px',
       cursor: 'pointer',
-      color: '#6b7280',
+      color: 'var(--status-neutral)',
       padding: '4px 8px'
     } as React.CSSProperties,
     content: {
@@ -160,7 +160,7 @@ metadata:
       boxSizing: 'border-box'
     } as React.CSSProperties,
     inputError: {
-      borderColor: '#ef4444'
+      borderColor: 'var(--status-error)'
     } as React.CSSProperties,
     select: {
       width: '100%',
@@ -182,13 +182,13 @@ metadata:
       boxSizing: 'border-box'
     } as React.CSSProperties,
     error: {
-      color: '#ef4444',
+      color: 'var(--status-error)',
       fontSize: '12px',
       marginTop: '4px'
     } as React.CSSProperties,
     helperText: {
       fontSize: '12px',
-      color: '#6b7280',
+      color: 'var(--status-neutral)',
       marginTop: '4px'
     } as React.CSSProperties,
     footer: {
@@ -212,9 +212,9 @@ metadata:
       color: '#374151'
     } as React.CSSProperties,
     saveButton: {
-      background: '#3b82f6',
+      background: 'var(--status-running)',
       color: 'white',
-      borderColor: '#3b82f6'
+      borderColor: 'var(--status-running)'
     } as React.CSSProperties,
     saveButtonDisabled: {
       background: '#9ca3af',
@@ -251,7 +251,7 @@ metadata:
           {/* Name Field */}
           <div style={styles.field}>
             <label htmlFor="skill-name" style={styles.label}>
-              Skill Name <span style={{ color: '#ef4444' }}>*</span>
+              Skill Name <span style={{ color: 'var(--status-error)' }}>*</span>
             </label>
             <input
               id="skill-name"

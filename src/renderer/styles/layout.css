@@ -9,10 +9,23 @@
    ======================================== */
 
 :root {
+  /*
+   * HOW TO THEME (read before adding new UI):
+   * This block is the single source of truth for color in the renderer.
+   * All new UI MUST reference a var(--token) below — never a literal hex.
+   * Do not add a fallback value (e.g. `var(--color-accent, #00D4AA)`); these
+   * tokens are always loaded globally via this file, and a hard-coded
+   * fallback just re-bakes the literal and rots the next time this palette
+   * changes. To re-theme the whole app, edit the values in this block only.
+   * (CI can enforce this with `grep -rE '#[0-9a-fA-F]{6}' src/renderer --include='*.tsx'`
+   * outside this file.)
+   */
+
   /* Colors - Preserve existing dark theme */
   --color-bg-primary: #1E3A5F;
   --color-bg-secondary: #0D1F35;
   --color-bg-tertiary: #152840;
+  --color-bg-quaternary: #3a3a3a;
   --color-accent: #00D4AA;
   --color-accent-hover: #00FFCC;
   --color-accent-dim: rgba(0, 212, 170, 0.1);
@@ -21,6 +34,27 @@
   --color-text-tertiary: rgba(255, 255, 255, 0.5);
   --color-border: rgba(255, 255, 255, 0.1);
   --color-border-focus: rgba(0, 212, 170, 0.5);
+  --color-danger: #d32f2f;
+
+  /* Semantic status colors - use these instead of raw hex for
+     running/success/error/warning/neutral state indicators */
+  --status-running: #3b82f6;
+  --status-success: #10b981;
+  --status-error: #ef4444;
+  --status-warning: #f59e0b;
+  --status-neutral: #6b7280;
+
+  /* PluginsLauncher.ts alias family: that view was written against a
+     --bg-*/--text-*/--danger-* token family that layout.css never defined.
+     Rather than touch every call site, alias them once here to the
+     canonical --color-* tokens above so they resolve correctly. */
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --bg-quaternary: var(--color-bg-quaternary);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-tertiary);
+  --danger-color: var(--color-danger);
 
   /* Spacing */
   --spacing-xs: 4px;

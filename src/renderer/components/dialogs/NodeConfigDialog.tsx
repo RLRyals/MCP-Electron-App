@@ -872,7 +872,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                   </label>
                   <div style={{
                     fontSize: '13px',
-                    color: '#6b7280',
+                    color: 'var(--status-neutral)',
                     marginBottom: '8px'
                   }}>
                     Output styles control presentation format. Skills are auto-selected from ~/.claude/skills/ based on conversation context.
@@ -1577,7 +1577,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 placeholder="{{score}} > 80"
                 aria-required="true"
               />
-              <small style={{ color: '#6b7280', fontSize: '12px' }}>
+              <small style={{ color: 'var(--status-neutral)', fontSize: '12px' }}>
                 Use {'{{variableName}}'} syntax or JavaScript expressions
               </small>
             </div>
@@ -1879,7 +1879,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
               </select>
               <div id="config-headless-help" style={{
                 fontSize: '13px',
-                color: '#6b7280',
+                color: 'var(--status-neutral)',
                 marginTop: '4px'
               }}>
                 <strong>Automatic:</strong> Agent processes input and moves to next node without waiting.<br/>
@@ -2500,7 +2500,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: {
     margin: '4px 0 0 0',
     fontSize: '14px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
 
   closeButton: {
@@ -2533,7 +2533,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderBottom: '3px solid transparent',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -2544,8 +2544,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   tabActive: {
-    color: '#3b82f6',
-    borderBottomColor: '#3b82f6',
+    color: 'var(--status-running)',
+    borderBottomColor: 'var(--status-running)',
     fontWeight: 600,
   },
 
@@ -2604,7 +2604,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 0 12px 0',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
   },
@@ -2694,12 +2694,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f9fafb',
     border: '1px solid #e5e7eb',
     borderRadius: '6px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
   },
 
   helpText: {
     fontSize: '12px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     marginTop: '4px',
   },
 
@@ -2721,7 +2721,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 16px',
     fontSize: '14px',
     fontWeight: 500,
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     background: '#f9fafb',
     border: '1px solid #d1d5db',
     borderRadius: '6px',
@@ -2730,9 +2730,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   modeButtonActive: {
-    color: '#3b82f6',
+    color: 'var(--status-running)',
     background: '#eff6ff',
-    borderColor: '#3b82f6',
+    borderColor: 'var(--status-running)',
     fontWeight: 600,
   },
 
@@ -2760,7 +2760,7 @@ const styles: Record<string, React.CSSProperties> = {
   placeholderText: {
     margin: '0 0 12px 0',
     fontSize: '14px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     lineHeight: 1.6,
   },
 
@@ -2769,7 +2769,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '16px auto',
     maxWidth: '500px',
     fontSize: '14px',
-    color: '#6b7280',
+    color: 'var(--status-neutral)',
     lineHeight: 1.8,
   },
 
@@ -2810,7 +2810,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'white',
-    background: '#3b82f6',
+    background: 'var(--status-running)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',

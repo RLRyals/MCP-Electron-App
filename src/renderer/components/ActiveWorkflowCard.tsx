@@ -22,28 +22,28 @@ const getSourceBadge = (source: WorkflowSource): { label: string; color: string 
     case 'claude_code':
       return { label: 'CC', color: '#7c3aed' }; // Purple for Claude Code
     case 'fictionlab_ui':
-      return { label: 'FL', color: '#00D4AA' }; // Accent color for FictionLab
+      return { label: 'FL', color: 'var(--color-accent)' }; // Accent color for FictionLab
     case 'typingmind':
-      return { label: 'TM', color: '#3b82f6' }; // Blue for TypingMind
+      return { label: 'TM', color: 'var(--status-running)' }; // Blue for TypingMind
     default:
-      return { label: '?', color: '#6b7280' };
+      return { label: '?', color: 'var(--status-neutral)' };
   }
 };
 
 const getStatusColor = (status: string): string => {
   switch (status) {
     case 'running':
-      return '#3b82f6'; // Blue
+      return 'var(--status-running)'; // Blue
     case 'paused':
-      return '#f59e0b'; // Amber
+      return 'var(--status-warning)'; // Amber
     case 'completed':
-      return '#10b981'; // Green
+      return 'var(--status-success)'; // Green
     case 'failed':
-      return '#ef4444'; // Red
+      return 'var(--status-error)'; // Red
     case 'cancelled':
-      return '#6b7280'; // Gray
+      return 'var(--status-neutral)'; // Gray
     default:
-      return '#6b7280';
+      return 'var(--status-neutral)';
   }
 };
 
@@ -62,7 +62,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
 
   const cardStyle: React.CSSProperties = {
     background: isSelected ? 'rgba(0, 212, 170, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-    border: `1px solid ${isSelected ? 'var(--color-accent, #00D4AA)' : 'var(--color-border, rgba(255, 255, 255, 0.1))'}`,
+    border: `1px solid ${isSelected ? 'var(--color-accent)' : 'var(--color-border, rgba(255, 255, 255, 0.1))'}`,
     borderRadius: '8px',
     padding: '12px',
     marginBottom: '8px',
@@ -197,7 +197,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
     top: '100%',
     left: 0,
     right: 0,
-    background: 'var(--color-bg-secondary, #0D1F35)',
+    background: 'var(--color-bg-secondary)',
     border: '1px solid var(--color-border, rgba(255, 255, 255, 0.1))',
     borderRadius: '6px',
     padding: '4px',
@@ -234,7 +234,7 @@ export const ActiveWorkflowCard: React.FC<ActiveWorkflowCardProps> = ({
       onClick={handleCardClick}
       onMouseEnter={(e) => {
         if (!isSelected) {
-          e.currentTarget.style.borderColor = 'var(--color-accent, #00D4AA)';
+          e.currentTarget.style.borderColor = 'var(--color-accent)';
         }
       }}
       onMouseLeave={(e) => {

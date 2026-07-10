@@ -248,7 +248,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     position: 'relative',
     height: '100%',
     width: `${width}px`,
-    background: 'var(--color-bg-tertiary, #152840)',
+    background: 'var(--color-bg-tertiary)',
     borderLeft: '1px solid var(--color-border, rgba(255, 255, 255, 0.1))',
     display: 'flex',
     flexDirection: 'column',
@@ -264,7 +264,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     bottom: 0,
     width: '4px',
     cursor: 'ew-resize',
-    background: isResizing ? 'var(--color-accent, #00D4AA)' : 'transparent',
+    background: isResizing ? 'var(--color-accent)' : 'transparent',
     transition: 'background 0.15s ease',
     zIndex: 10,
   };
@@ -275,7 +275,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     alignItems: 'center',
     padding: '8px 12px',
     borderBottom: '1px solid var(--color-border, rgba(255, 255, 255, 0.1))',
-    background: 'var(--color-bg-secondary, #0D1F35)',
+    background: 'var(--color-bg-secondary)',
   };
 
   const titleStyle: React.CSSProperties = {
@@ -314,7 +314,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
     cursor: 'pointer',
     borderRadius: '4px',
     background: isSelected ? 'rgba(0, 212, 170, 0.1)' : 'transparent',
-    borderLeft: isSelected ? '2px solid var(--color-accent, #00D4AA)' : '2px solid transparent',
+    borderLeft: isSelected ? '2px solid var(--color-accent)' : '2px solid transparent',
     marginBottom: '2px',
     transition: 'all 0.15s ease',
     overflow: 'hidden',
@@ -330,7 +330,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
         className={`panel-resize-handle ${isResizing ? 'active' : ''}`}
         onMouseDown={handleResizeStart}
         onMouseEnter={(e) => {
-          if (!isResizing) e.currentTarget.style.background = 'var(--color-accent, #00D4AA)';
+          if (!isResizing) e.currentTarget.style.background = 'var(--color-accent)';
         }}
         onMouseLeave={(e) => {
           if (!isResizing) e.currentTarget.style.background = 'transparent';
@@ -419,7 +419,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                   width: '100%',
                   padding: '6px 28px 6px 10px',
                   fontSize: '12px',
-                  background: 'var(--color-bg-secondary, #0D1F35)',
+                  background: 'var(--color-bg-secondary)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '4px',
                   color: 'var(--color-text-primary, rgba(255, 255, 255, 0.9))',
@@ -427,7 +427,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                   boxSizing: 'border-box',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-accent, #00D4AA)';
+                  e.currentTarget.style.borderColor = 'var(--color-accent)';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
@@ -557,7 +557,7 @@ export const WorkflowManagerPanel: React.FC<WorkflowManagerPanelProps> = ({
                             position: 'fixed',
                             top: menuPosition.top,
                             left: menuPosition.left,
-                            background: 'var(--color-bg-secondary, #0D1F35)',
+                            background: 'var(--color-bg-secondary)',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
                             borderRadius: '6px',
                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',

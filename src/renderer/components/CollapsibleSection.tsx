@@ -33,7 +33,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     padding: '8px 12px',
     cursor: 'pointer',
     userSelect: 'none',
-    background: 'var(--color-bg-tertiary, #152840)',
+    background: 'var(--color-bg-tertiary)',
     transition: 'background 0.15s ease',
   };
 
@@ -55,7 +55,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
 
   const countStyle: React.CSSProperties = {
     background: 'var(--color-accent-dim, rgba(0, 212, 170, 0.1))',
-    color: 'var(--color-accent, #00D4AA)',
+    color: 'var(--color-accent)',
     fontSize: '10px',
     fontWeight: 600,
     padding: '2px 6px',
@@ -83,7 +83,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'var(--color-bg-tertiary, #152840)';
+          e.currentTarget.style.background = 'var(--color-bg-tertiary)';
         }}
       >
         <span style={chevronStyle} className="chevron">
