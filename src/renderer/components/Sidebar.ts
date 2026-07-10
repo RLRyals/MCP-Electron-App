@@ -42,6 +42,15 @@ export class Sidebar {
   private pluginNavItems: Array<{ id: string; label: string; icon: string }> = [];
   private mobileToggleButton: HTMLButtonElement | null = null;
   private readonly MOBILE_BREAKPOINT = 767;
+  // Guards attachEventListeners() against stacking duplicate delegated
+  // listeners. attachEventListeners() is called from 6 places (constructor,
+  // pinned-plugins-changed, pinPlugin, unpinPlugin, updateBadge,
+  // setPluginNavItems) — every call aborts the previous batch of listeners
+  // (container click/keydown, document keydown, window
+  // pinned-plugins-changed) before attaching a fresh one, so exactly one
+  // copy is ever live. Also lets destroy() release the document/window
+  // listeners, which used to leak past destroy(). See issue #211.
+  private eventsController: AbortController | null = null;
 
   // Storage keys
   private readonly STORAGE_ACTIVE_VIEW = 'fictionlab-active-view';
@@ -238,6 +247,12 @@ export class Sidebar {
    * Attach event listeners
    */
   private attachEventListeners(): void {
+    // Abort any listeners attached by a previous call before attaching a
+    // fresh set — prevents the duplicate-listener stacking bug (#211).
+    this.eventsController?.abort();
+    this.eventsController = new AbortController();
+    const { signal } = this.eventsController;
+
     // Navigation item clicks
     this.container.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -283,7 +298,7 @@ export class Sidebar {
       if (target.closest('[data-action="toggle-collapse"]')) {
         this.toggleCollapse();
       }
-    });
+    }, { signal });
 
     // Keyboard navigation
     this.container.addEventListener('keydown', (e) => {
@@ -307,7 +322,7 @@ export class Sidebar {
           (items[nextIndex] as HTMLElement).focus();
         }
       }
-    });
+    }, { signal });
 
     // Global keyboard shortcuts (Ctrl+1-9)
     document.addEventListener('keydown', (e) => {
@@ -319,14 +334,14 @@ export class Sidebar {
           this.navigateTo(primaryItems[index].id);
         }
       }
-    });
+    }, { signal });
 
     // Listen for pinned plugins changes from PluginsLauncher
     window.addEventListener('pinned-plugins-changed', () => {
       this.pinnedPlugins = this.loadPinnedPlugins();
       this.render();
       this.attachEventListeners();
-    });
+    }, { signal });
   }
 
   /**
@@ -685,6 +700,8 @@ export class Sidebar {
    * Destroy the sidebar
    */
   public destroy(): void {
+    this.eventsController?.abort();
+    this.eventsController = null;
     this.container.innerHTML = '';
     this.listeners.clear();
     this.mobileToggleButton?.remove();
