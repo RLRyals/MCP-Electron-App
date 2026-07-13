@@ -73,8 +73,17 @@ jobs:
           $releaseDir = Join-Path $PWD 'out\release'
           New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
-          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter *.exe -Recurse -File |
-            Where-Object { $_.FullName -notlike "$releaseDir\*" } |
+          # Issue #223: this used to be -Recurse over the whole 'out' tree, which
+          # also swept up out/win-unpacked/FictionLab.exe (bare app exe) plus NSIS
+          # helper binaries (elevate.exe, pagent.exe) and shipped them as release
+          # assets alongside the real installer. electron-builder's nsis target
+          # writes the actual installer directly under out/ (default artifactName
+          # "${productName} Setup ${version}.${ext}" -> "FictionLab Setup X.Y.Z.exe",
+          # verified against package.json's build.nsis config, which has no
+          # artifactName override). Scoping to the top level of out/ (no -Recurse)
+          # already excludes win-unpacked/; the *Setup*.exe filter is a second,
+          # explicit guard against any other top-level .exe.
+          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter '*Setup*.exe' -File |
             ForEach-Object {
               $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
               $filename = $_.Name
@@ -314,7 +323,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
           files: |
-            release-assets/windows/**/*.exe
+            release-assets/windows/**/*Setup*.exe
             release-assets/windows/checksums-windows.txt
             release-assets/macos/*.dmg
             release-assets/macos/*.zip
