@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Gets Installed — FictionLab-App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site-header">
+    <h1>FictionLab-App Release Info</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="whats-installed.html">What Gets Installed</a>
+      <a href="install-guides.html">Install Guides</a>
+      <a href="components.html">Component Versions</a>
+      <a href="release-notes.html">Release Notes</a>
+    </nav>
+  </header>
+
+  <h2>What Gets Installed</h2>
+  <p>
+    FictionLab's core promise: set up Docker, the database, and the local TypingMind MCP
+    Connector container &mdash; with <strong>zero plugins installed</strong>. Plugins (workflow,
+    kanban, &hellip;) add capability on top of that core; they are never required for the app to
+    install, boot, and be usable.
+  </p>
+  <p class="callout">
+    Source of truth: <a href="https://github.com/RLRyals/MCP-Electron-App/blob/develop/docs/CORE-VS-OPTIONAL-COMPONENTS.md"><code>docs/CORE-VS-OPTIONAL-COMPONENTS.md</code></a>
+    in the app repo, checked against <code>docker-compose.yml</code> and enforced in CI by
+    <code>e2e/pluginless.spec.ts</code>. This page mirrors that document; if the two ever
+    disagree, the doc in the repo is canonical.
+  </p>
+
+  <h3>Core (bare install &mdash; no plugins)</h3>
+  <p>Everything below installs and starts with zero plugins present.</p>
+  <table>
+    <thead>
+      <tr><th>Component</th><th>Container name</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PostgreSQL</td>
+        <td><code>fictionlab-postgres</code></td>
+        <td>Primary datastore for the app and all MCP servers</td>
+      </tr>
+      <tr>
+        <td>PgBouncer</td>
+        <td><code>fictionlab-pgbouncer</code></td>
+        <td>Connection pooling in front of PostgreSQL</td>
+      </tr>
+      <tr>
+        <td>MCP Writing Servers</td>
+        <td><code>fictionlab-mcp-servers</code></td>
+        <td>The set of MCP servers (DB admin, NPE, workflow manager, outline, kanban, etc.) that the connector fronts</td>
+      </tr>
+      <tr>
+        <td>MCP Connector</td>
+        <td><code>fictionlab-mcp-connector</code></td>
+        <td>The <strong>local</strong> TypingMind MCP Connector (<code>@typingmind/mcp</code>), listening on <code>:50880</code>, that bridges MCP clients to the writing servers &mdash; the Docker container the app orchestrates, not TypingMind's cloud connector</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Core app surfaces that must always be reachable with zero plugins installed:</p>
+  <ul>
+    <li><strong>Dashboard</strong> &mdash; Running/Next/Blocked cockpit</li>
+    <li><strong>Settings &gt; Setup</strong> &mdash; the setup wizard (Docker/client detection, env config)</li>
+    <li><strong>Settings &gt; Database</strong></li>
+    <li><strong>Settings &gt; Services</strong> &mdash; the container list above, with start/stop/restart controls and live status</li>
+    <li><strong>Settings &gt; Logs</strong></li>
+    <li><strong>Plugins</strong> &mdash; browse/install plugins from here; this is how a bare install gains optional capability</li>
+    <li><strong>Help / About</strong></li>
+  </ul>
+
+  <h3>Optional (added by plugins)</h3>
+  <table>
+    <thead>
+      <tr><th>Plugin</th><th>Adds</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>fictionlab-workflow</code></td>
+        <td>The Workflows nav view/tab (FictionLab workflow execution UI)</td>
+      </tr>
+      <tr>
+        <td><code>fictionlab-kanban</code></td>
+        <td>The Kanban board view (plugin-owned since <code>fictionlab-workflow</code> 1.1.0's containment migration &mdash; the app no longer bundles this view; the plugin ships its own renderer bundle)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Plugins are discovered from your FictionLab user-data <code>plugins</code> folder and can be
+    installed, updated, or removed at any time from the in-app <strong>Plugins</strong> screen
+    &mdash; no reinstall of the app required.
+  </p>
+
+  <h3>Not part of any install</h3>
+  <p>
+    Development-side tooling used to build and track FictionLab itself &mdash; the beads issue
+    tracker (<code>bd</code>), scheduled tasks, and background pollers used by the dev team &mdash;
+    is never bundled, installed, or run by the app. If you install FictionLab, none of that ships
+    to your machine.
+  </p>
+
+  <footer class="site-footer">
+    <p><a href="index.html">&larr; Back to overview</a></p>
+  </footer>
+</div>
+</body>
+</html>
