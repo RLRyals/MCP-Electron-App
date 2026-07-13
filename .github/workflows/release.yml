@@ -54,7 +54,11 @@ jobs:
         run: |
           npx playwright install chromium --with-deps
 
-      - name: Run Electron E2E smoke test (issue #208)
+      - name: Run Electron E2E smoke tests (issue #208, bead mea-eed)
+        # playwright.config.ts testDir is e2e/, so this runs every *.spec.ts
+        # there: the launch-only smoke test (smoke.spec.ts) plus the
+        # pluginless core smoke test (pluginless.spec.ts) that gates a
+        # zero-plugins install against dangling plugin-view references.
         run: |
           npm run test:e2e
 
