@@ -1,0 +1,183 @@
+name: Platform Test Report
+description: >-
+  Report the results of running through TESTING.md on a real machine
+  (Linux, macOS, or Windows ARM64/x64). This is community test-result
+  intake, not a work-tracking issue -- it gets triaged into the project's
+  own tracker, so please don't expect a direct code-review thread here.
+title: '[TEST] '
+labels:
+  - platform-test-report
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing a FictionLab release! Please work through
+        [TESTING.md](../../blob/develop/TESTING.md) first, then fill this
+        in. Every checkbox below mirrors a section of that checklist --
+        check it only if that step actually passed on your machine.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Linux Mint
+        - Other Debian/Ubuntu-family Linux
+        - Other Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      description: e.g. "21.3", "14.5 Sonoma", "11 24H2"
+      placeholder: OS version number
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: CPU architecture
+      options:
+        - x64 / amd64
+        - arm64 / Apple Silicon
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: FictionLab version tested
+      description: The version in the installer filename, or Help → About once installed.
+      placeholder: e.g. 0.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: installer-file
+    attributes:
+      label: Installer file downloaded
+      description: Exact filename from the release page.
+      placeholder: e.g. "FictionLab Setup 0.3.0 arm64.exe"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: download-verify
+    attributes:
+      label: '1. Download and verify (TESTING.md #1)'
+      options:
+        - label: SHA256 checksum matched the published checksums file
+          required: false
+
+  - type: checkboxes
+    id: install
+    attributes:
+      label: '2. Install (TESTING.md #2)'
+      options:
+        - label: Installer ran / package installed without unexpected errors
+          required: false
+        - label: >-
+            OS security warning appeared (SmartScreen / Gatekeeper / distro
+            equivalent) -- describe exactly what you saw and what you clicked
+            through in the notes field below
+          required: false
+        - label: App launched successfully after install
+          required: false
+
+  - type: checkboxes
+    id: first-run
+    attributes:
+      label: '3. First-run wizard (TESTING.md #3)'
+      options:
+        - label: App opened to the setup wizard, not a blank window or crash
+          required: false
+        - label: Docker Desktop detection worked (install guidance shown, or "not running" prompt if applicable)
+          required: false
+        - label: Setup wizard completed (client selection etc.)
+          required: false
+
+  - type: checkboxes
+    id: database
+    attributes:
+      label: '4. Database initialization (TESTING.md #4)'
+      options:
+        - label: PostgreSQL initialized via Docker without manual steps
+          required: false
+        - label: Settings > Database shows connected/healthy
+          required: false
+
+  - type: checkboxes
+    id: connector
+    attributes:
+      label: '5. Connector health :50880 (TESTING.md #5)'
+      options:
+        - label: Settings > Services shows all three containers running (PostgreSQL, MCP Writing Servers, MCP Connector)
+          required: false
+        - label: MCP Connector reachable at localhost:50880
+          required: false
+
+  - type: checkboxes
+    id: pluginless
+    attributes:
+      label: '6. Pluginless core check (TESTING.md #6)'
+      options:
+        - label: Sidebar shows only core items with zero plugins installed (no Workflows, no plugin-named entries)
+          required: false
+        - label: Settings > Services and Settings > Setup both reachable, no "plugin not found" / "plugin required" text
+          required: false
+        - label: Plugins screen itself is reachable
+          required: false
+
+  - type: checkboxes
+    id: update-uninstall
+    attributes:
+      label: '7-8. Update check and uninstall (TESTING.md #7-8, optional)'
+      options:
+        - label: 'Check for Updates completed without error (up-to-date is a pass)'
+          required: false
+        - label: Uninstall completed cleanly via the normal OS mechanism
+          required: false
+
+  - type: dropdown
+    id: overall
+    attributes:
+      label: Overall result
+      options:
+        - Everything passed
+        - Passed with minor issues (see notes)
+        - Blocked / could not complete testing (see notes)
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / anything that failed
+      description: >-
+        Describe any failed step, unexpected dialog/warning text, or
+        anything not covered above. Exact error text is much more useful
+        than a paraphrase.
+      placeholder: What happened, at which step, and what you expected instead
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (if anything failed)
+      description: >-
+        Attach the app logs by dragging the file(s) into this box, or paste
+        relevant excerpts. Log locations: Windows
+        `%USERPROFILE%\AppData\Roaming\fictionlab\logs`, macOS
+        `~/Library/Logs/fictionlab`, Linux `~/.config/fictionlab/logs`.
+        Please redact anything that looks like a token, password, or API
+        key before attaching -- see SECURITY-NOTES.md.
+      placeholder: Drag and drop log files here, or paste excerpts
+    validations:
+      required: false
