@@ -21,6 +21,12 @@ import { CurrentUserSetting, DEFAULT_CURRENT_USER } from '../types/identity';
 
 interface AppSettings {
   currentUser?: CurrentUserSetting;
+  /**
+   * The last app version whose "What's New" release notes the user has seen
+   * (bead mea-1j9). Compared against app.getVersion() on startup; when they
+   * differ, the What's New panel is shown once and this is advanced.
+   */
+  lastSeenVersion?: string;
 }
 
 /**
@@ -88,5 +94,30 @@ export async function setCurrentUser(user: CurrentUserSetting): Promise<{ succes
   await saveSettings(settings);
 
   logWithCategory('info', LogCategory.SYSTEM, `Current user identity set to '${settings.currentUser.id}'`);
+  return { success: true };
+}
+
+/**
+ * Get the last app version whose What's New notes were shown (bead mea-1j9).
+ * Undefined on first run / installs that predate this feature.
+ */
+export async function getLastSeenVersion(): Promise<string | undefined> {
+  const settings = await loadSettings();
+  return settings.lastSeenVersion;
+}
+
+/**
+ * Record that the What's New notes for `version` have been shown.
+ */
+export async function setLastSeenVersion(version: string): Promise<{ success: boolean }> {
+  if (!version || !version.trim()) {
+    throw new Error('version is required');
+  }
+
+  const settings = await loadSettings();
+  settings.lastSeenVersion = version.trim();
+  await saveSettings(settings);
+
+  logWithCategory('info', LogCategory.SYSTEM, `What's New last-seen version set to '${settings.lastSeenVersion}'`);
   return { success: true };
 }

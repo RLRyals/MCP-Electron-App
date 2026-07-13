@@ -18,9 +18,9 @@
  */
 import { app } from 'electron';
 import logger, { logWithCategory, LogCategory } from './logger';
+import { fetchLatestRelease } from './release-notes';
 
-const APP_REPO = 'RLRyals/MCP-Electron-App';
-const RELEASES_LATEST_URL = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
+export const APP_REPO = 'RLRyals/MCP-Electron-App';
 
 export type AppUpdateStatus = 'up-to-date' | 'update-available' | 'no-releases' | 'error';
 
@@ -95,56 +95,27 @@ export async function checkForAppUpdate(
   try {
     logWithCategory('info', LogCategory.SYSTEM, `Checking for FictionLab app updates (current: ${currentVersion})...`);
 
-    const response = await fetch(RELEASES_LATEST_URL, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'MCP-Electron-App',
-      },
-    });
+    // The GitHub Releases fetch lives in the reusable release-notes module
+    // (bead mea-1j9) so the What's New panel and the private-repo plugin
+    // updater (bead mea-6tt) share the same code path.
+    const result = await fetchLatestRelease(APP_REPO);
 
-    if (response.status === 404) {
+    if (result.status === 'not-found') {
       // Expected steady-state until the first release is tagged -- not an error.
       logWithCategory('info', LogCategory.SYSTEM, 'No published releases found for the app repo yet.');
       return { status: 'no-releases', currentVersion };
     }
 
-    if (!response.ok) {
-      if (response.status === 403) {
-        return {
-          status: 'error',
-          currentVersion,
-          error: 'GitHub API rate limit exceeded. Please try again later.',
-        };
-      }
+    if (result.status === 'error' || !result.release) {
       return {
         status: 'error',
         currentVersion,
-        error: `GitHub API error: ${response.status} ${response.statusText}`,
+        error: result.error || 'Unknown error fetching latest release.',
       };
     }
 
-    const release = await response.json();
-    const tagName: string | undefined = release?.tag_name;
-
-    if (!tagName) {
-      return {
-        status: 'error',
-        currentVersion,
-        error: 'Latest release response did not include a tag_name.',
-      };
-    }
-
-    const latestVersion = stripLeadingV(tagName);
-    const releaseUrl: string | undefined = release?.html_url;
-    const releaseNotes: string | undefined = release?.body || undefined;
-    const publishedAt: string | undefined = release?.published_at || undefined;
-    const assets: ReleaseAsset[] | undefined = Array.isArray(release?.assets)
-      ? release.assets.map((asset: any) => ({
-          name: asset?.name,
-          downloadUrl: asset?.browser_download_url,
-          size: asset?.size,
-        }))
-      : undefined;
+    const release = result.release;
+    const latestVersion = stripLeadingV(release.tagName);
 
     const status: AppUpdateStatus =
       compareVersions(latestVersion, currentVersion) > 0 ? 'update-available' : 'up-to-date';
@@ -153,10 +124,10 @@ export async function checkForAppUpdate(
       status,
       currentVersion,
       latestVersion,
-      releaseUrl,
-      releaseNotes,
-      publishedAt,
-      assets,
+      releaseUrl: release.htmlUrl,
+      releaseNotes: release.body,
+      publishedAt: release.publishedAt,
+      assets: release.assets,
     };
   } catch (error: any) {
     logger.error('Error checking for FictionLab app updates:', error);
