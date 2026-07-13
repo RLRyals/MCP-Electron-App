@@ -23,6 +23,7 @@ import * as databaseBackup from './database-backup';
 import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as appUpdater from './app-updater';
+import * as whatsNew from './whats-new';
 import * as setupWizard from './setup-wizard';
 import * as appSettings from './app-settings';
 import type { CurrentUserSetting } from '../types/identity';
@@ -1355,6 +1356,22 @@ function setupIPC(): void {
   registerHandler('updates:check-for-updates', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for FictionLab app updates...');
     return await appUpdater.checkForAppUpdate();
+  });
+
+  // What's New IPC handlers (bead mea-1j9 -- post-update release notes panel)
+  registerHandler('whats-new:get-startup', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, "IPC: Checking whether to show What's New on startup...");
+    return await whatsNew.getStartupWhatsNew();
+  });
+
+  registerHandler('whats-new:get-current', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, "IPC: Fetching current release notes on demand...");
+    return await whatsNew.getCurrentReleaseNotes();
+  });
+
+  registerHandler('whats-new:mark-seen', "", async (_, version: string) => {
+    logWithCategory('info', LogCategory.SYSTEM, `IPC: Marking What's New seen for version ${version}...`);
+    return await whatsNew.markVersionSeen(version);
   });
 
   // App Settings IPC handlers (issue #181 -- configured current-user identity)

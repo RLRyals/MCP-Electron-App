@@ -247,12 +247,14 @@ export const DashboardApp: React.FC = () => {
   const handleResume = useCallback((id: string) => invokeWorkflowAction('workflow:resume', id), [invokeWorkflowAction]);
   const handleCancel = useCallback((id: string) => invokeWorkflowAction('workflow:cancel', id), [invokeWorkflowAction]);
 
-  // v1 deep-link scope (design supplement decision 1): every kanban-backed
-  // item just navigates to the Board view. Opening a specific card's
-  // drawer would need plugin-side support.
-  // v2: card deep-link needs plugin API
-  const handleCardClick = useCallback((_card: KanbanCard) => {
-    (window as any).__viewRouter__?.navigateTo?.('kanban');
+  // Card deep-link (bead mea-5bq): navigate to the Board view AND tell it
+  // which card to open. The card id crosses the app->plugin boundary via
+  // ViewRouter's existing `navigateTo(viewId, params)` -> `view.mount(container,
+  // params)` contract; the fictionlab-kanban plugin (>= 1.1.2) reads
+  // `params.cardId` in its mount() and opens that card's drawer. Older plugin
+  // versions ignore the extra param and just show the board (previous behavior).
+  const handleCardClick = useCallback((card: KanbanCard) => {
+    (window as any).__viewRouter__?.navigateTo?.('kanban', { cardId: card.id });
   }, []);
 
   const handleWorkflowClick = useCallback((_workflow: ActiveWorkflowInstance) => {

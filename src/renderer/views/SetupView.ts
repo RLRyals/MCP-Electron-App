@@ -128,6 +128,7 @@ export class SetupView implements View {
             </label>
             <div id="fictionlab-current-version" style="margin-bottom: 8px; font-size: 0.9rem; opacity: 0.9;">Current Version: Loading...</div>
             <button type="button" class="test-button" id="check-fictionlab-updates" title="Check for FictionLab application updates">Check for Updates</button>
+            <button type="button" class="test-button" id="show-whats-new" title="Show the release notes for this version of FictionLab">What's New</button>
             <div id="fictionlab-update-status" style="margin-top: 8px; font-size: 0.9rem; display: none;"></div>
           </div>
         </div>
