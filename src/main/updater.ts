@@ -15,6 +15,7 @@ import * as mcpSystem from './mcp-system';
 import { checkDockerRunning } from './prerequisites';
 import { DatabaseMigrator } from './database-migrator';
 import * as clientSelection from './client-selection';
+import { getChangeList, ChangeListResult } from './release-notes';
 
 const execAsync = promisify(exec);
 
@@ -64,6 +65,13 @@ export interface UpdateResult {
   message: string;
   error?: string;
   rollback?: boolean;
+  /**
+   * What changed in this update (bead mea-1j9): old/new commit SHAs around
+   * the git pull plus the commit subjects between them, so the renderer can
+   * show a "What's New" panel instead of a bare "updated" message. Omitted
+   * `changes` means the delta couldn't be determined (quiet fallback).
+   */
+  whatsNew?: ChangeListResult;
 }
 
 /**
@@ -530,19 +538,33 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
       status: 'downloading',
     });
 
+    // Load metadata BEFORE the pull so we can capture the previous SHA --
+    // the old..new delta drives the What's New panel (bead mea-1j9).
+    const metadata = await loadMetadata();
+    const previousSha = metadata.mcpServers?.sha;
+
     const mcpRepoDir = getRepositoryDirectory('mcp-servers');
     const sha = await cloneOrPullRepository(
-        MCP_SERVERS_REPO_URL, 
-        mcpRepoDir, 
-        MCP_SERVERS_BRANCH, 
+        MCP_SERVERS_REPO_URL,
+        mcpRepoDir,
+        MCP_SERVERS_BRANCH,
         progressCallback,
         'mcp-servers'
     );
 
+    // Compute the change list between the previous and new SHA (local
+    // `git log` with a GitHub-compare fallback). Never throws -- a failed
+    // notes lookup must not fail a successful update.
+    const whatsNew = await getChangeList({
+      repo: MCP_SERVERS_REPO,
+      repoDir: mcpRepoDir,
+      previousSha,
+      newSha: sha,
+    });
+
     // 3.5 Clone/pull Custom Clients
     const selectedClients = await clientSelection.loadClientSelection();
     const availableClients = await clientSelection.getAvailableClients();
-    const metadata = await loadMetadata();
     metadata.customClients = metadata.customClients || {};
 
     if (selectedClients?.clients) {
@@ -724,7 +746,10 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
 
     return {
       success: true,
-      message: 'MCP Servers updated successfully',
+      message: whatsNew.upToDate
+        ? 'MCP Servers already up to date'
+        : 'MCP Servers updated successfully',
+      whatsNew,
     };
 
   } catch (error: any) {

@@ -9,6 +9,8 @@
  * - Update tools for MCP-Writing-Servers, Typing Mind, and FictionLab
  */
 
+import { showWhatsNewPanel } from './WhatsNewPanel.js';
+
 interface PrerequisiteStatus {
   installed: boolean;
   running?: boolean;
@@ -85,6 +87,11 @@ function setupSetupTabListeners(): void {
   const checkUpdatesBtn = document.getElementById('check-fictionlab-updates');
   if (checkUpdatesBtn) {
     checkUpdatesBtn.addEventListener('click', handleCheckFictionLabUpdates);
+  }
+
+  const whatsNewBtn = document.getElementById('show-whats-new');
+  if (whatsNewBtn) {
+    whatsNewBtn.addEventListener('click', handleShowWhatsNew);
   }
 
   console.log('Setup Tab event listeners attached');
@@ -318,6 +325,7 @@ async function handleUpdateMCPServers(): Promise<void> {
         statusDiv.textContent = `Updated: ${result.message}`;
         statusDiv.style.color = '#00D4AA';
       }
+      showMCPServersWhatsNew(result.whatsNew);
     } else {
       showNotification(`Update failed: ${result.error || result.message}`, 'error');
       if (statusDiv) {
@@ -337,6 +345,37 @@ async function handleUpdateMCPServers(): Promise<void> {
     button.disabled = false;
     button.textContent = 'Update MCP-Writing-Servers';
   }
+}
+
+/**
+ * Show the What's New panel for an MCP-Writing-Servers update (bead mea-1j9):
+ * the commit subjects between the previous and new SHA. Quiet when the
+ * updater couldn't determine a delta -- the update itself still succeeded.
+ */
+function showMCPServersWhatsNew(whatsNew?: {
+  previousSha?: string;
+  newSha?: string;
+  changes?: string[];
+  upToDate?: boolean;
+}): void {
+  if (!whatsNew) return;
+
+  const shortSha = (sha?: string) => (sha ? sha.substring(0, 7) : '?');
+
+  if (whatsNew.upToDate) {
+    showNotification('MCP-Writing-Servers is already up to date — no changes.', 'info');
+    return;
+  }
+
+  if (whatsNew.changes && whatsNew.changes.length > 0) {
+    showWhatsNewPanel({
+      title: "What's New in MCP-Writing-Servers",
+      subtitle: `${shortSha(whatsNew.previousSha)} → ${shortSha(whatsNew.newSha)} (${whatsNew.changes.length} commit${whatsNew.changes.length === 1 ? '' : 's'})`,
+      items: whatsNew.changes,
+    });
+  }
+  // No `changes` at all: delta couldn't be determined (offline fallback) --
+  // stay quiet per the graceful-degradation acceptance criterion.
 }
 
 /**
@@ -417,6 +456,50 @@ async function handleCheckFictionLabUpdates(): Promise<void> {
   } finally {
     button.disabled = false;
     button.textContent = 'Check for Updates';
+  }
+}
+
+/**
+ * Handle the on-demand "What's New" button (bead mea-1j9): show the release
+ * notes for the running version (falling back to the latest release).
+ */
+async function handleShowWhatsNew(): Promise<void> {
+  const button = document.getElementById('show-whats-new') as HTMLButtonElement;
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Loading...';
+    }
+
+    // Guard for renderer builds/tests running against an older preload that
+    // hasn't picked up the `whatsNew` bridge yet.
+    if (!window.electronAPI.whatsNew?.getCurrent) {
+      showNotification("What's New is not available in this build", 'info');
+      return;
+    }
+
+    const payload = await window.electronAPI.whatsNew.getCurrent();
+
+    if (!payload) {
+      showNotification('No release notes available (offline or no published releases yet)', 'info');
+      return;
+    }
+
+    showWhatsNewPanel({
+      title: `What's New in FictionLab ${payload.version}`,
+      markdown: payload.notes,
+      emptyMessage: 'This release has no notes.',
+      linkUrl: payload.releaseUrl,
+    });
+  } catch (error) {
+    console.error("Error fetching What's New:", error);
+    showNotification('Failed to fetch release notes', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "What's New";
+    }
   }
 }
 
