@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { VariableBrowser, VariableBrowserProps } from '../VariableBrowser';
@@ -426,7 +426,10 @@ describe('VariableBrowser - Keyboard Navigation', () => {
       const firstItem = treeitems[0];
       const secondItem = treeitems[1];
 
-      firstItem.focus();
+      // fireEvent.focus (not the raw DOM .focus()) wraps dispatch in act(),
+      // so the onFocus-driven setFocusedItemId state update has flushed by
+      // the time the very next synchronous assertion runs.
+      fireEvent.focus(firstItem);
       expect(firstItem).toHaveAttribute('tabindex', '0');
 
       await user.keyboard('{ArrowDown}');

@@ -158,8 +158,7 @@ describe('BuildOrchestrator', () => {
         return [mockRepoPath, mockPackageJsonPath, nodeModulesPath].includes(filePath);
       });
 
-      const mockRmSync = jest.fn();
-      (fs.rmSync as jest.Mock) = mockRmSync;
+      const mockRmSync = jest.spyOn(fs, 'rmSync').mockImplementation(() => undefined);
 
       const options: NpmOptions = { clean: true };
 

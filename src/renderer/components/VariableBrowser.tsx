@@ -503,6 +503,7 @@ export const VariableBrowser: React.FC<VariableBrowserProps> = ({
             handleInsert(item.path);
           }}
           onKeyDown={(e) => handleKeyDown(e, item.id, 'item', item.path)}
+          onFocus={() => setFocusedItemId(item.id)}
         >
           {item.hasChildren && (
             <span className="tree-expand-icon" aria-hidden="true">
@@ -546,6 +547,7 @@ export const VariableBrowser: React.FC<VariableBrowserProps> = ({
           className={`tree-section-header ${isFocused ? 'tree-item-focused' : ''}`}
           onClick={() => toggleExpanded(section.nodeId)}
           onKeyDown={(e) => handleKeyDown(e, section.nodeId, 'section')}
+          onFocus={() => setFocusedItemId(section.nodeId)}
         >
           <span className="tree-expand-icon" aria-hidden="true">
             {isExpanded ? '▼' : '▶'}
@@ -596,8 +598,11 @@ export const VariableBrowser: React.FC<VariableBrowserProps> = ({
       {/* Tree view */}
       <div
         ref={treeContainerRef}
-        role="tree"
-        aria-label="Available variables"
+        // role="tree" requires at least one treeitem/group child (axe
+        // aria-required-children); the empty state renders neither, so
+        // drop the tree role there instead of leaving an invalid empty tree.
+        role={nodeSections.length === 0 && Object.keys(globalVariables).length === 0 ? undefined : 'tree'}
+        aria-label={nodeSections.length === 0 && Object.keys(globalVariables).length === 0 ? undefined : 'Available variables'}
         className="variable-browser-tree"
       >
         {nodeSections.length === 0 && Object.keys(globalVariables).length === 0 ? (

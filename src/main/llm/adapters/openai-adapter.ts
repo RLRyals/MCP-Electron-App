@@ -46,8 +46,9 @@ export class OpenAIAdapter implements LLMProviderAdapter {
         });
       }
 
-      // Add context as system message if available
-      if (request.context && typeof request.context === 'object') {
+      // Add context as system message if available (skip an empty object --
+      // `Context: {}` is pure noise to the model and wastes a message/tokens)
+      if (request.context && typeof request.context === 'object' && Object.keys(request.context).length > 0) {
         const contextStr = JSON.stringify(request.context, null, 2);
         messages.push({
           role: 'system',

@@ -21,9 +21,12 @@
  * pre-existing suites (build-orchestrator, ipc-handlers, etc.) that predate
  * the src/.../__tests__ convention.
  *
- * isolatedModules: true on both projects' ts-jest transform skips full
- * type-checking during the test transform for faster runs; type errors are
- * still caught by `npm run build` (tsc).
+ * isolatedModules is set in tsconfig.json's compilerOptions (not here, as a
+ * ts-jest transform option) -- ts-jest's own "isolatedModules" transform
+ * option is deprecated as of ts-jest v29 and slated for removal in v30, in
+ * favor of the standard tsconfig flag ts-jest now reads directly (mea-3).
+ * Same effect: skips full type-checking during the test transform for
+ * faster runs; type errors are still caught by `npm run build` (tsc).
  *
  * moduleNameMapper strips a trailing `.js` off relative imports before
  * resolution. The source tree writes relative imports with an explicit
@@ -61,12 +64,7 @@ module.exports = {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
       transform: {
-        '^.+\\.tsx?$': [
-          'ts-jest',
-          {
-            isolatedModules: true,
-          },
-        ],
+        '^.+\\.tsx?$': 'ts-jest',
       },
     },
     {
@@ -82,12 +80,7 @@ module.exports = {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
       transform: {
-        '^.+\\.tsx?$': [
-          'ts-jest',
-          {
-            isolatedModules: true,
-          },
-        ],
+        '^.+\\.tsx?$': 'ts-jest',
       },
     },
   ],
