@@ -16,6 +16,8 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
+  OUTLINE_PORT: number;
+  KANBAN_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -232,6 +234,8 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       PGBOUNCER_PORT: currentEnvConfig?.PGBOUNCER_PORT || 6432,
       NPE_PORT: currentEnvConfig?.NPE_PORT || 3011,
       WORKFLOW_MANAGER_PORT: currentEnvConfig?.WORKFLOW_MANAGER_PORT || 3012,
+      OUTLINE_PORT: currentEnvConfig?.OUTLINE_PORT || 3013,
+      KANBAN_PORT: currentEnvConfig?.KANBAN_PORT || 3015,
       // Not exposed as a form field on this form - preserve existing value so a
       // re-save doesn't silently erase a stored GitHub token
       GITHUB_TOKEN: currentEnvConfig?.GITHUB_TOKEN,

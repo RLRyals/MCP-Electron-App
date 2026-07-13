@@ -38,6 +38,8 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
+  OUTLINE_PORT: number;
+  KANBAN_PORT: number;
 }
 
 /**
@@ -107,7 +109,7 @@ const MCP_SERVERS: Array<{
  * A single row in the Ports settings table
  */
 interface PortRowDefinition {
-  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT';
+  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT' | 'OUTLINE_PORT' | 'KANBAN_PORT';
   name: string;
 }
 
@@ -122,6 +124,8 @@ const PORT_ROWS: PortRowDefinition[] = [
   { key: 'DB_ADMIN_PORT', name: 'DB Admin' },
   { key: 'NPE_PORT', name: 'NPE Server' },
   { key: 'WORKFLOW_MANAGER_PORT', name: 'Workflow Manager' },
+  { key: 'OUTLINE_PORT', name: 'Outline Server' },
+  { key: 'KANBAN_PORT', name: 'Kanban Server' },
 ];
 
 export class ServicesTab {

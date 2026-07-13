@@ -31,6 +31,8 @@ export interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
+  OUTLINE_PORT: number;
+  KANBAN_PORT: number;
   GITHUB_TOKEN?: string;
 }
 
@@ -49,6 +51,8 @@ export const DEFAULT_CONFIG: EnvConfig = {
   PGBOUNCER_PORT: 6432,
   NPE_PORT: 3011,
   WORKFLOW_MANAGER_PORT: 3012,
+  OUTLINE_PORT: 3013,
+  KANBAN_PORT: 3015,
   GITHUB_TOKEN: '',
 };
 
@@ -457,6 +461,8 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.PGBOUNCER_PORT, name: 'PgBouncer', key: 'PGBOUNCER_PORT' as const },
     { port: config.NPE_PORT, name: 'NPE Server', key: 'NPE_PORT' as const },
     { port: config.WORKFLOW_MANAGER_PORT, name: 'Workflow Manager', key: 'WORKFLOW_MANAGER_PORT' as const },
+    { port: config.OUTLINE_PORT, name: 'Outline Server', key: 'OUTLINE_PORT' as const },
+    { port: config.KANBAN_PORT, name: 'Kanban Server', key: 'KANBAN_PORT' as const },
   ];
 
   // Check configurable ports
@@ -630,6 +636,12 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'WORKFLOW_MANAGER_PORT':
           config.WORKFLOW_MANAGER_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'OUTLINE_PORT':
+          config.OUTLINE_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'KANBAN_PORT':
+          config.KANBAN_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -732,6 +744,8 @@ export function formatEnvFile(config: EnvConfig): string {
     `PGBOUNCER_PORT=${config.PGBOUNCER_PORT}`,
     `NPE_PORT=${config.NPE_PORT}`,
     `WORKFLOW_MANAGER_PORT=${config.WORKFLOW_MANAGER_PORT}`,
+    `OUTLINE_PORT=${config.OUTLINE_PORT}`,
+    `KANBAN_PORT=${config.KANBAN_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -831,6 +845,16 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const workflowManagerPortValidation = validatePort(config.WORKFLOW_MANAGER_PORT);
   if (!workflowManagerPortValidation.valid) {
     errors.push(`Workflow Manager port: ${workflowManagerPortValidation.error}`);
+  }
+
+  const outlinePortValidation = validatePort(config.OUTLINE_PORT);
+  if (!outlinePortValidation.valid) {
+    errors.push(`Outline port: ${outlinePortValidation.error}`);
+  }
+
+  const kanbanPortValidation = validatePort(config.KANBAN_PORT);
+  if (!kanbanPortValidation.valid) {
+    errors.push(`Kanban port: ${kanbanPortValidation.error}`);
   }
 
   // Validate auth token

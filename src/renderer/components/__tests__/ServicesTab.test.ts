@@ -58,6 +58,8 @@ const CONFIG_FIXTURE = {
   PGBOUNCER_PORT: 6432,
   NPE_PORT: 8765,
   WORKFLOW_MANAGER_PORT: 8766,
+  OUTLINE_PORT: 8767,
+  KANBAN_PORT: 8768,
 };
 
 /**
@@ -193,7 +195,7 @@ describe('Services tab (issue #124)', () => {
     expect(container.textContent).toContain('Docker Desktop');
 
     const portRows = document.querySelectorAll('#ports-table-body tr');
-    expect(portRows.length).toBe(7);
+    expect(portRows.length).toBe(9);
   });
 
   it('shows PostgreSQL connection info (host, port, database) from the env config', async () => {

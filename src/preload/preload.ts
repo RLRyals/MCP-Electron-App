@@ -78,6 +78,8 @@ interface EnvConfig {
   PGBOUNCER_PORT: number;
   NPE_PORT: number;
   WORKFLOW_MANAGER_PORT: number;
+  OUTLINE_PORT: number;
+  KANBAN_PORT: number;
 }
 
 /**
