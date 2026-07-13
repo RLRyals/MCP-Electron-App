@@ -30,6 +30,38 @@ tranche).
 
 10 tests fixed in total (2 + 5 + 1 + 2, matching the 25 -> 15 drop).
 
+## FIXED (CI flake, post-tranche-2)
+
+While validating this branch's CI run, `VariableBrowser.a11y.test.tsx`
+started failing on `ubuntu-latest` and `windows-latest` (passed on
+`macos-latest`) with an uncaught-exception error attributed to `Tree Item
+Labels > should include data type and value in aria-label` -- a test with no
+apparent connection to the actual assertion failure (`expect(leafNodes.length
+).toBeGreaterThan(0)` received `0`).
+
+Root cause: the *previous* test, `Tree Structure > should not have
+aria-expanded for leaf nodes`, ran its assertion inside a bare
+`setTimeout(..., 100)` callback that Jest never awaited -- the test function
+was synchronous and returned before the timeout fired, so Jest reported it
+"passed" immediately. The callback (and its assertion) kept running in the
+background and fired later, during whichever test happened to be executing
+100ms after -- landing mid-test on the more contended ubuntu/windows CI
+runners (macOS's runner was fast enough that the callback consistently fired
+inside the *original* test's window, so it never surfaced there). jsdom
+reports an unhandled callback exception as an "Uncaught exception" against
+the currently-running test, which is why the error appeared attached to an
+unrelated test name.
+
+Fix (`src/renderer/components/__tests__/VariableBrowser.a11y.test.tsx`):
+made the test `async`, `await`ed `user.click(firstSection)` instead of the
+unawaited `userEvent.click(firstSection)`, and replaced the bare `setTimeout`
+with `waitFor(...)` (imported from `@testing-library/react`) so the
+assertion is bounded by Jest's own test lifecycle instead of leaking into
+whatever runs next. Verified locally with 3 back-to-back full
+`jest.config.ci.cjs` runs (599/599 passing each time) and a full default
+`npx jest` run (matches the documented 4-failed-suite/15-failed-test
+baseline exactly, all in the already-DEFERRED suites below).
+
 ## DELETED
 
 None in tranche 2 -- tranche 1 already deleted the only dead suites found
