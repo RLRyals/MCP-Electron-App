@@ -60,6 +60,7 @@ const CONFIG_FIXTURE = {
   WORKFLOW_MANAGER_PORT: 8766,
   OUTLINE_PORT: 8767,
   KANBAN_PORT: 8768,
+  STORY_ANALYSIS_PORT: 8769,
 };
 
 /**
@@ -195,7 +196,7 @@ describe('Services tab (issue #124)', () => {
     expect(container.textContent).toContain('Docker Desktop');
 
     const portRows = document.querySelectorAll('#ports-table-body tr');
-    expect(portRows.length).toBe(9);
+    expect(portRows.length).toBe(10);
   });
 
   it('shows PostgreSQL connection info (host, port, database) from the env config', async () => {

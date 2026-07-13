@@ -40,6 +40,7 @@ interface EnvConfig {
   WORKFLOW_MANAGER_PORT: number;
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
+  STORY_ANALYSIS_PORT: number;
 }
 
 /**
@@ -109,7 +110,7 @@ const MCP_SERVERS: Array<{
  * A single row in the Ports settings table
  */
 interface PortRowDefinition {
-  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT' | 'OUTLINE_PORT' | 'KANBAN_PORT';
+  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT' | 'OUTLINE_PORT' | 'KANBAN_PORT' | 'STORY_ANALYSIS_PORT';
   name: string;
 }
 
@@ -126,6 +127,7 @@ const PORT_ROWS: PortRowDefinition[] = [
   { key: 'WORKFLOW_MANAGER_PORT', name: 'Workflow Manager' },
   { key: 'OUTLINE_PORT', name: 'Outline Server' },
   { key: 'KANBAN_PORT', name: 'Kanban Server' },
+  { key: 'STORY_ANALYSIS_PORT', name: 'Story Analysis Server' },
 ];
 
 export class ServicesTab {

@@ -731,6 +731,7 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             WORKFLOW_MANAGER_PORT: currentConfig?.WORKFLOW_MANAGER_PORT || 3012,
             OUTLINE_PORT: currentConfig?.OUTLINE_PORT || 3013,
             KANBAN_PORT: currentConfig?.KANBAN_PORT || 3015,
+            STORY_ANALYSIS_PORT: currentConfig?.STORY_ANALYSIS_PORT || 3016,
             // Not exposed in this wizard step - preserve existing value so a re-save
             // doesn't silently erase a stored GitHub token
             GITHUB_TOKEN: currentConfig?.GITHUB_TOKEN,
