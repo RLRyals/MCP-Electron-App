@@ -10,7 +10,7 @@ FictionLab is an installer and management tool that sets up everything you need 
 
 **Key Benefit:** You don't need any programming knowledge, terminal experience, or technical expertise. Just download the installer and click through the setup wizard!
 
-**Release info:** See the [FictionLab Release Info site](https://rlryals.github.io/MCP-Electron-App/) for release notes, the component version matrix, what gets installed on your machine, and per-platform install guides.
+**Release info:** See the [FictionLab-App Release Info site](https://rlryals.github.io/MCP-Electron-App/) for release notes, the component version matrix, what gets installed on your machine, and per-platform install guides.
 
 ---
 
