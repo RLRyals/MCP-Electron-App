@@ -144,6 +144,8 @@ const mockProtocol = {
   registerStreamProtocol: jest.fn(),
   unregisterProtocol: jest.fn(),
   isProtocolRegistered: jest.fn().mockReturnValue(false),
+  registerSchemesAsPrivileged: jest.fn(),
+  handle: jest.fn(),
 };
 
 const mockSession = {
@@ -170,6 +172,7 @@ const mockNet = {
     write: jest.fn(),
     end: jest.fn(),
   }),
+  fetch: jest.fn().mockResolvedValue(new Response(null, { status: 200 })),
 };
 
 export {

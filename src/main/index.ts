@@ -36,6 +36,10 @@ import { pluginManager } from './plugin-manager';
 import { pluginViewManager } from './plugin-views';
 import { initializeDatabasePool, getDatabasePool, closeDatabasePool } from './database-connection';
 import { getProviderManager } from './llm/provider-manager';
+import {
+  registerMediaProtocolAsPrivileged,
+  registerMediaProtocolHandler,
+} from './media-protocol';
 import type { LLMProviderConfig } from '../types/llm-providers';
 import type {
   RepositoryCloneRequest,
@@ -67,6 +71,12 @@ import type {
 } from '../types/ipc';
 
 let mainWindow: InstanceType<typeof BrowserWindow> | null = null;
+
+// Must run before `app.whenReady()` resolves — Electron requirement for
+// registering a privileged custom protocol scheme (fictionlab-media://,
+// used to serve plugin-owned local images to the renderer under a tightly
+// scoped img-src CSP directive; see media-protocol.ts).
+registerMediaProtocolAsPrivileged();
 
 /**
  * Get the correct icon path for the current platform and packaging state
@@ -2993,6 +3003,11 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('net.fictionlab.studio');
   }
+
+  // Serve plugin-owned local images to the renderer via fictionlab-media://.
+  // Must be registered before any window loads, since the renderer CSP's
+  // img-src directive allows this scheme (see src/renderer/index.html).
+  registerMediaProtocolHandler();
 
   // E2E SMOKE TEST MODE (Issue #208): the Playwright smoke test only verifies that
   // the renderer boots and the window renders without console errors (the #186
