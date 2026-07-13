@@ -7,9 +7,10 @@
  *   - `app-updater.ts` (the FictionLab self-update check, issue #213 / PR #218)
  *   - `whats-new.ts` (the post-update "What's New" panel)
  *   - `updater.ts` (managed-repo commit deltas around the mws pull)
- *   - the upcoming private-repo plugin updater (bead mea-6tt) -- every
- *     function takes an optional `token` for `Authorization: Bearer` access
- *     to private repos, so that feature can reuse this module as-is.
+ *   - `plugin-github-updater.ts` (private-repo plugin updater, bead mea-6tt)
+ *     -- every function takes an optional `token` for `Authorization: Bearer`
+ *     access to private repos; `downloadReleaseAsset` additionally streams
+ *     an asset's raw bytes via the same authenticated path.
  *
  * All functions never throw: failures resolve to `{ status: 'error' }` (or
  * the first-class `'not-found'` state) so callers can degrade gracefully --
@@ -30,6 +31,15 @@ export interface ReleaseAssetInfo {
   name: string;
   downloadUrl: string;
   size?: number;
+  /**
+   * GitHub's numeric asset id. Needed to download from a PRIVATE repo:
+   * `downloadUrl` (browser_download_url) redirects to a signed storage URL
+   * that only works for public assets or an authenticated browser session,
+   * while the `/releases/assets/{id}` API endpoint (see
+   * `downloadReleaseAsset` below) accepts the same `Authorization: Bearer`
+   * header as every other call in this module (bead mea-6tt).
+   */
+  id?: number;
 }
 
 export interface ReleaseInfo {
@@ -101,6 +111,7 @@ function parseRelease(release: any): ReleaseFetchResult {
         name: asset?.name,
         downloadUrl: asset?.browser_download_url,
         size: asset?.size,
+        id: typeof asset?.id === 'number' ? asset.id : undefined,
       }))
     : undefined;
 
@@ -214,6 +225,59 @@ export async function fetchCommitDelta(
     // Newest first, matching `git log` ordering (the compare API returns
     // oldest first).
     return { status: 'ok', commits: commits.reverse() };
+  } catch (error: any) {
+    return { status: 'error', error: error?.message || String(error) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Release asset download (bead mea-6tt: private-repo plugin updater)
+// ---------------------------------------------------------------------------
+
+export interface AssetDownloadResult {
+  status: FetchStatus;
+  /** Raw asset bytes on success. */
+  data?: Buffer;
+  error?: string;
+}
+
+/**
+ * Download a release asset by its numeric id via the GitHub API, using
+ * `Accept: application/octet-stream` so GitHub streams the raw bytes
+ * instead of the asset's JSON metadata. Works uniformly for public and
+ * private repos (unlike `browser_download_url`, which requires either no
+ * auth (public) or an authenticated browser session (private) -- the API
+ * endpoint accepts the same Bearer token as every other call here).
+ *
+ * Never throws; failures resolve to `{ status: 'error' }` so callers can
+ * show a clean message instead of an unhandled rejection. The error
+ * message intentionally never includes the request URL (it carries no
+ * credentials, but keeping this module's error surface URL-free avoids
+ * ever having to reason about what a future asset URL might embed).
+ */
+export async function downloadReleaseAsset(
+  repo: string,
+  assetId: number,
+  options: ReleaseFetchOptions = {}
+): Promise<AssetDownloadResult> {
+  const fetchFn = options.fetchFn ?? fetch;
+
+  try {
+    const url = `${GITHUB_API_BASE}/repos/${repo}/releases/assets/${assetId}`;
+    const response = await fetchFn(url, {
+      headers: {
+        ...buildHeaders(options.token),
+        'Accept': 'application/octet-stream',
+      },
+    });
+
+    if (!response.ok) {
+      const mapped = mapErrorResponse(response);
+      return { status: mapped.status, error: mapped.error };
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return { status: 'ok', data: Buffer.from(arrayBuffer) };
   } catch (error: any) {
     return { status: 'error', error: error?.message || String(error) };
   }

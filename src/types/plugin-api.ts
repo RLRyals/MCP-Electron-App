@@ -70,6 +70,27 @@ export interface PluginManifest {
     fictionlabApi?: string;
   };
 
+  /**
+   * Where to check for updates (bead mea-6tt, BRAT-style private-repo
+   * plugin updater). Optional: when a plugin omits this, the app falls
+   * back to a small built-in map of known plugin repos (see
+   * `KNOWN_PLUGIN_UPDATE_SOURCES` in `src/main/plugin-github-updater.ts`)
+   * so already-shipped plugins (fictionlab-workflow, fictionlab-kanban)
+   * still update without needing a manifest change first.
+   */
+  updateSource?: {
+    /** GitHub "owner/repo", e.g. "RLRyals/fictionlab-workflow". */
+    repo: string;
+    /**
+     * Glob-ish pattern (only `*` is special) matched against release asset
+     * filenames to pick this plugin's zip out of a release that may bundle
+     * multiple plugins' assets together.
+     */
+    assetPattern: string;
+    /** True when `repo` requires a token (see GITHUB_PLUGINS_TOKEN). */
+    private?: boolean;
+  };
+
   /** UI integration points */
   ui?: PluginUIConfig;
 
