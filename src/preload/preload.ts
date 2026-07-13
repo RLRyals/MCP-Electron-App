@@ -456,6 +456,25 @@ interface UpdateResult {
   message: string;
   error?: string;
   rollback?: boolean;
+  /** Commit delta around a managed-repo pull (bead mea-1j9 "What's New"). */
+  whatsNew?: {
+    previousSha?: string;
+    newSha?: string;
+    changes?: string[];
+    upToDate?: boolean;
+  };
+}
+
+/**
+ * What's New payload (bead mea-1j9). Mirrors WhatsNewPayload from
+ * src/main/whats-new.ts.
+ */
+interface WhatsNewPayload {
+  version: string;
+  title: string;
+  notes?: string;
+  releaseUrl?: string;
+  publishedAt?: string;
 }
 
 /**
@@ -1873,6 +1892,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     checkForUpdates: (): Promise<AppUpdateCheckResult> => {
       return ipcRenderer.invoke('updates:check-for-updates');
+    },
+  },
+
+  /**
+   * What's New API (bead mea-1j9 -- post-update release notes panel)
+   */
+  whatsNew: {
+    /**
+     * Startup check: non-null exactly when the panel should be shown
+     * (running version differs from the persisted lastSeenVersion and its
+     * release notes could be fetched).
+     */
+    getStartup: (): Promise<WhatsNewPayload | null> => {
+      return ipcRenderer.invoke('whats-new:get-startup');
+    },
+
+    /**
+     * On-demand release notes for the running version (falls back to the
+     * latest published release). Null when nothing is available.
+     */
+    getCurrent: (): Promise<WhatsNewPayload | null> => {
+      return ipcRenderer.invoke('whats-new:get-current');
+    },
+
+    /**
+     * Record that the What's New panel for `version` was shown, so it is
+     * not shown again for the same version.
+     */
+    markSeen: (version: string): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('whats-new:mark-seen', version);
     },
   },
 

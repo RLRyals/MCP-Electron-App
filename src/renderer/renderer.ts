@@ -14,6 +14,7 @@ import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
 import { syncPluginProvidedViews } from './services/pluginViewLoader.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
+import { checkStartupWhatsNew } from './components/WhatsNewPanel.js';
 // import { createDashboardTab } from './components/DashboardTab.js'; // No longer used with new ViewRouter
 import { createDefaultLogsTab } from './components/LogsTab.js';
 import { initializeServicesTab } from './components/ServicesTab.js';
@@ -461,6 +462,25 @@ interface ElectronAPI {
       assets?: Array<{ name: string; downloadUrl: string; size?: number }>;
       error?: string;
     }>;
+  };
+  // What's New API (bead mea-1j9). Optional for renderer builds/tests
+  // running against an older preload, same convention as `updates` above.
+  whatsNew?: {
+    getStartup: () => Promise<{
+      version: string;
+      title: string;
+      notes?: string;
+      releaseUrl?: string;
+      publishedAt?: string;
+    } | null>;
+    getCurrent: () => Promise<{
+      version: string;
+      title: string;
+      notes?: string;
+      releaseUrl?: string;
+      publishedAt?: string;
+    } | null>;
+    markSeen: (version: string) => Promise<{ success: boolean }>;
   };
 }
 
@@ -1345,6 +1365,10 @@ async function init(): Promise<void> {
     console.error('Error initializing Setup Tab:', err);
     // Don't show notification - this is not critical
   });
+
+  // What's New after an app update (bead mea-1j9): shown once per new
+  // version; quiet no-op on first run, same version, or fetch failure.
+  void checkStartupWhatsNew();
 
   // NOTE: Dashboard initialization (issue #214) now happens inside
   // DashboardView.mount() -- DashboardApp (DashboardViewReact.tsx) owns its
