@@ -18,6 +18,7 @@ interface EnvConfig {
   WORKFLOW_MANAGER_PORT: number;
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
+  STORY_ANALYSIS_PORT: number;
   GITHUB_TOKEN?: string;
   GITHUB_PLUGINS_TOKEN?: string;
 }
@@ -237,6 +238,7 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       WORKFLOW_MANAGER_PORT: currentEnvConfig?.WORKFLOW_MANAGER_PORT || 3012,
       OUTLINE_PORT: currentEnvConfig?.OUTLINE_PORT || 3013,
       KANBAN_PORT: currentEnvConfig?.KANBAN_PORT || 3015,
+      STORY_ANALYSIS_PORT: currentEnvConfig?.STORY_ANALYSIS_PORT || 3016,
       // Not exposed as a form field on this form - preserve existing value so a
       // re-save doesn't silently erase a stored GitHub token
       GITHUB_TOKEN: currentEnvConfig?.GITHUB_TOKEN,

@@ -97,6 +97,7 @@ services:
       - "${WORKFLOW_MANAGER_PORT}:3012"  # Workflow Manager (host side remappable, container fixed at 3012)
       - "${OUTLINE_PORT}:3013"  # Outline Server (host side remappable, container fixed at 3013)
       - "${KANBAN_PORT}:3015"  # Kanban Server (host side remappable, container fixed at 3015)
+      - "${STORY_ANALYSIS_PORT}:3016"  # Story Analysis Server (host side remappable, container fixed at 3016)
     environment:
       # PRIMARY: Use PgBouncer for connection pooling (internal Docker network port)
       # CRITICAL: Use container name and INTERNAL port (6432), NOT the external ${PGBOUNCER_PORT} variable

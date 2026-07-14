@@ -80,6 +80,7 @@ interface EnvConfig {
   WORKFLOW_MANAGER_PORT: number;
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
+  STORY_ANALYSIS_PORT: number;
   GITHUB_TOKEN?: string;
   /** Fine-grained PAT for the private plugin repo (bead mea-6tt). */
   GITHUB_PLUGINS_TOKEN?: string;

@@ -33,6 +33,7 @@ export interface EnvConfig {
   WORKFLOW_MANAGER_PORT: number;
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
+  STORY_ANALYSIS_PORT: number;
   GITHUB_TOKEN?: string;
   /**
    * Fine-grained GitHub PAT scoped ONLY to RLRyals/fictionlab-workflow,
@@ -61,6 +62,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   WORKFLOW_MANAGER_PORT: 3012,
   OUTLINE_PORT: 3013,
   KANBAN_PORT: 3015,
+  STORY_ANALYSIS_PORT: 3016,
   GITHUB_TOKEN: '',
   GITHUB_PLUGINS_TOKEN: '',
 };
@@ -472,6 +474,7 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.WORKFLOW_MANAGER_PORT, name: 'Workflow Manager', key: 'WORKFLOW_MANAGER_PORT' as const },
     { port: config.OUTLINE_PORT, name: 'Outline Server', key: 'OUTLINE_PORT' as const },
     { port: config.KANBAN_PORT, name: 'Kanban Server', key: 'KANBAN_PORT' as const },
+    { port: config.STORY_ANALYSIS_PORT, name: 'Story Analysis Server', key: 'STORY_ANALYSIS_PORT' as const },
   ];
 
   // Check configurable ports
@@ -651,6 +654,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'KANBAN_PORT':
           config.KANBAN_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'STORY_ANALYSIS_PORT':
+          config.STORY_ANALYSIS_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -758,6 +764,7 @@ export function formatEnvFile(config: EnvConfig): string {
     `WORKFLOW_MANAGER_PORT=${config.WORKFLOW_MANAGER_PORT}`,
     `OUTLINE_PORT=${config.OUTLINE_PORT}`,
     `KANBAN_PORT=${config.KANBAN_PORT}`,
+    `STORY_ANALYSIS_PORT=${config.STORY_ANALYSIS_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -872,6 +879,11 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const kanbanPortValidation = validatePort(config.KANBAN_PORT);
   if (!kanbanPortValidation.valid) {
     errors.push(`Kanban port: ${kanbanPortValidation.error}`);
+  }
+
+  const storyAnalysisPortValidation = validatePort(config.STORY_ANALYSIS_PORT);
+  if (!storyAnalysisPortValidation.valid) {
+    errors.push(`Story Analysis port: ${storyAnalysisPortValidation.error}`);
   }
 
   // Validate auth token
