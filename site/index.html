@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FictionLab-App Release Info</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site-header">
+    <h1>FictionLab-App Release Info</h1>
+    <p>What's in a release, what it installs on your machine, and how to get it running.</p>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="whats-installed.html">What Gets Installed</a>
+      <a href="install-guides.html">Install Guides</a>
+      <a href="components.html">Component Versions</a>
+      <a href="release-notes.html">Release Notes</a>
+    </nav>
+  </header>
+
+  <p class="callout">
+    <strong>Current release: <span id="current-version"><!--CURRENT_VERSION--></span></strong><br>
+    Published <span id="current-published"><!--CURRENT_PUBLISHED--></span>.
+    See <a href="release-notes.html">full release notes</a> or jump straight to
+    <a href="https://github.com/RLRyals/MCP-Electron-App/releases/latest">the download page</a>.
+  </p>
+
+  <h2>Start here</h2>
+  <table>
+    <tr>
+      <td><a href="whats-installed.html">What Gets Installed</a></td>
+      <td>The Docker stack every install gets (Postgres, PgBouncer, MCP Writing Servers, the local MCP Connector), where your data lives, and what each optional plugin adds on top.</td>
+    </tr>
+    <tr>
+      <td><a href="install-guides.html">Install Guides</a></td>
+      <td>Step-by-step install instructions for Windows, macOS, and Linux, plus where to find the tester checklist.</td>
+    </tr>
+    <tr>
+      <td><a href="components.html">Component Versions</a></td>
+      <td>Per-release matrix of the app version against the Docker image versions it pins.</td>
+    </tr>
+    <tr>
+      <td><a href="release-notes.html">Release Notes</a></td>
+      <td>What changed in every published release, newest first.</td>
+    </tr>
+  </table>
+
+  <h2>About this site</h2>
+  <p>
+    This site is rebuilt automatically every time a release is published on
+    <a href="https://github.com/RLRyals/MCP-Electron-App">the FictionLab (MCP-Electron-App) repo</a>
+    via <code>.github/workflows/pages.yml</code>. Release notes and the component matrix are pulled
+    live from the GitHub Releases API and the repository at each tagged release; nothing here is
+    hand-maintained per release.
+  </p>
+
+  <footer class="site-footer">
+    <p>FictionLab is an installer/management app for a self-hosted AI writing workspace.
+    Source: <a href="https://github.com/RLRyals/MCP-Electron-App">github.com/RLRyals/MCP-Electron-App</a>.</p>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Guides — FictionLab-App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site-header">
+    <h1>FictionLab-App Release Info</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="whats-installed.html">What Gets Installed</a>
+      <a href="install-guides.html">Install Guides</a>
+      <a href="components.html">Component Versions</a>
+      <a href="release-notes.html">Release Notes</a>
+    </nav>
+  </header>
+
+  <h2>Install Guides</h2>
+  <p>
+    Download the latest installer for your platform from
+    <a href="https://github.com/RLRyals/MCP-Electron-App/releases/latest">GitHub Releases</a>.
+    FictionLab handles the rest &mdash; Docker containers, database setup, and MCP client
+    configuration &mdash; through its setup wizard. No terminal commands required.
+  </p>
+
+  <h3>Windows</h3>
+  <ol>
+    <li>Download <code>FictionLab-Setup.exe</code> (Windows 10/11, 64-bit).</li>
+    <li>Double-click the installer.</li>
+    <li>Follow the installation wizard (choose an install folder if you like).</li>
+    <li>Click "Install" and wait for it to finish.</li>
+    <li>Launch FictionLab from the Start Menu or the desktop shortcut.</li>
+  </ol>
+  <p class="callout">
+    Windows may show an "Unknown Publisher" warning &mdash; the installer isn't code-signed yet.
+    Click "More info" &rarr; "Run anyway" to continue.
+  </p>
+
+  <h3>macOS</h3>
+  <ol>
+    <li>Download <code>FictionLab.dmg</code> (macOS 10.15+, Intel and Apple Silicon).</li>
+    <li>Open the downloaded DMG file.</li>
+    <li>Drag the FictionLab icon to your Applications folder.</li>
+    <li>Open FictionLab from Applications.</li>
+  </ol>
+  <p class="callout">
+    macOS may say "App can't be opened" because the app isn't notarized yet.
+    Right-click the app &rarr; "Open" &rarr; "Open" to bypass Gatekeeper the first time.
+  </p>
+
+  <h3>Linux</h3>
+  <ol>
+    <li>Download <code>FictionLab.AppImage</code> or <code>fictionlab.deb</code> (Ubuntu 20.04+, Debian, other distros).</li>
+    <li>
+      <strong>AppImage:</strong> make it executable and run it:
+      <pre><code>chmod +x FictionLab.AppImage
+./FictionLab.AppImage</code></pre>
+    </li>
+    <li>
+      <strong>.deb:</strong> install with:
+      <pre><code>sudo dpkg -i fictionlab.deb</code></pre>
+    </li>
+    <li>Launch FictionLab from your applications menu.</li>
+  </ol>
+
+  <h3>What the setup wizard does for you</h3>
+  <p>After launch, FictionLab's setup wizard automatically:</p>
+  <ul>
+    <li>Detects (or helps you install) Docker</li>
+    <li>Provisions and starts the PostgreSQL database, with a securely generated password</li>
+    <li>Starts the MCP Writing Servers and the local MCP Connector</li>
+    <li>Connects your AI client of choice (TypingMind, recommended for beginners, or Claude Desktop)</li>
+  </ul>
+  <p>See <a href="whats-installed.html">What Gets Installed</a> for the full component list.</p>
+
+  <h3>Verifying a download</h3>
+  <p>
+    Every release includes a <code>checksums-*.txt</code> file alongside the installers.
+    Compare the SHA256 hash of what you downloaded against the matching line before installing.
+  </p>
+
+  <h3>Cross-platform tester checklist</h3>
+  <p class="callout">
+    A structured <code>TESTING.md</code> checklist (install, first-run wizard, Docker detection,
+    database init, connector health check) is tracked as part of the cross-platform testing
+    effort for FictionLab and will be linked here once it lands in the repo. In the meantime,
+    the install steps above cover the same ground for manual testing.
+  </p>
+
+  <footer class="site-footer">
+    <p><a href="index.html">&larr; Back to overview</a></p>
+  </footer>
+</div>
+</body>
+</html>

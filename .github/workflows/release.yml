@@ -104,6 +104,96 @@ jobs:
             out/checksums-windows.txt
           retention-days: 1
 
+  build-windows-arm64:
+    name: Build Windows ARM64
+    # Hosted arm64 Windows runner (bead mea-0um). Native arm64 host, not a
+    # cross-build from windows-latest -- electron-builder + the NSIS tooling
+    # it shells out to run fine under this runner the same way they do on
+    # windows-latest (Windows-on-ARM handles the x64 helper binaries via
+    # built-in emulation).
+    runs-on: windows-11-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Run full test suite (informational)
+        id: full_tests
+        continue-on-error: true
+        run: npm test
+
+      - name: Note pre-existing test failures
+        if: steps.full_tests.outcome == 'failure'
+        run: |
+          echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install chromium --with-deps
+
+      - name: Run Electron E2E smoke tests (bead mea-0um)
+        # Same suite as the win-x64 job (smoke.spec.ts + pluginless.spec.ts).
+        # windows-11-arm is a GUI-capable hosted runner like windows-latest,
+        # so no xvfb wrapper is needed here (unlike ubuntu-latest below).
+        # NOTE: this is the first time this suite runs on windows-11-arm --
+        # if Playwright's chromium download has no win32-arm64 binary this
+        # step will fail loudly on the first real CI run rather than silently
+        # skip; that is the intended "documented, not silent" failure mode
+        # per bead mea-0um until verified.
+        run: |
+          npm run test:e2e
+
+      - name: Build Windows ARM64 app
+        run: npm run package:win-arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Generate checksums
+        shell: powershell
+        run: |
+          $releaseDir = Join-Path $PWD 'out\release'
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          # Same *Setup*.exe scoping as the win-x64 job (issue #223 lesson).
+          # nsis.artifactName now includes ${arch} (package.json) so the x64
+          # and arm64 installers never collide when both are attached to the
+          # same GitHub release.
+          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter '*Setup*.exe' -File |
+            ForEach-Object {
+              $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+              $filename = $_.Name
+              "$($hash.Hash.ToLower())  $filename" | Out-File -Append -FilePath (Join-Path $PWD 'out\checksums-windows-arm64.txt') -Encoding utf8
+
+              $dest = Join-Path $releaseDir $filename
+              Copy-Item -Path $_.FullName -Destination $dest -Force
+            }
+
+          Get-Content out/checksums-windows-arm64.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64-installer
+          path: |
+            out/release/*.exe
+            out/checksums-windows-arm64.txt
+          retention-days: 1
+
   build-macos:
     name: Build macOS
     runs-on: macos-latest
@@ -136,6 +226,17 @@ jobs:
         if: steps.full_tests.outcome == 'failure'
         run: |
           echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install chromium --with-deps
+
+      - name: Run Electron E2E smoke tests (bead mea-0um)
+        # macos-latest is GUI-capable out of the box (macOS CI runners always
+        # have a windowserver, unlike Linux) -- no xvfb wrapper needed, same
+        # as the win-x64 job.
+        run: |
+          npm run test:e2e
 
       - name: Build macOS app
         run: npm run package:mac
@@ -196,6 +297,19 @@ jobs:
         run: |
           echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this release build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
 
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install chromium --with-deps
+
+      - name: Run Electron E2E smoke tests (bead mea-0um)
+        # ubuntu-latest is headless -- Electron (and Playwright's underlying
+        # CDP connection to it) needs a display server, so this runs under
+        # xvfb-run the same way an Electron app would in any headless Linux
+        # CI environment. xvfb itself comes from the --with-deps install
+        # above.
+        run: |
+          xvfb-run --auto-servernum npm run test:e2e
+
       - name: Build Linux app
         run: npm run package:linux
 
@@ -222,7 +336,15 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [build-windows, build-macos, build-linux]
+    # build-windows-arm64 is listed as a dependency (so it's scheduled and
+    # awaited alongside the others) but deliberately NOT required to succeed
+    # in the `if:` gate below (bead mea-0um). windows-11-arm is a brand new
+    # hosted runner class this workflow has never exercised; the existing
+    # win-x64/mac/linux release path should not go dark because of a problem
+    # on the newest, least-proven leg. If it fails, the release still ships
+    # for the other three platforms and simply omits the win-arm64 asset --
+    # a documented skip, not a silent one (see the job's own comments).
+    needs: [build-windows, build-windows-arm64, build-macos, build-linux]
     runs-on: ubuntu-latest
     if: always() && needs.build-windows.result == 'success' && needs.build-macos.result == 'success' && needs.build-linux.result == 'success'
 
@@ -248,6 +370,16 @@ jobs:
         with:
           name: windows-installer
           path: release-assets/windows
+
+      - name: Download Windows ARM64 artifacts
+        # Best-effort: only download if that job actually succeeded, so a
+        # win-arm64 failure doesn't take down asset collection for the other
+        # three platforms (see the create-release job comment above).
+        if: needs.build-windows-arm64.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-arm64-installer
+          path: release-assets/windows-arm64
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
@@ -278,9 +410,9 @@ jobs:
           cat << EOF > release_notes.md
           ## Installation
 
-          **Windows**: Download and run the installer executable.
+          **Windows (x64 and ARM64)**: Download and run the installer executable for your architecture (the filename includes \`x64\` or \`arm64\`). Not sure which you have? Settings > System > About > "System type".
 
-          **macOS**: Download the DMG file, mount it, and drag the app to Applications.
+          **macOS (Apple Silicon)**: Download the DMG file, mount it, and drag the app to Applications. Unsigned build -- see the Notes section below for the Gatekeeper steps.
 
           **Linux AppImage**: Download the AppImage file, make it executable, and run:
           \`\`\`bash
@@ -299,7 +431,8 @@ jobs:
 
           ## Notes
 
-          - Code signing certificates are not yet configured (Windows and macOS may show security warnings)
+          - Code signing certificates are not yet configured for any platform (Windows and macOS builds are unsigned and will show OS security warnings -- SmartScreen on Windows, Gatekeeper on macOS). See TESTING.md for the exact click-through steps on each OS.
+          - Windows ARM64 and the win-arm64 CI smoke test are new in this release; if the ARM64 asset is missing from this release, its build did not complete in time and shipped without blocking the other platforms -- check the release workflow run for the \`Build Windows ARM64\` job status.
           - Please verify checksums before installation
           EOF
 
@@ -320,6 +453,8 @@ jobs:
           files: |
             release-assets/windows/**/*Setup*.exe
             release-assets/windows/checksums-windows.txt
+            release-assets/windows-arm64/**/*Setup*.exe
+            release-assets/windows-arm64/checksums-windows-arm64.txt
             release-assets/macos/*.dmg
             release-assets/macos/*.zip
             release-assets/macos/checksums-macos.txt

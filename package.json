@@ -18,6 +18,7 @@
     "copy-assets": "node scripts/copy-assets.js",
     "package": "npm run build && electron-builder build --publish never",
     "package:win": "npm run build && electron-builder build --win --publish never",
+    "package:win-arm64": "npm run build && electron-builder build --win --arm64 --publish never",
     "package:mac": "npm run build && electron-builder build --mac --publish never",
     "package:linux": "npm run build && electron-builder build --linux --publish never",
     "package:all": "npm run build && electron-builder build -mwl --publish never",
@@ -123,7 +124,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName} Setup ${version} ${arch}.${ext}"
     },
     "mac": {
       "target": [

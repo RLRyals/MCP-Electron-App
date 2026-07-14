@@ -74,28 +74,6 @@ function showMessageBox(
 }
 
 /**
- * Extract a zip file
- */
-async function extractZip(zipPath: string, destPath: string): Promise<void> {
-  const { exec } = require('child_process');
-  const { promisify } = require('util');
-  const execAsync = promisify(exec);
-
-  await fs.ensureDir(destPath);
-
-  if (process.platform === 'win32') {
-    // Use PowerShell on Windows
-    await execAsync(
-      `powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destPath}' -Force"`,
-      { timeout: 60000 }
-    );
-  } else {
-    // Use unzip on Unix
-    await execAsync(`unzip -o "${zipPath}" -d "${destPath}"`, { timeout: 60000 });
-  }
-}
-
-/**
  * Register plugin update handlers
  */
 export function registerPluginUpdateHandlers() {

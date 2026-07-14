@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Component Versions — FictionLab-App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site-header">
+    <h1>FictionLab-App Release Info</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="whats-installed.html">What Gets Installed</a>
+      <a href="install-guides.html">Install Guides</a>
+      <a href="components.html">Component Versions</a>
+      <a href="release-notes.html">Release Notes</a>
+    </nav>
+  </header>
+
+  <h2>Component Version Matrix</h2>
+  <p>
+    Each row is a published release: the app version, and the Docker image versions that release's
+    <code>docker-compose.yml</code> pins. Generated at publish time by reading
+    <code>package.json</code> and <code>docker-compose.yml</code> as they existed at each release tag,
+    so this always reflects what actually shipped &mdash; not a hand-maintained list.
+  </p>
+  <p class="callout">
+    <strong>MCP Writing Servers</strong> is built from source, cloned from
+    <a href="https://github.com/RLRyals/MCP-Writing-Servers">RLRyals/MCP-Writing-Servers</a> on
+    its default branch at install/update time &mdash; it is tracked by branch, not pinned to a
+    tag per app release, so it has no single version number to show in this table.
+    <strong>fictionlab-workflow</strong> and <strong>fictionlab-kanban</strong> are optional
+    plugins installed independently from the in-app Plugins screen; see each plugin's own
+    GitHub Releases page for its version history.
+  </p>
+
+  <!-- GENERATED:MATRIX:START -->
+  <p><em>The component matrix will appear here once the publish workflow has run at least once.</em></p>
+  <!-- GENERATED:MATRIX:END -->
+
+  <footer class="site-footer">
+    <p><a href="index.html">&larr; Back to overview</a></p>
+  </footer>
+</div>
+</body>
+</html>

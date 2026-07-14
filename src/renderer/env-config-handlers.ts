@@ -20,6 +20,7 @@ interface EnvConfig {
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
   GITHUB_TOKEN?: string;
+  GITHUB_PLUGINS_TOKEN?: string;
 }
 
 /**
@@ -241,6 +242,10 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       // Not exposed as a form field on this form - preserve existing value so a
       // re-save doesn't silently erase a stored GitHub token
       GITHUB_TOKEN: currentEnvConfig?.GITHUB_TOKEN,
+      // Not exposed as a form field here either - set from the Plugins settings
+      // surface (bead mea-6tt); preserve existing value so a re-save here
+      // doesn't silently erase it
+      GITHUB_PLUGINS_TOKEN: currentEnvConfig?.GITHUB_PLUGINS_TOKEN,
     };
 
     const validation = await (window as any).electronAPI.envConfig.validateConfig(config);

@@ -10,6 +10,9 @@ dist/
 out/
 build/
 
+# Generated release-info Pages site (built by .github/workflows/pages.yml)
+_site/
+
 # Compiled TypeScript (but keep build scripts and templates)
 *.js
 !scripts/*.js

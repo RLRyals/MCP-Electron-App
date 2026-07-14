@@ -81,6 +81,9 @@ interface EnvConfig {
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
+  GITHUB_TOKEN?: string;
+  /** Fine-grained PAT for the private plugin repo (bead mea-6tt). */
+  GITHUB_PLUGINS_TOKEN?: string;
 }
 
 /**
@@ -2388,6 +2391,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getPluginPath: (pluginId: string): Promise<string> => {
       return ipcRenderer.invoke('plugin:get-path', pluginId);
+    },
+
+    /**
+     * GitHub Plugins Token status for masked UI display (bead mea-6tt).
+     * Returns only `configured` + the last 4 characters -- never the token.
+     */
+    getGithubTokenStatus: (): Promise<{ configured: boolean; last4?: string }> => {
+      return ipcRenderer.invoke('plugin-updates:get-token-status');
+    },
+
+    /**
+     * Set/replace/clear GITHUB_PLUGINS_TOKEN.
+     */
+    setGithubToken: (token: string): Promise<{ success: boolean; error?: string; last4?: string }> => {
+      return ipcRenderer.invoke('plugin-updates:set-token', token);
+    },
+
+    /**
+     * Check an installed plugin against its GitHub release feed.
+     */
+    checkGithubUpdate: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin-updates:check', pluginId);
+    },
+
+    /**
+     * Download + dependency-gate + install an available GitHub-release update.
+     */
+    installGithubUpdate: (pluginId: string): Promise<any> => {
+      return ipcRenderer.invoke('plugin-updates:install', pluginId);
     },
   },
 

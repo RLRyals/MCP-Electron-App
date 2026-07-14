@@ -35,6 +35,14 @@ export interface EnvConfig {
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
   GITHUB_TOKEN?: string;
+  /**
+   * Fine-grained GitHub PAT scoped ONLY to RLRyals/fictionlab-workflow,
+   * read-only Contents permission -- used exclusively by the BRAT-style
+   * plugin updater (bead mea-6tt) to check/download releases from that
+   * private repo. Deliberately a distinct field from GITHUB_TOKEN (a
+   * broader-scope token used elsewhere) so the two are never conflated.
+   */
+  GITHUB_PLUGINS_TOKEN?: string;
 }
 
 /**
@@ -56,6 +64,7 @@ export const DEFAULT_CONFIG: EnvConfig = {
   KANBAN_PORT: 3015,
   STORY_ANALYSIS_PORT: 3016,
   GITHUB_TOKEN: '',
+  GITHUB_PLUGINS_TOKEN: '',
 };
 
 /**
@@ -651,6 +660,9 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
+        case 'GITHUB_PLUGINS_TOKEN':
+          config.GITHUB_PLUGINS_TOKEN = unquotedValue;
+          break;
       }
     }
   }
@@ -758,6 +770,11 @@ export function formatEnvFile(config: EnvConfig): string {
   // Only include GITHUB_TOKEN if it's set
   if (config.GITHUB_TOKEN) {
     lines.push(`GITHUB_TOKEN=${config.GITHUB_TOKEN}`);
+  }
+
+  // Only include GITHUB_PLUGINS_TOKEN if it's set (bead mea-6tt)
+  if (config.GITHUB_PLUGINS_TOKEN) {
+    lines.push(`GITHUB_PLUGINS_TOKEN=${config.GITHUB_PLUGINS_TOKEN}`);
   }
 
   lines.push('');

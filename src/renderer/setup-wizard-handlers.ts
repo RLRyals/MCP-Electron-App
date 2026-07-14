@@ -735,6 +735,9 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             // Not exposed in this wizard step - preserve existing value so a re-save
             // doesn't silently erase a stored GitHub token
             GITHUB_TOKEN: currentConfig?.GITHUB_TOKEN,
+            // Not exposed in this wizard step either - set from the Plugins
+            // settings surface (bead mea-6tt); preserve existing value
+            GITHUB_PLUGINS_TOKEN: currentConfig?.GITHUB_PLUGINS_TOKEN,
         };
 
         // Check if .env file actually exists on disk

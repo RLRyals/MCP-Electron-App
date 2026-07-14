@@ -12,6 +12,7 @@ import {
   fetchReleaseByTag,
   fetchCommitDelta,
   getChangeList,
+  downloadReleaseAsset,
 } from '../release-notes';
 
 function okJsonResponse(body: any) {
@@ -128,6 +129,51 @@ describe('fetchReleaseByTag', () => {
     const result = await fetchReleaseByTag('RLRyals/MCP-Electron-App', 'v9.9.9', { fetchFn: fetchFn as any });
 
     expect(result.status).toBe('not-found');
+  });
+});
+
+describe('downloadReleaseAsset (bead mea-6tt)', () => {
+  it('requests the asset-by-id endpoint with an octet-stream Accept header and the token', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      arrayBuffer: async () => new TextEncoder().encode('zip-bytes').buffer,
+    });
+
+    const result = await downloadReleaseAsset('RLRyals/fictionlab-workflow', 12345, {
+      token: 'ghp_test',
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.data?.toString()).toBe('zip-bytes');
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases/assets/12345',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer ghp_test',
+          'Accept': 'application/octet-stream',
+        }),
+      })
+    );
+  });
+
+  it('returns "not-found" (not an error) on a 404', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    const result = await downloadReleaseAsset('RLRyals/fictionlab-workflow', 1, { fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('not-found');
+  });
+
+  it('returns a graceful "error" on a network failure', async () => {
+    const fetchFn = jest.fn().mockRejectedValue(new Error('network down'));
+
+    const result = await downloadReleaseAsset('RLRyals/fictionlab-workflow', 1, { fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('error');
+    expect(result.error).toMatch(/network down/);
   });
 });
 

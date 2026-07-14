@@ -62,7 +62,12 @@ describe('Adapter Integration Tests', () => {
         adapter: claudeAdapter,
         provider: claudeProvider,
         mockSetup: () => {
-          const Anthropic = require('@anthropic-ai/sdk');
+          // @anthropic-ai/sdk sets __esModule: true, so the adapter's
+          // `import Anthropic from '@anthropic-ai/sdk'` resolves to the
+          // module's `.default` export, a distinct mock from the raw
+          // require() result -- mocking the latter left `new Anthropic()`
+          // hitting the unconfigured automock (messages undefined).
+          const Anthropic = require('@anthropic-ai/sdk').default;
           const mockAnthropic = {
             messages: {
               create: jest.fn().mockResolvedValue({
@@ -92,7 +97,8 @@ describe('Adapter Integration Tests', () => {
         adapter: openaiAdapter,
         provider: openaiProvider,
         mockSetup: () => {
-          const OpenAI = require('openai');
+          // Same __esModule/.default mismatch as the Anthropic mock above.
+          const OpenAI = require('openai').default;
           const mockOpenAI = {
             chat: {
               completions: {
@@ -212,6 +218,11 @@ describe('Adapter Integration Tests', () => {
 
   describe('Provider switching', () => {
     let manager: LLMProviderManager;
+    // Captured per-test so assertions read THIS test's mock call history --
+    // `Anthropic.mock.results` accumulates across every test in the describe
+    // block (nothing clears the constructor mock itself between tests), so
+    // indexing into it directly picked up an earlier test's leftover call.
+    let mockAnthropicCreate: jest.Mock;
 
     beforeEach(async () => {
       manager = new LLMProviderManager();
@@ -225,20 +236,22 @@ describe('Adapter Integration Tests', () => {
 
       (manager as any).initialized = true;
 
-      // Setup mocks
-      const Anthropic = require('@anthropic-ai/sdk');
+      // Setup mocks (mock the `.default` export -- see note in the
+      // "Common adapter interface" mockSetup above)
+      const Anthropic = require('@anthropic-ai/sdk').default;
+      mockAnthropicCreate = jest.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'Claude response' }],
+        usage: { input_tokens: 10, output_tokens: 20 },
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const mockAnthropic = {
         messages: {
-          create: jest.fn().mockResolvedValue({
-            content: [{ type: 'text', text: 'Claude response' }],
-            usage: { input_tokens: 10, output_tokens: 20 },
-            model: 'claude-sonnet-4-5-20250929',
-          }),
+          create: mockAnthropicCreate,
         },
       };
       Anthropic.mockImplementation(() => mockAnthropic);
 
-      const OpenAI = require('openai');
+      const OpenAI = require('openai').default;
       const mockOpenAI = {
         chat: {
           completions: {
@@ -317,12 +330,9 @@ describe('Adapter Integration Tests', () => {
       await manager.executePrompt(highTempProvider, 'Test', {});
       await manager.executePrompt(lowTempProvider, 'Test', {});
 
-      const Anthropic = require('@anthropic-ai/sdk');
-      const mockCreate = Anthropic.mock.results[0].value.messages.create;
-
       // Verify different temperatures were used
-      expect(mockCreate.mock.calls[0][0].temperature).toBe(1.5);
-      expect(mockCreate.mock.calls[1][0].temperature).toBe(0.2);
+      expect(mockAnthropicCreate.mock.calls[0][0].temperature).toBe(1.5);
+      expect(mockAnthropicCreate.mock.calls[1][0].temperature).toBe(0.2);
     });
   });
 
@@ -521,7 +531,7 @@ describe('Adapter Integration Tests', () => {
 
         // Mock appropriate SDK
         if (mockModule === '@anthropic-ai/sdk') {
-          const Anthropic = require(mockModule);
+          const Anthropic = require(mockModule).default;
           Anthropic.mockImplementation(() => ({
             messages: {
               create: jest.fn().mockResolvedValue({
@@ -532,7 +542,7 @@ describe('Adapter Integration Tests', () => {
             },
           }));
         } else if (mockModule === 'openai') {
-          const OpenAI = require(mockModule);
+          const OpenAI = require(mockModule).default;
           OpenAI.mockImplementation(() => ({
             chat: {
               completions: {

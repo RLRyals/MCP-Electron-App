@@ -15,8 +15,10 @@ import {
 } from '../types/wizard';
 
 // Re-export wizard types for backward compatibility
-export {
-  WizardStep,
+// WizardStep is a real runtime enum, so it stays a value export; the rest
+// are interfaces (type-only under isolatedModules).
+export { WizardStep } from '../types/wizard';
+export type {
   WizardStepData,
   MigrationRecord,
   WizardState

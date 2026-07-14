@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { VariableBrowser, VariableBrowserProps } from '../VariableBrowser';
@@ -163,7 +163,7 @@ describe('VariableBrowser - ARIA Tree Attributes', () => {
       });
     });
 
-    it('should not have aria-expanded for leaf nodes', () => {
+    it('should not have aria-expanded for leaf nodes', async () => {
       renderVariableBrowser();
       const user = userEvent.setup();
 
@@ -172,16 +172,22 @@ describe('VariableBrowser - ARIA Tree Attributes', () => {
       const firstSection = sections[0];
 
       // Click to expand
-      userEvent.click(firstSection);
+      await user.click(firstSection);
 
-      // Wait and check for leaf nodes
-      setTimeout(() => {
+      // Wait for the leaf nodes to render (bounded by Jest's own test
+      // lifecycle via waitFor, instead of a bare setTimeout whose callback
+      // -- and its assertion -- would otherwise fire after this test had
+      // already reported as passed, sometimes landing mid-way through a
+      // later test on slower/more contended CI runners and throwing an
+      // "Uncaught exception" attributed to whichever test happened to be
+      // running at the time).
+      await waitFor(() => {
         const allTreeitems = screen.getAllByRole('treeitem');
         const leafNodes = allTreeitems.filter(
           item => item.getAttribute('aria-expanded') === null
         );
         expect(leafNodes.length).toBeGreaterThan(0);
-      }, 100);
+      });
     });
 
     it('should update aria-expanded when items are toggled', async () => {
@@ -426,7 +432,10 @@ describe('VariableBrowser - Keyboard Navigation', () => {
       const firstItem = treeitems[0];
       const secondItem = treeitems[1];
 
-      firstItem.focus();
+      // fireEvent.focus (not the raw DOM .focus()) wraps dispatch in act(),
+      // so the onFocus-driven setFocusedItemId state update has flushed by
+      // the time the very next synchronous assertion runs.
+      fireEvent.focus(firstItem);
       expect(firstItem).toHaveAttribute('tabindex', '0');
 
       await user.keyboard('{ArrowDown}');
