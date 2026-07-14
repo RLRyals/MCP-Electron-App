@@ -443,6 +443,7 @@ import { registerImportHandlers } from './handlers/import-handlers';
 import { registerBundledPluginsHandlers } from './handlers/bundled-plugins-handlers';
 import { registerWorkflowHandlers } from './handlers/workflow-handlers';
 import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers';
+import { registerPluginGithubUpdateHandlers } from './handlers/plugin-github-update-handlers';
 import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
 import { registerLinkHandlers } from './handlers/link-handlers';
 
@@ -506,6 +507,9 @@ function setupIPC(): void {
 
   // Register plugin update handlers
   registerPluginUpdateHandlers();
+
+  // Register GitHub-release plugin update handlers (bead mea-6tt)
+  registerPluginGithubUpdateHandlers();
 
   // Register workflow handlers
   registerWorkflowHandlers();

@@ -440,6 +440,54 @@ export class PluginsLauncher implements View {
         <h2 style="margin: 0; color: var(--text-primary, #fff);">Manage Plugins</h2>
         <button id="close-manage-dialog" style="background: none; border: none; color: var(--text-secondary, #888); font-size: 24px; cursor: pointer;">&times;</button>
       </div>
+      <div id="github-token-section" style="
+        background: var(--bg-tertiary, #2a2a2a);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        color: var(--text-primary, #fff);
+        font-size: 13px;
+      ">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <div>
+            <strong>GitHub Plugins Token</strong>
+            <div id="github-token-status" style="color: var(--text-secondary, #888); margin-top: 2px;">Checking…</div>
+          </div>
+          <button id="github-token-edit-btn" style="
+            background: var(--bg-quaternary, #3a3a3a);
+            color: var(--text-primary, #fff);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+          ">Set Token…</button>
+        </div>
+        <div id="github-token-edit-row" style="display: none; margin-top: 10px; gap: 8px; align-items: center;">
+          <input type="password" id="github-token-input" placeholder="Fine-grained PAT (Contents: read-only)" style="
+            flex: 1;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color, #444);
+            background: var(--bg-secondary, #1e1e1e);
+            color: var(--text-primary, #fff);
+            font-size: 12px;
+            width: 70%;
+          ">
+          <button id="github-token-save-btn" style="
+            background: var(--accent-color, #4a7dfc);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+          ">Save</button>
+        </div>
+        <p style="color: var(--text-tertiary, #666); margin: 8px 0 0 0; font-size: 11px;">
+          Scoped to RLRyals/fictionlab-workflow only, read-only Contents access. Required to check/install updates for private-repo plugins (fictionlab-workflow, fictionlab-kanban).
+        </p>
+      </div>
       <div id="plugin-list-container" style="color: var(--text-primary, #fff);">
         <div style="text-align: center; padding: 20px;">Loading plugins...</div>
       </div>
@@ -454,6 +502,9 @@ export class PluginsLauncher implements View {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) overlay.remove();
     });
+
+    // GitHub Plugins Token (bead mea-6tt): masked status + set/change.
+    await this.setupGithubTokenSection(dialog);
 
     // Load plugins
     const container = dialog.querySelector('#plugin-list-container');
@@ -494,6 +545,15 @@ export class PluginsLauncher implements View {
               </div>
             </div>
             <div style="display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap;">
+              <button class="plugin-github-check-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Check GitHub releases for an update" style="
+                background: var(--bg-quaternary, #3a3a3a);
+                color: var(--text-primary, #fff);
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+              ">Check for Updates</button>
               <button class="plugin-folder-btn" data-plugin-id="${this.escapeHtml(plugin.id)}" title="Update this plugin in place from a local plugin folder" style="
                 background: var(--bg-quaternary, #3a3a3a);
                 color: var(--text-primary, #fff);
@@ -593,6 +653,84 @@ export class PluginsLauncher implements View {
         });
       });
 
+      // Add event listeners for "Check for Updates" buttons (bead mea-6tt:
+      // GitHub-release plugin updater). Flow lives in the main process
+      // (plugin-github-updater.ts + handlers/plugin-github-update-handlers.ts):
+      // resolve update source -> fetch latest release -> compare versions ->
+      // on "Install", download the matching asset, gate on its declared
+      // dependencies, then reuse the same atomic swap as the folder updater.
+      container.querySelectorAll('.plugin-github-check-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const pluginId = (e.target as HTMLElement).getAttribute('data-plugin-id');
+          if (!pluginId) return;
+
+          const statusEl = container.querySelector(`.plugin-status[data-plugin-id="${pluginId}"]`) as HTMLElement;
+          const button = e.target as HTMLButtonElement;
+
+          button.disabled = true;
+          button.textContent = 'Checking…';
+          if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--text-secondary, #888)';
+            statusEl.textContent = 'Checking GitHub for a newer release…';
+          }
+
+          try {
+            const result = await (window as any).electronAPI.plugins.checkGithubUpdate(pluginId);
+            button.disabled = false;
+            button.textContent = 'Check for Updates';
+
+            if (!statusEl) return;
+
+            switch (result.status) {
+              case 'update-available':
+                statusEl.style.color = 'var(--accent-color, #4a7dfc)';
+                statusEl.innerHTML = '';
+                statusEl.textContent = `Update available: ${result.currentVersion ?? 'unknown'} → ${result.latestVersion}. `;
+                {
+                  const installBtn = document.createElement('button');
+                  installBtn.textContent = 'Install Update';
+                  installBtn.style.cssText = 'margin-left: 6px; background: var(--accent-color, #4a7dfc); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;';
+                  installBtn.addEventListener('click', () => this.installGithubUpdate(pluginId, statusEl, installBtn));
+                  statusEl.appendChild(installBtn);
+                }
+                break;
+              case 'up-to-date':
+                statusEl.style.color = 'var(--success-color, #4caf50)';
+                statusEl.textContent = `Already up to date (v${result.currentVersion}).`;
+                break;
+              case 'token-required':
+                statusEl.style.color = 'var(--danger-color, #d32f2f)';
+                statusEl.textContent = 'This plugin\'s repo is private. Set a GitHub Plugins Token above to check for updates.';
+                break;
+              case 'no-update-source':
+                statusEl.style.color = 'var(--text-secondary, #888)';
+                statusEl.textContent = 'No update source configured for this plugin.';
+                break;
+              case 'no-releases':
+                statusEl.style.color = 'var(--text-secondary, #888)';
+                statusEl.textContent = 'No published releases found yet.';
+                break;
+              case 'no-matching-asset':
+                statusEl.style.color = 'var(--danger-color, #d32f2f)';
+                statusEl.textContent = result.error || 'Release found but no matching asset.';
+                break;
+              default:
+                statusEl.style.color = 'var(--danger-color, #d32f2f)';
+                statusEl.textContent = result.error || 'Update check failed.';
+            }
+          } catch (error: any) {
+            button.disabled = false;
+            button.textContent = 'Check for Updates';
+            if (statusEl) {
+              statusEl.style.display = 'block';
+              statusEl.style.color = 'var(--danger-color, #d32f2f)';
+              statusEl.textContent = `Update check failed: ${error.message}`;
+            }
+          }
+        });
+      });
+
       // Add event listeners for "Open Folder" buttons
       container.querySelectorAll('.plugin-open-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -652,6 +790,102 @@ export class PluginsLauncher implements View {
         </div>
       `;
     }
+  }
+
+  /**
+   * Install a checked GitHub-release update for a plugin (bead mea-6tt).
+   * Called from the "Install Update" button injected by the "Check for
+   * Updates" handler above.
+   */
+  private async installGithubUpdate(pluginId: string, statusEl: HTMLElement, installBtn: HTMLButtonElement): Promise<void> {
+    installBtn.disabled = true;
+    installBtn.textContent = 'Installing…';
+
+    try {
+      const result = await (window as any).electronAPI.plugins.installGithubUpdate(pluginId);
+
+      if (result.success) {
+        statusEl.style.color = 'var(--success-color, #4caf50)';
+        statusEl.textContent = result.restarting
+          ? `Updated to v${result.version}. Restarting…`
+          : `Updated to v${result.version}. Restart FictionLab whenever you're ready to load it.`;
+        return;
+      }
+
+      statusEl.style.color = 'var(--danger-color, #d32f2f)';
+      if (result.status === 'dependency-blocked') {
+        statusEl.textContent = `Update blocked: ${(result.blockers || []).join(' ')}`;
+      } else if (result.status === 'refused') {
+        statusEl.textContent = result.message || 'Update refused.';
+      } else {
+        statusEl.textContent = result.error || 'Update failed.';
+      }
+      installBtn.disabled = false;
+      installBtn.textContent = 'Install Update';
+    } catch (error: any) {
+      statusEl.style.color = 'var(--danger-color, #d32f2f)';
+      statusEl.textContent = `Update failed: ${error.message}`;
+      installBtn.disabled = false;
+      installBtn.textContent = 'Install Update';
+    }
+  }
+
+  /**
+   * Wire up the masked GitHub Plugins Token display + set/change control
+   * (bead mea-6tt). The full token is only ever sent from this input,
+   * directly to `plugins.setGithubToken` -- it is never fetched back for
+   * display; the status line only shows `configured` + last 4 characters.
+   */
+  private async setupGithubTokenSection(dialog: HTMLElement): Promise<void> {
+    const statusEl = dialog.querySelector('#github-token-status') as HTMLElement;
+    const editBtn = dialog.querySelector('#github-token-edit-btn') as HTMLButtonElement;
+    const editRow = dialog.querySelector('#github-token-edit-row') as HTMLElement;
+    const input = dialog.querySelector('#github-token-input') as HTMLInputElement;
+    const saveBtn = dialog.querySelector('#github-token-save-btn') as HTMLButtonElement;
+    if (!statusEl || !editBtn || !editRow || !input || !saveBtn) return;
+
+    const refreshStatus = async () => {
+      try {
+        const status = await (window as any).electronAPI.plugins.getGithubTokenStatus();
+        statusEl.textContent = status.configured
+          ? `Configured (••••${status.last4})`
+          : 'Not configured — private-repo plugin updates unavailable.';
+      } catch (error: any) {
+        statusEl.textContent = `Could not read token status: ${error.message}`;
+      }
+    };
+
+    editBtn.addEventListener('click', () => {
+      editRow.style.display = editRow.style.display === 'none' ? 'flex' : 'none';
+      if (editRow.style.display === 'flex') input.focus();
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try {
+        const result = await (window as any).electronAPI.plugins.setGithubToken(input.value);
+        if (result.success) {
+          input.value = '';
+          editRow.style.display = 'none';
+          await refreshStatus();
+          if ((window as any).showNotification) {
+            (window as any).showNotification('GitHub Plugins Token saved', 'success');
+          }
+        } else if ((window as any).showNotification) {
+          (window as any).showNotification(`Failed to save token: ${result.error}`, 'error');
+        }
+      } catch (error: any) {
+        if ((window as any).showNotification) {
+          (window as any).showNotification(`Failed to save token: ${error.message}`, 'error');
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    });
+
+    await refreshStatus();
   }
 
   /**
