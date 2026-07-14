@@ -22,24 +22,28 @@ FictionLab is an installer and management tool that sets up everything you need 
 
 Download the latest installer for your operating system from the [GitHub Releases](../../releases) page (see also the [Release Info site](https://rlryals.github.io/MCP-Electron-App/) for what's in each release):
 
-- **Windows:** `FictionLab-Setup.exe` (Windows 10/11, 64-bit)
-- **macOS:** `FictionLab.dmg` (macOS 10.15+, Intel and Apple Silicon)
-- **Linux:** `FictionLab.AppImage` or `fictionlab.deb` (Ubuntu 20.04+, Debian, other distros)
+- **Windows:** `FictionLab Setup <version> x64.exe` or `... arm64.exe` (Windows 10/11, 64-bit or ARM64)
+- **macOS:** `FictionLab-<version>-arm64.dmg` (macOS 11+, Apple Silicon only -- no Intel/x64 build)
+- **Linux:** `FictionLab.AppImage` or `fictionlab.deb` (Ubuntu 20.04+, Debian, Linux Mint, other distros; x64)
+
+**None of these builds are code-signed** (no Windows Authenticode cert, no Apple Developer cert). Expect an OS security warning on first launch -- see the click-through steps below and [TESTING.md](TESTING.md) for the full checklist.
 
 #### Installation Steps
 
-**Windows:**
-1. Download `FictionLab-Setup.exe`
+**Windows (x64 or ARM64):**
+1. Download the installer matching your architecture (check Settings > System > About > "System type" if unsure)
 2. Double-click the installer
-3. Follow the installation wizard (choose installation folder if desired)
-4. Click "Install" and wait for completion
-5. Launch the app from your Start Menu or Desktop shortcut
+3. Windows SmartScreen will likely warn "Windows protected your PC" -- click **More info** → **Run anyway**
+4. Follow the installation wizard (choose installation folder if desired)
+5. Click "Install" and wait for completion
+6. Launch the app from your Start Menu or Desktop shortcut
 
-**macOS:**
-1. Download `FictionLab.dmg`
+**macOS (Apple Silicon):**
+1. Download `FictionLab-<version>-arm64.dmg`
 2. Open the downloaded DMG file
 3. Drag the FictionLab icon to your Applications folder
-4. Open from Applications (you may need to allow the app in Security & Privacy settings)
+4. Because the app is unsigned and not notarized, a plain double-click will likely be **blocked outright** ("FictionLab is damaged and can't be opened"), not just warned. Instead: **right-click (Control-click) FictionLab in Applications → Open → Open** in the confirmation dialog. This is only needed once.
+   - If macOS still refuses: System Settings → Privacy & Security → "FictionLab was blocked" → **Open Anyway**.
 
 **Linux:**
 1. Download `FictionLab.AppImage` or `fictionlab.deb`
@@ -101,7 +105,7 @@ All of this happens through the app's graphical interface - no configuration fil
 ### System Requirements
 
 **Minimum Requirements:**
-- **OS:** Windows 10/11 (64-bit), macOS 10.15+, or Linux (Ubuntu 20.04+)
+- **OS:** Windows 10/11 (x64 or ARM64), macOS 11+ (Apple Silicon only), or Linux (Ubuntu 20.04+, Debian, Linux Mint)
 - **RAM:** 4GB minimum (8GB recommended)
 - **Disk Space:** 10GB free space (for Docker images and databases)
 - **Internet:** Required for initial setup and downloading components
@@ -182,6 +186,7 @@ If Docker Desktop isn't installed, the app provides a comprehensive step-by-step
 - **[Quick Start](docs/QUICK-START.md)** - Fast setup for experienced users
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Solutions to common problems
 - **[FAQ](docs/FAQ.md)** - Frequently asked questions
+- **[Testing Checklist](TESTING.md)** - Manual per-platform tester script (Linux, macOS, Windows x64/ARM64); also where to report results
 
 **For Developers:**
 - **[Architecture](docs/ARCHITECTURE.md)** - Technical architecture overview

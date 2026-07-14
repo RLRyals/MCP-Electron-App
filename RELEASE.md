@@ -99,11 +99,14 @@ If you maintain a CHANGELOG.md, update it with:
 
 ### 5. Testing
 
-Test the application on multiple platforms:
+Test the application on multiple platforms (see [TESTING.md](TESTING.md) for
+the full tester checklist -- Docker detection, DB init, connector health,
+pluginless core check):
 
-- [ ] Windows 10/11
-- [ ] macOS (Intel and Apple Silicon if possible)
-- [ ] Linux (at least one major distribution)
+- [ ] Windows x64
+- [ ] Windows ARM64
+- [ ] macOS (Apple Silicon)
+- [ ] Linux (Ubuntu/Debian/Mint or another major distribution)
 
 ### 6. Clean State
 
@@ -184,23 +187,61 @@ When a version tag is pushed, the following happens:
 
 ### 2. Build Jobs (Parallel)
 
-Three jobs run simultaneously on different runners:
+Four jobs run simultaneously on different runners (bead mea-0um added the
+Windows ARM64 leg):
 
-#### Windows Build (`windows-latest`)
-- Builds NSIS installer (.exe)
+#### Windows x64 Build (`windows-latest`)
+- Runs `npm run test:ci` (required gate) + the Playwright Electron E2E smoke
+  suite (`e2e/smoke.spec.ts` + `e2e/pluginless.spec.ts`)
+- Builds NSIS installer (.exe), x64
 - Generates SHA256 checksums
 - Uploads to release
 
+#### Windows ARM64 Build (`windows-11-arm`)
+- Same test/smoke gate as the x64 job
+- Builds NSIS installer (.exe), arm64, via `npm run package:win-arm64`
+- Generates SHA256 checksums
+- Uploads to release
+- **Not required for the release to publish.** This is the newest, least-proven
+  leg of the matrix (a brand-new hosted runner class this workflow has never
+  exercised) -- `create-release` waits for it but does not block on its
+  success, so a win-arm64 failure ships the other three platforms without the
+  ARM64 asset rather than blocking everyone. Check the workflow run if the
+  ARM64 installer is missing from a release.
+
 #### macOS Build (`macos-latest`)
-- Builds DMG for Intel (x64) and Apple Silicon (arm64)
+- Same test/smoke gate as the Windows jobs (macOS CI runners are GUI-capable
+  without xvfb)
+- Builds DMG for Apple Silicon (arm64) -- **no Intel/x64 build**
 - Generates SHA256 checksums
 - Uploads to release
 
 #### Linux Build (`ubuntu-latest`)
-- Builds AppImage
-- Builds Debian package (.deb)
+- Same test gate; the E2E smoke suite runs under `xvfb-run` since
+  `ubuntu-latest` is headless
+- Builds AppImage (x64)
+- Builds Debian package (.deb, x64)
 - Generates SHA256 checksums
 - Uploads to release
+
+### Code signing status (honest, as of this release)
+
+**No platform is code-signed.** `CSC_IDENTITY_AUTO_DISCOVERY: false` is set
+on every build job, and no signing secrets are configured. Concretely:
+
+- **Windows** (both x64 and ARM64): unsigned. Users hit a SmartScreen
+  "Windows protected your PC" warning and must click through "More info" →
+  "Run anyway".
+- **macOS**: unsigned and not notarized. Users hit Gatekeeper's harder block
+  ("...is damaged and can't be opened") and must right-click → Open, or use
+  System Settings → Privacy & Security → "Open Anyway".
+- **Linux**: no GPG-signed apt repository; the `.deb` is a standalone package
+  installed directly with `dpkg`, and the AppImage is unsigned (AppImage has
+  no standard code-signing mechanism in wide use).
+
+See [TESTING.md](TESTING.md) for the exact tester-facing click-through steps,
+and the "Code Signing Issues" section below for how to actually turn signing
+on when certificates are available.
 
 ### 3. Release Complete Job
 
@@ -216,18 +257,23 @@ After a successful release:
 
 1. Go to the [Releases page](https://github.com/<username>/MCP-Electron-App/releases)
 2. Check that all artifacts are present:
-   - Windows: `MCP-Electron-App-Setup-vX.X.X.exe`
-   - macOS: `MCP-Electron-App-vX.X.X.dmg`
-   - Linux: `MCP-Electron-App-vX.X.X.AppImage` and `mcp-electron-app_vX.X.X_amd64.deb`
-   - Checksum files for each platform
+   - Windows x64: `FictionLab Setup X.X.X x64.exe`
+   - Windows ARM64: `FictionLab Setup X.X.X arm64.exe` (best-effort -- see the
+     "Windows ARM64 Build" note above; may be absent on a given release)
+   - macOS: `FictionLab-X.X.X-arm64.dmg`
+   - Linux: `FictionLab-X.X.X.AppImage` and `fictionlab_X.X.X_amd64.deb`
+   - Checksum files for each platform (`checksums-windows.txt`,
+     `checksums-windows-arm64.txt`, `checksums-macos.txt`,
+     `checksums-linux.txt`)
 
 ### 2. Test Downloads
 
-Download and test the installer on each platform:
+Download and test the installer on each platform (see
+[TESTING.md](TESTING.md) for the full checklist):
 
 ```bash
 # Verify checksums
-sha256sum MCP-Electron-App-vX.X.X.AppImage
+sha256sum FictionLab-X.X.X.AppImage
 # Compare with checksums-linux.txt
 ```
 
