@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting — FictionLab-App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="site-header">
+    <h1>FictionLab-App Release Info</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="whats-installed.html">What Gets Installed</a>
+      <a href="install-guides.html">Install Guides</a>
+      <a href="components.html">Component Versions</a>
+      <a href="release-notes.html">Release Notes</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+    </nav>
+  </header>
+
+  <h2>Troubleshooting</h2>
+  <p>
+    Known failure modes, keyed by what you see in the app. Each entry tells you what is
+    actually broken, how to confirm it, and the fix that works &mdash; including the
+    tempting fixes that <em>don't</em>.
+  </p>
+
+  <h3 id="docker-port-forwarding">Boards, Workflows, and Database admin are all empty (Windows)</h3>
+
+  <p><strong>Symptom.</strong> FictionLab launches, but the Kanban board shows no boards, the
+  Workflows view shows no workflows, and Settings &gt; Database shows nothing &mdash; all three
+  at once. Docker Desktop reports every container as running and healthy, and your data is
+  still safely in the database.</p>
+
+  <p><strong>What is actually broken.</strong> Docker Desktop's port-forwarding layer &mdash;
+  the relay that carries connections from Windows <code>localhost</code> into the WSL2
+  containers &mdash; has silently died. The containers themselves are fine; checks run
+  <em>inside</em> a container (<code>docker exec</code>) pass, because they bypass the relay.
+  But every Windows-side process, including FictionLab, gets <code>ECONNRESET</code> when it
+  connects to <code>localhost:5432</code> / <code>localhost:6432</code> (PostgreSQL /
+  PgBouncer) or the MCP service ports. All three views die together because they share that
+  one dependency.</p>
+
+  <p><strong>What does NOT fix it.</strong> Restarting or rebuilding the containers, and
+  relaunching the app. The fault is in Docker Desktop itself, not in anything it is running
+  &mdash; this failure has been observed to survive two full container teardown/rebuilds and
+  an app relaunch.</p>
+
+  <p><strong>The fix</strong> &mdash; restart Docker Desktop completely, not the containers:</p>
+  <ol>
+    <li>Right-click the Docker whale in the system tray &rarr; <strong>Quit Docker Desktop</strong>,
+        and wait for it to fully exit.</li>
+    <li>In any terminal (PowerShell or CMD), run <code>wsl --shutdown</code>.</li>
+    <li>Start Docker Desktop again and wait until it reports the engine is running.</li>
+    <li>Relaunch FictionLab. Boards, workflows, and the database view come back on their own
+        &mdash; no data is lost, because the database volume was never the problem.</li>
+  </ol>
+
+  <p class="callout">
+    Rebooting the whole machine also cures it (a reboot restarts Docker Desktop and WSL along
+    with everything else), but it's the sledgehammer version &mdash; the three steps above fix
+    it in under a minute without closing the rest of your work.
+  </p>
+
+  <p><strong>How to confirm this is your problem</strong> before restarting anything: in
+  PowerShell, run <code>Test-NetConnection localhost -Port 6432</code>. If that fails or the
+  connection resets while <code>docker ps</code> still shows
+  <code>fictionlab-postgres</code> and <code>fictionlab-pgbouncer</code> as healthy, the
+  relay is dead and the fix above applies.</p>
+
+  <p class="callout">
+    <strong>Heads-up:</strong> <code>wsl --shutdown</code> stops <em>everything</em> running
+    inside WSL2, not just Docker. On a typical FictionLab install only
+    <code>docker-desktop</code> lives there, so nothing else is affected &mdash; but if you
+    run Linux distros or other WSL workloads, save their state first.
+  </p>
+
+  <footer class="site-footer">
+    <p><a href="index.html">&larr; Back to overview</a></p>
+  </footer>
+</div>
+</body>
+</html>
