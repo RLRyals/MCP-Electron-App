@@ -80,7 +80,17 @@ describe('resolveUpdateSource', () => {
       updateSource: { repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false },
     };
     const source = resolveUpdateSource('fictionlab-kanban', manifest);
-    expect(source).toEqual({ repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false });
+    expect(source).toEqual({ repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false, tagPrefix: undefined });
+  });
+
+  it('carries a manifest-declared tagPrefix through (bead mea-ecp)', () => {
+    const manifest: any = {
+      id: 'fictionlab-kanban',
+      version: '1.0.0',
+      updateSource: { repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false, tagPrefix: 'custom-plugin-' },
+    };
+    const source = resolveUpdateSource('fictionlab-kanban', manifest);
+    expect(source?.tagPrefix).toBe('custom-plugin-');
   });
 
   it('returns null for a plugin with no known or declared update source', () => {
@@ -131,6 +141,28 @@ describe('normalizeVersion', () => {
     expect(normalizeVersion('v1.2.3')).toBe('1.2.3');
     expect(normalizeVersion('1.2.3')).toBe('1.2.3');
   });
+
+  it('strips a tagPrefix before the leading v (per-plugin tags, bead mea-ecp)', () => {
+    expect(normalizeVersion('workflow-plugin-v1.2.0', 'workflow-plugin-')).toBe('1.2.0');
+    expect(normalizeVersion('kanban-plugin-v2.0.0', 'kanban-plugin-')).toBe('2.0.0');
+  });
+
+  it('is a no-op when the tagPrefix does not match', () => {
+    expect(normalizeVersion('workflow-plugin-v1.2.0', 'kanban-plugin-')).toBe('workflow-plugin-v1.2.0');
+  });
+});
+
+describe('KNOWN_PLUGIN_UPDATE_SOURCES tagPrefix (bead mea-ecp)', () => {
+  it('declares a distinct tagPrefix for every known plugin, including fictionlab-agent-factory', () => {
+    expect(KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-workflow'].tagPrefix).toBe('workflow-plugin-');
+    expect(KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-kanban'].tagPrefix).toBe('kanban-plugin-');
+    expect(KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory']).toEqual({
+      repo: 'RLRyals/fictionlab-workflow',
+      assetPattern: 'fictionlab-agent-factory-*.zip',
+      private: true,
+      tagPrefix: 'agent-factory-plugin-',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -142,7 +174,7 @@ describe('checkPluginUpdate', () => {
   it('sends Authorization: Bearer when a token is supplied (private repo)', async () => {
     await writeInstalledPlugin('fictionlab-kanban', '1.0.0');
     const fetchFn = jest.fn().mockResolvedValue(
-      okJsonResponse({ tag_name: 'v1.1.0', assets: [SAMPLE_ASSET] })
+      okJsonResponse([{ tag_name: 'kanban-plugin-v1.1.0', assets: [SAMPLE_ASSET] }])
     );
 
     await checkPluginUpdate({
@@ -153,7 +185,7 @@ describe('checkPluginUpdate', () => {
     });
 
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases/latest',
+      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases?per_page=30&page=1',
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer ghp_test_token' }) })
     );
   });
@@ -188,7 +220,7 @@ describe('checkPluginUpdate', () => {
 
   it('reports "up-to-date" when the latest release is not newer than the installed version', async () => {
     await writeInstalledPlugin('fictionlab-kanban', '1.5.0');
-    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse({ tag_name: 'v1.5.0', assets: [SAMPLE_ASSET] }));
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'kanban-plugin-v1.5.0', assets: [SAMPLE_ASSET] }]));
 
     const result = await checkPluginUpdate({ pluginId: 'fictionlab-kanban', pluginsDir, token: 't', fetchFn: fetchFn as any });
 
@@ -197,7 +229,7 @@ describe('checkPluginUpdate', () => {
 
   it('reports "update-available" with the matched asset when the release is newer', async () => {
     await writeInstalledPlugin('fictionlab-kanban', '1.0.0');
-    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse({ tag_name: 'v1.1.0', assets: [SAMPLE_ASSET] }));
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'kanban-plugin-v1.1.0', assets: [SAMPLE_ASSET] }]));
 
     const result = await checkPluginUpdate({ pluginId: 'fictionlab-kanban', pluginsDir, token: 't', fetchFn: fetchFn as any });
 
@@ -209,7 +241,7 @@ describe('checkPluginUpdate', () => {
   it('reports "no-matching-asset" when the release has no asset for this plugin', async () => {
     await writeInstalledPlugin('fictionlab-kanban', '1.0.0');
     const fetchFn = jest.fn().mockResolvedValue(
-      okJsonResponse({ tag_name: 'v1.1.0', assets: [{ name: 'fictionlab-workflow-1.1.0.zip', browser_download_url: 'x', id: 1 }] })
+      okJsonResponse([{ tag_name: 'kanban-plugin-v1.1.0', assets: [{ name: 'fictionlab-workflow-1.1.0.zip', browser_download_url: 'x', id: 1 }] }])
     );
 
     const result = await checkPluginUpdate({ pluginId: 'fictionlab-kanban', pluginsDir, token: 't', fetchFn: fetchFn as any });
@@ -223,6 +255,34 @@ describe('checkPluginUpdate', () => {
     const result = await checkPluginUpdate({ pluginId: 'some-unrelated-plugin', pluginsDir });
 
     expect(result.status).toBe('no-update-source');
+  });
+
+  it('resolves the correct plugin release out of a mixed-plugin release list, not the repo-wide latest (bead mea-ecp)', async () => {
+    await writeInstalledPlugin('fictionlab-workflow', '1.0.0');
+    // /releases/latest would be the kanban plugin (released most recently);
+    // the fix must walk /releases and pick the workflow-prefixed tag instead.
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => [
+        { tag_name: 'kanban-plugin-v3.0.0', assets: [{ name: 'fictionlab-kanban-3.0.0.zip', browser_download_url: 'x', id: 1 }] },
+        {
+          tag_name: 'workflow-plugin-v1.2.0',
+          assets: [{ name: 'fictionlab-workflow-1.2.0.zip', browser_download_url: 'y', id: 2 }],
+        },
+      ],
+    });
+
+    const result = await checkPluginUpdate({ pluginId: 'fictionlab-workflow', pluginsDir, token: 't', fetchFn: fetchFn as any });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases?per_page=30&page=1',
+      expect.anything()
+    );
+    expect(result.status).toBe('update-available');
+    expect(result.latestVersion).toBe('1.2.0');
+    expect(result.asset?.id).toBe(2);
   });
 
   it('never includes the token in a returned error message', async () => {

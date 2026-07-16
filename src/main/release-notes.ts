@@ -170,6 +170,68 @@ export async function fetchReleaseByTag(
   );
 }
 
+const RELEASES_PAGE_SIZE = 30;
+const RELEASES_MAX_PAGES = 10;
+
+/**
+ * Fetch the latest published release for a repo whose tag_name starts with
+ * `tagPrefix` (bead mea-ecp). Repos that publish one GitHub Release per
+ * plugin (fictionlab-workflow: `workflow-plugin-vX.Y.Z`,
+ * `kanban-plugin-vX.Y.Z`, `agent-factory-plugin-vX.Y.Z`, ...) can't rely on
+ * `/releases/latest`, which is whichever plugin released most recently
+ * repo-wide -- this walks `/repos/{repo}/releases` (paginated, newest first)
+ * and returns the first non-draft, non-prerelease release matching the
+ * prefix.
+ *
+ * When `tagPrefix` is falsy this delegates to `fetchLatestRelease` --
+ * backward compat for single-plugin repos and already-installed manifests
+ * that predate `tagPrefix` (asset-pattern matching remains the final arbiter
+ * either way, so a wrong-prefix match still can't install the wrong asset).
+ */
+export async function fetchLatestReleaseForPrefix(
+  repo: string,
+  tagPrefix: string | undefined | null,
+  options: ReleaseFetchOptions = {}
+): Promise<ReleaseFetchResult> {
+  if (!tagPrefix) {
+    return fetchLatestRelease(repo, options);
+  }
+
+  const fetchFn = options.fetchFn ?? fetch;
+
+  try {
+    for (let page = 1; page <= RELEASES_MAX_PAGES; page++) {
+      const url = `${GITHUB_API_BASE}/repos/${repo}/releases?per_page=${RELEASES_PAGE_SIZE}&page=${page}`;
+      const response = await fetchFn(url, { headers: buildHeaders(options.token) });
+
+      if (!response.ok) {
+        return mapErrorResponse(response);
+      }
+
+      const releases = await response.json();
+      if (!Array.isArray(releases) || releases.length === 0) {
+        return { status: 'not-found' };
+      }
+
+      const match = releases.find(
+        (r: any) =>
+          !r?.draft && !r?.prerelease && typeof r?.tag_name === 'string' && r.tag_name.startsWith(tagPrefix)
+      );
+      if (match) {
+        return parseRelease(match);
+      }
+
+      if (releases.length < RELEASES_PAGE_SIZE) {
+        return { status: 'not-found' };
+      }
+    }
+
+    return { status: 'not-found' };
+  } catch (error: any) {
+    return { status: 'error', error: error?.message || String(error) };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Commit deltas (managed-repo updates: "what changed between old and new SHA")
 // ---------------------------------------------------------------------------

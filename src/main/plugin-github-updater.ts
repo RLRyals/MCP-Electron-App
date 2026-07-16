@@ -49,7 +49,7 @@ import * as os from 'os';
 import * as fs from 'fs-extra';
 import * as semver from 'semver';
 import {
-  fetchLatestRelease,
+  fetchLatestReleaseForPrefix,
   downloadReleaseAsset,
   ReleaseFetchOptions,
   ReleaseInfo,
@@ -74,6 +74,16 @@ export interface PluginUpdateSource {
   assetPattern: string;
   /** True when `repo` requires GITHUB_PLUGINS_TOKEN to read releases at all. */
   private?: boolean;
+  /**
+   * Prefix of this plugin's release tags (e.g. `workflow-plugin-`) in a repo
+   * that publishes one GitHub Release per plugin (bead mea-ecp). When set,
+   * `checkPluginUpdate` resolves the latest release by walking
+   * `/repos/{repo}/releases` for the first non-draft, non-prerelease tag
+   * starting with this prefix instead of the repo-wide `/releases/latest`,
+   * and strips it before comparing versions. Omit for repos that still cut
+   * one release per repo.
+   */
+  tagPrefix?: string;
 }
 
 /**
@@ -81,18 +91,29 @@ export interface PluginUpdateSource {
  * manifest-declared `updateSource` field existed. A plugin whose manifest
  * *does* declare `updateSource` always wins (see `resolveUpdateSource`) --
  * this map only fills the gap for already-installed fictionlab-workflow /
- * fictionlab-kanban copies.
+ * fictionlab-kanban / fictionlab-agent-factory copies. fictionlab-workflow
+ * publishes one GitHub Release per plugin (`workflow-plugin-vX.Y.Z`,
+ * `kanban-plugin-vX.Y.Z`, `agent-factory-plugin-vX.Y.Z`), hence `tagPrefix`
+ * on every entry here (bead mea-ecp).
  */
 export const KNOWN_PLUGIN_UPDATE_SOURCES: Record<string, PluginUpdateSource> = {
   'fictionlab-workflow': {
     repo: 'RLRyals/fictionlab-workflow',
     assetPattern: 'fictionlab-workflow-*.zip',
     private: true,
+    tagPrefix: 'workflow-plugin-',
   },
   'fictionlab-kanban': {
     repo: 'RLRyals/fictionlab-workflow',
     assetPattern: 'fictionlab-kanban-*.zip',
     private: true,
+    tagPrefix: 'kanban-plugin-',
+  },
+  'fictionlab-agent-factory': {
+    repo: 'RLRyals/fictionlab-workflow',
+    assetPattern: 'fictionlab-agent-factory-*.zip',
+    private: true,
+    tagPrefix: 'agent-factory-plugin-',
   },
 };
 
@@ -106,6 +127,7 @@ export function resolveUpdateSource(
       repo: declared.repo,
       assetPattern: declared.assetPattern,
       private: !!declared.private,
+      tagPrefix: typeof declared.tagPrefix === 'string' ? declared.tagPrefix : undefined,
     };
   }
   return KNOWN_PLUGIN_UPDATE_SOURCES[pluginId] ?? null;
@@ -181,9 +203,16 @@ export function findMatchingAsset(
 // Version compare
 // ---------------------------------------------------------------------------
 
-/** Strip a leading "v"/"V" so GitHub's `v1.2.3` tags compare against plain semver. */
-export function normalizeVersion(version: string): string {
-  const trimmed = (version || '').trim();
+/**
+ * Strip a source's `tagPrefix` (if any), then a leading "v"/"V", so both
+ * plain `v1.2.3` tags and per-plugin tags like `workflow-plugin-v1.2.0`
+ * compare against plain semver.
+ */
+export function normalizeVersion(version: string, tagPrefix?: string): string {
+  let trimmed = (version || '').trim();
+  if (tagPrefix && trimmed.startsWith(tagPrefix)) {
+    trimmed = trimmed.slice(tagPrefix.length);
+  }
   return trimmed.replace(/^v/i, '');
 }
 
@@ -244,7 +273,7 @@ export async function checkPluginUpdate(
     return { status: 'token-required', pluginId, currentVersion, source };
   }
 
-  const result = await fetchLatestRelease(source.repo, { token, fetchFn: params.fetchFn });
+  const result = await fetchLatestReleaseForPrefix(source.repo, source.tagPrefix, { token, fetchFn: params.fetchFn });
 
   if (result.status === 'not-found') {
     return { status: 'no-releases', pluginId, currentVersion, source };
@@ -261,7 +290,7 @@ export async function checkPluginUpdate(
   }
 
   const release = result.release;
-  const latestVersion = normalizeVersion(release.tagName);
+  const latestVersion = normalizeVersion(release.tagName, source.tagPrefix);
 
   const isNewer = currentVersion
     ? semver.valid(latestVersion) && semver.valid(currentVersion)

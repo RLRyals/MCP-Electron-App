@@ -9,6 +9,7 @@
 
 import {
   fetchLatestRelease,
+  fetchLatestReleaseForPrefix,
   fetchReleaseByTag,
   fetchCommitDelta,
   getChangeList,
@@ -129,6 +130,89 @@ describe('fetchReleaseByTag', () => {
     const result = await fetchReleaseByTag('RLRyals/MCP-Electron-App', 'v9.9.9', { fetchFn: fetchFn as any });
 
     expect(result.status).toBe('not-found');
+  });
+});
+
+describe('fetchLatestReleaseForPrefix (bead mea-ecp)', () => {
+  it('delegates to fetchLatestRelease when tagPrefix is falsy (backward compat)', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse(SAMPLE_RELEASE));
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/MCP-Electron-App', undefined, { fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('ok');
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.github.com/repos/RLRyals/MCP-Electron-App/releases/latest',
+      expect.anything()
+    );
+  });
+
+  it('picks the first non-draft, non-prerelease release matching the prefix out of a mixed-plugin list', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'kanban-plugin-v2.0.0', assets: [] },
+        { tag_name: 'workflow-plugin-v1.5.0', assets: [] },
+        { tag_name: 'agent-factory-plugin-v0.1.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.5.0');
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases?per_page=30&page=1',
+      expect.anything()
+    );
+  });
+
+  it('skips draft and prerelease releases even when the tag matches', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'workflow-plugin-v2.0.0', draft: true, assets: [] },
+        { tag_name: 'workflow-plugin-v1.9.0', prerelease: true, assets: [] },
+        { tag_name: 'workflow-plugin-v1.5.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.5.0');
+  });
+
+  it('returns "not-found" when no release in the list matches the prefix', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([{ tag_name: 'kanban-plugin-v2.0.0', assets: [] }])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.status).toBe('not-found');
+  });
+
+  it('paginates when the first page is full and has no match', async () => {
+    const page1 = Array.from({ length: 30 }, (_, i) => ({ tag_name: `kanban-plugin-v${i}.0.0`, assets: [] }));
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce(okJsonResponse(page1))
+      .mockResolvedValueOnce(okJsonResponse([{ tag_name: 'workflow-plugin-v1.0.0', assets: [] }]));
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.0.0');
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      'https://api.github.com/repos/RLRyals/fictionlab-workflow/releases?per_page=30&page=2',
+      expect.anything()
+    );
   });
 });
 
