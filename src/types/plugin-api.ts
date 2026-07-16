@@ -89,6 +89,12 @@ export interface PluginManifest {
     assetPattern: string;
     /** True when `repo` requires a token (see GITHUB_PLUGINS_TOKEN). */
     private?: boolean;
+    /**
+     * Prefix of this plugin's release tags (e.g. `workflow-plugin-`) in a
+     * repo that publishes one GitHub Release per plugin (bead mea-ecp).
+     * Omit for repos that still cut one release per repo.
+     */
+    tagPrefix?: string;
   };
 
   /** UI integration points */
