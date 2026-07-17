@@ -80,6 +80,49 @@ function dotColor(status: DetailedServiceStatus['status']): string {
   }
 }
 
+export interface AggregateStatus {
+  status: 'healthy' | 'warning' | 'error';
+  text: string;
+}
+
+/**
+ * Derive the TopBar's aggregate health text/color from the same `overall`
+ * summary the health dots already use (bead mea-lj0). Exported for direct
+ * unit coverage of the derivation rule, independent of the fetch/render
+ * plumbing around it.
+ */
+export function deriveAggregateStatus(overall: DetailedSystemStatus['overall'] | undefined): AggregateStatus {
+  if (!overall) {
+    return { status: 'error', text: 'Status Unknown' };
+  }
+  if (overall.healthy) {
+    return { status: 'healthy', text: 'All Systems Operational' };
+  }
+  if (overall.running) {
+    return { status: 'warning', text: overall.message || 'System Degraded' };
+  }
+  return { status: 'error', text: overall.message || 'System Offline' };
+}
+
+/**
+ * Push the derived aggregate to the TopBar's environment indicator (bead
+ * mea-lj0). The indicator used to read its status from `#dashboard-status-
+ * text` / `#dashboard-status-indicator` DOM elements that issue #214's
+ * cockpit redesign deleted along with the old Dashboard markup -- nothing
+ * has driven it since, so it was permanently stuck on its "Status Unknown"
+ * default regardless of real health. SystemStrip is the strip that already
+ * owns the live health fetch, so it's the natural (and only, today) source
+ * to drive it from, via the same `window.topBar` global renderer.ts exposes
+ * (mirrors the guarded-call convention WorkflowsViewReact.tsx already uses
+ * for topBar.refreshProjectSelector()).
+ */
+function notifyTopBarOfStatus(overall: DetailedSystemStatus['overall'] | undefined): void {
+  const topBar = (window as any).topBar;
+  if (!topBar || typeof topBar.updateEnvironmentStatus !== 'function') return;
+  const aggregate = deriveAggregateStatus(overall);
+  topBar.updateEnvironmentStatus(aggregate.status, aggregate.text);
+}
+
 /**
  * There's no dedicated "Docker daemon" IPC channel exposed to the renderer
  * (checkDockerRunning() in src/main/prerequisites.ts is main-process-only --
@@ -100,6 +143,8 @@ export const SystemStrip: React.FC = () => {
   const [detailed, setDetailed] = useState<DetailedSystemStatus | null>(null);
   const [actionInProgress, setActionInProgress] = useState<SystemAction | null>(null);
   const [progressText, setProgressText] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const actionInProgressRef = useRef<SystemAction | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -108,6 +153,8 @@ export const SystemStrip: React.FC = () => {
       if (!electronAPI?.mcpSystem?.getDetailedStatus) return;
       const result: DetailedSystemStatus = await electronAPI.mcpSystem.getDetailedStatus();
       setDetailed(result);
+      setLastChecked(new Date());
+      notifyTopBarOfStatus(result?.overall);
     } catch (error) {
       console.error('[SystemStrip] Failed to fetch detailed status:', error);
     }
@@ -116,7 +163,19 @@ export const SystemStrip: React.FC = () => {
   useEffect(() => {
     fetchStatus();
     const pollInterval = setInterval(fetchStatus, POLL_INTERVAL_MS);
-    const handleRefresh = () => fetchStatus();
+    // The Refresh top-bar action (DashboardView's handleAction('refresh'))
+    // dispatches this event. Unlike the silent poll above, a manual refresh
+    // needs VISIBLE feedback (bead mea-lj0) -- the health dots update either
+    // way, but with nothing already unhealthy, that update is invisible, so
+    // clicking Refresh looked like it did nothing.
+    const handleRefresh = async () => {
+      setIsRefreshing(true);
+      try {
+        await fetchStatus();
+      } finally {
+        setIsRefreshing(false);
+      }
+    };
     window.addEventListener('dashboard-refresh', handleRefresh);
     return () => {
       clearInterval(pollInterval);
@@ -227,6 +286,18 @@ export const SystemStrip: React.FC = () => {
     color: 'var(--color-text-tertiary)',
   };
 
+  // Manual-refresh feedback (bead mea-lj0): "Checking…" while in flight,
+  // then a last-checked timestamp -- takes priority over nothing so the
+  // Refresh button visibly does something even when no dot changes color.
+  // Falls back to any Start/Stop/Restart progress text when one is running.
+  const statusLineText = progressText
+    ? progressText
+    : isRefreshing
+    ? 'Checking…'
+    : lastChecked
+    ? `Checked ${lastChecked.toLocaleTimeString()}`
+    : '';
+
   const services = detailed?.services || [];
   // "Writing Srv" / "Connector" per the design supplement's ASCII layout --
   // getDetailedServiceStatus() names them "MCP Writing Servers" / "MCP Connector".
@@ -253,7 +324,11 @@ export const SystemStrip: React.FC = () => {
       </div>
 
       <div style={actionsContainerStyle}>
-        {progressText && <span style={progressTextStyle}>{progressText}</span>}
+        {statusLineText && (
+          <span style={progressTextStyle} aria-live="polite">
+            {statusLineText}
+          </span>
+        )}
         <div style={buttonGroupStyle} role="group" aria-label="System controls">
           {(['start', 'stop', 'restart'] as SystemAction[]).map((action) => (
             <button
