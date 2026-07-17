@@ -295,6 +295,7 @@ function createMCPConnectionManager(
         'review': 3007,
         'reporting': 3008,
         'author': 3009,
+        'outline': 3013,
         'kanban': 3015,
       };
 
