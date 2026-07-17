@@ -5,58 +5,44 @@
  * (status bar, quick actions grid, database management, hardcoded service
  * cards, an unfed Recent Activity list).
  *
- * Follows the WorkflowsViewReact host-bundled React view idiom, but data
- * fetching for workflows + kanban cards is centralized here (rather than
- * duplicated per panel) because the dedupe rule (a kanban card is
- * suppressed if its workflow_registry_id matches an already-shown run)
- * needs both lists computed together, and Running/Blocked both need
- * different slices of the *same* workflow list.
+ * The panel grid is now kanban-only: running/blocked workflow runs used to
+ * be centralized here too (deduped against kanban cards sharing a
+ * workflow_registry_id), until the workflow plugin grew its own dashboard
+ * widget for that (bead mea-cjl.4, packages/workflow-plugin/src/renderer/
+ * dashboard-widget.tsx in fictionlab-workflow). That cross-plugin dedupe
+ * has no home anymore -- it needed both lists in one place, and the
+ * workflow plugin can't reach into kanban's data without coupling to its
+ * IPC contract. A kanban card mirroring a running workflow may now appear
+ * in both the kanban panel grid below and the workflow widget above.
  *
- * Plugin containment: this file lives in the host and aggregates host +
- * plugin data purely over IPC (`plugin:fictionlab-kanban:*` channels via
- * electronAPI.invoke/on) -- it never imports plugin code.
+ * Plugin containment: this file lives in the host and renders kanban data
+ * purely over IPC (`plugin:fictionlab-kanban:*` channels via
+ * electronAPI.invoke/on) -- it never imports plugin code. Any
+ * plugin-contributed dashboard widgets (workflow's Running/Blocked cards,
+ * and future ones) render above this grid rather than replacing it, since
+ * kanban's content isn't covered by any widget yet.
  */
 
 import * as React from 'react';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { ActiveWorkflowInstance, WorkflowUpdate } from '../../types/workflow.js';
 import { RunningPanel } from '../components/dashboard/RunningPanel.js';
 import { NextPanel } from '../components/dashboard/NextPanel.js';
 import { BlockedPanel } from '../components/dashboard/BlockedPanel.js';
 import { SystemStrip } from '../components/dashboard/SystemStrip.js';
 import { NoPluginsEmptyState } from '../components/dashboard/NoPluginsEmptyState.js';
 import { DashboardWidgetSlot } from '../components/dashboard/DashboardWidgetSlot.js';
-import {
-  KANBAN_PLUGIN_ID,
-  WORKFLOW_PLUGIN_ID,
-  DEFAULT_BOARD_KEY,
-  isPluginActive,
-} from '../components/dashboard/types.js';
+import { KANBAN_PLUGIN_ID, DEFAULT_BOARD_KEY, isPluginActive } from '../components/dashboard/types.js';
 import type { KanbanCard } from '../components/dashboard/types.js';
 import { loadActiveDashboardWidgets } from '../services/dashboardWidgetLoader.js';
 import type { LoadedDashboardWidget } from '../services/dashboardWidgetLoader.js';
 
 const KANBAN_PLUGIN_PREFIX = `plugin:${KANBAN_PLUGIN_ID}:`;
 
-// Workflow list poll interval. Design supplement item 6 only mandates a 15s
-// poll backstop for the strip, but WorkflowManagerPanel.tsx already
-// established (and documented, see its loadActiveWorkflows() effect) that
-// workflow:instance-updated alone isn't enough: a workflow driven by an
-// external Claude Code session never goes through the IPC handlers that
-// call broadcastWorkflowUpdate(), so the push channel never fires for it
-// (see also WorkflowsViewReact.tsx's identical poll-fallback comment,
-// issue #178). Reusing that exact 5s poll here for the same IPC channel
-// avoids reintroducing that already-fixed-elsewhere bug in the cockpit.
-const WORKFLOW_POLL_INTERVAL_MS = 5000;
-
 const WIDE_LAYOUT_QUERY = '(min-width: 1100px)';
 
 export const DashboardApp: React.FC = () => {
-  const [workflows, setWorkflows] = useState<ActiveWorkflowInstance[]>([]);
   const [kanbanCards, setKanbanCards] = useState<KanbanCard[]>([]);
-  const [workflowPluginActive, setWorkflowPluginActive] = useState(false);
   const [kanbanPluginActive, setKanbanPluginActive] = useState(false);
-  const [workflowsLoading, setWorkflowsLoading] = useState(true);
   const [kanbanLoading, setKanbanLoading] = useState(true);
   // null = not yet checked (default to the "plugins installed" layout until
   // resolved, so nothing flashes empty on first paint).
@@ -66,19 +52,12 @@ export const DashboardApp: React.FC = () => {
     typeof window.matchMedia === 'function' ? window.matchMedia(WIDE_LAYOUT_QUERY).matches : true
   );
 
-  const workflowPluginActiveRef = useRef(workflowPluginActive);
   const kanbanPluginActiveRef = useRef(kanbanPluginActive);
-  workflowPluginActiveRef.current = workflowPluginActive;
   kanbanPluginActiveRef.current = kanbanPluginActive;
 
   // ---- Plugin gating -------------------------------------------------
   const checkPlugins = useCallback(async () => {
-    const [wfActive, kbActive] = await Promise.all([
-      isPluginActive(WORKFLOW_PLUGIN_ID),
-      isPluginActive(KANBAN_PLUGIN_ID),
-    ]);
-    setWorkflowPluginActive(wfActive);
-    setKanbanPluginActive(kbActive);
+    setKanbanPluginActive(await isPluginActive(KANBAN_PLUGIN_ID));
   }, []);
 
   // ---- Widget-slot API (bead mea-cjl.1): pluginless empty state + any
@@ -117,50 +96,6 @@ export const DashboardApp: React.FC = () => {
     electronAPI.on('plugin-state-changed', handlePluginStateChanged);
     return () => electronAPI.off('plugin-state-changed', handlePluginStateChanged);
   }, [checkPlugins, checkInstalledPlugins, loadWidgets]);
-
-  // ---- Workflow list (RUNNING + BLOCKED-failed) -----------------------
-  const loadWorkflows = useCallback(async () => {
-    if (!workflowPluginActiveRef.current) return;
-    try {
-      const electronAPI = (window as any).electronAPI;
-      if (!electronAPI?.invoke) return;
-      const result = await electronAPI.invoke('workflow:list-active');
-      if (Array.isArray(result)) {
-        setWorkflows(result);
-      }
-    } catch (error) {
-      console.error('[DashboardApp] Failed to load active workflows:', error);
-    } finally {
-      setWorkflowsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!workflowPluginActive) {
-      setWorkflows([]);
-      setWorkflowsLoading(false);
-      return;
-    }
-
-    setWorkflowsLoading(true);
-    loadWorkflows();
-
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.on || !electronAPI?.off) return;
-
-    const handleUpdate = (_update: WorkflowUpdate) => loadWorkflows();
-    electronAPI.on('workflow:instance-updated', handleUpdate);
-
-    const pollInterval = setInterval(loadWorkflows, WORKFLOW_POLL_INTERVAL_MS);
-    const handleDashboardRefresh = () => loadWorkflows();
-    window.addEventListener('dashboard-refresh', handleDashboardRefresh);
-
-    return () => {
-      electronAPI.off('workflow:instance-updated', handleUpdate);
-      clearInterval(pollInterval);
-      window.removeEventListener('dashboard-refresh', handleDashboardRefresh);
-    };
-  }, [workflowPluginActive, loadWorkflows]);
 
   // ---- Kanban cards (RUNNING in_progress/claimed, NEXT ready, BLOCKED) --
   const loadKanbanCards = useCallback(async () => {
@@ -228,28 +163,9 @@ export const DashboardApp: React.FC = () => {
   }, []);
 
   // ---- Derived slices ---------------------------------------------------
-  const runningWorkflows = useMemo(
-    () => workflows.filter((w) => w.status === 'running' || w.status === 'paused'),
-    [workflows]
-  );
-  const failedWorkflows = useMemo(() => workflows.filter((w) => w.status === 'failed'), [workflows]);
-
-  // Dedupe rule: a kanban card whose workflow_registry_id matches an
-  // already-shown running/paused workflow is suppressed from the Running
-  // panel's card list -- the ActiveWorkflowCard already represents it.
-  const runningRegistryIds = useMemo(
-    () => new Set(runningWorkflows.map((w) => w.id)),
-    [runningWorkflows]
-  );
-
   const runningKanbanCards = useMemo(
-    () =>
-      kanbanCards.filter(
-        (c) =>
-          (c.status === 'in_progress' || c.status === 'claimed') &&
-          !(c.workflow_registry_id && runningRegistryIds.has(c.workflow_registry_id))
-      ),
-    [kanbanCards, runningRegistryIds]
+    () => kanbanCards.filter((c) => c.status === 'in_progress' || c.status === 'claimed'),
+    [kanbanCards]
   );
 
   const nextKanbanCards = useMemo(() => kanbanCards.filter((c) => c.status === 'ready'), [kanbanCards]);
@@ -262,27 +178,9 @@ export const DashboardApp: React.FC = () => {
     [kanbanCards]
   );
 
-  const blockedHasItems =
-    (kanbanPluginActive && blockedKanbanCards.length > 0) || (workflowPluginActive && failedWorkflows.length > 0);
+  const blockedHasItems = kanbanPluginActive && blockedKanbanCards.length > 0;
 
   // ---- Actions -----------------------------------------------------------
-  const invokeWorkflowAction = useCallback(
-    async (channel: string, registryId: string) => {
-      try {
-        const electronAPI = (window as any).electronAPI;
-        await electronAPI.invoke(channel, registryId);
-        loadWorkflows();
-      } catch (error) {
-        console.error(`[DashboardApp] Failed to invoke ${channel}:`, error);
-      }
-    },
-    [loadWorkflows]
-  );
-
-  const handlePause = useCallback((id: string) => invokeWorkflowAction('workflow:pause', id), [invokeWorkflowAction]);
-  const handleResume = useCallback((id: string) => invokeWorkflowAction('workflow:resume', id), [invokeWorkflowAction]);
-  const handleCancel = useCallback((id: string) => invokeWorkflowAction('workflow:cancel', id), [invokeWorkflowAction]);
-
   // Card deep-link (bead mea-5bq): navigate to the Board view AND tell it
   // which card to open. The card id crosses the app->plugin boundary via
   // ViewRouter's existing `navigateTo(viewId, params)` -> `view.mount(container,
@@ -291,10 +189,6 @@ export const DashboardApp: React.FC = () => {
   // versions ignore the extra param and just show the board (previous behavior).
   const handleCardClick = useCallback((card: KanbanCard) => {
     (window as any).__viewRouter__?.navigateTo?.('kanban', { cardId: card.id });
-  }, []);
-
-  const handleWorkflowClick = useCallback((_workflow: ActiveWorkflowInstance) => {
-    (window as any).__viewRouter__?.navigateTo?.('workflows');
   }, []);
 
   // ---- Layout -------------------------------------------------------------
@@ -331,16 +225,11 @@ export const DashboardApp: React.FC = () => {
 
   const runningColumn = (
     <div style={{ ...columnStyle, order: !isWide ? (blockedHasItems ? 1 : 0) : undefined }} key="running">
-      <div style={headingStyle}>Running ({runningWorkflows.length + runningKanbanCards.length})</div>
+      <div style={headingStyle}>Running ({runningKanbanCards.length})</div>
       <RunningPanel
-        workflows={runningWorkflows}
         kanbanCards={runningKanbanCards}
-        workflowPluginActive={workflowPluginActive}
         kanbanPluginActive={kanbanPluginActive}
-        loading={workflowsLoading || kanbanLoading}
-        onPause={handlePause}
-        onResume={handleResume}
-        onCancel={handleCancel}
+        loading={kanbanLoading}
         onCardClick={handleCardClick}
       />
     </div>
@@ -360,15 +249,12 @@ export const DashboardApp: React.FC = () => {
 
   const blockedColumn = (
     <div style={{ ...columnStyle, order: !isWide ? (blockedHasItems ? 0 : 2) : undefined }} key="blocked">
-      <div style={headingStyle}>Blocked ({blockedKanbanCards.length + failedWorkflows.length})</div>
+      <div style={headingStyle}>Blocked ({blockedKanbanCards.length})</div>
       <BlockedPanel
         kanbanCards={blockedKanbanCards}
-        failedWorkflows={failedWorkflows}
         kanbanPluginActive={kanbanPluginActive}
-        workflowPluginActive={workflowPluginActive}
-        loading={workflowsLoading || kanbanLoading}
+        loading={kanbanLoading}
         onCardClick={handleCardClick}
-        onWorkflowClick={handleWorkflowClick}
       />
     </div>
   );
@@ -391,22 +277,25 @@ export const DashboardApp: React.FC = () => {
       <SystemStrip />
       {noPluginsInstalled ? (
         <NoPluginsEmptyState />
-      ) : dashboardWidgets.length > 0 ? (
-        <div style={widgetsContainerStyle} className="dashboard-widgets">
-          {dashboardWidgets.map((widget) => (
-            <DashboardWidgetSlot
-              key={`${widget.pluginId}:${widget.widgetId}`}
-              WidgetClass={widget.WidgetClass}
-              pluginId={widget.pluginId}
-            />
-          ))}
-        </div>
       ) : (
-        <div style={panelsContainerStyle} className="dashboard-cockpit-panels">
-          {runningColumn}
-          {nextColumn}
-          {blockedColumn}
-        </div>
+        <>
+          {dashboardWidgets.length > 0 && (
+            <div style={widgetsContainerStyle} className="dashboard-widgets">
+              {dashboardWidgets.map((widget) => (
+                <DashboardWidgetSlot
+                  key={`${widget.pluginId}:${widget.widgetId}`}
+                  WidgetClass={widget.WidgetClass}
+                  pluginId={widget.pluginId}
+                />
+              ))}
+            </div>
+          )}
+          <div style={panelsContainerStyle} className="dashboard-cockpit-panels">
+            {runningColumn}
+            {nextColumn}
+            {blockedColumn}
+          </div>
+        </>
       )}
     </div>
   );
