@@ -12,7 +12,7 @@
 import * as React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SystemStrip } from '../SystemStrip';
+import { SystemStrip, deriveAggregateStatus } from '../SystemStrip';
 
 function installElectronAPI(overrides: Partial<any> = {}) {
   const api = {
@@ -84,5 +84,85 @@ describe('SystemStrip', () => {
 
     expect(api.mcpSystem.start).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(api.mcpSystem.getDetailedStatus).toHaveBeenCalled());
+  });
+});
+
+describe('deriveAggregateStatus (bead mea-lj0)', () => {
+  it('reports healthy when overall.healthy is true', () => {
+    expect(deriveAggregateStatus({ running: true, healthy: true, ready: true, message: 'ok' })).toEqual({
+      status: 'healthy',
+      text: 'All Systems Operational',
+    });
+  });
+
+  it('reports warning with the service message when running but not yet healthy', () => {
+    expect(
+      deriveAggregateStatus({ running: true, healthy: false, ready: false, message: 'Starting Postgres...' })
+    ).toEqual({ status: 'warning', text: 'Starting Postgres...' });
+  });
+
+  it('falls back to a generic warning message when running-but-unhealthy has no message', () => {
+    expect(deriveAggregateStatus({ running: true, healthy: false, ready: false, message: '' })).toEqual({
+      status: 'warning',
+      text: 'System Degraded',
+    });
+  });
+
+  it('reports error when not running, using the service message', () => {
+    expect(
+      deriveAggregateStatus({ running: false, healthy: false, ready: false, message: 'Docker not detected' })
+    ).toEqual({ status: 'error', text: 'Docker not detected' });
+  });
+
+  it('reports error with "System Offline" when not running and no message', () => {
+    expect(deriveAggregateStatus({ running: false, healthy: false, ready: false, message: '' })).toEqual({
+      status: 'error',
+      text: 'System Offline',
+    });
+  });
+
+  it('reports "Status Unknown" when overall is undefined (status not fetched yet)', () => {
+    expect(deriveAggregateStatus(undefined)).toEqual({ status: 'error', text: 'Status Unknown' });
+  });
+});
+
+describe('SystemStrip -> TopBar aggregate push (bead mea-lj0)', () => {
+  it('pushes the derived healthy aggregate to window.topBar.updateEnvironmentStatus on fetch', async () => {
+    installElectronAPI();
+    const updateEnvironmentStatus = jest.fn();
+    (window as any).topBar = { updateEnvironmentStatus };
+
+    render(<SystemStrip />);
+
+    await waitFor(() =>
+      expect(updateEnvironmentStatus).toHaveBeenCalledWith('healthy', 'All Systems Operational')
+    );
+
+    delete (window as any).topBar;
+  });
+
+  it('does not throw when window.topBar is unavailable', async () => {
+    installElectronAPI();
+    delete (window as any).topBar;
+
+    render(<SystemStrip />);
+    await screen.findByText('Postgres');
+    // No assertion beyond "didn't throw".
+  });
+
+  it('shows "Checking…" then a last-checked timestamp after a manual dashboard-refresh', async () => {
+    installElectronAPI();
+    render(<SystemStrip />);
+    await screen.findByText('Postgres');
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
+    });
+
+    // The refresh resolves near-instantly with mocked IPC, but the
+    // "Checking…"/"Checked <time>" text is the visible-feedback contract
+    // under test -- assert the end state landed rather than racing the
+    // synchronous flip back to false.
+    await waitFor(() => expect(screen.getByText(/^Checked /)).toBeInTheDocument());
   });
 });

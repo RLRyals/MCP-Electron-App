@@ -38,6 +38,11 @@ export class TopBar {
   private container: HTMLElement;
   private currentConfig: TopBarConfig = {};
   private listeners: Map<string, Set<Function>> = new Map();
+  // Last aggregate status pushed via updateEnvironmentStatus() (bead
+  // mea-lj0). null = never pushed yet (e.g. Dashboard/SystemStrip hasn't
+  // mounted this session) -- rendered as a neutral "Status Unknown", not a
+  // false "error", so a real error can't be confused with "not checked yet".
+  private environmentStatus: { status: 'healthy' | 'warning' | 'error'; text: string } | null = null;
 
   constructor(options: TopBarOptions) {
     this.container = options.container;
@@ -293,37 +298,20 @@ export class TopBar {
    * Render environment indicator
    */
   private renderEnvironmentIndicator(): string {
-    // Get actual system status from DOM (updated by dashboard handlers)
-    const statusTextElement = document.getElementById('dashboard-status-text');
-    const statusIndicator = document.getElementById('dashboard-status-indicator');
-
-    let status: 'healthy' | 'warning' | 'error' = 'error';
-    let statusText = 'Status Unknown';
-
-    if (statusTextElement && statusIndicator) {
-      const currentStatusText = statusTextElement.textContent || '';
-
-      // Map dashboard status to environment indicator status
-      if (currentStatusText === 'System Ready') {
-        status = 'healthy';
-        statusText = 'All Systems Operational';
-      } else if (currentStatusText === 'System Starting' || currentStatusText === 'System Degraded') {
-        status = 'warning';
-        statusText = currentStatusText;
-      } else if (currentStatusText === 'System Offline') {
-        status = 'error';
-        statusText = 'System Offline';
-      } else {
-        // Unknown status
-        status = 'error';
-        statusText = currentStatusText || 'Status Unknown';
-      }
-    }
+    // Driven by updateEnvironmentStatus() (bead mea-lj0) -- SystemStrip
+    // pushes the live aggregate here on every status fetch. Previously this
+    // read `#dashboard-status-text` / `#dashboard-status-indicator`, DOM
+    // elements the old Dashboard markup owned; issue #214's cockpit redesign
+    // deleted that markup without replacing what fed this indicator, so it
+    // was permanently stuck reporting "Status Unknown" regardless of real
+    // health (verified 2026-07-17 -- neither id exists anywhere in the tree).
+    const statusClass = this.environmentStatus?.status ?? '';
+    const statusText = this.environmentStatus?.text ?? 'Status Unknown';
 
     return `
       <div class="environment-indicator">
-        <span class="environment-dot ${status}"></span>
-        <span class="environment-text">${statusText}</span>
+        <span class="environment-dot ${statusClass}"></span>
+        <span class="environment-text">${this.escapeHtml(statusText)}</span>
       </div>
     `;
   }
@@ -749,6 +737,12 @@ export class TopBar {
    * This method is called by the dashboard handlers when status changes
    */
   public updateEnvironmentStatus(status: 'healthy' | 'warning' | 'error', text?: string): void {
+    // Persist so the NEXT full render() (e.g. navigating to another view,
+    // which rebuilds this markup from scratch via setContext -> render())
+    // still reflects the last known status instead of resetting to "Status
+    // Unknown" (bead mea-lj0) -- see renderEnvironmentIndicator().
+    this.environmentStatus = { status, text: text ?? this.environmentStatus?.text ?? 'Status Unknown' };
+
     const indicator = this.container.querySelector('.environment-indicator');
     if (indicator) {
       const dot = indicator.querySelector('.environment-dot');
@@ -761,8 +755,8 @@ export class TopBar {
         dot.classList.add(status);
       }
 
-      if (textEl && text) {
-        textEl.textContent = text;
+      if (textEl) {
+        textEl.textContent = this.environmentStatus.text;
       }
     }
   }
