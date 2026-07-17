@@ -24,6 +24,8 @@ import { RunningPanel } from '../components/dashboard/RunningPanel.js';
 import { NextPanel } from '../components/dashboard/NextPanel.js';
 import { BlockedPanel } from '../components/dashboard/BlockedPanel.js';
 import { SystemStrip } from '../components/dashboard/SystemStrip.js';
+import { NoPluginsEmptyState } from '../components/dashboard/NoPluginsEmptyState.js';
+import { DashboardWidgetSlot } from '../components/dashboard/DashboardWidgetSlot.js';
 import {
   KANBAN_PLUGIN_ID,
   WORKFLOW_PLUGIN_ID,
@@ -31,6 +33,8 @@ import {
   isPluginActive,
 } from '../components/dashboard/types.js';
 import type { KanbanCard } from '../components/dashboard/types.js';
+import { loadActiveDashboardWidgets } from '../services/dashboardWidgetLoader.js';
+import type { LoadedDashboardWidget } from '../services/dashboardWidgetLoader.js';
 
 const KANBAN_PLUGIN_PREFIX = `plugin:${KANBAN_PLUGIN_ID}:`;
 
@@ -54,6 +58,10 @@ export const DashboardApp: React.FC = () => {
   const [kanbanPluginActive, setKanbanPluginActive] = useState(false);
   const [workflowsLoading, setWorkflowsLoading] = useState(true);
   const [kanbanLoading, setKanbanLoading] = useState(true);
+  // null = not yet checked (default to the "plugins installed" layout until
+  // resolved, so nothing flashes empty on first paint).
+  const [installedPluginCount, setInstalledPluginCount] = useState<number | null>(null);
+  const [dashboardWidgets, setDashboardWidgets] = useState<LoadedDashboardWidget[]>([]);
   const [isWide, setIsWide] = useState(() =>
     typeof window.matchMedia === 'function' ? window.matchMedia(WIDE_LAYOUT_QUERY).matches : true
   );
@@ -73,14 +81,42 @@ export const DashboardApp: React.FC = () => {
     setKanbanPluginActive(kbActive);
   }, []);
 
+  // ---- Widget-slot API (bead mea-cjl.1): pluginless empty state + any
+  // plugin-contributed dashboard widgets ---------------------------------
+  const checkInstalledPlugins = useCallback(async () => {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI?.plugins?.list) {
+      setInstalledPluginCount(0);
+      return;
+    }
+    try {
+      const plugins = await electronAPI.plugins.list();
+      setInstalledPluginCount(Array.isArray(plugins) ? plugins.length : 0);
+    } catch (error) {
+      console.error('[DashboardApp] Failed to list installed plugins:', error);
+      setInstalledPluginCount(0);
+    }
+  }, []);
+
+  const loadWidgets = useCallback(async () => {
+    const widgets = await loadActiveDashboardWidgets();
+    setDashboardWidgets(widgets);
+  }, []);
+
   useEffect(() => {
     checkPlugins();
+    checkInstalledPlugins();
+    loadWidgets();
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI?.on || !electronAPI?.off) return;
-    const handlePluginStateChanged = () => checkPlugins();
+    const handlePluginStateChanged = () => {
+      checkPlugins();
+      checkInstalledPlugins();
+      loadWidgets();
+    };
     electronAPI.on('plugin-state-changed', handlePluginStateChanged);
     return () => electronAPI.off('plugin-state-changed', handlePluginStateChanged);
-  }, [checkPlugins]);
+  }, [checkPlugins, checkInstalledPlugins, loadWidgets]);
 
   // ---- Workflow list (RUNNING + BLOCKED-failed) -----------------------
   const loadWorkflows = useCallback(async () => {
@@ -337,14 +373,41 @@ export const DashboardApp: React.FC = () => {
     </div>
   );
 
+  // No plugins installed at all -> collapse to the health strip + an
+  // install-plugins affordance (epic mea-cjl target: pluginless core).
+  // installedPluginCount === null means "not checked yet"; default to the
+  // panel grid below rather than flashing the empty state.
+  const noPluginsInstalled = installedPluginCount === 0;
+
+  const widgetsContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    padding: '16px',
+  };
+
   return (
     <div style={containerStyle}>
       <SystemStrip />
-      <div style={panelsContainerStyle} className="dashboard-cockpit-panels">
-        {runningColumn}
-        {nextColumn}
-        {blockedColumn}
-      </div>
+      {noPluginsInstalled ? (
+        <NoPluginsEmptyState />
+      ) : dashboardWidgets.length > 0 ? (
+        <div style={widgetsContainerStyle} className="dashboard-widgets">
+          {dashboardWidgets.map((widget) => (
+            <DashboardWidgetSlot
+              key={`${widget.pluginId}:${widget.widgetId}`}
+              WidgetClass={widget.WidgetClass}
+              pluginId={widget.pluginId}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={panelsContainerStyle} className="dashboard-cockpit-panels">
+          {runningColumn}
+          {nextColumn}
+          {blockedColumn}
+        </div>
+      )}
     </div>
   );
 };
