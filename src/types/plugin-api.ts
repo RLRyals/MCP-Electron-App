@@ -184,6 +184,17 @@ export interface PluginUIConfig {
   /** Sidebar widget component */
   sidebarWidget?: string;
 
+  /**
+   * Dashboard widget component identifier (bead mea-cjl.1). When the
+   * manifest also declares `entry.renderer`, the host dynamically imports
+   * that SAME bundle and looks for a NAMED export `dashboardWidget` (the
+   * `entry.renderer` doc comment above reserves the default export for
+   * `ui.mainView`) — a widget class implementing `{ mount(container),
+   * unmount?() }` — and mounts one instance into the Dashboard under this
+   * id. Omit if the plugin contributes no dashboard widget.
+   */
+  dashboardWidget?: string;
+
   /** Settings panel component */
   settingsPanel?: string;
 
