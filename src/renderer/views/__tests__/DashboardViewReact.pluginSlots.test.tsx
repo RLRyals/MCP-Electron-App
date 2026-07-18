@@ -87,9 +87,14 @@ describe('DashboardApp pluginless empty state (bead mea-cjl.1)', () => {
     expect(screen.queryByText('No plugins installed')).not.toBeInTheDocument();
   });
 
-  it('with a plugin contributing a dashboard widget, renders the widget slot instead of the cockpit columns', async () => {
+  it('with a plugin contributing a dashboard widget, renders the widget slot ALONGSIDE the (kanban) cockpit columns', async () => {
+    // Widgets and the panel grid are composited, not exclusive -- the grid
+    // is kanban-only since bead mea-cjl.4 moved the workflow columns into
+    // the workflow plugin's own widget, so it still needs to render even
+    // when a widget is present (kanban's content isn't covered by any
+    // widget yet, see DashboardViewReact.tsx's module doc comment).
     loadActiveDashboardWidgets.mockResolvedValue([
-      { pluginId: 'fictionlab-workflow', pluginVersion: '1.0.0', widgetId: 'workflow-widget', WidgetClass: FakeWorkflowWidget },
+      { pluginId: 'fictionlab-workflow', pluginVersion: '1.0.0', widgetId: 'workflow-status', WidgetClass: FakeWorkflowWidget },
     ]);
     installMocks([{ id: 'fictionlab-workflow', status: 'active' }]);
 
@@ -97,6 +102,6 @@ describe('DashboardApp pluginless empty state (bead mea-cjl.1)', () => {
 
     await waitFor(() => expect(screen.getByText('RUNNING / NEXT / BLOCKED')).toBeInTheDocument());
     expect(screen.queryByText('No plugins installed')).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Running \(/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/^Running \(/)).toBeInTheDocument();
   });
 });

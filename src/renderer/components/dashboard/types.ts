@@ -30,7 +30,7 @@ export interface KanbanCard {
   due_at?: string | null;
   /** e.g. 'review-required' -- gates whether a review-column card counts as Blocked. */
   review_policy?: string | null;
-  /** Set when a workflow run is attached to this card (join key for the dedupe rule). */
+  /** Set when a workflow run is attached to this card. */
   workflow_registry_id?: string | null;
   workflow_phase?: string | null;
   workflow_progress_percent?: number | null;
@@ -59,7 +59,6 @@ export const PRIORITY_LABELS: Record<string, string> = {
 };
 
 export const KANBAN_PLUGIN_ID = 'fictionlab-kanban';
-export const WORKFLOW_PLUGIN_ID = 'fictionlab-workflow';
 
 /**
  * Board scope (design supplement item 5): the cockpit should follow the
