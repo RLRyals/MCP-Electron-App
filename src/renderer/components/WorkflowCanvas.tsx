@@ -36,6 +36,7 @@ import { DocumentEditDialog } from './dialogs/DocumentEditDialog.js';
 import type { WorkflowNode } from '../../types/workflow-nodes.js';
 import type { LLMProviderConfig } from '../../types/llm-providers.js';
 import type { NodeStatusInfo } from '../../types/workflow.js';
+import type { VariableReference } from '../../types/workflow-context.js';
 
 // Simple debounce utility
 function debounce<T extends (...args: any[]) => void>(
@@ -370,6 +371,38 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
     }
   }, [graphData.nodes, availableProviders]);
 
+  // Variables available to the node currently being edited: every ancestor
+  // reachable by walking incoming edges backward through the graph. This is
+  // resolved statically from the graph shape, not from execution results.
+  const editingNodeAvailableVariables = useMemo((): VariableReference[] => {
+    if (!editingNode) return [];
+
+    const nodesById = new Map(graphData.nodes.map(n => [String(n.id), n]));
+    const visited = new Set<string>();
+    const queue: string[] = [editingNode.id];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      for (const edge of graphData.edges) {
+        if (String(edge.target) === currentId && !visited.has(String(edge.source))) {
+          const sourceId = String(edge.source);
+          visited.add(sourceId);
+          queue.push(sourceId);
+        }
+      }
+    }
+
+    return Array.from(visited)
+      .map(id => nodesById.get(id))
+      .filter((n): n is NonNullable<typeof n> => !!n)
+      .map(n => ({
+        nodeId: String(n.id),
+        nodeName: n.name || 'Unnamed',
+        nodeType: n.type,
+        path: `$.${n.id}.output`,
+        type: 'object',
+      }));
+  }, [editingNode, graphData.nodes, graphData.edges]);
 
   // Handle save edited node (new NodeConfigDialog)
   const handleSaveNode = useCallback(async (updatedNode: WorkflowNode) => {
@@ -1140,6 +1173,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           onSave={handleSaveNode}
           onCancel={() => setEditingNode(null)}
           availableWorkflows={availableWorkflows}
+          availableVariables={editingNodeAvailableVariables}
         />
       )}
 

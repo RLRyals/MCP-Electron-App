@@ -21,8 +21,12 @@ import { VariableReference } from '../../../types/workflow-context';
 export interface ContextVariablesTabProps {
   node: WorkflowNode;
   onChange: (updates: Partial<WorkflowNode>) => void;
-  availableVariables: VariableReference[]; // From previous nodes
+  availableVariables: VariableReference[]; // Resolved from upstream nodes in the workflow graph
   errors: Record<string, string>;
+  /** Whether this node type has a prompt field that variables can be inserted into */
+  canInsertIntoPrompt: boolean;
+  /** Insert {{nodeId}} into the node's prompt field (Configuration tab) */
+  onInsertIntoPrompt: (nodeId: string) => void;
 }
 
 export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
@@ -30,29 +34,23 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
   onChange,
   availableVariables,
   errors,
+  canInsertIntoPrompt,
+  onInsertIntoPrompt,
 }) => {
-  const [mode, setMode] = useState<'simple' | 'advanced'>(node.contextConfig.mode);
+  // Mode is owned by the parent dialog (toggle buttons live there); this tab just renders for it.
+  const mode = node.contextConfig.mode;
   const [inputMappings, setInputMappings] = useState<ContextMapping[]>(
     node.contextConfig.inputs || []
   );
   const [outputMappings, setOutputMappings] = useState<ContextMapping[]>(
     node.contextConfig.outputs || []
   );
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showVariableBrowser, setShowVariableBrowser] = useState(true);
-  const [activeField, setActiveField] = useState<'input' | 'output' | null>(null);
-
-  // Handle mode toggle
-  const handleModeToggle = () => {
-    const newMode = mode === 'simple' ? 'advanced' : 'simple';
-    setMode(newMode);
-    onChange({
-      contextConfig: {
-        ...node.contextConfig,
-        mode: newMode,
-      },
-    });
-  };
+  // Which mapping row's source field was last focused - clicking a variable
+  // fills that field; with nothing focused it falls back to prompt insertion.
+  const [focusedMappingField, setFocusedMappingField] = useState<
+    { type: 'input' | 'output'; index: number } | null
+  >(null);
 
   // Add input mapping
   const handleAddInputMapping = () => {
@@ -62,8 +60,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
     };
     const updated = [...inputMappings, newMapping];
     setInputMappings(updated);
-    setEditingIndex(updated.length - 1);
-    setActiveField('input');
+    setFocusedMappingField({ type: 'input', index: updated.length - 1 });
     updateNodeContext({ inputs: updated });
   };
 
@@ -79,7 +76,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
   const handleDeleteInputMapping = (index: number) => {
     const updated = inputMappings.filter((_, i) => i !== index);
     setInputMappings(updated);
-    setEditingIndex(null);
+    setFocusedMappingField(null);
     updateNodeContext({ inputs: updated });
   };
 
@@ -91,8 +88,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
     };
     const updated = [...outputMappings, newMapping];
     setOutputMappings(updated);
-    setEditingIndex(updated.length - 1);
-    setActiveField('output');
+    setFocusedMappingField({ type: 'output', index: updated.length - 1 });
     updateNodeContext({ outputs: updated });
   };
 
@@ -108,7 +104,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
   const handleDeleteOutputMapping = (index: number) => {
     const updated = outputMappings.filter((_, i) => i !== index);
     setOutputMappings(updated);
-    setEditingIndex(null);
+    setFocusedMappingField(null);
     updateNodeContext({ outputs: updated });
   };
 
@@ -122,11 +118,22 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
     });
   };
 
-  // Insert variable into active field
-  const handleInsertVariable = (path: string) => {
-    // This would insert the variable path into the currently focused field
-    // For now, we'll just show the path
-    console.log('Insert variable:', path);
+  // Insert a variable into whichever mapping field was last focused; with no
+  // field focused (or in Simple mode, where there are no mapping fields),
+  // insert it into the node's prompt instead.
+  const handleInsertVariable = (variable: VariableReference) => {
+    if (focusedMappingField) {
+      const { type, index } = focusedMappingField;
+      if (type === 'input') {
+        handleUpdateInputMapping(index, 'source', variable.path);
+      } else {
+        handleUpdateOutputMapping(index, 'source', variable.path);
+      }
+      return;
+    }
+    if (canInsertIntoPrompt) {
+      onInsertIntoPrompt(variable.nodeId);
+    }
   };
 
   // Validate JSONPath or variable reference
@@ -147,30 +154,6 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
 
   return (
     <div style={styles.container}>
-      {/* Mode Toggle */}
-      <div style={styles.modeToggleContainer}>
-        <div style={styles.modeToggleLabel}>Variable Mode</div>
-        <button
-          style={styles.modeToggle}
-          onClick={handleModeToggle}
-          aria-pressed={mode === 'advanced'}
-          title={`Switch to ${mode === 'simple' ? 'Advanced' : 'Simple'} Mode`}
-        >
-          <div
-            style={{
-              ...styles.modeToggleSlider,
-              left: mode === 'advanced' ? '50%' : '0',
-            }}
-          />
-          <span style={mode === 'simple' ? styles.modeToggleOptionActive : styles.modeToggleOption}>
-            Simple
-          </span>
-          <span style={mode === 'advanced' ? styles.modeToggleOptionActive : styles.modeToggleOption}>
-            Advanced
-          </span>
-        </button>
-      </div>
-
       {/* Simple Mode Display */}
       {mode === 'simple' && (
         <div style={styles.simpleModeContainer}>
@@ -185,11 +168,40 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
           </div>
 
           <div style={styles.availableSection}>
-            <h3 style={styles.sectionTitle}>What's Available to This Node</h3>
+            <h3 style={styles.sectionTitle}>Inherited From Upstream Nodes</h3>
+            {availableVariables.length === 0 ? (
+              <div style={styles.emptyState}>
+                No upstream nodes yet. Connect a node before this one in the graph to see its outputs here.
+              </div>
+            ) : (
+              <ul style={styles.availableList}>
+                {availableVariables.map((variable) => (
+                  <li key={`${variable.nodeId}-${variable.path}`} style={styles.availableItem}>
+                    <div>
+                      <strong>{variable.nodeName}</strong>{' '}
+                      <span style={styles.variableSource}>({variable.nodeType})</span>
+                      <div>
+                        <code style={styles.code}>{variable.path}</code>
+                      </div>
+                    </div>
+                    {canInsertIntoPrompt && (
+                      <button
+                        type="button"
+                        style={styles.insertIntoPromptButton}
+                        onClick={() => onInsertIntoPrompt(variable.nodeId)}
+                        aria-label={`Insert {{${variable.nodeId}}} into prompt`}
+                        title={`Insert {{${variable.nodeId}}} into prompt`}
+                      >
+                        {'{{'}
+                        {variable.nodeId}
+                        {'}}'} → Prompt
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <ul style={styles.availableList}>
-              <li style={styles.availableItem}>
-                <strong>Previous Node Outputs:</strong> All outputs from nodes executed before this one
-              </li>
               <li style={styles.availableItem}>
                 <strong>Global Variables:</strong> Variables set during workflow execution
               </li>
@@ -257,6 +269,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
                               }
                               value={mapping.source || ''}
                               onChange={(e) => handleUpdateInputMapping(index, 'source', e.target.value)}
+                              onFocus={() => setFocusedMappingField({ type: 'input', index })}
                               placeholder="$.previousNode.field or {{variable}}"
                               aria-label="Source JSONPath"
                               aria-invalid={!validateSource(mapping.source || '')}
@@ -393,6 +406,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
                               }
                               value={mapping.source || ''}
                               onChange={(e) => handleUpdateOutputMapping(index, 'source', e.target.value)}
+                              onFocus={() => setFocusedMappingField({ type: 'output', index })}
                               placeholder="$.output.field"
                               aria-label="Source JSONPath"
                               aria-invalid={!validateSource(mapping.source || '')}
@@ -497,10 +511,15 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
                 <button
                   style={styles.sidebarToggle}
                   onClick={() => setShowVariableBrowser(false)}
+                  aria-label="Hide variable browser"
                   title="Hide variable browser"
                 >
                   ✕
                 </button>
+              </div>
+
+              <div style={styles.helperBox}>
+                Click a variable to fill the focused source field above{canInsertIntoPrompt ? ', or insert it into the prompt if no field is focused' : ''}.
               </div>
 
               <div style={styles.variableList}>
@@ -508,10 +527,11 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
                   <div style={styles.emptyState}>No variables available yet</div>
                 ) : (
                   availableVariables.map((variable, index) => (
-                    <div
+                    <button
                       key={index}
+                      type="button"
                       style={styles.variableItem}
-                      onClick={() => handleInsertVariable(variable.path)}
+                      onClick={() => handleInsertVariable(variable)}
                       title={`Click to insert: ${variable.path}`}
                     >
                       <div style={styles.variableName}>{variable.path}</div>
@@ -528,7 +548,7 @@ export const ContextVariablesTab: React.FC<ContextVariablesTabProps> = ({
                             : String(variable.value).substring(0, 50)}
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -557,62 +577,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '20px',
     height: '100%',
-  },
-
-  // Mode Toggle
-  modeToggleContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  modeToggleLabel: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#374151',
-  },
-  modeToggle: {
-    position: 'relative',
-    display: 'flex',
-    width: '200px',
-    height: '40px',
-    background: '#f3f4f6',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    padding: '4px',
-    transition: 'all 0.3s',
-  },
-  modeToggleSlider: {
-    position: 'absolute',
-    top: '4px',
-    width: '50%',
-    height: 'calc(100% - 8px)',
-    background: 'var(--status-running)',
-    borderRadius: '6px',
-    transition: 'left 0.3s',
-    zIndex: 1,
-  },
-  modeToggleOption: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'var(--status-neutral)',
-    zIndex: 2,
-    transition: 'color 0.3s',
-  },
-  modeToggleOptionActive: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'white',
-    zIndex: 2,
-    transition: 'color 0.3s',
   },
 
   // Simple Mode
@@ -660,6 +624,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     color: '#374151',
     lineHeight: '1.5',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  insertIntoPromptButton: {
+    flexShrink: 0,
+    padding: '4px 10px',
+    fontSize: '12px',
+    fontWeight: 600,
+    fontFamily: 'monospace',
+    color: 'var(--status-running)',
+    background: 'white',
+    border: '1px solid var(--status-running)',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
   hint: {
     padding: '12px 16px',
@@ -891,6 +871,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px',
   },
   variableItem: {
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
     padding: '12px',
     background: 'white',
     border: '1px solid #e5e7eb',
@@ -898,6 +881,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '8px',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    font: 'inherit',
   },
   variableName: {
     fontSize: '13px',
