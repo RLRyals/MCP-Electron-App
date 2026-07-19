@@ -23,7 +23,7 @@
  * ```
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { WorkflowNode, SubWorkflowNode } from '../../../types/workflow-nodes';
 import type { LLMProviderConfig } from '../../../types/llm-providers';
 import { AgentSkillSelector } from '../AgentSkillSelector.js';
@@ -82,6 +82,12 @@ const NODE_TYPE_CONFIGS = [
   { value: 'swarm', label: 'Swarm Exploration', icon: '🐝' },
 ] as const;
 
+// Claude Code agent types that are always available for --agent, independent
+// of whatever custom agent .md files happen to exist in ~/.claude/agents/.
+// Not installable/editable as a file (no "Edit" action) - the CLI resolves
+// them natively.
+const BUILT_IN_AGENTS = ['general-purpose'] as const;
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -113,6 +119,15 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [creatingSkill, setCreatingSkill] = useState(false);
   const [creatingOutputStyle, setCreatingOutputStyle] = useState(false);
+
+  // Agent dropdown options: built-ins first, then whatever custom agent .md
+  // files are installed (deduped, in case a file happens to share a built-in's
+  // name). The "Agent" field's Edit button still checks against
+  // `installedAgents` alone, so built-ins correctly show as non-editable.
+  const agentSelectOptions = useMemo(
+    () => [...BUILT_IN_AGENTS, ...installedAgents.filter(a => !(BUILT_IN_AGENTS as readonly string[]).includes(a))],
+    [installedAgents]
+  );
 
   // ============================================================================
   // Refs for Focus Management
@@ -927,7 +942,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                       setIsDirty(true);
                       setErrors(errors.filter(err => err.field !== 'agent'));
                     }}
-                    installedOptions={installedAgents}
+                    installedOptions={agentSelectOptions}
                     error={agentError?.message}
                     required={true}
                   />
