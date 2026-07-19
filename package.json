@@ -52,6 +52,9 @@
     "simple-git": "^3.21.0",
     "vm2": "^3.10.0"
   },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.6.3",
