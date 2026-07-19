@@ -32,6 +32,8 @@ import { CreateAgentDialog } from './CreateAgentDialog.js';
 import { CreateSkillDialog } from './CreateSkillDialog.js';
 import { DocumentEditDialog } from './DocumentEditDialog.js';
 import { SubWorkflowNodeConfig } from './config-panels/SubWorkflowNodeConfig.js';
+import { ContextVariablesTab } from './ContextVariablesTab.js';
+import type { VariableReference } from '../../../types/workflow-context';
 
 // ============================================================================
 // Types & Interfaces
@@ -48,6 +50,8 @@ export interface NodeConfigDialogProps {
     description?: string;
     versions?: Array<{ version: string; createdAt: string }>;
   }>;
+  /** Upstream node outputs available to `node`, resolved from the workflow graph */
+  availableVariables?: VariableReference[];
 }
 
 type TabId = 'basic' | 'config' | 'provider' | 'context' | 'advanced';
@@ -92,6 +96,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   onSave,
   onCancel,
   availableWorkflows = [],
+  availableVariables = [],
 }) => {
   // ============================================================================
   // State Management
@@ -123,6 +128,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   const lastFocusableRef = useRef<HTMLButtonElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const errorAnnouncerRef = useRef<HTMLDivElement>(null);
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ============================================================================
   // Tab Configuration
@@ -159,7 +165,12 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   // Initialize form data when node changes
   useEffect(() => {
     if (node) {
-      setFormData(node);
+      // Legacy/pre-existing nodes may predate contextConfig; default it so
+      // downstream tabs (Context & Variables, Sub-Workflow) never read undefined.
+      setFormData({
+        ...node,
+        contextConfig: node.contextConfig || { mode: 'simple' },
+      });
       setContextMode(node.contextConfig?.mode || 'simple');
       setIsDirty(false);
       setErrors([]);
@@ -246,6 +257,38 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
     // Clear errors for this field
     setErrors(prev => prev.filter(err => err.field !== field));
   }, []); // Remove formData dependency - we use prev parameter instead
+
+  const handleContextModeChange = useCallback((mode: 'simple' | 'advanced') => {
+    setContextMode(mode);
+    setFormData(prev => {
+      if (!prev) return prev;
+      return { ...prev, contextConfig: { ...(prev.contextConfig || {}), mode } };
+    });
+    setIsDirty(true);
+  }, []);
+
+  // Insert {{nodeId}} into the node's prompt field (Configuration tab),
+  // reachable from the Context & Variables tab regardless of which tab is
+  // currently showing. Only agent-type nodes have a prompt field.
+  const insertVariableIntoPrompt = useCallback((nodeId: string) => {
+    const variableSyntax = `{{${nodeId}}}`;
+    setFormData(prev => {
+      if (!prev || !isAgentNode(prev)) return prev;
+      const current = (prev as any).prompt || '';
+      const textarea = promptTextareaRef.current;
+      let updated: string;
+      if (textarea && document.activeElement === textarea) {
+        const start = textarea.selectionStart ?? current.length;
+        const end = textarea.selectionEnd ?? current.length;
+        updated = current.slice(0, start) + variableSyntax + current.slice(end);
+      } else {
+        updated = current && !/\s$/.test(current) ? `${current} ${variableSyntax}` : `${current}${variableSyntax}`;
+      }
+      return { ...prev, prompt: updated };
+    });
+    setIsDirty(true);
+    setErrors(prev => prev.filter(err => err.field !== 'prompt'));
+  }, []);
 
   const handleTabChange = useCallback((tabId: TabId) => {
     setActiveTab(tabId);
@@ -1012,6 +1055,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
                 </div>
                 <textarea
                   id="config-prompt"
+                  ref={promptTextareaRef}
                   style={{ ...styles.input, minHeight: '200px', fontFamily: 'monospace', fontSize: '13px' }}
                   value={(formData as any).prompt || ''}
                   onChange={(e) => {
@@ -2023,6 +2067,12 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   };
 
   const renderContextTab = () => {
+    if (!formData) return null;
+    const nodeForContext = {
+      ...formData,
+      contextConfig: formData.contextConfig || { mode: 'simple' as const },
+    };
+
     return (
       <div role="tabpanel" id="panel-context" aria-labelledby="tab-context">
         <div style={styles.field}>
@@ -2031,7 +2081,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
             <button
               type="button"
               style={contextMode === 'simple' ? { ...styles.modeButton, ...styles.modeButtonActive } : styles.modeButton}
-              onClick={() => setContextMode('simple')}
+              onClick={() => handleContextModeChange('simple')}
               aria-pressed={contextMode === 'simple'}
             >
               Simple
@@ -2039,7 +2089,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
             <button
               type="button"
               style={contextMode === 'advanced' ? { ...styles.modeButton, ...styles.modeButtonActive } : styles.modeButton}
-              onClick={() => setContextMode('advanced')}
+              onClick={() => handleContextModeChange('advanced')}
               aria-pressed={contextMode === 'advanced'}
             >
               Advanced
@@ -2047,39 +2097,18 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
           </div>
         </div>
 
-        <div style={styles.placeholderPanel}>
-          <div style={styles.placeholderIcon}>🔗</div>
-          <h3 style={styles.placeholderTitle}>
-            Context & Variables - {contextMode === 'simple' ? 'Simple' : 'Advanced'} Mode
-          </h3>
-          <p style={styles.placeholderText}>
-            This panel will be populated by a separate component for managing context and variables.
-          </p>
-          {contextMode === 'simple' ? (
-            <>
-              <p style={styles.placeholderText}>
-                <strong>Simple Mode:</strong> Automatically inherits all context from previous nodes.
-              </p>
-              <ul style={styles.placeholderList}>
-                <li>No manual configuration needed</li>
-                <li>All previous node outputs available</li>
-                <li>Suitable for most workflows</li>
-              </ul>
-            </>
-          ) : (
-            <>
-              <p style={styles.placeholderText}>
-                <strong>Advanced Mode:</strong> Explicit input/output mapping with transformations.
-              </p>
-              <ul style={styles.placeholderList}>
-                <li>Input mapping (JSONPath expressions)</li>
-                <li>Output mapping (extract specific fields)</li>
-                <li>Variable transformations (JavaScript)</li>
-                <li>Fine-grained control over data flow</li>
-              </ul>
-            </>
-          )}
-        </div>
+        <ContextVariablesTab
+          node={nodeForContext}
+          onChange={(updates) => {
+            if (updates.contextConfig) {
+              handleFieldChange('contextConfig', updates.contextConfig);
+            }
+          }}
+          availableVariables={availableVariables}
+          errors={errors.reduce((acc, e) => ({ ...acc, [e.field]: e.message }), {} as Record<string, string>)}
+          canInsertIntoPrompt={isAgentNode(formData)}
+          onInsertIntoPrompt={insertVariableIntoPrompt}
+        />
       </div>
     );
   };
@@ -2734,43 +2763,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#eff6ff',
     borderColor: 'var(--status-running)',
     fontWeight: 600,
-  },
-
-  // Placeholder Panel
-  placeholderPanel: {
-    padding: '32px',
-    textAlign: 'center',
-    background: '#f9fafb',
-    borderRadius: '8px',
-    border: '2px dashed #d1d5db',
-  },
-
-  placeholderIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-  },
-
-  placeholderTitle: {
-    margin: '0 0 12px 0',
-    fontSize: '18px',
-    fontWeight: 600,
-    color: '#374151',
-  },
-
-  placeholderText: {
-    margin: '0 0 12px 0',
-    fontSize: '14px',
-    color: 'var(--status-neutral)',
-    lineHeight: 1.6,
-  },
-
-  placeholderList: {
-    textAlign: 'left',
-    margin: '16px auto',
-    maxWidth: '500px',
-    fontSize: '14px',
-    color: 'var(--status-neutral)',
-    lineHeight: 1.8,
   },
 
   infoBox: {
