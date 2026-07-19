@@ -7,6 +7,7 @@
 import { BrowserWindow } from 'electron';
 import path from 'path';
 import { logWithCategory, LogCategory } from './logger';
+import { attachSpellCheckContextMenu } from './spellcheck-context-menu';
 
 export interface PluginViewInfo {
   pluginId: string;
@@ -64,6 +65,8 @@ class PluginViewManager {
           sandbox: false,
         },
       });
+
+      attachSpellCheckContextMenu(window.webContents);
 
       // Open DevTools in development mode only
       if (!require('electron').app.isPackaged) {

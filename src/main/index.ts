@@ -42,6 +42,7 @@ import {
   registerMediaProtocolHandler,
 } from './media-protocol';
 import type { LLMProviderConfig } from '../types/llm-providers';
+import { attachSpellCheckContextMenu } from './spellcheck-context-menu';
 import type {
   RepositoryCloneRequest,
   RepositoryCloneResponse,
@@ -300,6 +301,8 @@ function createWizardWindow(): void {
     show: false, // Don't show until ready
   });
 
+  attachSpellCheckContextMenu(mainWindow.webContents);
+
   // Load the setup wizard HTML file
   const wizardPath = path.join(__dirname, '../renderer/setup-wizard.html');
   mainWindow.loadFile(wizardPath);
@@ -345,6 +348,8 @@ function createMigrationWizardWindow(): void {
     },
     show: false, // Don't show until ready
   });
+
+  attachSpellCheckContextMenu(mainWindow.webContents);
 
   // Load the migration wizard HTML file
   const migrationWizardPath = path.join(__dirname, '../renderer/migration-wizard.html');
@@ -400,6 +405,17 @@ function createWindow(): void {
       backgroundThrottling: false,
     },
     show: false, // Don't show until ready
+  });
+
+  attachSpellCheckContextMenu(mainWindow.webContents);
+
+  // Plugin UI (e.g. the kanban board) renders inside a <webview> tag
+  // (src/renderer/components/PluginContainer.ts), which gets its own
+  // WebContents distinct from the host window's -- wire the same
+  // suggestion menu onto every guest view as it attaches so right-click
+  // works inside plugin content too.
+  mainWindow.webContents.on('did-attach-webview', (_event, guestWebContents) => {
+    attachSpellCheckContextMenu(guestWebContents);
   });
 
   // Load the index.html file
