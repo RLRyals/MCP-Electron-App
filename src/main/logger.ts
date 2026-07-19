@@ -23,6 +23,7 @@ export enum LogCategory {
   ERROR = 'ERROR',
   CONFIG = 'CONFIG',
   WORKFLOW = "WORKFLOW",
+  TERMINAL = "TERMINAL",
 }
 
 /**

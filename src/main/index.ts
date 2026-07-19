@@ -462,6 +462,7 @@ import { registerPluginUpdateHandlers } from './handlers/plugin-update-handlers'
 import { registerPluginGithubUpdateHandlers } from './handlers/plugin-github-update-handlers';
 import { registerGenrePackHandlers } from './handlers/genre-pack-handlers';
 import { registerLinkHandlers } from './handlers/link-handlers';
+import { registerTerminalHandlers, killAllTerminals } from './handlers/terminal-handlers';
 
 /**
  * Build the README.md dropped into a newly-initialized project root
@@ -536,6 +537,9 @@ function setupIPC(): void {
   // Register app:open-external / app:reveal-in-folder (issue #198 --
   // Kanban card links, issue_ref, and body URLs)
   registerLinkHandlers();
+
+  // Register embedded terminal (Casey cockpit) handlers (mea-bkr)
+  registerTerminalHandlers();
 
   // Example IPC handler - ping/pong
   registerHandler('ping', "Health-check ping/pong", async () => {
@@ -3356,6 +3360,14 @@ app.on('before-quit', async (event) => {
   isQuitting = true;
 
   logger.info('App is quitting...');
+
+  // Kill any live terminal (Casey cockpit) PTY sessions before the app exits
+  // so closing FictionLab never leaves an orphaned claude/shell process running.
+  try {
+    killAllTerminals();
+  } catch (error) {
+    logWithCategory('error', LogCategory.SYSTEM, 'Error killing terminal sessions:', error);
+  }
 
   // Clean up plugin system
   try {
