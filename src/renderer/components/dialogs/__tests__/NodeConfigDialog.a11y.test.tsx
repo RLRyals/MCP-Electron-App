@@ -713,3 +713,41 @@ describe('NodeConfigDialog - Advanced Tab Accessibility', () => {
     expect(timeoutInput).toHaveAttribute('min', '0');
   });
 });
+
+// ============================================================================
+// Built-in Agent Option (mea-2bj)
+// ============================================================================
+
+describe('NodeConfigDialog - Built-in Agent Option', () => {
+  it('always offers general-purpose in the Agent dropdown, even with no installed agent files', async () => {
+    renderDialog();
+    const user = userEvent.setup();
+
+    const configTab = screen.getByRole('tab', { name: /Configuration/i });
+    await user.click(configTab);
+
+    const agentSelect = screen.getByLabelText('Select Agent') as HTMLSelectElement;
+    const optionValues = within(agentSelect)
+      .getAllByRole('option')
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(optionValues).toContain('general-purpose');
+  });
+
+  it('defaults a freshly agent-ified node to general-purpose, and that value is actually selected (not silently dropped)', async () => {
+    // mockUserInputNode has no `agent` field; switching its type to an agent
+    // type is what triggers the 'general-purpose' default (NodeConfigDialog
+    // handleFieldChange). Before this fix, that default referenced an agent
+    // absent from the dropdown's option list.
+    renderDialog({ node: mockUserInputNode });
+    const user = userEvent.setup();
+
+    const typeSelect = screen.getByLabelText('Node type');
+    await user.selectOptions(typeSelect, 'writing');
+
+    const configTab = screen.getByRole('tab', { name: /Configuration/i });
+    await user.click(configTab);
+
+    const agentSelect = screen.getByLabelText('Select Agent') as HTMLSelectElement;
+    expect(agentSelect.value).toBe('general-purpose');
+  });
+});
