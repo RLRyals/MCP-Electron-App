@@ -73,14 +73,38 @@ describe('resolveUpdateSource', () => {
     expect(source).toEqual(KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-kanban']);
   });
 
-  it('prefers a manifest-declared updateSource over the known-plugin map', () => {
+  it('prefers a manifest-declared updateSource over the known-plugin map, merging in the known tagPrefix when the manifest omits it (bead mea-4w7)', () => {
+    // Defect 1 (mea-4w7): a manifest that declares updateSource but omits
+    // tagPrefix used to short-circuit past KNOWN_PLUGIN_UPDATE_SOURCES
+    // entirely, yielding tagPrefix: undefined even for a plugin the table
+    // knows the correct prefix for. repo/assetPattern/private still come
+    // from the manifest (unchanged precedence) -- only tagPrefix merges.
     const manifest: any = {
       id: 'fictionlab-kanban',
       version: '1.0.0',
       updateSource: { repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false },
     };
     const source = resolveUpdateSource('fictionlab-kanban', manifest);
-    expect(source).toEqual({ repo: 'someone/fork', assetPattern: 'custom-*.zip', private: false, tagPrefix: undefined });
+    expect(source).toEqual({
+      repo: 'someone/fork',
+      assetPattern: 'custom-*.zip',
+      private: false,
+      tagPrefix: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-kanban'].tagPrefix,
+    });
+  });
+
+  it('resolves tagPrefix from the known-plugin table when the manifest declares updateSource without one, for a plugin present in the table (the production case, bead mea-4w7)', () => {
+    const manifest: any = {
+      id: 'fictionlab-agent-factory',
+      version: '0.1.1',
+      updateSource: {
+        repo: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].repo,
+        assetPattern: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].assetPattern,
+        private: true,
+      },
+    };
+    const source = resolveUpdateSource('fictionlab-agent-factory', manifest);
+    expect(source?.tagPrefix).toBe('agent-factory-plugin-');
   });
 
   it('carries a manifest-declared tagPrefix through (bead mea-ecp)', () => {
@@ -283,6 +307,77 @@ describe('checkPluginUpdate', () => {
     expect(result.status).toBe('update-available');
     expect(result.latestVersion).toBe('1.2.0');
     expect(result.asset?.id).toBe(2);
+  });
+
+  it('reports "up-to-date" (not a phantom update) when installed 0.1.1 and the latest release tag is the raw "agent-factory-plugin-v0.1.1", even when the installed manifest omits tagPrefix (bead mea-4w7, Rebecca\'s reported symptom)', async () => {
+    await writeInstalledPlugin('fictionlab-agent-factory', '0.1.1', {
+      updateSource: {
+        repo: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].repo,
+        assetPattern: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].assetPattern,
+        private: true,
+        // deliberately no tagPrefix -- the pre-mea-ecp installed-manifest shape
+      },
+    });
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([{ tag_name: 'agent-factory-plugin-v0.1.1', assets: [{ name: 'fictionlab-agent-factory-0.1.1.zip', browser_download_url: 'x', id: 1 }] }])
+    );
+
+    const result = await checkPluginUpdate({ pluginId: 'fictionlab-agent-factory', pluginsDir, token: 't', fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('up-to-date');
+    expect(result.latestVersion).toBe('0.1.1');
+  });
+
+  it('still detects a real upgrade for the same plugin/tagPrefix shape -- installed 0.1.1, release tag agent-factory-plugin-v0.2.0 -> update-available with a clean semver, never the raw tag (bead mea-4w7)', async () => {
+    await writeInstalledPlugin('fictionlab-agent-factory', '0.1.1', {
+      updateSource: {
+        repo: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].repo,
+        assetPattern: KNOWN_PLUGIN_UPDATE_SOURCES['fictionlab-agent-factory'].assetPattern,
+        private: true,
+      },
+    });
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([{ tag_name: 'agent-factory-plugin-v0.2.0', assets: [{ name: 'fictionlab-agent-factory-0.2.0.zip', browser_download_url: 'x', id: 1 }] }])
+    );
+
+    const result = await checkPluginUpdate({ pluginId: 'fictionlab-agent-factory', pluginsDir, token: 't', fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('update-available');
+    expect(result.latestVersion).toBe('0.2.0');
+    expect(result.latestVersion).not.toContain('agent-factory-plugin');
+  });
+
+  it('treats a double-digit patch bump as newer, not as a string-lexical regression -- installed 0.1.9, release tag ...-v0.1.10 -> update-available', async () => {
+    await writeInstalledPlugin('fictionlab-kanban', '0.1.9');
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'kanban-plugin-v0.1.10', assets: [SAMPLE_ASSET] }]));
+
+    const result = await checkPluginUpdate({ pluginId: 'fictionlab-kanban', pluginsDir, token: 't', fetchFn: fetchFn as any });
+
+    expect(result.status).toBe('update-available');
+    expect(result.latestVersion).toBe('0.1.10');
+  });
+
+  it('fails safe (no update offered) and logs a warning naming the plugin/tag/normalized value when a version is unparseable on either side (bead mea-4w7)', async () => {
+    await writeInstalledPlugin('fictionlab-kanban', '1.0.0');
+    // Prefix matches (so fetchLatestReleaseForPrefix's own prefix filter
+    // still selects this release), but what remains after stripping the
+    // prefix is not valid semver -- this must never be read as "newer".
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'kanban-plugin-not-a-semver', assets: [SAMPLE_ASSET] }]));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const result = await checkPluginUpdate({ pluginId: 'fictionlab-kanban', pluginsDir, token: 't', fetchFn: fetchFn as any });
+
+      expect(result.status).toBe('up-to-date');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('fictionlab-kanban')
+      );
+      const warnedMessage = warnSpy.mock.calls[0]?.[0] as string;
+      expect(warnedMessage).toContain('kanban-plugin-not-a-semver');
+      expect(warnedMessage).toContain('1.0.0');
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('never includes the token in a returned error message', async () => {
