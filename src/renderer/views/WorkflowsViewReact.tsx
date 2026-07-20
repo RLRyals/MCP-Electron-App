@@ -430,8 +430,11 @@ const WorkflowsApp: React.FC = () => {
       setExecutionStatus(new Map());
       setActiveNodeId(null);
       setActiveRegistryId(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[WorkflowsViewReact] Failed to get workflow:', error);
+      if (typeof (window as any).showNotification === 'function') {
+        (window as any).showNotification(`Failed to open workflow: ${error?.message || error}`, 'error');
+      }
     }
   };
 
@@ -865,6 +868,7 @@ const WorkflowsApp: React.FC = () => {
                       onNodeClick={(nodeId: string, phase: any) => {
                         console.log('[WorkflowsViewReact] Node clicked:', nodeId, phase);
                       }}
+                      onOpenSubWorkflow={handleSelectWorkflow}
                       onWorkflowChange={(updatedWorkflow: any) => {
                         console.log('[WorkflowsViewReact] Workflow changed:', updatedWorkflow);
                         // Update the selected workflow with the new data

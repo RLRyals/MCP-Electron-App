@@ -199,6 +199,16 @@ export const SubWorkflowNodeConfig: React.FC<SubWorkflowNodeConfigProps> = ({
         </div>
       )}
 
+      {node.subWorkflowId && !selectedWorkflow && (
+        <div style={styles.warningBox}>
+          <span style={styles.warningIcon}>⚠</span>
+          <div style={styles.warningContent}>
+            <strong>Referenced workflow not found:</strong> "{node.subWorkflowId}" no longer
+            exists (it may have been deleted or renamed). Select a different workflow.
+          </div>
+        </div>
+      )}
+
       {/* Execution Settings */}
       <div style={styles.field}>
         <label style={styles.checkboxLabel}>

@@ -782,6 +782,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
   const nodesWithStatus = useMemo(() => {
     return baseNodes.map(node => {
       const statusInfo = executionStatus?.get(node.id);
+      const subWorkflowId = node.baseData.phase.subWorkflowId;
+      const subWorkflowMissing = !!subWorkflowId && !availableWorkflows.some((wf) => wf.id === subWorkflowId);
       return {
         ...node,
         data: {
@@ -790,13 +792,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = React.memo(({
           loopIteration: statusInfo?.loopIteration,
           isActiveNode: activeNodeId === node.id, // Highlight the currently executing node
           onEdit: () => handleEditNode(node.id), // Use new NodeConfigDialog
-          onOpenSubWorkflow: node.baseData.phase.subWorkflowId
-            ? () => handleOpenSubWorkflow(node.baseData.phase.subWorkflowId!)
+          subWorkflowMissing,
+          onOpenSubWorkflow: subWorkflowId && !subWorkflowMissing
+            ? () => handleOpenSubWorkflow(subWorkflowId)
             : undefined,
         },
       };
     });
-  }, [baseNodes, executionStatus, activeNodeId, handleEditNode, handleOpenSubWorkflow]);
+  }, [baseNodes, executionStatus, activeNodeId, handleEditNode, handleOpenSubWorkflow, availableWorkflows]);
 
   // Update React Flow state when memoized values change
   useEffect(() => {

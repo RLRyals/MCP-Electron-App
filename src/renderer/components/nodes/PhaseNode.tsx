@@ -49,6 +49,8 @@ export interface PhaseNodeData extends Record<string, unknown> {
   loopIteration?: number;
   /** True if this node is the currently executing node in an active workflow */
   isActiveNode?: boolean;
+  /** True if phase.subWorkflowId is set but doesn't resolve to a known workflow */
+  subWorkflowMissing?: boolean;
   onEdit?: () => void;
   onOpenSubWorkflow?: () => void;
 }
@@ -235,14 +237,24 @@ export const PhaseNode = ({ data }: NodeProps) => {
 
       {/* Sub-workflow indicator with click-to-open */}
       {nodeData.phase.type === 'subworkflow' && nodeData.phase.subWorkflowId && (
-        <div
-          className="sub-workflow-link"
-          style={subWorkflowLinkStyle}
-          onClick={handleSubWorkflowClick}
-          title="Click to open sub-workflow"
-        >
-          🔗 {nodeData.phase.subWorkflowId}
-        </div>
+        nodeData.subWorkflowMissing ? (
+          <div
+            className="sub-workflow-link sub-workflow-link-missing"
+            style={subWorkflowLinkMissingStyle}
+            title={`Referenced workflow "${nodeData.phase.subWorkflowId}" not found`}
+          >
+            🔗 {nodeData.phase.subWorkflowId} (not found)
+          </div>
+        ) : (
+          <div
+            className="sub-workflow-link"
+            style={subWorkflowLinkStyle}
+            onClick={handleSubWorkflowClick}
+            title="Click to open sub-workflow"
+          >
+            🔗 {nodeData.phase.subWorkflowId}
+          </div>
+        )
       )}
 
       {nodeData.phase.gate && (
@@ -313,4 +325,13 @@ const subWorkflowLinkStyle: React.CSSProperties = {
   cursor: 'pointer',
   textDecoration: 'underline',
   transition: 'color 0.2s',
+};
+
+const subWorkflowLinkMissingStyle: React.CSSProperties = {
+  fontSize: '11px',
+  color: '#9ca3af',
+  marginBottom: '4px',
+  cursor: 'not-allowed',
+  textDecoration: 'line-through',
+  fontStyle: 'italic',
 };
