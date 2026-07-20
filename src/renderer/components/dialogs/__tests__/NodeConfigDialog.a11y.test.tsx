@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { NodeConfigDialog, NodeConfigDialogProps } from '../NodeConfigDialog';
@@ -341,6 +341,10 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const basicTab = screen.getByRole('tab', { name: /Basic Info/i });
       basicTab.focus();
+      // Windows CI runners can be slow enough that the keydown fires before
+      // jsdom has committed the imperative .focus() call, so the ArrowRight
+      // handler reads the wrong tabId (mea-3en). Wait for focus to settle.
+      await waitFor(() => expect(basicTab).toHaveFocus());
 
       await user.keyboard('{ArrowRight}');
 
@@ -356,6 +360,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
       const configTab = screen.getByRole('tab', { name: /Configuration/i });
       await user.click(configTab);
       configTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(configTab).toHaveFocus());
 
       await user.keyboard('{ArrowLeft}');
 
@@ -371,6 +378,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
       const advancedTab = screen.getByRole('tab', { name: /Advanced/i });
       await user.click(advancedTab);
       advancedTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(advancedTab).toHaveFocus());
 
       await user.keyboard('{ArrowRight}');
 
@@ -384,6 +394,10 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const basicTab = screen.getByRole('tab', { name: /Basic Info/i });
       basicTab.focus();
+      // Windows CI runners can be slow enough that the keydown fires before
+      // jsdom has committed the imperative .focus() call, so the ArrowLeft
+      // handler reads the wrong tabId (mea-3en, the primary flaky case).
+      await waitFor(() => expect(basicTab).toHaveFocus());
 
       await user.keyboard('{ArrowLeft}');
 
@@ -397,6 +411,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const basicTab = screen.getByRole('tab', { name: /Basic Info/i });
       basicTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(basicTab).toHaveFocus());
 
       await user.keyboard('{ArrowDown}');
 
@@ -411,6 +428,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
       const configTab = screen.getByRole('tab', { name: /Configuration/i });
       await user.click(configTab);
       configTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(configTab).toHaveFocus());
 
       await user.keyboard('{ArrowUp}');
 
@@ -425,6 +445,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
       const advancedTab = screen.getByRole('tab', { name: /Advanced/i });
       await user.click(advancedTab);
       advancedTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(advancedTab).toHaveFocus());
 
       await user.keyboard('{Home}');
 
@@ -438,6 +461,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const basicTab = screen.getByRole('tab', { name: /Basic Info/i });
       basicTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(basicTab).toHaveFocus());
 
       await user.keyboard('{End}');
 
@@ -451,6 +477,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const configTab = screen.getByRole('tab', { name: /Configuration/i });
       configTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(configTab).toHaveFocus());
 
       await user.keyboard('{Enter}');
 
@@ -463,6 +492,9 @@ describe('NodeConfigDialog - Keyboard Navigation', () => {
 
       const configTab = screen.getByRole('tab', { name: /Configuration/i });
       configTab.focus();
+      // See mea-3en: wait for focus to settle before dispatching the key so
+      // the keydown lands on the tab we expect, not a stale activeElement.
+      await waitFor(() => expect(configTab).toHaveFocus());
 
       await user.keyboard(' ');
 
