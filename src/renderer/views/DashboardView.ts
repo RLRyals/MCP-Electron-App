@@ -14,6 +14,12 @@
  * handlers are gone -- DashboardApp owns its own polling/subscriptions, and
  * SystemStrip.tsx re-implements Start/Stop/Restart System directly against
  * the same mcpSystem IPC dashboard-handlers.ts used to call.
+ *
+ * The top bar's "Export Report" action was removed (mea-ctr): exporting a
+ * diagnostic report is a rare action, not a primary-toolbar one. It remains
+ * reachable from the Diagnostics menu ("Export Diagnostic Report") and the
+ * Settings > Logs page, both of which already called the same
+ * `logger.exportDiagnosticReport` IPC handler this view used to call too.
  */
 
 import * as React from 'react';
@@ -21,7 +27,6 @@ import * as ReactDOM from 'react-dom/client';
 import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig } from '../components/TopBar.js';
 import { DashboardApp } from './DashboardViewReact.js';
-import { exportDashboardDiagnosticReport } from '../dashboard-handlers.js';
 
 export class DashboardView implements View {
   private container: HTMLElement | null = null;
@@ -53,11 +58,6 @@ export class DashboardView implements View {
         // listeners), same as the top-bar action always did.
         window.dispatchEvent(new CustomEvent('dashboard-refresh'));
         break;
-      case 'export':
-        exportDashboardDiagnosticReport().catch((error) => {
-          console.error('[DashboardView] Export failed:', error);
-        });
-        break;
       default:
         console.warn('[DashboardView] Unknown action:', actionId);
     }
@@ -68,7 +68,6 @@ export class DashboardView implements View {
       title: 'Dashboard',
       actions: [
         { id: 'refresh', label: 'Refresh', icon: '🔄' },
-        { id: 'export', label: 'Export Report', icon: '📊' },
       ],
       global: {
         projectSelector: true,
