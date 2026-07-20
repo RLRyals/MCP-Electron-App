@@ -359,9 +359,10 @@ describe('checkPluginUpdate', () => {
 
   it('fails safe (no update offered) and logs a warning naming the plugin/tag/normalized value when a version is unparseable on either side (bead mea-4w7)', async () => {
     await writeInstalledPlugin('fictionlab-kanban', '1.0.0');
-    // A tag whose prefix does not match the resolved tagPrefix normalizes to
-    // garbage that is not valid semver -- this must never be read as "newer".
-    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'totally-unparseable-garbage', assets: [SAMPLE_ASSET] }]));
+    // Prefix matches (so fetchLatestReleaseForPrefix's own prefix filter
+    // still selects this release), but what remains after stripping the
+    // prefix is not valid semver -- this must never be read as "newer".
+    const fetchFn = jest.fn().mockResolvedValue(okJsonResponse([{ tag_name: 'kanban-plugin-not-a-semver', assets: [SAMPLE_ASSET] }]));
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
@@ -372,7 +373,7 @@ describe('checkPluginUpdate', () => {
         expect.stringContaining('fictionlab-kanban')
       );
       const warnedMessage = warnSpy.mock.calls[0]?.[0] as string;
-      expect(warnedMessage).toContain('totally-unparseable-garbage');
+      expect(warnedMessage).toContain('kanban-plugin-not-a-semver');
       expect(warnedMessage).toContain('1.0.0');
     } finally {
       warnSpy.mockRestore();
