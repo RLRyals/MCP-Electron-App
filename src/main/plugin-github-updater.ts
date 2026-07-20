@@ -122,15 +122,25 @@ export function resolveUpdateSource(
   manifest: MinimalPluginManifest | null
 ): PluginUpdateSource | null {
   const declared = (manifest as any)?.updateSource;
+  const known = KNOWN_PLUGIN_UPDATE_SOURCES[pluginId];
+
   if (declared && typeof declared.repo === 'string' && typeof declared.assetPattern === 'string') {
+    // Manifest values win for repo/assetPattern/private (unchanged
+    // precedence). tagPrefix is the one field that falls back to the
+    // known-plugin table when the manifest omits it -- the manifest on an
+    // already-installed plugin can predate bead mea-ecp, in which case the
+    // table is the only place the correct prefix is known. See mea-4w7:
+    // dropping straight to `undefined` here caused fetchLatestReleaseForPrefix
+    // to fall back to the repo-wide /releases/latest for a multi-plugin repo,
+    // and normalizeVersion to leave the raw tag name unstripped.
     return {
       repo: declared.repo,
       assetPattern: declared.assetPattern,
       private: !!declared.private,
-      tagPrefix: typeof declared.tagPrefix === 'string' ? declared.tagPrefix : undefined,
+      tagPrefix: typeof declared.tagPrefix === 'string' ? declared.tagPrefix : known?.tagPrefix,
     };
   }
-  return KNOWN_PLUGIN_UPDATE_SOURCES[pluginId] ?? null;
+  return known ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,11 +302,28 @@ export async function checkPluginUpdate(
   const release = result.release;
   const latestVersion = normalizeVersion(release.tagName, source.tagPrefix);
 
-  const isNewer = currentVersion
-    ? semver.valid(latestVersion) && semver.valid(currentVersion)
-      ? semver.gt(latestVersion, currentVersion)
-      : latestVersion !== currentVersion
-    : true;
+  let isNewer: boolean;
+  if (!currentVersion) {
+    // No installed version to compare against -- there is nothing installed
+    // yet, so any release counts as available.
+    isNewer = true;
+  } else if (semver.valid(latestVersion) && semver.valid(currentVersion)) {
+    isNewer = semver.gt(latestVersion, currentVersion);
+  } else {
+    // Fail safe: an unparseable version on either side must NOT be reported
+    // as an update. The previous `latestVersion !== currentVersion` fallback
+    // treated any unparseable tag (e.g. a raw "agent-factory-plugin-v0.1.1"
+    // left unstripped by a missing tagPrefix) as "newer", forever offering a
+    // phantom same-version update. A missed update is recoverable by
+    // reinstalling; a false positive destroys trust in the whole pane. See
+    // mea-4w7.
+    isNewer = false;
+    console.warn(
+      `[plugin-github-updater] Could not compare versions for plugin "${pluginId}": ` +
+        `raw tag "${release.tagName}" normalized to "${latestVersion}", installed version "${currentVersion}". ` +
+        'At least one side is not valid semver; treating as up-to-date to avoid a false-positive update prompt.'
+    );
+  }
 
   if (!isNewer) {
     return { status: 'up-to-date', pluginId, currentVersion, latestVersion, release, source };
