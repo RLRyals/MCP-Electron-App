@@ -10,10 +10,12 @@
  * the .tsx file the way WorkflowsViewReact does. It creates a ReactDOM
  * root in mount() and tears it down in unmount(), and forwards top-bar
  * actions: 'refresh' dispatches a 'dashboard-refresh' CustomEvent that
- * DashboardApp's panels + SystemStrip subscribe to, 'export' calls
- * dashboard-handlers.ts's exportDashboardDiagnosticReport() (the one piece
- * of the old dashboard-handlers.ts surface DashboardView itself still
- * depends on).
+ * DashboardApp's panels + SystemStrip subscribe to.
+ *
+ * The top-bar 'export' action (and its dashboard-handlers.ts
+ * exportDashboardDiagnosticReport() handler) was removed in mea-ctr -- the
+ * same diagnostic report is already reachable from the Diagnostics menu and
+ * the Settings > Logs page.
  *
  * DashboardViewReact.js is mocked wholesale (real DashboardApp render
  * behavior is covered by its own panel/strip component tests under
@@ -26,12 +28,7 @@ jest.mock('../DashboardViewReact.js', () => ({
   DashboardApp: () => null,
 }));
 
-jest.mock('../../dashboard-handlers.js', () => ({
-  exportDashboardDiagnosticReport: jest.fn().mockResolvedValue(undefined),
-}));
-
 import { DashboardView } from '../DashboardView';
-import * as dashboardHandlers from '../../dashboard-handlers.js';
 
 describe('DashboardView', () => {
   let container: HTMLElement;
@@ -73,17 +70,10 @@ describe('DashboardView', () => {
     window.removeEventListener('dashboard-refresh', listener);
   });
 
-  it('triggers a real diagnostic export on the "export" top-bar action', async () => {
-    await view.mount(container);
-    view.handleAction('export');
-
-    expect(dashboardHandlers.exportDashboardDiagnosticReport).toHaveBeenCalledTimes(1);
-  });
-
-  it('exposes the Dashboard title and Refresh/Export Report top-bar actions', () => {
+  it('exposes the Dashboard title and Refresh top-bar action', () => {
     const config = view.getTopBarConfig();
 
     expect(config.title).toBe('Dashboard');
-    expect(config.actions?.map((a) => a.id)).toEqual(['refresh', 'export']);
+    expect(config.actions?.map((a) => a.id)).toEqual(['refresh']);
   });
 });
