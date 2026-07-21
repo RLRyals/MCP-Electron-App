@@ -69,14 +69,20 @@ export class PluginLoader {
         // for crash rollback, and `.staging` is a not-yet-swapped-in update.
         // Both are full copies of a real plugin (same id, own plugin.json),
         // so without this guard they'd be "discovered" as duplicate plugins.
-        // Also skip the older ad-hoc `.backup-<timestamp>` naming in case any
-        // are still on disk from before this change.
+        // Matched with `.includes(...)` rather than `.endsWith(...)` because
+        // a human-renamed rollback copy (e.g. `<id>.bak-0.1.1`, keeping the
+        // old version in the name for clarity) is still a `.bak` sibling and
+        // must not slip through (mea-4yh: this exact naming pinned a stale
+        // plugin renderer bundle after an update). Also skip the older
+        // ad-hoc `.backup-<timestamp>` naming, and any dot-prefixed folder
+        // (hidden/staging scratch dirs are never real plugins).
         if (
-          entry.name.endsWith('.bak') ||
-          entry.name.endsWith('.staging') ||
+          entry.name.startsWith('.') ||
+          entry.name.includes('.bak') ||
+          entry.name.includes('.staging') ||
           entry.name.includes('.backup-')
         ) {
-          logWithCategory('debug', LogCategory.SYSTEM, `Skipping update-swap directory: ${entry.name}`);
+          logWithCategory('debug', LogCategory.SYSTEM, `Skipping update-swap/hidden directory: ${entry.name}`);
           continue;
         }
 
@@ -102,11 +108,77 @@ export class PluginLoader {
 
       logWithCategory('info', LogCategory.SYSTEM, `Discovered ${results.length} plugins (${results.filter(r => r.valid).length} valid)`);
 
-      return results;
+      return this.dedupeById(results);
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, 'Error discovering plugins:', error);
       return [];
     }
+  }
+
+  /**
+   * Belt-and-suspenders guard against two discovered folders declaring the
+   * same plugin id (e.g. a `.bak`/`.staging` sibling that slipped past the
+   * name filter above, or any other stray copy). Without this, whichever
+   * folder happened to sort last would silently win in sortByDependencies'
+   * id-keyed map -- the exact "loads the wrong copy" failure mode this
+   * dedup exists to prevent (mea-4yh).
+   *
+   * Preference order: folder name exactly equal to the plugin id, then
+   * higher semver version. Losers are marked invalid (with a WARN naming
+   * the ignored folder and why) rather than dropped, so callers still see
+   * every discovered path.
+   */
+  private dedupeById(results: PluginDiscoveryResult[]): PluginDiscoveryResult[] {
+    const byId = new Map<string, PluginDiscoveryResult[]>();
+
+    for (const result of results) {
+      if (!result.valid) continue;
+      const group = byId.get(result.manifest.id) ?? [];
+      group.push(result);
+      byId.set(result.manifest.id, group);
+    }
+
+    const losers = new Set<PluginDiscoveryResult>();
+
+    for (const [id, group] of byId) {
+      if (group.length <= 1) continue;
+
+      const winner = group.reduce((best, candidate) => {
+        const bestIsExactId = path.basename(best.path) === id;
+        const candidateIsExactId = path.basename(candidate.path) === id;
+
+        if (candidateIsExactId && !bestIsExactId) return candidate;
+        if (bestIsExactId && !candidateIsExactId) return best;
+
+        return semver.gt(candidate.manifest.version, best.manifest.version) ? candidate : best;
+      });
+
+      for (const candidate of group) {
+        if (candidate === winner) continue;
+        losers.add(candidate);
+        logWithCategory(
+          'warn',
+          LogCategory.SYSTEM,
+          `Duplicate plugin id '${id}': ignoring folder '${path.basename(candidate.path)}' (v${candidate.manifest.version}) in favor of '${path.basename(winner.path)}' (v${winner.manifest.version})`
+        );
+      }
+    }
+
+    if (losers.size === 0) {
+      return results;
+    }
+
+    return results.map(result => {
+      if (!losers.has(result)) return result;
+      return {
+        ...result,
+        valid: false,
+        errors: [
+          ...(result.errors ?? []),
+          `Ignored: duplicate plugin id '${result.manifest.id}' -- another folder for this id was preferred`,
+        ],
+      };
+    });
   }
 
   /**

@@ -98,6 +98,42 @@ describe('PluginLoader.discoverPlugins skips update-swap bookkeeping directories
     expect(results[0].manifest.version).toBe('2.0.0');
   });
 
+  it('ignores a human-renamed `.bak-<version>` rollback folder (mea-4yh concrete incident)', async () => {
+    // Exact reported layout: updating fictionlab-agent-factory to v0.2.0 left
+    // a rollback folder named `fictionlab-agent-factory.bak-0.1.1` (the old
+    // `.bak` renamed with the version for clarity) beside the canonical
+    // install. The pre-mea-4yh filter only matched an EXACT `.bak` suffix,
+    // so this versioned variant slipped through and got discovered as a
+    // duplicate-id plugin, which then won the id-keyed dependency sort.
+    writeManifest(
+      path.join(pluginsDir, 'fictionlab-agent-factory'),
+      'fictionlab-agent-factory',
+      '0.2.0'
+    );
+    writeManifest(
+      path.join(pluginsDir, 'fictionlab-agent-factory.bak-0.1.1'),
+      'fictionlab-agent-factory',
+      '0.1.1'
+    );
+
+    const loader = new PluginLoader();
+    const results = await loader.discoverPlugins();
+
+    expect(results).toHaveLength(1);
+    expect(results[0].manifest.version).toBe('0.2.0');
+  });
+
+  it('does not discover a dot-prefixed sibling folder even with a valid plugin.json', async () => {
+    writeManifest(path.join(pluginsDir, 'fictionlab-kanban'), 'fictionlab-kanban', '2.0.0');
+    writeManifest(path.join(pluginsDir, '.fictionlab-kanban.staging-tmp'), 'fictionlab-kanban', '2.1.0');
+
+    const loader = new PluginLoader();
+    const results = await loader.discoverPlugins();
+
+    expect(results).toHaveLength(1);
+    expect(results[0].manifest.version).toBe('2.0.0');
+  });
+
   it('does not discover a plugin at all when only a backup copy exists (no phantom fallback)', async () => {
     writeManifest(
       path.join(pluginsDir, 'fictionlab-workflow.backup-1769903090229'),
