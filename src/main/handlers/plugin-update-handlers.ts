@@ -93,9 +93,13 @@ export function registerPluginUpdateHandlers() {
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         // Skip update-swap bookkeeping directories (see plugin-update-swap.ts).
+        // `.includes(...)` (not `.endsWith(...)`) so a human-renamed rollback
+        // copy like `<id>.bak-0.1.1` is still recognized as a `.bak` sibling
+        // (mea-4yh); dot-prefixed folders are skipped too.
         if (
-          entry.name.endsWith('.bak') ||
-          entry.name.endsWith('.staging') ||
+          entry.name.startsWith('.') ||
+          entry.name.includes('.bak') ||
+          entry.name.includes('.staging') ||
           entry.name.includes('.backup-')
         ) {
           continue;
