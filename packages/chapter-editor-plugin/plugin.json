@@ -1,0 +1,40 @@
+{
+  "id": "fictionlab-chapter-editor",
+  "name": "Chapter Editor",
+  "version": "0.1.0",
+  "description": "Hand-editing view for chapter markdown files: highlight + comment (Tiptap Core + the MIT tiptap-comment-extension) and cut/paste, reading/writing the same markdown files the AI drafting pipeline (chapter-writer-7step, etc.) uses, unchanged underneath.",
+  "author": "FictionLab",
+  "icon": "📝",
+  "fictionLabVersion": ">=0.1.0",
+  "pluginType": "utility",
+
+  "updateSource": {
+    "repo": "RLRyals/MCP-Electron-App",
+    "assetPattern": "fictionlab-chapter-editor-*.zip",
+    "tagPrefix": "chapter-editor-plugin-"
+  },
+
+  "entry": {
+    "main": "dist/index.js",
+    "renderer": "dist-renderer/index.js"
+  },
+
+  "permissions": {
+    "database": false,
+    "fileSystem": true,
+    "childProcesses": false
+  },
+  "dependencies": [],
+  "ui": {
+    "mainView": "chapter-editor",
+    "mainViewLabel": "Chapter Editor",
+    "mainViewIcon": "📝",
+    "menuItems": [
+      {
+        "id": "open-chapter-editor",
+        "label": "Chapter Editor",
+        "location": "main-menu"
+      }
+    ]
+  }
+}

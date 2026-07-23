@@ -1,0 +1,23 @@
+{
+  // Typecheck-only config for the renderer bundle sources (src/renderer).
+  // Emission is esbuild's job (build:renderer -> dist-renderer/index.js);
+  // this config exists so `npm run build` still fails on type errors in the
+  // renderer code. noEmit keeps it from ever writing output — the
+  // main-process tsc pass (tsconfig.json) and this one must never share an
+  // outDir (dual-compiler dist clobber, MCP-Electron-App #186/#188).
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["src/renderer/**/*"],
+  "exclude": ["node_modules", "dist", "dist-renderer"]
+}
