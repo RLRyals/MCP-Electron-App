@@ -1,0 +1,45 @@
+{
+  "name": "@fictionlab/chapter-editor-plugin",
+  "version": "0.1.0",
+  "description": "FictionLab chapter-editor plugin: Tiptap Core hand-editing (highlight + comment + cut/paste) over chapter markdown files, per the mea-cjl lean-core/plugin-containment ruling.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npm run build:main && npm run typecheck:renderer && npm run build:renderer",
+    "build:main": "tsc",
+    "typecheck:renderer": "tsc -p tsconfig.renderer.json",
+    "build:renderer": "esbuild src/renderer/index.tsx --bundle --format=esm --platform=browser --target=es2020 --jsx=automatic --outfile=dist-renderer/index.js --sourcemap",
+    "clean": "rimraf dist dist-renderer",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@sereneinserenade/tiptap-comment-extension": "^0.2.0",
+    "@tiptap/core": "^3.28.0",
+    "@tiptap/extension-bubble-menu": "^3.28.0",
+    "@tiptap/markdown": "^3.28.0",
+    "@tiptap/pm": "^3.28.0",
+    "@tiptap/react": "^3.28.0",
+    "@tiptap/starter-kit": "^3.28.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "electron": "^28.3.3",
+    "esbuild": "^0.25.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "rimraf": "^5.0.5",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.0.0"
+  }
+}
