@@ -1,11 +1,13 @@
 /**
- * Renderer CSP tests (issue #225 / bead mea-1783883500211-1-dda839c4).
+ * Renderer CSP tests (issue #225 / bead mea-1783883500211-1-dda839c4;
+ * data: added for plugin data-URL images, bead mea-i38).
  *
  * The renderer CSP had no img-src directive, so it fell back to
  * default-src 'self' — which blocks every practical way of rendering a
  * locally-stored plugin image (data:, blob:, file:). This locks down the
  * fix: img-src is added scoped to 'self' plus the fictionlab-media: custom
- * protocol, default-src is untouched, and no remote origin is permitted.
+ * protocol and data: (for plugin-inlined data-URL images), default-src is
+ * untouched, and no remote origin is permitted.
  */
 
 import * as fs from 'fs';
@@ -45,6 +47,10 @@ describe('index.html Content-Security-Policy', () => {
     expect(directives['img-src']).toContain('fictionlab-media:');
   });
 
+  it('img-src allows data: for plugin-inlined data-URL images', () => {
+    expect(directives['img-src']).toContain('data:');
+  });
+
   it('img-src permits no remote origin (http:, https:, or *)', () => {
     for (const value of directives['img-src']) {
       expect(value).not.toBe('http:');
@@ -55,5 +61,10 @@ describe('index.html Content-Security-Policy', () => {
 
   it('leaves default-src unchanged (self only)', () => {
     expect(directives['default-src']).toEqual(["'self'"]);
+  });
+
+  it('leaves script-src and style-src untouched by the data: change', () => {
+    expect(directives['script-src']).not.toContain('data:');
+    expect(directives['style-src']).not.toContain('data:');
   });
 });
