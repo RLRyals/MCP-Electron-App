@@ -47,19 +47,13 @@ export class ViewRouter {
   private initPromise: Promise<void> | null = null;
 
   // Plugin-dependent views: view id -> plugin id that provides it.
-  // 'workflows' is still host-bundled (WorkflowsViewReact) so it stays
-  // hardcoded; plugin-shipped views (renderer bundles, e.g. the kanban
-  // board from fictionlab-kanban) are added dynamically from their
-  // manifests via registerPluginViewRequirement().
-  private pluginRequiredViews: Map<string, string> = new Map([
-    ['workflows', 'fictionlab-workflow']
-  ]);
+  // Populated dynamically from every active plugin's manifest (entry.renderer
+  // + ui.mainView) via registerPluginViewRequirement() — see pluginViewLoader.
+  private pluginRequiredViews: Map<string, string> = new Map();
 
   // Human-readable labels for plugin-provided views (from ui.mainViewLabel),
   // used by the "plugin required" screen and top-bar title fallback.
-  private pluginViewLabels: Map<string, string> = new Map([
-    ['workflows', 'Workflows']
-  ]);
+  private pluginViewLabels: Map<string, string> = new Map();
 
   constructor(options: ViewRouterOptions) {
     this.container = options.container;
@@ -113,8 +107,6 @@ export class ViewRouter {
 
       // New views
       await register('plugins', () => import('../views/PluginsLauncher.js'), 'PluginsLauncher');
-
-      // Note: WorkflowsViewReact is registered manually in renderer.ts (uses React via import map)
 
       await register('library', () => import('../views/LibraryView.js'), 'LibraryView');
 
