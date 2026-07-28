@@ -10,7 +10,6 @@ import { loadClientOptions, setupClientSelectionListeners } from './client-selec
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { ViewRouter } from './components/ViewRouter.js';
-import { WorkflowsViewReact } from './views/WorkflowsViewReact.js';
 import { syncPluginProvidedViews } from './services/pluginViewLoader.js';
 // Legacy imports (still used by view wrappers)
 import { initializeSetupTab } from './components/SetupTab.js';
@@ -1045,15 +1044,6 @@ async function init(): Promise<void> {
   // Initialize ViewRouter (async - registers all views)
   await viewRouter.initialize();
 
-  // Register React-based views manually only if their plugins are installed
-  // WorkflowsViewReact requires fictionlab-workflow plugin
-  if (sidebar.isPluginInstalled('fictionlab-workflow')) {
-    viewRouter.registerView('workflows', WorkflowsViewReact);
-    console.log('[Renderer] WorkflowsViewReact registered (plugin installed)');
-  } else {
-    console.log('[Renderer] WorkflowsViewReact not registered (plugin not installed)');
-  }
-
   // Plugin-provided views (universal path, fictionlab-workflow#8): any
   // active plugin whose manifest declares entry.renderer + ui.mainView gets
   // its renderer bundle imported and its view registered by id — the kanban
@@ -1075,27 +1065,6 @@ async function init(): Promise<void> {
 
       // Reload sidebar navigation
       await sidebar.updateNavigation();
-
-      // Re-register plugin-dependent views
-      if (sidebar.isPluginInstalled('fictionlab-workflow')) {
-        const wasRegistered = viewRouter['viewClasses'].has('workflows');
-        if (!wasRegistered) {
-          viewRouter.registerView('workflows', WorkflowsViewReact);
-          console.log('[Renderer] WorkflowsViewReact registered after plugin install');
-        }
-
-        // If we're currently trying to view workflows but it was showing "Plugin Required",
-        // re-navigate to actually load the view now that the plugin is ready
-        const currentViewId = viewRouter['currentViewId'];
-        const savedView = localStorage.getItem('fictionlab-active-view');
-        if (savedView === 'workflows' && (!currentViewId || currentViewId !== 'workflows' || !wasRegistered)) {
-          console.log('[Renderer] Re-navigating to workflows view after plugin activation');
-          await viewRouter.navigateTo('workflows');
-        }
-      } else {
-        // Remove workflows view if plugin was uninstalled
-        viewRouter.clearCache('workflows');
-      }
 
       // Re-sync plugin-provided views (imports newly-available renderer
       // bundles, unregisters ones whose plugin went away).
@@ -1234,12 +1203,6 @@ async function init(): Promise<void> {
     // Update sidebar navigation
     await sidebar.updateNavigation();
 
-    // Register workflow view if the workflow plugin was installed
-    if (pluginId === 'fictionlab-workflow' && sidebar.isPluginInstalled('fictionlab-workflow')) {
-      viewRouter.registerView('workflows', WorkflowsViewReact);
-      console.log('[Renderer] WorkflowsViewReact registered after plugin installation');
-    }
-
     // Load any renderer bundle the newly-installed plugin provides and
     // register its view + sidebar entry (universal path — see
     // pluginViewLoader).
@@ -1254,11 +1217,6 @@ async function init(): Promise<void> {
 
     // Update sidebar navigation
     await sidebar.updateNavigation();
-
-    // If workflow plugin was uninstalled and user is on workflows view, navigate away
-    if (pluginId === 'fictionlab-workflow' && viewRouter.getCurrentViewId() === 'workflows') {
-      await viewRouter.navigateTo('dashboard');
-    }
 
     // Unregister any plugin-provided views the uninstalled plugin was
     // serving, and don't strand the user on one of them.
