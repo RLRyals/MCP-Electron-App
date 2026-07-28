@@ -34,6 +34,11 @@ export interface EnvConfig {
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
+  SERIES_PORT: number;
+  CHAPTER_PORT: number;
+  CHARACTER_PORT: number;
+  SCENE_PORT: number;
+  AUTHOR_PORT: number;
   GITHUB_TOKEN?: string;
   /**
    * Fine-grained GitHub PAT scoped ONLY to RLRyals/fictionlab-workflow,
@@ -63,6 +68,11 @@ export const DEFAULT_CONFIG: EnvConfig = {
   OUTLINE_PORT: 3013,
   KANBAN_PORT: 3015,
   STORY_ANALYSIS_PORT: 3016,
+  SERIES_PORT: 3002,
+  CHAPTER_PORT: 3003,
+  CHARACTER_PORT: 3004,
+  SCENE_PORT: 3005,
+  AUTHOR_PORT: 3009,
   GITHUB_TOKEN: '',
   GITHUB_PLUGINS_TOKEN: '',
 };
@@ -475,6 +485,11 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.OUTLINE_PORT, name: 'Outline Server', key: 'OUTLINE_PORT' as const },
     { port: config.KANBAN_PORT, name: 'Kanban Server', key: 'KANBAN_PORT' as const },
     { port: config.STORY_ANALYSIS_PORT, name: 'Story Analysis Server', key: 'STORY_ANALYSIS_PORT' as const },
+    { port: config.SERIES_PORT, name: 'Series Planning Server', key: 'SERIES_PORT' as const },
+    { port: config.CHAPTER_PORT, name: 'Chapter Planning Server', key: 'CHAPTER_PORT' as const },
+    { port: config.CHARACTER_PORT, name: 'Character Server', key: 'CHARACTER_PORT' as const },
+    { port: config.SCENE_PORT, name: 'Scene Server', key: 'SCENE_PORT' as const },
+    { port: config.AUTHOR_PORT, name: 'Author Server', key: 'AUTHOR_PORT' as const },
   ];
 
   // Check configurable ports
@@ -657,6 +672,21 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'STORY_ANALYSIS_PORT':
           config.STORY_ANALYSIS_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'SERIES_PORT':
+          config.SERIES_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'CHAPTER_PORT':
+          config.CHAPTER_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'CHARACTER_PORT':
+          config.CHARACTER_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'SCENE_PORT':
+          config.SCENE_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'AUTHOR_PORT':
+          config.AUTHOR_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -765,6 +795,11 @@ export function formatEnvFile(config: EnvConfig): string {
     `OUTLINE_PORT=${config.OUTLINE_PORT}`,
     `KANBAN_PORT=${config.KANBAN_PORT}`,
     `STORY_ANALYSIS_PORT=${config.STORY_ANALYSIS_PORT}`,
+    `SERIES_PORT=${config.SERIES_PORT}`,
+    `CHAPTER_PORT=${config.CHAPTER_PORT}`,
+    `CHARACTER_PORT=${config.CHARACTER_PORT}`,
+    `SCENE_PORT=${config.SCENE_PORT}`,
+    `AUTHOR_PORT=${config.AUTHOR_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -884,6 +919,31 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const storyAnalysisPortValidation = validatePort(config.STORY_ANALYSIS_PORT);
   if (!storyAnalysisPortValidation.valid) {
     errors.push(`Story Analysis port: ${storyAnalysisPortValidation.error}`);
+  }
+
+  const seriesPortValidation = validatePort(config.SERIES_PORT);
+  if (!seriesPortValidation.valid) {
+    errors.push(`Series Planning port: ${seriesPortValidation.error}`);
+  }
+
+  const chapterPortValidation = validatePort(config.CHAPTER_PORT);
+  if (!chapterPortValidation.valid) {
+    errors.push(`Chapter Planning port: ${chapterPortValidation.error}`);
+  }
+
+  const characterPortValidation = validatePort(config.CHARACTER_PORT);
+  if (!characterPortValidation.valid) {
+    errors.push(`Character port: ${characterPortValidation.error}`);
+  }
+
+  const scenePortValidation = validatePort(config.SCENE_PORT);
+  if (!scenePortValidation.valid) {
+    errors.push(`Scene port: ${scenePortValidation.error}`);
+  }
+
+  const authorPortValidation = validatePort(config.AUTHOR_PORT);
+  if (!authorPortValidation.valid) {
+    errors.push(`Author port: ${authorPortValidation.error}`);
   }
 
   // Validate auth token

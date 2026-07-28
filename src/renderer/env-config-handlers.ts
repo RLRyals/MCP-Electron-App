@@ -19,6 +19,11 @@ interface EnvConfig {
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
+  SERIES_PORT: number;
+  CHAPTER_PORT: number;
+  CHARACTER_PORT: number;
+  SCENE_PORT: number;
+  AUTHOR_PORT: number;
   GITHUB_TOKEN?: string;
   GITHUB_PLUGINS_TOKEN?: string;
 }
@@ -239,6 +244,11 @@ export async function saveEnvConfig(event: Event): Promise<void> {
       OUTLINE_PORT: currentEnvConfig?.OUTLINE_PORT || 3013,
       KANBAN_PORT: currentEnvConfig?.KANBAN_PORT || 3015,
       STORY_ANALYSIS_PORT: currentEnvConfig?.STORY_ANALYSIS_PORT || 3016,
+      SERIES_PORT: currentEnvConfig?.SERIES_PORT || 3002,
+      CHAPTER_PORT: currentEnvConfig?.CHAPTER_PORT || 3003,
+      CHARACTER_PORT: currentEnvConfig?.CHARACTER_PORT || 3004,
+      SCENE_PORT: currentEnvConfig?.SCENE_PORT || 3005,
+      AUTHOR_PORT: currentEnvConfig?.AUTHOR_PORT || 3009,
       // Not exposed as a form field on this form - preserve existing value so a
       // re-save doesn't silently erase a stored GitHub token
       GITHUB_TOKEN: currentEnvConfig?.GITHUB_TOKEN,

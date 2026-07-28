@@ -75,6 +75,11 @@ interface EnvConfig {
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
+  SERIES_PORT: number;
+  CHAPTER_PORT: number;
+  CHARACTER_PORT: number;
+  SCENE_PORT: number;
+  AUTHOR_PORT: number;
 }
 
 interface PortConflictDetail {
