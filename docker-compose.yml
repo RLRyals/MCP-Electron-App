@@ -98,6 +98,11 @@ services:
       - "${OUTLINE_PORT}:3013"  # Outline Server (host side remappable, container fixed at 3013)
       - "${KANBAN_PORT}:3015"  # Kanban Server (host side remappable, container fixed at 3015)
       - "${STORY_ANALYSIS_PORT}:3016"  # Story Analysis Server (host side remappable, container fixed at 3016)
+      - "${SERIES_PORT}:3002"  # Series Planning Server (host side remappable, container fixed at 3002)
+      - "${CHAPTER_PORT}:3003"  # Chapter Planning Server (host side remappable, container fixed at 3003)
+      - "${CHARACTER_PORT}:3004"  # Character Server (host side remappable, container fixed at 3004)
+      - "${SCENE_PORT}:3005"  # Scene Server (host side remappable, container fixed at 3005)
+      - "${AUTHOR_PORT}:3009"  # Author Server (host side remappable, container fixed at 3009)
     environment:
       # PRIMARY: Use PgBouncer for connection pooling (internal Docker network port)
       # CRITICAL: Use container name and INTERNAL port (6432), NOT the external ${PGBOUNCER_PORT} variable

@@ -61,6 +61,11 @@ const CONFIG_FIXTURE = {
   OUTLINE_PORT: 8767,
   KANBAN_PORT: 8768,
   STORY_ANALYSIS_PORT: 8769,
+  SERIES_PORT: 8770,
+  CHAPTER_PORT: 8771,
+  CHARACTER_PORT: 8772,
+  SCENE_PORT: 8773,
+  AUTHOR_PORT: 8774,
 };
 
 /**
@@ -196,7 +201,7 @@ describe('Services tab (issue #124)', () => {
     expect(container.textContent).toContain('Docker Desktop');
 
     const portRows = document.querySelectorAll('#ports-table-body tr');
-    expect(portRows.length).toBe(10);
+    expect(portRows.length).toBe(15);
   });
 
   it('shows PostgreSQL connection info (host, port, database) from the env config', async () => {

@@ -81,6 +81,11 @@ interface EnvConfig {
   OUTLINE_PORT: number;
   KANBAN_PORT: number;
   STORY_ANALYSIS_PORT: number;
+  SERIES_PORT: number;
+  CHAPTER_PORT: number;
+  CHARACTER_PORT: number;
+  SCENE_PORT: number;
+  AUTHOR_PORT: number;
   GITHUB_TOKEN?: string;
   /** Fine-grained PAT for the private plugin repo (bead mea-6tt). */
   GITHUB_PLUGINS_TOKEN?: string;
