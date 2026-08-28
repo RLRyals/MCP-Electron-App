@@ -2,6 +2,16 @@
 
 This document describes the process for creating and publishing releases of the FictionLab App.
 
+> **Releases are automatic (mea-36t).** You no longer create or push the
+> `vX.X.X` tag yourself -- `.github/workflows/build.yml`'s `auto-tag-release`
+> job does it for you the moment a `package.json` version bump lands on
+> `develop` and its build goes green. Bump the version, merge to `develop`,
+> done. See the [README's "Releases Are Automatic" section](../README.md#releases-are-automatic-mea-36t)
+> for the full explanation. The manual `git tag` / `git push origin vX.X.X`
+> steps still described below are what CI now performs *for* you, not
+> something you run yourself -- do not follow them by hand, and never file
+> a bead asking someone to push a tag.
+
 ## Table of Contents
 
 - [Release Schedule](#release-schedule)
