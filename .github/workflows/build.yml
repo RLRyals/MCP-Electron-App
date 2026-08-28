@@ -129,3 +129,48 @@ jobs:
             exit 1
           fi
           echo "::notice::All builds completed successfully!"
+
+  auto-tag-release:
+    name: Auto-tag App Release
+    # mea-36t: on push to develop, once all three OS builds are green, tag
+    # the commit v<package.json version> if that tag doesn't already exist,
+    # then dispatch release.yml for it -- no bead, no manual tag push.
+    # `needs: build` gates this on the matrix job (all 3 OS legs), so a
+    # broken commit never gets tagged. Never runs on pull_request (a PR's
+    # version bump has no commit on develop yet to tag) or on pushes to
+    # main/other branches.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release tag
+      actions: write # workflow_dispatch release.yml (see script comment on why push-tag alone can't trigger it)
+    concurrency:
+      # Serialize auto-tagging across overlapping pushes to develop so two
+      # near-simultaneous merges can't race to tag/push the same version twice.
+      group: auto-tag-release
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Tags aren't fetched by default; the idempotency check needs the
+          # remote tag list to know whether this version was already released.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure git identity for tagging
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Auto-tag and dispatch release if the version isn't tagged yet
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/auto-tag-release.js

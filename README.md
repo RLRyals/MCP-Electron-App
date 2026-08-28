@@ -473,20 +473,38 @@ The CI pipeline:
 4. Generates SHA256 checksums
 5. Uploads build artifacts (retained for 7 days)
 
-#### Creating a Release
+#### Releases Are Automatic (mea-36t)
 
-1. Update the version in `package.json`
-2. Commit: `git commit -am "Bump version to X.X.X"`
-3. Create tag: `git tag -a vX.X.X -m "Release version X.X.X"`
-4. Push tag: `git push origin vX.X.X`
+Releases cut themselves. There is no manual tag-push step and there should
+never be one:
 
-The release workflow will automatically:
-- Build for all platforms
-- Generate checksums
-- Create a GitHub Release
-- Upload all installers and checksums
+1. Bump the version in `package.json` (and `package-lock.json`) in your
+   feature PR, or a dedicated `chore(release): vX.X.X` PR.
+2. Merge to `develop`.
 
-See [RELEASE.md](RELEASE.md) for detailed release instructions.
+That's it. Once the `build.yml` workflow's matrix (Windows/macOS/Linux)
+goes green on that push, its `auto-tag-release` job
+(`scripts/auto-tag-release.js`) tags the commit `vX.X.X`, then dispatches
+`release.yml` via `workflow_dispatch` for that tag, which builds every
+platform, generates checksums, and publishes the GitHub Release. Zero human
+steps after merge.
+
+- **Never push a tag by hand.** `auto-tag-release` is idempotent -- if the
+  tag for the current `package.json` version already exists, it logs
+  `"vX.X.X already released"` and exits 0. A push to `develop` with no
+  version bump does nothing.
+- **Never file a "cut the release" bead or task.** The version bump landing
+  on `develop` *is* the release trigger.
+- **Never ask a human to push a tag.** If a release doesn't appear, check
+  the `auto-tag-release` job's logs on the `develop` push, not "did someone
+  remember to tag."
+
+See [RELEASE.md](RELEASE.md) and [docs/RELEASE-PROCESS.md](docs/RELEASE-PROCESS.md)
+for the fuller release process (versioning scheme, pre-release checklist,
+troubleshooting) -- both now carry a pointer back to this section for the
+actual trigger mechanism, since their step-by-step "create and push a tag"
+instructions predate this automation and describe what CI does for you now,
+not a step you perform.
 
 ### Contributing
 

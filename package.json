@@ -31,6 +31,7 @@
     "test:a11y": "jest --testPathPatterns=a11y",
     "test:a11y:watch": "jest --watch --testPathPatterns=a11y",
     "test:ci": "jest --config jest.config.ci.cjs",
+    "test:scripts": "jest --config jest.config.scripts.cjs",
     "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {

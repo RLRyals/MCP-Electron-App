@@ -444,6 +444,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: FictionLab ${{ steps.get_version.outputs.version }}
+          # mea-36t: pin the release tag explicitly to the resolved version
+          # rather than relying on softprops/action-gh-release's default
+          # (github.ref_name). That default happens to work today because
+          # scripts/auto-tag-release.js always dispatches with
+          # `--ref v<version>` (a tag ref, so ref_name already equals the
+          # version) -- but a workflow_dispatch run started any other way
+          # (e.g. `--ref develop -f version=v1.2.3`) would otherwise create
+          # a release tagged with the branch name instead of the version in
+          # `inputs.version`. Tying tag_name to the same
+          # steps.get_version.outputs.version used for the release name
+          # keeps both paths (tag push and workflow_dispatch) correct
+          # regardless of which ref the dispatch used.
+          tag_name: ${{ steps.get_version.outputs.version }}
           body_path: release_notes.md
           # Auto-generate the "What's Changed" changelog from merged PR
           # titles (appended after the body above) -- bead mea-1j9.
