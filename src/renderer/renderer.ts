@@ -487,6 +487,12 @@ interface ElectronAPI {
     } | null>;
     markSeen: (version: string) => Promise<{ success: boolean }>;
   };
+  // App Auto-Update API (bead mea-hbi). Optional for renderer builds/tests
+  // running against an older preload, same convention as `updates` above.
+  appUpdater?: {
+    onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
+    restartToInstall: () => Promise<{ success: boolean }>;
+  };
 }
 
 // Access the API exposed through preload script
@@ -794,6 +800,45 @@ export function showNotification(message: string, type: 'success' | 'error' | 'i
 
 // Make showNotification globally available for other modules
 (window as any).showNotification = showNotification;
+
+/**
+ * Show a persistent "Restart to update" prompt once electron-updater has
+ * finished silently downloading a new FictionLab build (bead mea-hbi).
+ * Reuses the `.error-dialog` styling (defined in index.html) rather than
+ * `showNotification`'s 3s auto-dismiss toast, since this needs to stay
+ * visible until the user acts on it.
+ */
+function showRestartToUpdateDialog(version: string): void {
+  const existing = document.getElementById('restart-to-update-dialog');
+  if (existing) {
+    return; // Already showing (e.g. a stray duplicate event) -- don't stack dialogs.
+  }
+
+  const dialog = document.createElement('div');
+  dialog.id = 'restart-to-update-dialog';
+  dialog.className = 'error-dialog';
+  dialog.innerHTML = `
+    <div class="error-dialog-backdrop"></div>
+    <div class="error-dialog-content">
+      <h3>Update Ready</h3>
+      <p>FictionLab ${version} has been downloaded and is ready to install.</p>
+      <div class="error-dialog-buttons">
+        <button id="restart-to-update" class="button primary">Restart to Update</button>
+        <button id="dismiss-update-dialog" class="button">Later</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  document.getElementById('restart-to-update')?.addEventListener('click', () => {
+    window.electronAPI.appUpdater?.restartToInstall();
+  });
+
+  document.getElementById('dismiss-update-dialog')?.addEventListener('click', () => {
+    dialog.remove();
+  });
+}
 
 /**
  * Show error dialog with details
@@ -1333,6 +1378,14 @@ async function init(): Promise<void> {
   // What's New after an app update (bead mea-1j9): shown once per new
   // version; quiet no-op on first run, same version, or fetch failure.
   void checkStartupWhatsNew();
+
+  // App auto-update "Restart to update" prompt (bead mea-hbi): electron-updater
+  // downloads silently in the main process, then pushes this event once the
+  // update is ready to install. Optional bridge -- older preload builds/tests
+  // simply never fire it.
+  window.electronAPI.appUpdater?.onUpdateDownloaded((info) => {
+    showRestartToUpdateDialog(info.version);
+  });
 
   // NOTE: Dashboard initialization (issue #214) now happens inside
   // DashboardView.mount() -- DashboardApp (DashboardViewReact.tsx) owns its

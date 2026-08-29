@@ -95,12 +95,28 @@ jobs:
 
           Get-Content out/checksums-windows.txt
 
+          # bead mea-hbi: electron-updater's NSIS provider needs latest.yml
+          # (points it at the installer + its blockmap) alongside the exe on
+          # the GitHub release. package.json's build.publish + `npm run
+          # package:win` (still `--publish never`, no upload) is enough for
+          # electron-builder to WRITE these locally -- see PublishManager's
+          # isWriteUpdateInfo gate, which fires independently of the
+          # never-publish flag. Only the x64 job's latest.yml gets published
+          # (see build-windows-arm64 below): electron-updater expects exactly
+          # one `latest.yml` per release, and x64 is the primary target.
+          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter 'latest.yml' -File |
+            ForEach-Object { Copy-Item -Path $_.FullName -Destination $releaseDir -Force }
+          Get-ChildItem -Path (Join-Path $PWD 'out') -Filter '*.exe.blockmap' -File |
+            ForEach-Object { Copy-Item -Path $_.FullName -Destination $releaseDir -Force }
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: |
             out/release/*.exe
+            out/release/*.blockmap
+            out/release/latest.yml
             out/checksums-windows.txt
           retention-days: 1
 
@@ -261,6 +277,8 @@ jobs:
           path: |
             out/*.dmg
             out/*.zip
+            out/*.zip.blockmap
+            out/latest-mac.yml
             out/checksums-macos.txt
           retention-days: 1
 
@@ -331,6 +349,7 @@ jobs:
           path: |
             out/*.AppImage
             out/*.deb
+            out/latest-linux.yml
             out/checksums-linux.txt
           retention-days: 1
 
@@ -432,6 +451,7 @@ jobs:
           ## Notes
 
           - Code signing certificates are not yet configured for any platform (Windows and macOS builds are unsigned and will show OS security warnings -- SmartScreen on Windows, Gatekeeper on macOS). See TESTING.md for the exact click-through steps on each OS.
+          - Already-installed FictionLab apps (Windows x64) auto-check for this release and install it in the background -- unsigned NSIS updates still work with electron-updater; expect the same SmartScreen prompt on the silent install as on a fresh manual install.
           - Windows ARM64 and the win-arm64 CI smoke test are new in this release; if the ARM64 asset is missing from this release, its build did not complete in time and shipped without blocking the other platforms -- check the release workflow run for the \`Build Windows ARM64\` job status.
           - Please verify checksums before installation
           EOF
@@ -465,14 +485,19 @@ jobs:
           prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
           files: |
             release-assets/windows/**/*Setup*.exe
+            release-assets/windows/**/*.blockmap
+            release-assets/windows/**/latest.yml
             release-assets/windows/checksums-windows.txt
             release-assets/windows-arm64/**/*Setup*.exe
             release-assets/windows-arm64/checksums-windows-arm64.txt
             release-assets/macos/*.dmg
             release-assets/macos/*.zip
+            release-assets/macos/*.zip.blockmap
+            release-assets/macos/latest-mac.yml
             release-assets/macos/checksums-macos.txt
             release-assets/linux/*.AppImage
             release-assets/linux/*.deb
+            release-assets/linux/latest-linux.yml
             release-assets/linux/checksums-linux.txt
 
   release-complete:

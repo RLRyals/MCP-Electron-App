@@ -1905,6 +1905,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * App Auto-Update API (bead mea-hbi -- electron-updater background
+   * download + "Restart to update" prompt, separate from the manual
+   * GitHub-Releases-API check above)
+   */
+  appUpdater: {
+    /**
+     * Fires when electron-updater has finished silently downloading an
+     * update and is ready to install it on restart.
+     */
+    onUpdateDownloaded: (callback: (info: { version: string }) => void): void => {
+      ipcRenderer.on('app-updater:update-downloaded', (_, info) => callback(info));
+    },
+
+    /**
+     * Restart the app and install the downloaded update.
+     */
+    restartToInstall: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('app-updater:restart-to-install');
+    },
+  },
+
+  /**
    * What's New API (bead mea-1j9 -- post-update release notes panel)
    */
   whatsNew: {

@@ -23,6 +23,7 @@ import * as databaseBackup from './database-backup';
 import * as databaseAdmin from './database-admin';
 import * as updater from './updater';
 import * as appUpdater from './app-updater';
+import * as autoUpdater from './auto-updater';
 import * as whatsNew from './whats-new';
 import * as setupWizard from './setup-wizard';
 import * as appSettings from './app-settings';
@@ -1380,6 +1381,14 @@ function setupIPC(): void {
   registerHandler('updates:check-for-updates', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, 'IPC: Checking for FictionLab app updates...');
     return await appUpdater.checkForAppUpdate();
+  });
+
+  // App auto-update install IPC handler (bead mea-hbi -- electron-updater
+  // "Restart to update" action, fired after an update-downloaded event).
+  registerHandler('app-updater:restart-to-install', "", async () => {
+    logWithCategory('info', LogCategory.SYSTEM, 'IPC: Restarting to install downloaded app update...');
+    autoUpdater.quitAndInstall();
+    return { success: true };
   });
 
   // What's New IPC handlers (bead mea-1j9 -- post-update release notes panel)
@@ -3301,6 +3310,12 @@ app.whenReady().then(async () => {
       logWithCategory('error', LogCategory.SYSTEM, 'Error initializing plugin system:', error);
       // Non-fatal, just log and continue
     }
+
+    // FictionLab app self-update via electron-updater (bead mea-hbi):
+    // checks GitHub Releases on startup and every 6h, downloads silently,
+    // and prompts a "Restart to update" action once downloaded. Separate
+    // from the MCP-servers `updater` check below.
+    autoUpdater.initAutoUpdater();
 
     // Auto-check for updates on startup (only for non-first-run)
     try {
