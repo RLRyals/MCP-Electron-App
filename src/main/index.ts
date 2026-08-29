@@ -2949,7 +2949,27 @@ async function ensureDockerReadyForLaunch(): Promise<boolean> {
     }
 
     if (daemonReady) {
-      logWithCategory('info', LogCategory.DOCKER, 'Docker daemon is reachable - ensuring core containers...');
+      logWithCategory('info', LogCategory.DOCKER, 'Docker daemon is reachable - checking for docker-compose.yml updates...');
+
+      // A release whose only change is the bundled docker-compose.yml (e.g. a
+      // host port remap) is otherwise invisible when the stack is already
+      // running at launch, since ensureCoreContainers()'s fast path below
+      // never re-copies the compose file in that case (mea-a3o). Reconcile
+      // and recreate here, before the fast path can short-circuit.
+      try {
+        const composeSync = await mcpSystem.syncComposeIfChanged((progress) => {
+          logWithCategory('debug', LogCategory.DOCKER,
+            `Compose sync: ${progress.message} (${progress.percent}%)`);
+        });
+        if (composeSync.changed) {
+          logWithCategory('info', LogCategory.DOCKER,
+            `docker-compose.yml changed since last run (stack recreated: ${composeSync.recreated})`);
+        }
+      } catch (error) {
+        logWithCategory('error', LogCategory.DOCKER, 'Error syncing docker-compose.yml update', error);
+      }
+
+      logWithCategory('info', LogCategory.DOCKER, 'Ensuring core containers...');
 
       const containerResult = await mcpSystem.ensureCoreContainers((progress) => {
         logWithCategory('debug', LogCategory.DOCKER,

@@ -7,6 +7,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import * as fs from 'fs-extra';
 import { app } from 'electron';
 import { logWithCategory, LogCategory } from './logger';
@@ -189,6 +190,99 @@ async function initializeDockerDirectory(): Promise<void> {
   } catch (error) {
     logWithCategory('error', LogCategory.DOCKER, 'Failed to initialize Docker directory', error);
     throw error;
+  }
+}
+
+/**
+ * Hash a file's contents (SHA-256), or return null if it does not exist.
+ */
+async function hashFile(filePath: string): Promise<string | null> {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  const content = await fs.readFile(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Result of checking the bundled docker-compose.yml against the deployed one.
+ */
+export interface ComposeSyncResult {
+  /** True if the bundled compose differs from the one the stack was last started from. */
+  changed: boolean;
+  /** True if a changed compose was applied and the stack was recreated. */
+  recreated: boolean;
+}
+
+/**
+ * Detect whether the app's bundled docker-compose.yml has changed since the
+ * currently-deployed one (the file the running stack was actually started
+ * from) and, if the stack is already running, apply the update automatically:
+ * copy the new compose over and recreate the stack via restartMCPSystem().
+ *
+ * restartMCPSystem() stops via `docker compose down` (no -v) then starts
+ * again, so named volumes - and the data in them - are preserved.
+ *
+ * This closes the gap where a release whose only change is a compose edit
+ * (e.g. a host port remap) sits invisible until the user manually restarts
+ * the MCP system: ensureCoreContainers()'s fast path returns immediately
+ * when postgres/pgbouncer are already healthy, never reaching
+ * initializeDockerDirectory() at all (mea-a3o).
+ *
+ * If there is no deployed compose yet (fresh install) this is a no-op - the
+ * normal startup path (initializeDockerDirectory) handles that copy. If the
+ * stack isn't currently running, the change is left for the next start to
+ * pick up naturally rather than forcing a recreate here.
+ */
+export async function syncComposeIfChanged(
+  progressCallback?: ProgressCallback
+): Promise<ComposeSyncResult> {
+  try {
+    const deployedCompose = path.join(getProjectRootDirectory(), 'docker-compose.yml');
+    const resourcesPath = getBundledResourcesPath();
+    let bundledCompose = path.join(resourcesPath, 'docker-compose.yml');
+    if (!fs.existsSync(bundledCompose)) {
+      bundledCompose = path.join(resourcesPath, 'resources', 'docker-compose.yml');
+    }
+
+    const [deployedHash, bundledHash] = await Promise.all([
+      hashFile(deployedCompose),
+      hashFile(bundledCompose),
+    ]);
+
+    if (!deployedHash || !bundledHash || deployedHash === bundledHash) {
+      return { changed: false, recreated: false };
+    }
+
+    logWithCategory('info', LogCategory.DOCKER,
+      `docker-compose.yml hash changed (deployed ${deployedHash.slice(0, 12)} -> ` +
+      `bundled ${bundledHash.slice(0, 12)})`
+    );
+
+    const existingHealth = await getContainerHealth([deployedCompose]);
+    const stackRunning = existingHealth.some(c => c.running);
+
+    if (!stackRunning) {
+      logWithCategory('info', LogCategory.DOCKER,
+        'Compose changed but stack is not currently running - next start will apply it');
+      return { changed: true, recreated: false };
+    }
+
+    logWithCategory('info', LogCategory.DOCKER,
+      'Compose changed and stack is running - copying update and recreating containers');
+
+    const restartResult = await restartMCPSystem(progressCallback);
+    if (!restartResult.success) {
+      logWithCategory('error', LogCategory.DOCKER,
+        `Failed to recreate stack after compose change: ${restartResult.message}`);
+      return { changed: true, recreated: false };
+    }
+
+    logWithCategory('info', LogCategory.DOCKER, 'Stack recreated successfully after compose change');
+    return { changed: true, recreated: true };
+  } catch (error: any) {
+    logWithCategory('error', LogCategory.DOCKER, 'Error checking/applying docker-compose.yml update', error);
+    return { changed: false, recreated: false };
   }
 }
 
