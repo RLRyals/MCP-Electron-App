@@ -13,6 +13,7 @@ import {
   buildNewWorkflowDefinition,
   DEFAULT_NEW_WORKFLOW_VERSION,
 } from '../workflow/create-workflow';
+import { checkAndReimportWorkflow, checkAndReimportAllWorkflows, ReimportCheckResult } from '../workflow/reimport-check';
 import type { WorkflowUpdate, ActiveWorkflowInstance } from '../../types/workflow';
 
 /**
@@ -110,6 +111,37 @@ async function getWorkflowClient(): Promise<PersistentMCPClient> {
 }
 
 /**
+ * Broadcast an auto re-import staleness check result to all renderer windows
+ * (mea-ov6). Fired from the workflow:register-active run-preflight check and
+ * from the app-focus hook (see runFocusReimportCheck below).
+ */
+function broadcastReimportResult(result: ReimportCheckResult) {
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('workflow:auto-reimport-result', result);
+  });
+}
+
+/**
+ * Entry point for the app-focus hook in src/main/index.ts (mea-ov6):
+ * re-checks every imported workflow against its on-disk source and
+ * re-imports through the guarded import path any that are newer. Never
+ * blocks or throws -- a failed check is logged and otherwise ignored.
+ */
+export async function runFocusReimportCheck(): Promise<void> {
+  try {
+    const client = await getWorkflowClient();
+    const results = await checkAndReimportAllWorkflows(client);
+    for (const result of results) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Focus reimport check: ${result.workflowId} -> ${result.status}: ${result.message}`);
+      broadcastReimportResult(result);
+    }
+  } catch (error: any) {
+    logWithCategory('warn', LogCategory.WORKFLOW, `Focus reimport check failed: ${error.message}`);
+  }
+}
+
+/**
  * Register workflow-related IPC handlers
  */
 export function registerWorkflowHandlers() {
@@ -137,6 +169,45 @@ export function registerWorkflowHandlers() {
     } catch (error: any) {
       logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Get definition failed', { error: error.message, stack: error.stack });
       throw error;
+    }
+  });
+
+  // Get version history for a workflow (workflow_versions snapshots, mea-ov6)
+  registerHandler('workflow:get-versions', "Get version history for a workflow", async (_event, workflowId: string) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Get versions for workflow ${workflowId}`);
+    try {
+      const client = await getWorkflowClient();
+      return await client.getWorkflowVersions(workflowId);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Get versions failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Restore a workflow to a previously snapshotted version (mea-ov6)
+  registerHandler('workflow:restore-version', "Restore a workflow to a previously snapshotted version", async (_event, { workflowId, version }: { workflowId: string; version: string }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, `IPC: Restore workflow ${workflowId} to v${version}`);
+    try {
+      const client = await getWorkflowClient();
+      return await client.restoreWorkflowVersion(workflowId, version);
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Restore version failed', { error: error.message });
+      throw error;
+    }
+  });
+
+  // Check all imported workflows for on-disk updates (mea-ov6). Used by the
+  // app-focus hook and available as a manual "check for updates" affordance.
+  registerHandler('workflow:check-for-updates', "Check imported workflows against disk and auto-reimport newer ones", async (_event, opts?: { force?: boolean }) => {
+    logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Check workflows for on-disk updates');
+    try {
+      const client = await getWorkflowClient();
+      const results = await checkAndReimportAllWorkflows(client, opts || {});
+      results.forEach(broadcastReimportResult);
+      return results;
+    } catch (error: any) {
+      logWithCategory('error', LogCategory.WORKFLOW, 'IPC: Check for updates failed', { error: error.message });
+      return [];
     }
   });
 
@@ -874,6 +945,22 @@ export function registerWorkflowHandlers() {
     logWithCategory('info', LogCategory.WORKFLOW, `IPC: Register active workflow ${params.workflowId}${params.parentWorkflowId ? ` (parent: ${params.parentWorkflowId})` : ''}`);
     try {
       const client = await getWorkflowClient();
+
+      // Run-preflight staleness check (mea-ov6): re-import through the guarded
+      // path if the on-disk workflow is newer than the DB-served definition.
+      // Never blocks the run -- a failed/refused check is only surfaced.
+      try {
+        const reimportResult = await checkAndReimportWorkflow(params.workflowId, client);
+        if (reimportResult.status !== 'no-source' && reimportResult.status !== 'up-to-date') {
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `IPC: Run-preflight reimport for ${params.workflowId}: ${reimportResult.status} - ${reimportResult.message}`);
+          broadcastReimportResult(reimportResult);
+        }
+      } catch (reimportError: any) {
+        logWithCategory('warn', LogCategory.WORKFLOW,
+          `IPC: Run-preflight reimport check failed for ${params.workflowId}: ${reimportError.message}`);
+      }
+
       const result = await client.registerActiveWorkflow(params);
 
       // Broadcast so the canvas can detect new workflows and auto-connect

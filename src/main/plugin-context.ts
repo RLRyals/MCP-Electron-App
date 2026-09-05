@@ -805,6 +805,45 @@ function createWorkflowService(
         return null;
       }
     },
+
+    async getVersionHistory(workflowId: string) {
+      try {
+        const client = await getWorkflowMCPClient();
+        const result = await client.callTool('get_workflow_versions', { workflow_id: workflowId });
+        return Array.isArray(result) ? result : [];
+      } catch (error: any) {
+        logWithCategory('warn', LogCategory.SYSTEM,
+          `Plugin ${pluginId} could not get version history for ${workflowId}:`, error.message);
+        return [];
+      }
+    },
+
+    async restoreVersion(workflowId: string, version: string): Promise<WorkflowImportResult> {
+      try {
+        logWithCategory('info', LogCategory.SYSTEM,
+          `Plugin ${pluginId} restoring workflow ${workflowId} to v${version}`);
+
+        const client = await getWorkflowMCPClient();
+        const result = await client.callTool('restore_workflow_version', {
+          workflow_id: workflowId,
+          version
+        });
+
+        return {
+          success: true,
+          workflowId: result?.workflow_id || workflowId,
+          message: result?.message,
+        };
+      } catch (error: any) {
+        logWithCategory('error', LogCategory.SYSTEM,
+          `Plugin ${pluginId} workflow restore failed:`, error);
+
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+    },
   };
 }
 
