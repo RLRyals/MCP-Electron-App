@@ -381,6 +381,36 @@ export interface WorkflowService {
    * @returns Source path if available
    */
   getImportSource(workflowId: string): Promise<string | null>;
+
+  /**
+   * Get the snapshotted version history for a workflow (mea-ov6).
+   * Populated automatically whenever an import overwrites an existing
+   * version (see the auto re-import staleness check).
+   * @param workflowId ID of the workflow
+   * @returns Version snapshots, most recent first
+   */
+  getVersionHistory(workflowId: string): Promise<WorkflowVersionSnapshot[]>;
+
+  /**
+   * Restore a workflow to a previously snapshotted version (mea-ov6).
+   * The current definition is itself snapshotted first, so a restore is undoable.
+   * @param workflowId ID of the workflow
+   * @param version The workflow_versions version to restore
+   */
+  restoreVersion(workflowId: string, version: string): Promise<WorkflowImportResult>;
+}
+
+/**
+ * A snapshotted workflow definition (mea-ov6) -- one row of
+ * fictionlab.workflow_versions, as returned by getVersionHistory().
+ */
+export interface WorkflowVersionSnapshot {
+  workflow_id: string;
+  version: string;
+  changelog?: string | null;
+  parent_version?: string | null;
+  created_by?: string | null;
+  created_at?: string;
 }
 
 /**

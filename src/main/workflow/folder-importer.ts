@@ -310,6 +310,25 @@ export class FolderImporter {
   }
 
   /**
+   * Read just the version out of a workflow file on disk (mea-ov6).
+   * Used by the auto re-import staleness check, which needs to compare
+   * disk vs. DB version cheaply -- unlike previewWorkflow(), this does no
+   * DB round-trip for duplicate-ID detection.
+   */
+  async getFolderVersion(folderPath: string): Promise<string | null> {
+    try {
+      const workflowFile = await this.findWorkflowFile(folderPath);
+      if (!workflowFile) return null;
+      const workflow = await this.parser.parseWorkflow(workflowFile);
+      return workflow.version;
+    } catch (error: any) {
+      logWithCategory('warn', LogCategory.WORKFLOW,
+        `getFolderVersion: failed to read version from ${folderPath}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Find workflow.yaml or workflow.json in folder
    *
    * Checks multiple locations to support both:

@@ -3373,6 +3373,21 @@ app.whenReady().then(async () => {
       });
     }
   });
+
+  // Auto re-import staleness check (mea-ov6): when the app regains focus,
+  // re-check every imported workflow against its on-disk source (the YAML
+  // repo) and re-import through the guarded path (mws-l3i) any that are
+  // newer. The DB is the source of truth workflows run from; this is what
+  // keeps it from drifting behind a `git pull` in the workflow repo. Also
+  // runs as a run-preflight check right before a workflow starts (see
+  // workflow:register-active in workflow-handlers.ts).
+  app.on('browser-window-focus', () => {
+    import('./handlers/workflow-handlers').then(({ runFocusReimportCheck }) => {
+      runFocusReimportCheck().catch(error => {
+        logWithCategory('warn', LogCategory.SYSTEM, `Focus reimport check failed: ${error.message}`);
+      });
+    });
+  });
 });
 
 // Quit when all windows are closed, except on macOS

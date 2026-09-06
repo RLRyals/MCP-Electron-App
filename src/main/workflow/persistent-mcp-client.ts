@@ -671,6 +671,28 @@ export class PersistentMCPClient {
   }
 
   /**
+   * Get the recorded import source path for a workflow (mea-ov6).
+   * Used by the auto re-import staleness check to find the on-disk copy
+   * to compare against the DB-served definition.
+   */
+  async getWorkflowImportSource(workflowId: string): Promise<string | null> {
+    const result = await this.callTool('get_workflow_import_source', { id: workflowId });
+    return result?.sourcePath || null;
+  }
+
+  /**
+   * Restore a previously snapshotted workflow_versions row back into
+   * workflow_definitions (mea-ov6). The server snapshots the current
+   * definition first, so a restore is itself undoable.
+   */
+  async restoreWorkflowVersion(workflowId: string, version: string): Promise<any> {
+    return await this.callTool('restore_workflow_version', {
+      workflow_id: workflowId,
+      version
+    });
+  }
+
+  /**
    * Lock workflow version during execution
    */
   async lockWorkflowVersion(
