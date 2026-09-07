@@ -90,6 +90,63 @@ describe('checkAndReimportWorkflow', () => {
   });
 });
 
+describe('checkAndReimportWorkflow - worktree remap (mea-38o)', () => {
+  beforeEach(() => {
+    MockedFolderImporter.mockClear();
+  });
+
+  it('falls back to the canonical repo path when the recorded worktree path no longer exists', async () => {
+    const worktreePath = 'C:\\github\\FictionLab-Downloads-worktrees\\fld-6qs\\workflows\\book-formatting';
+    const canonicalPath = 'C:\\github\\FictionLab-Downloads\\workflows\\book-formatting';
+
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockImplementation((p: string) => {
+      if (p === canonicalPath) return Promise.resolve('1.11.0');
+      return Promise.resolve(null); // worktree path is gone
+    });
+    MockedFolderImporter.prototype.importFromFolder = jest.fn().mockResolvedValue({
+      success: true,
+      workflowId: 'book-formatting',
+      version: '1.11.0',
+      message: 'Imported',
+    });
+
+    const client = makeClient({
+      getWorkflowImportSource: jest.fn().mockResolvedValue(worktreePath),
+      getWorkflowDefinition: jest.fn().mockResolvedValue({ workflow_id: 'book-formatting', version: '1.9.1' }),
+    });
+
+    const result = await checkAndReimportWorkflow('book-formatting', client);
+
+    expect(result.status).toBe('reimported');
+    expect(MockedFolderImporter.prototype.importFromFolder).toHaveBeenCalledWith(canonicalPath);
+  });
+
+  it('reports an error when neither the recorded path nor its canonical remap are readable', async () => {
+    const worktreePath = 'C:\\github\\FictionLab-Downloads-worktrees\\fld-6qs\\workflows\\book-formatting';
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue(null);
+    MockedFolderImporter.prototype.importFromFolder = jest.fn();
+    const client = makeClient({ getWorkflowImportSource: jest.fn().mockResolvedValue(worktreePath) });
+
+    const result = await checkAndReimportWorkflow('book-formatting', client);
+
+    expect(result.status).toBe('error');
+    expect(result.message).toContain(worktreePath);
+    expect(MockedFolderImporter.prototype.importFromFolder).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt a remap for a recorded path that is not inside a dispatch worktree', async () => {
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue(null);
+    const client = makeClient({ getWorkflowImportSource: jest.fn().mockResolvedValue('/repo/workflows/my-flow') });
+
+    const result = await checkAndReimportWorkflow('my-flow', client);
+
+    expect(result.status).toBe('error');
+    // Only the one, non-worktree path should ever have been probed.
+    expect(MockedFolderImporter.prototype.getFolderVersion).toHaveBeenCalledTimes(1);
+    expect(MockedFolderImporter.prototype.getFolderVersion).toHaveBeenCalledWith('/repo/workflows/my-flow');
+  });
+});
+
 describe('checkAndReimportAllWorkflows', () => {
   beforeEach(() => {
     MockedFolderImporter.mockClear();
@@ -127,5 +184,38 @@ describe('checkAndReimportAllWorkflows', () => {
     expect(results).toHaveLength(1);
     expect(results[0].workflowId).toBe('stale-flow');
     expect(results[0].status).toBe('reimported');
+  });
+
+  it('reports an unreadable recorded source path once per session, then suppresses it on later automatic checks (mea-38o)', async () => {
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue(null);
+
+    const client = makeClient({
+      getWorkflowDefinitions: jest.fn().mockResolvedValue([{ workflow_id: 'broken-source-flow', version: '1.0.0' }]),
+      getWorkflowImportSource: jest.fn().mockResolvedValue('/repo/workflows/broken-source-flow'),
+      getWorkflowDefinition: jest.fn().mockResolvedValue({ workflow_id: 'broken-source-flow', version: '1.0.0' }),
+    });
+
+    const nowSpy = jest.spyOn(Date, 'now');
+
+    // First automatic check: surfaces the error.
+    nowSpy.mockReturnValue(1_000_000);
+    const first = await checkAndReimportAllWorkflows(client, { force: true });
+    expect(first).toHaveLength(1);
+    expect(first[0].status).toBe('error');
+
+    // A later automatic (non-force) check, well past the cooldown window,
+    // must not re-surface the same unreadable-path error again.
+    nowSpy.mockReturnValue(1_000_000 + 61_000);
+    const second = await checkAndReimportAllWorkflows(client);
+    expect(second).toHaveLength(0);
+
+    // An explicit forced check (the user clicking "check for updates") still
+    // surfaces current state.
+    nowSpy.mockReturnValue(1_000_000 + 122_000);
+    const third = await checkAndReimportAllWorkflows(client, { force: true });
+    expect(third).toHaveLength(1);
+    expect(third[0].status).toBe('error');
+
+    nowSpy.mockRestore();
   });
 });
