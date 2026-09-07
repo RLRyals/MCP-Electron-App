@@ -11,18 +11,24 @@
  * `-worktrees` directory: `<repo>\...`.
  */
 
-import * as path from 'path';
-
 const WORKTREE_DIR_SUFFIX = /^(.*)-worktrees$/i;
 
 /**
  * If sourcePath sits inside a `<repo>-worktrees\<branch>\...` dispatch
  * worktree, return the equivalent path in `<repo>`'s live checkout. Returns
  * null if sourcePath doesn't match that convention (nothing to remap).
+ *
+ * sourcePath is recorded by the (Windows) dispatch machine, so it's always
+ * Windows-style (`C:\...`) regardless of which OS this code runs on -- CI
+ * also runs this on Linux/macOS runners. Split on both `\` and `/` instead
+ * of relying on Node's platform-dependent `path.sep`, and rejoin using
+ * whichever separator the input actually used, so the remap works
+ * identically on every platform.
  */
 export function remapWorktreeSourcePath(sourcePath: string): string | null {
-  const normalized = path.normalize(sourcePath);
-  const segments = normalized.split(path.sep);
+  const sepMatch = sourcePath.match(/[\\/]/);
+  const sep = sepMatch ? sepMatch[0] : '\\';
+  const segments = sourcePath.split(/[\\/]+/);
 
   const worktreesIndex = segments.findIndex(seg => WORKTREE_DIR_SUFFIX.test(seg));
   // Need a "-worktrees" segment AND at least one more segment after it (the
@@ -43,5 +49,5 @@ export function remapWorktreeSourcePath(sourcePath: string): string | null {
     ...segments.slice(worktreesIndex + 2),
   ];
 
-  return canonicalSegments.join(path.sep);
+  return canonicalSegments.join(sep);
 }
