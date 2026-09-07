@@ -18,6 +18,7 @@
 import { PersistentMCPClient } from './persistent-mcp-client';
 import { FolderImporter } from './folder-importer';
 import { logWithCategory, LogCategory } from '../logger';
+import { remapWorktreeSourcePath } from './worktree-path';
 
 export type ReimportStatus = 'reimported' | 'up-to-date' | 'no-source' | 'refused' | 'error';
 
@@ -75,7 +76,26 @@ export async function checkAndReimportWorkflow(
     }
 
     const importer = new FolderImporter();
-    const diskVersion = await importer.getFolderVersion(sourcePath);
+    let diskVersion = await importer.getFolderVersion(sourcePath);
+    let resolvedSourcePath = sourcePath;
+
+    if (!diskVersion) {
+      // The recorded path may be a dispatch worktree that was cleaned up
+      // after its PR merged (mea-38o) - retry against the repo's canonical
+      // checkout before giving up.
+      const remapped = remapWorktreeSourcePath(sourcePath);
+      if (remapped) {
+        const remappedVersion = await importer.getFolderVersion(remapped);
+        if (remappedVersion) {
+          logWithCategory('info', LogCategory.WORKFLOW,
+            `Auto re-import: recorded source path for ${workflowId} no longer exists (worktree cleaned up); ` +
+            `resolved via canonical repo path instead: ${remapped}`);
+          diskVersion = remappedVersion;
+          resolvedSourcePath = remapped;
+        }
+      }
+    }
+
     if (!diskVersion) {
       return {
         workflowId,
@@ -98,7 +118,7 @@ export async function checkAndReimportWorkflow(
     logWithCategory('info', LogCategory.WORKFLOW,
       `Auto re-import: ${workflowId} disk v${diskVersion} is newer than DB v${dbVersion}, re-importing`);
 
-    const result = await importer.importFromFolder(sourcePath);
+    const result = await importer.importFromFolder(resolvedSourcePath);
     if (!result.success) {
       // The guard refused (e.g. a concurrent write landed a same/lower version
       // between our check and the import call, or disk content diverged in a
@@ -126,6 +146,20 @@ export async function checkAndReimportWorkflow(
 const FOCUS_CHECK_COOLDOWN_MS = 60_000;
 let lastFocusCheckAt = 0;
 
+// A workflow whose recorded source path is unreadable (even after the
+// worktree remap) stays unreadable until someone re-imports it from a valid
+// location - repeating the same error on every ~minute focus tick for the
+// rest of the session is just noise. Track which workflows have already had
+// this specific error surfaced once, and skip re-surfacing it on subsequent
+// automatic checks (mea-38o). An explicit force check (opts.force) still
+// surfaces the current state, since that's the user asking on purpose.
+const reportedMissingSourceWorkflowIds = new Set<string>();
+
+function isMissingSourceError(result: ReimportCheckResult): boolean {
+  return result.status === 'error' &&
+    /Could not read on-disk workflow at recorded source path/.test(result.message);
+}
+
 /**
  * Check every imported workflow for staleness. Used by the app-focus hook
  * and the manual "check for updates" IPC handler.
@@ -150,6 +184,17 @@ export async function checkAndReimportAllWorkflows(
     if (!workflowId) continue;
 
     const result = await checkAndReimportWorkflow(workflowId, client);
+
+    if (isMissingSourceError(result)) {
+      const alreadyReported = reportedMissingSourceWorkflowIds.has(workflowId);
+      reportedMissingSourceWorkflowIds.add(workflowId);
+      if (alreadyReported && !opts.force) {
+        continue;
+      }
+      results.push(result);
+      continue;
+    }
+
     if (result.status !== 'no-source' && result.status !== 'up-to-date') {
       results.push(result);
     }
