@@ -19,6 +19,7 @@ import { DependencyResolver } from './dependency-resolver';
 import { MCPWorkflowClient } from './mcp-workflow-client';
 import { logWithCategory, LogCategory } from '../logger';
 import { getDatabasePool } from '../database-connection';
+import { remapWorktreeSourcePath } from './worktree-path';
 
 export interface ImportResult {
   success: boolean;
@@ -276,8 +277,15 @@ export class FolderImporter {
       logWithCategory('info', LogCategory.WORKFLOW,
         `Workflow imported to database: ${result.workflow_id} v${result.version}`);
 
-      // 7. Record import
-      await this.recordImport(result.workflow_id, folderPath, installedCounts);
+      // 7. Record import - normalize a dispatch-worktree path to the repo's
+      // canonical checkout so it doesn't go stale once the worktree is
+      // cleaned up after its PR merges (mea-38o).
+      const remappedSourcePath = remapWorktreeSourcePath(folderPath);
+      if (remappedSourcePath) {
+        logWithCategory('info', LogCategory.WORKFLOW,
+          `Recording canonical repo path instead of dispatch worktree path: ${folderPath} -> ${remappedSourcePath}`);
+      }
+      await this.recordImport(result.workflow_id, remappedSourcePath || folderPath, installedCounts);
 
       // Re-check sub-workflows after import attempt
       const remainingSubWorkflows = await this.depResolver.checkSubWorkflows(
