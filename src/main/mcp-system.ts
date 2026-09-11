@@ -795,11 +795,20 @@ async function execDockerCompose(
 }
 
 /**
- * Parse docker-compose ps output to get container health
+ * Parse docker-compose ps output to get container health.
+ *
+ * By default (includeStopped=false) only running containers are returned,
+ * matching `docker compose ps`. Pass includeStopped=true (`docker compose ps -a`)
+ * to also see containers that exist but are currently stopped - needed to detect
+ * services that were previously part of the running stack (mea-5fh).
  */
-async function getContainerHealth(composeFile: string | string[]): Promise<ContainerHealth[]> {
+async function getContainerHealth(
+  composeFile: string | string[],
+  includeStopped = false
+): Promise<ContainerHealth[]> {
   try {
-    const { stdout } = await execDockerCompose(composeFile, 'ps', ['--format', 'json']);
+    const psArgs = includeStopped ? ['-a', '--format', 'json'] : ['--format', 'json'];
+    const { stdout } = await execDockerCompose(composeFile, 'ps', psArgs);
 
     if (!stdout.trim()) {
       return [];
@@ -966,13 +975,16 @@ async function waitForHealthy(
 
 /**
  * Ensure the core containers required before the DB pool can initialize
- * (postgres, pgbouncer) are up and healthy.
+ * (postgres, pgbouncer) are up and healthy - and restore mcp-connector /
+ * mcp-writing-servers too if this compose project previously had them
+ * provisioned but they aren't currently running (mea-5fh). That covers both
+ * a stack-recreate that drops the full set and a manual stop the user forgot
+ * to reverse - either way, launch/focus should not leave /fiction and the
+ * kanban lane stranded behind only-core-containers.
  *
- * This is a NARROW extraction of the postgres/pgbouncer portion of
+ * This is otherwise a NARROW extraction of the postgres/pgbouncer portion of
  * startMCPSystem() - deliberately not the full wizard-oriented path:
- * - no mcp-writing-servers image build (that's a from-source image only
- *   needed for mcp-connector/mcp-writing-servers, not the DB)
- * - no mcp-connector/mcp-writing-servers containers
+ * - mcp-writing-servers is only (re)built when it's actually being restored
  * - no aggressive stopExistingContainers() unless a real port conflict is found
  *
  * Used by the launch gate (index.ts) after the Docker daemon is confirmed
@@ -1008,9 +1020,31 @@ export async function ensureCoreContainers(
     const existingHealth = await getContainerHealth([coreFile]);
     const postgresUp = existingHealth.find(c => c.name.includes('postgres'));
     const pgbouncerUp = existingHealth.find(c => c.name.includes('pgbouncer'));
+    const coreHealthy = !!(postgresUp?.running && postgresUp.health === 'healthy' &&
+      pgbouncerUp?.running && pgbouncerUp.health === 'healthy');
 
-    if (postgresUp?.running && postgresUp.health === 'healthy' &&
-        pgbouncerUp?.running && pgbouncerUp.health === 'healthy') {
+    // Detect mcp-connector/mcp-writing-servers that were part of this compose
+    // project before (even if currently stopped) but aren't up right now, so a
+    // recreate or a forgotten manual restart doesn't strand the full stack while
+    // this "core only" path silently reports success (mea-5fh). Match by both
+    // the compose service name and its actual container name (docker-compose.yml
+    // names the mcp-writing-servers container "fictionlab-mcp-servers", which
+    // doesn't substring-match the service name).
+    const fullStackServiceContainerNames: Record<string, string> = {
+      'mcp-connector': 'fictionlab-mcp-connector',
+      'mcp-writing-servers': 'fictionlab-mcp-servers',
+    };
+    const allKnownContainers = await getContainerHealth([coreFile], true);
+    const missingFullStack = Object.keys(fullStackServiceContainerNames).filter(service => {
+      const containerName = fullStackServiceContainerNames[service];
+      const matches = (c: ContainerHealth) => c.name.includes(service) || c.name.includes(containerName);
+      const previouslyProvisioned = allKnownContainers.some(matches);
+      if (!previouslyProvisioned) return false;
+      const current = existingHealth.find(matches);
+      return !(current?.running && current.health === 'healthy');
+    });
+
+    if (coreHealthy && missingFullStack.length === 0) {
       logWithCategory('info', LogCategory.DOCKER, 'Core containers already running and healthy - nothing to do');
 
       if (progressCallback) {
@@ -1018,6 +1052,11 @@ export async function ensureCoreContainers(
       }
 
       return { success: true, message: 'Core containers already running and healthy' };
+    }
+
+    if (coreHealthy && missingFullStack.length > 0) {
+      logWithCategory('info', LogCategory.DOCKER,
+        `Core containers healthy, but previously-running services are down - restoring: ${missingFullStack.join(', ')}`);
     }
 
     // Verify environment configuration is valid before starting anything
@@ -1085,16 +1124,34 @@ export async function ensureCoreContainers(
 
     if (progressCallback) {
       progressCallback({
-        message: 'Starting PostgreSQL and PgBouncer...',
+        message: missingFullStack.length > 0
+          ? 'Starting PostgreSQL, PgBouncer, and previously-running services...'
+          : 'Starting PostgreSQL and PgBouncer...',
         percent: 40,
         step: 'starting-core',
         status: 'starting',
       });
     }
 
+    if (missingFullStack.includes('mcp-writing-servers')) {
+      try {
+        logWithCategory('info', LogCategory.DOCKER, 'Building mcp-writing-servers image before restoring it...');
+        await execDockerCompose(coreFile, 'build', ['mcp-writing-servers']);
+      } catch (buildError: any) {
+        // Non-fatal - fall through and try `up` with whatever image already exists.
+        logWithCategory('warn', LogCategory.DOCKER,
+          `Failed to rebuild mcp-writing-servers image before restoring (continuing with existing image if present): ${buildError.message || buildError}`);
+      }
+    }
+
+    const servicesToStart = ['postgres', 'pgbouncer', ...missingFullStack];
+
     try {
-      await execDockerCompose(coreFile, 'up', ['-d', 'postgres', 'pgbouncer']);
-      logWithCategory('info', LogCategory.DOCKER, 'Core containers (postgres, pgbouncer) started');
+      await execDockerCompose(coreFile, 'up', ['-d', ...servicesToStart]);
+      logWithCategory('info', LogCategory.DOCKER, `Core containers started: ${servicesToStart.join(', ')}`);
+      if (missingFullStack.length > 0) {
+        logWithCategory('info', LogCategory.DOCKER, `Restored previously-running services: ${missingFullStack.join(', ')}`);
+      }
     } catch (error: any) {
       const errorStderr = error.stderr || '';
       if (errorStderr.includes('port is already allocated')) {
@@ -1133,7 +1190,10 @@ export async function ensureCoreContainers(
       };
     }
 
-    return { success: true, message: 'Core containers are up and healthy' };
+    const restoredNote = missingFullStack.length > 0
+      ? ` (restored: ${missingFullStack.join(', ')})`
+      : '';
+    return { success: true, message: `Core containers are up and healthy${restoredNote}` };
   } catch (error: any) {
     const errorMessage = error.message || String(error);
     logWithCategory('error', LogCategory.DOCKER, 'Error ensuring core containers', error);
