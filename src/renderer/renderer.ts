@@ -895,9 +895,25 @@ function showErrorDialog(title: string, message: string, stack?: string): void {
 }
 
 /**
+ * Chromium's ResizeObserver loop notifications are benign -- they fire when
+ * a resize callback triggers another resize in the same frame, and never
+ * indicate broken app state. This listener is registered at module load, so
+ * it runs before any plugin-registered 'error' listener that tries to
+ * suppress the same message; by the time a later listener calls
+ * preventDefault()/stopImmediatePropagation(), this one has already shown
+ * the dialog (mea-m4x).
+ */
+function isBenignResizeObserverError(message: string | undefined): boolean {
+  return !!message && message.includes('ResizeObserver loop');
+}
+
+/**
  * Global error handler
  */
 window.addEventListener('error', (event) => {
+  if (isBenignResizeObserverError(event.message)) {
+    return;
+  }
   console.error('Global error:', event.error);
   showErrorDialog('Application Error', event.message, event.error?.stack);
 });
