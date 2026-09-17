@@ -257,6 +257,33 @@ export interface PluginServices {
 
   /** Workflow management (if permission granted) */
   workflow?: WorkflowService;
+
+  /** Current-user identity (app-settings current user) */
+  identity: IdentityService;
+}
+
+/**
+ * Current-user identity, as configured in app-settings (kanban "Mine"
+ * filter, actor attribution, comment authorship, assign-to-me).
+ */
+export interface PluginCurrentUser {
+  id: string;
+  displayName: string;
+}
+
+/**
+ * Identity Service
+ *
+ * Gives a plugin's main-process code read access to the host app's
+ * configured current-user identity, without requiring a renderer
+ * round-trip (app-settings:get-current-user is renderer-only).
+ */
+export interface IdentityService {
+  /**
+   * Get the current-user identity.
+   * @returns The configured current user (falls back to the host's default)
+   */
+  getCurrentUser(): Promise<PluginCurrentUser>;
 }
 
 /**
