@@ -239,6 +239,27 @@
   color: #9CA3AF;
 }
 
+.plugin-update-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  background: rgba(74, 125, 252, 0.2);
+  color: #4A7DFC;
+  cursor: pointer;
+}
+
+.plugin-update-badge:hover {
+  background: rgba(74, 125, 252, 0.35);
+}
+
+.plugin-update-badge::before {
+  content: '●';
+  font-size: 0.7em;
+}
+
 /* ========================================
    Plugin Actions
    ======================================== */
