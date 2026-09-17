@@ -8,11 +8,18 @@ import type { View } from '../components/ViewRouter.js';
 import type { TopBarConfig} from '../components/TopBar.js';
 import { PluginInstallWizard } from '../components/PluginInstallWizard.js';
 
+/** How long a per-session cached update-check result stays fresh (mea-lpy). */
+const UPDATE_CHECK_CACHE_MS = 10 * 60 * 1000;
+
 export class PluginsLauncher implements View {
   private container: HTMLElement | null = null;
   private plugins: any[] = [];
   private viewMode: 'grid' | 'list' = 'grid';
   private searchQuery: string = '';
+  // Session-level cache of GitHub update-check results, keyed by plugin id
+  // (bead mea-lpy). Populated in the background after the plugin grid has
+  // already rendered so first paint never waits on a GitHub round-trip.
+  private updateCheckCache: Map<string, { result: any; checkedAt: number }> = new Map();
 
   /**
    * Mount the plugins launcher view
@@ -30,6 +37,76 @@ export class PluginsLauncher implements View {
     this.attachEventListeners();
 
     console.log('[PluginsLauncher] Mounted with', this.plugins.length, 'plugins');
+
+    // Kick off update checks in the background; badges get patched in as
+    // results arrive (mea-lpy). Intentionally not awaited.
+    this.checkForPluginUpdates();
+  }
+
+  /**
+   * Check every plugin with a known GitHub update source for an available
+   * update, and patch a badge onto its card as each result arrives.
+   * Session-cached (UPDATE_CHECK_CACHE_MS) so re-mounting/searching/toggling
+   * views doesn't re-hit GitHub's API for plugins already checked recently.
+   */
+  private async checkForPluginUpdates(): Promise<void> {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI?.plugins?.checkGithubUpdate) return;
+
+    const now = Date.now();
+    const pluginsToCheck = this.plugins.filter((plugin) => {
+      const cached = this.updateCheckCache.get(plugin.id);
+      return !cached || now - cached.checkedAt > UPDATE_CHECK_CACHE_MS;
+    });
+
+    await Promise.all(
+      pluginsToCheck.map(async (plugin) => {
+        try {
+          const result = await electronAPI.plugins.checkGithubUpdate(plugin.id);
+          this.updateCheckCache.set(plugin.id, { result, checkedAt: Date.now() });
+          if (result?.status === 'update-available') {
+            this.patchUpdateBadge(plugin.id, result);
+          }
+        } catch (error) {
+          // Plugins without a configured update source, or a transient
+          // network/rate-limit error, just get no badge -- never an error
+          // state on this screen.
+          console.warn(`[PluginsLauncher] Update check failed for ${plugin.id}:`, error);
+        }
+      })
+    );
+  }
+
+  /**
+   * Insert an "Update available" badge into an already-rendered plugin
+   * card without a full re-render, so a slow-arriving check result can't
+   * clobber in-progress user interaction (e.g. typing in the search box).
+   */
+  private patchUpdateBadge(pluginId: string, result: any): void {
+    if (!this.container) return;
+    const card = this.container.querySelector(`.plugin-card[data-plugin-id="${CSS.escape(pluginId)}"]`);
+    if (!card) return;
+    const meta = card.querySelector('.plugin-meta');
+    if (!meta || meta.querySelector('.plugin-update-badge')) return;
+
+    const badge = document.createElement('span');
+    badge.className = 'plugin-update-badge';
+    badge.dataset.pluginId = pluginId;
+    badge.title = `Update available: ${result.currentVersion ?? 'current'} → ${result.latestVersion}`;
+    badge.textContent = 'Update available';
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openPluginManagerForUpdate(pluginId);
+    });
+    meta.appendChild(badge);
+  }
+
+  /**
+   * Route a badge click to Plugin Manager's existing update flow for this
+   * plugin, instead of reimplementing check/install here.
+   */
+  private openPluginManagerForUpdate(pluginId: string): void {
+    this.showPluginManagementDialog(pluginId);
   }
 
   /**
@@ -105,6 +182,11 @@ export class PluginsLauncher implements View {
     const description = manifest.description || 'No description';
     const version = manifest.version || '1.0.0';
     const icon = manifest.icon || '🔌';
+    const updateCheck = this.updateCheckCache.get(plugin.id);
+    const hasUpdate = updateCheck?.result?.status === 'update-available';
+    const updateTitle = hasUpdate
+      ? `Update available: ${updateCheck!.result.currentVersion ?? 'current'} → ${updateCheck!.result.latestVersion}`
+      : '';
 
     return `
       <div class="plugin-card ${isActive ? 'active' : 'inactive'}" data-plugin-id="${plugin.id}">
@@ -116,6 +198,7 @@ export class PluginsLauncher implements View {
             <span class="plugin-version">v${version}</span>
             <span class="plugin-status ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
             ${isUtility ? '<span class="plugin-type">Utility</span>' : ''}
+            ${hasUpdate ? `<span class="plugin-update-badge" data-plugin-id="${plugin.id}" title="${this.escapeHtml(updateTitle)}">Update available</span>` : ''}
           </div>
         </div>
         <div class="plugin-actions">
@@ -303,6 +386,16 @@ export class PluginsLauncher implements View {
         });
       }
 
+      // Update-available badge (mea-lpy) -- routes to Plugin Manager's
+      // existing check/install flow rather than reimplementing it here.
+      const updateBadge = card.querySelector('.plugin-update-badge');
+      if (updateBadge) {
+        updateBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openPluginManagerForUpdate(pluginId);
+        });
+      }
+
       // Card click to launch (if active and not a utility plugin)
       const plugin = this.plugins.find(p => p.id === pluginId);
       const pluginType = plugin?.manifest?.pluginType;
@@ -350,6 +443,7 @@ export class PluginsLauncher implements View {
         this.loadPlugins().then(() => {
           this.render();
           this.attachEventListeners();
+          this.checkForPluginUpdates();
         });
         break;
       case 'import':
@@ -404,7 +498,7 @@ export class PluginsLauncher implements View {
   /**
    * Show plugin management dialog
    */
-  private async showPluginManagementDialog(): Promise<void> {
+  private async showPluginManagementDialog(focusPluginId?: string): Promise<void> {
     // Create modal overlay
     const overlay = document.createElement('div');
     overlay.className = 'plugin-manage-overlay';
@@ -782,6 +876,19 @@ export class PluginsLauncher implements View {
           }
         });
       });
+
+      // Badge click from the launcher screen (mea-lpy): jump to this
+      // plugin's card and auto-fire its existing "Check for Updates" flow
+      // instead of reimplementing the check/install logic here.
+      if (focusPluginId) {
+        const focusBtn = container.querySelector(
+          `.plugin-github-check-btn[data-plugin-id="${CSS.escape(focusPluginId)}"]`
+        ) as HTMLButtonElement | null;
+        if (focusBtn) {
+          focusBtn.closest('.plugin-manage-card')?.scrollIntoView({ block: 'center' });
+          focusBtn.click();
+        }
+      }
     } catch (error: any) {
       container.innerHTML = `
         <div style="text-align: center; padding: 40px; color: var(--danger-color, #d32f2f);">
