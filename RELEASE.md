@@ -267,8 +267,8 @@ After a successful release:
 
 1. Go to the [Releases page](https://github.com/<username>/MCP-Electron-App/releases)
 2. Check that all artifacts are present:
-   - Windows x64: `FictionLab Setup X.X.X x64.exe`
-   - Windows ARM64: `FictionLab Setup X.X.X arm64.exe` (best-effort -- see the
+   - Windows x64: `FictionLab-Setup-X.X.X-x64.exe`
+   - Windows ARM64: `FictionLab-Setup-X.X.X-arm64.exe` (best-effort -- see the
      "Windows ARM64 Build" note above; may be absent on a given release)
    - macOS: `FictionLab-X.X.X-arm64.dmg`
    - Linux: `FictionLab-X.X.X.AppImage` and `fictionlab_X.X.X_amd64.deb`
