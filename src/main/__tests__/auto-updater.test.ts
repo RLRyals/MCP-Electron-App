@@ -119,7 +119,7 @@ describe('auto-updater', () => {
 
   it('logs and swallows a rejected downloadPromise (no unhandled rejection)', async () => {
     const unhandled = jest.fn();
-    (process as NodeJS.Process).on('unhandledRejection', unhandled);
+    (process as any).on('unhandledRejection', unhandled);
     const err = new Error('404');
     mockAutoUpdater.checkForUpdatesAndNotify.mockResolvedValueOnce({
       downloadPromise: Promise.reject(err),
@@ -128,7 +128,7 @@ describe('auto-updater', () => {
     autoUpdaterModule.checkForUpdates();
     for (let i = 0; i < 10; i++) await Promise.resolve();
     await new Promise((r) => jest.requireActual('timers').setImmediate(r));
-    (process as NodeJS.Process).off('unhandledRejection', unhandled);
+    (process as any).off('unhandledRejection', unhandled);
 
     expect(unhandled).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith('electron-updater download failed:', err);
