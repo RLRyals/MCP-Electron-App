@@ -41,6 +41,7 @@ jest.mock('../logger', () => ({
 }));
 
 import { BrowserWindow } from 'electron';
+import logger from '../logger';
 import * as autoUpdaterModule from '../auto-updater';
 
 describe('auto-updater', () => {
@@ -114,6 +115,23 @@ describe('auto-updater', () => {
     handler({ version: '1.2.3' });
 
     expect(send).toHaveBeenCalledWith('app-updater:update-downloaded', { version: '1.2.3' });
+  });
+
+  it('logs and swallows a rejected downloadPromise (no unhandled rejection)', async () => {
+    const unhandled = jest.fn();
+    (process as any).on('unhandledRejection', unhandled);
+    const err = new Error('404');
+    mockAutoUpdater.checkForUpdatesAndNotify.mockResolvedValueOnce({
+      downloadPromise: Promise.reject(err),
+    });
+
+    autoUpdaterModule.checkForUpdates();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    await new Promise((r) => jest.requireActual('timers').setImmediate(r));
+    (process as any).off('unhandledRejection', unhandled);
+
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith('electron-updater download failed:', err);
   });
 
   it('quitAndInstall() delegates to electron-updater', () => {
