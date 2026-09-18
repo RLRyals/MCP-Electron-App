@@ -114,8 +114,10 @@ import {
   PluginErrorType,
   WorkflowService,
   WorkflowImportResult,
+  IdentityService,
 } from '../types/plugin-api';
 import { logWithCategory, LogCategory } from './logger';
+import { getCurrentUser } from './app-settings';
 
 /**
  * Creates a plugin context for a loaded plugin
@@ -162,6 +164,22 @@ function createPluginServices(
     docker: permissions.docker ? createDockerService(pluginId) : undefined,
     environment: createEnvironmentService(),
     workflow: createWorkflowService(pluginId, permissions),
+    identity: createIdentityService(),
+  };
+}
+
+/**
+ * Creates identity service
+ *
+ * Lets a plugin's main-process code read the host's configured
+ * current-user identity (src/main/app-settings.ts's getCurrentUser())
+ * without a renderer round-trip.
+ */
+function createIdentityService(): IdentityService {
+  return {
+    async getCurrentUser() {
+      return getCurrentUser();
+    },
   };
 }
 
