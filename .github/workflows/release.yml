@@ -78,9 +78,8 @@ jobs:
           # helper binaries (elevate.exe, pagent.exe) and shipped them as release
           # assets alongside the real installer. electron-builder's nsis target
           # writes the actual installer directly under out/ (default artifactName
-          # "${productName} Setup ${version}.${ext}" -> "FictionLab Setup X.Y.Z.exe",
-          # verified against package.json's build.nsis config, which has no
-          # artifactName override). Scoping to the top level of out/ (no -Recurse)
+          # "${productName}-Setup-${version}-${arch}.${ext}" (no spaces, mea-8yi: GitHub
+          # rewrites spaces to dots in asset names, which broke latest.yml URLs)). Scoping to the top level of out/ (no -Recurse)
           # already excludes win-unpacked/; the *Setup*.exe filter is a second,
           # explicit guard against any other top-level .exe.
           Get-ChildItem -Path (Join-Path $PWD 'out') -Filter '*Setup*.exe' -File |
@@ -499,6 +498,31 @@ jobs:
             release-assets/linux/*.deb
             release-assets/linux/latest-linux.yml
             release-assets/linux/checksums-linux.txt
+
+      # mea-8yi: assert every url:/path: in the update manifests resolves under
+      # the release download URL (latest.yml once said "-" while the uploaded
+      # asset said "." and every auto-update 404'd).
+      - name: Verify update manifests resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.get_version.outputs.version }}
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          fail=0
+          for m in latest.yml latest-mac.yml latest-linux.yml; do
+            curl -fsSL "$base/$m" -o "$m" || { echo "::error::$m missing from release"; fail=1; continue; }
+            for f in $(grep -E '^\s*(-\s+)?(url|path):' "$m" | sed -E 's/^\s*(-\s+)?(url|path):\s*//; s/["'"'"']//g' | sort -u); do
+              case "$f" in http*) u="$f" ;; *) u="$base/$f" ;; esac
+              code=$(curl -s -o /dev/null -w '%{http_code}' -IL "$u")
+              if [ "$code" != "200" ] && [ "$code" != "302" ]; then
+                echo "::error::$m references $f -> HTTP $code"; fail=1
+              else
+                echo "ok: $m -> $f"
+              fi
+            done
+          done
+          exit $fail
 
   release-complete:
     name: Release Complete

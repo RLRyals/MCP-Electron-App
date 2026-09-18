@@ -25,7 +25,7 @@ structured checkboxes plus a log-attachment field.
 ## 1. Download and verify
 
 - [ ] Download the installer for your platform from the release page.
-  - Windows: `FictionLab Setup <version> x64.exe` or `... arm64.exe`
+  - Windows: `FictionLab-Setup-<version>-x64.exe` or `...-arm64.exe`
   - macOS: `FictionLab-<version>-arm64.dmg` (Apple Silicon)
   - Linux: `FictionLab-<version>.AppImage` or `fictionlab_<version>_amd64.deb`
 - [ ] Verify the SHA256 checksum against the matching `checksums-*.txt` file

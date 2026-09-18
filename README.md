@@ -22,7 +22,7 @@ FictionLab is an installer and management tool that sets up everything you need 
 
 Download the latest installer for your operating system from the [GitHub Releases](../../releases) page (see also the [Release Info site](https://rlryals.github.io/MCP-Electron-App/) for what's in each release):
 
-- **Windows:** `FictionLab Setup <version> x64.exe` or `... arm64.exe` (Windows 10/11, 64-bit or ARM64)
+- **Windows:** `FictionLab-Setup-<version>-x64.exe` or `...-arm64.exe` (Windows 10/11, 64-bit or ARM64)
 - **macOS:** `FictionLab-<version>-arm64.dmg` (macOS 11+, Apple Silicon only -- no Intel/x64 build)
 - **Linux:** `FictionLab.AppImage` or `fictionlab.deb` (Ubuntu 20.04+, Debian, Linux Mint, other distros; x64)
 

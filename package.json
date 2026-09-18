@@ -1,6 +1,6 @@
 {
   "name": "fictionlab",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "AI-powered writing workspace for authors - your creative laboratory",
   "main": "dist/main/index.js",
   "author": "FictionLab",
@@ -135,7 +135,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "${productName} Setup ${version} ${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [

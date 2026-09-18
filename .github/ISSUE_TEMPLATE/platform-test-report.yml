@@ -63,7 +63,7 @@ body:
     attributes:
       label: Installer file downloaded
       description: Exact filename from the release page.
-      placeholder: e.g. "FictionLab Setup 0.3.0 arm64.exe"
+      placeholder: e.g. "FictionLab-Setup-0.3.0-arm64.exe"
     validations:
       required: true
 
