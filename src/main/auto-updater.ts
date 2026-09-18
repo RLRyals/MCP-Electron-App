@@ -91,7 +91,14 @@ export function checkForUpdates(): void {
   if (!app.isPackaged) {
     return;
   }
-  autoUpdater.checkForUpdatesAndNotify().catch((error: any) => {
+  autoUpdater.checkForUpdatesAndNotify()
+    // The check promise resolves even when the download later fails; the
+    // download has its own promise that must be caught separately or it
+    // leaks as an unhandled rejection. Non-fatal: retried at the next check.
+    .then((result) => result?.downloadPromise?.catch((error: any) => {
+      logger.error('electron-updater download failed:', error);
+    }))
+    .catch((error: any) => {
     logger.error('electron-updater checkForUpdatesAndNotify failed:', error);
   });
 }
