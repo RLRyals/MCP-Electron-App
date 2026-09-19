@@ -10,6 +10,7 @@
  */
 
 import { showWhatsNewPanel } from './WhatsNewPanel.js';
+import { confirmProceedWithActiveWorkflows } from '../utils/interrupt-guard.js';
 
 interface PrerequisiteStatus {
   installed: boolean;
@@ -335,6 +336,12 @@ async function handleUpdateMCPServers(): Promise<void> {
         statusDiv.textContent = `Already up to date (${updateCheck.currentVersion || 'latest'})`;
         statusDiv.style.color = '#00D4AA';
       }
+      return;
+    }
+
+    // Updating restarts the MCP containers -- don't silently kill a running workflow.
+    if (!(await confirmProceedWithActiveWorkflows('Updating (restarting the MCP servers)'))) {
+      if (statusDiv) statusDiv.textContent = 'Update postponed: a workflow is running.';
       return;
     }
 
