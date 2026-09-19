@@ -19,10 +19,42 @@
 import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import logger, { logWithCategory, LogCategory } from './logger';
+import { checkForAppUpdate } from './app-updater';
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 export const UPDATE_DOWNLOADED_CHANNEL = 'app-updater:update-downloaded';
+export const UPDATE_AVAILABLE_CHANNEL = 'app-updater:update-available';
+
+/**
+ * macOS cannot use the electron-updater flow (bead mea-u1s): the build ships
+ * a dmg only (MacUpdater needs a zip) and is unsigned (Squirrel.Mac rejects
+ * unsigned apps), so every download attempt errors. On darwin we fall back to
+ * notify-and-link: check GitHub Releases and tell the renderer to show an
+ * "Update available" prompt that opens the release page.
+ */
+function isDarwin(): boolean {
+  return process.platform === 'darwin';
+}
+
+async function notifyIfUpdateAvailable(): Promise<void> {
+  try {
+    const result = await checkForAppUpdate();
+    if (result.status !== 'update-available') {
+      return;
+    }
+    logWithCategory('info', LogCategory.SYSTEM, `Update ${result.latestVersion} available (notify-and-link, macOS).`);
+    const win = getTargetWindow();
+    if (win) {
+      win.webContents.send(UPDATE_AVAILABLE_CHANNEL, {
+        version: result.latestVersion,
+        releaseUrl: result.releaseUrl,
+      });
+    }
+  } catch (error) {
+    logger.error('macOS update notify check failed:', error);
+  }
+}
 
 let initialized = false;
 let checkIntervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -46,6 +78,12 @@ export function initAutoUpdater(): void {
   if (!app.isPackaged) {
     logWithCategory('info', LogCategory.SYSTEM,
       'Skipping electron-updater init: app is not packaged (dev build has no app-update.yml).');
+    return;
+  }
+
+  if (isDarwin()) {
+    void notifyIfUpdateAvailable();
+    checkIntervalHandle = setInterval(() => void notifyIfUpdateAvailable(), CHECK_INTERVAL_MS);
     return;
   }
 
@@ -89,6 +127,10 @@ export function initAutoUpdater(): void {
  */
 export function checkForUpdates(): void {
   if (!app.isPackaged) {
+    return;
+  }
+  if (isDarwin()) {
+    void notifyIfUpdateAvailable();
     return;
   }
   autoUpdater.checkForUpdatesAndNotify()

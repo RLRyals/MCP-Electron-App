@@ -1924,6 +1924,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restartToInstall: (): Promise<{ success: boolean }> => {
       return ipcRenderer.invoke('app-updater:restart-to-install');
     },
+
+    /** macOS notify-and-link (bead mea-u1s): a newer release exists. */
+    onUpdateAvailable: (callback: (info: { version: string; releaseUrl?: string }) => void): void => {
+      ipcRenderer.on('app-updater:update-available', (_, info) => callback(info));
+    },
+
+    openRelease: (url: string): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('app-updater:open-release', url);
+    },
   },
 
   /**
