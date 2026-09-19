@@ -2418,8 +2418,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /**
      * Uninstall a plugin
      */
-    uninstall: (pluginId: string): Promise<any> => {
-      return ipcRenderer.invoke('plugin:uninstall', pluginId);
+    uninstall: (pluginId: string, options?: { removeSettings?: boolean }): Promise<any> => {
+      return ipcRenderer.invoke('plugin:uninstall', pluginId, options);
     },
 
     /**
