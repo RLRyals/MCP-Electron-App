@@ -4,6 +4,7 @@
  * It communicates with the main process via IPC through the preload script
  */
 
+import { confirmProceedWithActiveWorkflows } from './utils/interrupt-guard.js';
 import { loadEnvConfig, setupEnvConfigListeners } from './env-config-handlers.js';
 import { loadClientOptions, setupClientSelectionListeners } from './client-selection-handlers.js';
 // NEW: Dashboard redesign imports
@@ -833,7 +834,8 @@ function showRestartToUpdateDialog(version: string): void {
 
   document.body.appendChild(dialog);
 
-  document.getElementById('restart-to-update')?.addEventListener('click', () => {
+  document.getElementById('restart-to-update')?.addEventListener('click', async () => {
+    if (!(await confirmProceedWithActiveWorkflows('Restarting'))) return;
     window.electronAPI.appUpdater?.restartToInstall();
   });
 
