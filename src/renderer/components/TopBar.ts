@@ -52,6 +52,12 @@ export class TopBar {
    * Initialize the top bar
    */
   public initialize(): void {
+    // Mark macOS on the document root so top-bar.css can apply the single-row
+    // 56px layout with traffic-light clearance (bead mea-5rg).
+    const platform = navigator.platform.toLowerCase();
+    if (platform.includes('mac')) {
+      document.documentElement.setAttribute('data-platform', 'darwin');
+    }
     this.render();
     this.attachEventListeners();
     console.log('[TopBar] Initialized');

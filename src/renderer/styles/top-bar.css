@@ -646,3 +646,37 @@
   background: rgba(255, 255, 255, 0.1);
   color: var(--color-accent);
 }
+
+/* ========================================
+   macOS layout (bead mea-5rg)
+   hiddenInset title bar: native traffic lights overlay the top-left, and the
+   Mac renderer emits one row of direct children (not Windows' two rows).
+   ======================================== */
+
+:root[data-platform="darwin"] {
+  --top-bar-height: 56px;
+  --top-bar-min-height: 56px;
+}
+
+:root[data-platform="darwin"] .top-bar {
+  flex-direction: row;
+  align-items: center;
+  height: 56px;
+  padding: 0 var(--spacing-lg) 0 96px; /* clear the native window buttons */
+  gap: var(--spacing-md);
+}
+
+:root[data-platform="darwin"] .top-bar > .top-bar-left {
+  min-width: 0;
+}
+
+:root[data-platform="darwin"] .top-bar > .top-bar-center {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:root[data-platform="darwin"] .top-bar > .top-bar-center::-webkit-scrollbar {
+  display: none;
+}
