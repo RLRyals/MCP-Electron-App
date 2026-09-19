@@ -1391,6 +1391,15 @@ function setupIPC(): void {
     return { success: true };
   });
 
+  // macOS notify-and-link (bead mea-u1s): open the release page for the update prompt.
+  registerHandler('app-updater:open-release', "", async (_event: any, url: string) => {
+    if (typeof url === 'string' && url.startsWith('https://github.com/RLRyals/MCP-Electron-App/')) {
+      await shell.openExternal(url);
+      return { success: true };
+    }
+    return { success: false };
+  });
+
   // What's New IPC handlers (bead mea-1j9 -- post-update release notes panel)
   registerHandler('whats-new:get-startup', "", async () => {
     logWithCategory('info', LogCategory.SYSTEM, "IPC: Checking whether to show What's New on startup...");

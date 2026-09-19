@@ -33,6 +33,10 @@ jest.mock('electron-updater', () => ({
   autoUpdater: mockAutoUpdater,
 }));
 
+jest.mock('../app-updater', () => ({
+  checkForAppUpdate: jest.fn(),
+}));
+
 jest.mock('../logger', () => ({
   __esModule: true,
   default: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
@@ -43,9 +47,15 @@ jest.mock('../logger', () => ({
 import { BrowserWindow } from 'electron';
 import logger from '../logger';
 import * as autoUpdaterModule from '../auto-updater';
+import { checkForAppUpdate } from '../app-updater';
 
 describe('auto-updater', () => {
+  const realPlatform = process.platform;
+
   beforeEach(() => {
+    // The electron-updater flow is non-darwin only; pin the host so these tests
+    // don't take the macOS notify-and-link path when CI runs on macos-latest.
+    Object.defineProperty(process, 'platform', { value: 'win32' });
     jest.clearAllMocks();
     jest.useFakeTimers();
     isPackaged = true;
@@ -56,6 +66,7 @@ describe('auto-updater', () => {
   afterEach(() => {
     autoUpdaterModule.stopAutoUpdater();
     jest.useRealTimers();
+    Object.defineProperty(process, 'platform', { value: realPlatform });
   });
 
   it('does nothing on init when the app is not packaged (dev build)', () => {
@@ -137,5 +148,44 @@ describe('auto-updater', () => {
   it('quitAndInstall() delegates to electron-updater', () => {
     autoUpdaterModule.quitAndInstall();
     expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
+
+  describe('darwin (notify-and-link, mea-u1s)', () => {
+    const realPlatform = process.platform;
+    beforeEach(() => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+    });
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: realPlatform });
+    });
+
+    it('never runs the electron-updater flow and notifies when a newer release exists', async () => {
+      const send = jest.fn();
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([{ webContents: { send } }]);
+      (checkForAppUpdate as jest.Mock).mockResolvedValue({
+        status: 'update-available', latestVersion: '9.9.9', releaseUrl: 'https://github.com/x/y/releases/tag/v9.9.9',
+      });
+
+      autoUpdaterModule.initAutoUpdater();
+      autoUpdaterModule.checkForUpdates();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      expect(mockAutoUpdater.checkForUpdatesAndNotify).not.toHaveBeenCalled();
+      expect(mockAutoUpdater.on).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledWith('app-updater:update-available', {
+        version: '9.9.9', releaseUrl: 'https://github.com/x/y/releases/tag/v9.9.9',
+      });
+    });
+
+    it('does not notify when up to date', async () => {
+      const send = jest.fn();
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([{ webContents: { send } }]);
+      (checkForAppUpdate as jest.Mock).mockResolvedValue({ status: 'up-to-date' });
+
+      autoUpdaterModule.initAutoUpdater();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      expect(send).not.toHaveBeenCalled();
+    });
   });
 });

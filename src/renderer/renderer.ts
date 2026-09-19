@@ -492,6 +492,8 @@ interface ElectronAPI {
   appUpdater?: {
     onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
     restartToInstall: () => Promise<{ success: boolean }>;
+    onUpdateAvailable: (callback: (info: { version: string; releaseUrl?: string }) => void) => void;
+    openRelease: (url: string) => Promise<{ success: boolean }>;
   };
 }
 
@@ -838,6 +840,35 @@ function showRestartToUpdateDialog(version: string): void {
   document.getElementById('dismiss-update-dialog')?.addEventListener('click', () => {
     dialog.remove();
   });
+}
+
+/**
+ * macOS notify-and-link prompt (bead mea-u1s): auto-install is unavailable
+ * on macOS, so point the user at the release page to download the dmg.
+ */
+function showUpdateAvailableDialog(version: string, releaseUrl?: string): void {
+  if (document.getElementById('update-available-dialog')) {
+    return;
+  }
+  const dialog = document.createElement('div');
+  dialog.id = 'update-available-dialog';
+  dialog.className = 'error-dialog';
+  dialog.innerHTML = `
+    <div class="error-dialog-backdrop"></div>
+    <div class="error-dialog-content">
+      <h3>Update Available</h3>
+      <p>FictionLab ${version} is available. Download the new version from the release page.</p>
+      <div class="error-dialog-buttons">
+        <button id="open-release-page" class="button primary">Open Release Page</button>
+        <button id="dismiss-update-available" class="button">Later</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  document.getElementById('open-release-page')?.addEventListener('click', () => {
+    if (releaseUrl) window.electronAPI.appUpdater?.openRelease(releaseUrl);
+  });
+  document.getElementById('dismiss-update-available')?.addEventListener('click', () => dialog.remove());
 }
 
 /**
@@ -1401,6 +1432,9 @@ async function init(): Promise<void> {
   // simply never fire it.
   window.electronAPI.appUpdater?.onUpdateDownloaded((info) => {
     showRestartToUpdateDialog(info.version);
+  });
+  window.electronAPI.appUpdater?.onUpdateAvailable((info) => {
+    showUpdateAvailableDialog(info.version, info.releaseUrl);
   });
 
   // NOTE: Dashboard initialization (issue #214) now happens inside
