@@ -743,10 +743,17 @@ export interface PluginMetadata {
   /** Plugin version */
   version: string;
 
-  /** Plugin data directory */
+  /**
+   * Plugin data directory (`<userData>/plugin-data/<id>`). Persists across
+   * plugin updates; settings (config.json) live here. Kept on uninstall
+   * unless the user chooses to remove settings.
+   */
   dataPath: string;
 
-  /** Plugin installation directory */
+  /**
+   * Plugin installation directory. REPLACED WHOLESALE on every plugin
+   * update -- never store user data here.
+   */
   installPath: string;
 
   /** Plugin manifest */

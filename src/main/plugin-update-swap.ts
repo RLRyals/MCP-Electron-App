@@ -26,6 +26,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as semver from 'semver';
+import { migrateLegacyConfig } from './plugin-data-paths';
 
 /** Suffix used for the pre-swap backup of the previous plugin directory. */
 const BAK_SUFFIX = '.bak';
@@ -301,7 +302,8 @@ export interface RecoveryReport {
  * to the caller (this module doesn't depend on the app logger).
  */
 export async function recoverPluginsDirectory(
-  pluginsDir: string
+  pluginsDir: string,
+  dataRoot: string = path.join(path.dirname(pluginsDir), 'plugin-data')
 ): Promise<RecoveryReport> {
   const report: RecoveryReport = { completed: [], rolledBack: [], cleaned: [] };
 
@@ -328,7 +330,7 @@ export async function recoverPluginsDirectory(
 
   for (const pluginId of pluginIds) {
     try {
-      await recoverOnePlugin(pluginsDir, pluginId, report);
+      await recoverOnePlugin(pluginsDir, pluginId, report, dataRoot);
     } catch {
       // Best-effort: leave this plugin's directories untouched rather than
       // risk making things worse; a future launch can retry.
@@ -341,7 +343,8 @@ export async function recoverPluginsDirectory(
 async function recoverOnePlugin(
   pluginsDir: string,
   pluginId: string,
-  report: RecoveryReport
+  report: RecoveryReport,
+  dataRoot: string
 ): Promise<void> {
   const pluginPath = pluginDirPath(pluginsDir, pluginId);
   const bakPath = bakDirPath(pluginsDir, pluginId);
@@ -376,6 +379,9 @@ async function recoverOnePlugin(
   if (bakManifest) {
     // The swap that produced this live directory already succeeded (on this
     // run or an earlier one) -- this is "the next successful launch".
+    // Rescue settings stranded in the .bak by pre-mea-1l3 installs before
+    // it is deleted (no-op if the new location already has a config).
+    await migrateLegacyConfig(bakPath, path.join(dataRoot, pluginId)).catch(() => {});
     await fs.remove(bakPath).catch(() => {});
     report.cleaned.push(pluginId);
   } else if (await fs.pathExists(bakPath)) {

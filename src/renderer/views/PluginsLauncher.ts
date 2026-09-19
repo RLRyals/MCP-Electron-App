@@ -852,11 +852,16 @@ export class PluginsLauncher implements View {
           const button = e.target as HTMLButtonElement;
           const card = button.closest('.plugin-manage-card');
 
+          // Settings survive uninstall by default (reinstall restores them).
+          const removeSettings = confirm(
+            `Also remove "${pluginId}" settings? Choose Cancel to keep them so a reinstall restores your configuration.`
+          );
+
           button.disabled = true;
           button.textContent = 'Uninstalling...';
 
           try {
-            await (window as any).electronAPI.plugins.uninstall(pluginId);
+            await (window as any).electronAPI.plugins.uninstall(pluginId, { removeSettings });
             card?.remove();
 
             // Refresh if no plugins left

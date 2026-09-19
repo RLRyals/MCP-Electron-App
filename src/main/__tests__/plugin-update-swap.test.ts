@@ -18,6 +18,7 @@ import {
   readPluginManifestSafe,
   PluginUpdateError,
 } from '../plugin-update-swap';
+import { migrateLegacyConfig } from '../plugin-data-paths';
 
 let workDir: string;
 let pluginsDir: string;
@@ -352,5 +353,56 @@ describe('recoverPluginsDirectory', () => {
       rolledBack: [],
       cleaned: [],
     });
+  });
+});
+
+describe('plugin settings survive updates (mea-1l3)', () => {
+  // Real layout: <userData>/plugins/<id> (install) and <userData>/plugin-data/<id> (data)
+  const dataRootFor = () => path.join(workDir, 'plugin-data');
+
+  it('config in plugin-data survives updatePluginInPlace', async () => {
+    await writeInstalledPlugin('p1', '1.0.0');
+    const dataFile = path.join(dataRootFor(), 'p1', 'config.json');
+    await fs.outputJson(dataFile, { companyName: 'Acme' });
+
+    const src = await writeSourceBundle('p1', '2.0.0');
+    await updatePluginInPlace(pluginsDir, 'p1', src);
+    await recoverPluginsDirectory(pluginsDir);
+
+    expect(await fs.readJson(dataFile)).toEqual({ companyName: 'Acme' });
+  });
+
+  it('migrates legacy install-dir config.json to plugin-data', async () => {
+    const dir = await writeInstalledPlugin('p2', '1.0.0');
+    await fs.writeJson(path.join(dir, 'config.json'), { a: 1 });
+    const dataDir = path.join(dataRootFor(), 'p2');
+
+    expect(await migrateLegacyConfig(dir, dataDir)).toBe(true);
+    expect(await fs.readJson(path.join(dataDir, 'config.json'))).toEqual({ a: 1 });
+    expect(await fs.pathExists(path.join(dir, 'config.json'))).toBe(false);
+  });
+
+  it('does not overwrite an existing plugin-data config on migration', async () => {
+    const dir = await writeInstalledPlugin('p3', '1.0.0');
+    await fs.writeJson(path.join(dir, 'config.json'), { old: true });
+    const dataDir = path.join(dataRootFor(), 'p3');
+    await fs.outputJson(path.join(dataDir, 'config.json'), { fresh: true });
+
+    expect(await migrateLegacyConfig(dir, dataDir)).toBe(false);
+    expect(await fs.readJson(path.join(dataDir, 'config.json'))).toEqual({ fresh: true });
+  });
+
+  it('rescues config.json from a pending .bak before it is deleted', async () => {
+    await writeInstalledPlugin('p4', '1.0.0');
+    // Legacy layout: settings lived inside the install dir, then the swap moved it to .bak.
+    await fs.writeJson(path.join(pluginsDir, 'p4', 'config.json'), { boardKey: 'K' });
+    const src = await writeSourceBundle('p4', '2.0.0');
+    await updatePluginInPlace(pluginsDir, 'p4', src);
+    expect(await fs.pathExists(path.join(pluginsDir, 'p4', 'config.json'))).toBe(false);
+
+    await recoverPluginsDirectory(pluginsDir);
+
+    expect(await fs.pathExists(path.join(pluginsDir, 'p4.bak'))).toBe(false);
+    expect(await fs.readJson(path.join(dataRootFor(), 'p4', 'config.json'))).toEqual({ boardKey: 'K' });
   });
 });
