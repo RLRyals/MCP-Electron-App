@@ -16,6 +16,7 @@ import { checkDockerRunning } from './prerequisites';
 import { DatabaseMigrator } from './database-migrator';
 import * as clientSelection from './client-selection';
 import { getChangeList, ChangeListResult } from './release-notes';
+import { readSystemMetadata, updateSystemMetadata } from './system-metadata';
 
 const execAsync = promisify(exec);
 
@@ -120,51 +121,21 @@ const DEFAULT_PREFERENCES: UpdatePreferences = {
 };
 
 /**
- * Get the system metadata file path
- */
-function getMetadataPath(): string {
-  const userDataPath = app.getPath('userData');
-  return path.join(userDataPath, '.system-metadata.json');
-}
-
-/**
- * Load system metadata
+ * Load system metadata (single owner: ./system-metadata)
  */
 async function loadMetadata(): Promise<SystemMetadata> {
-  try {
-    const metadataPath = getMetadataPath();
-
-    if (!await fs.pathExists(metadataPath)) {
-      return {};
-    }
-
-    const content = await fs.readFile(metadataPath, 'utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    logger.error('Error loading system metadata:', error);
-    return {};
-  }
+  return readSystemMetadata<SystemMetadata>();
 }
 
 /**
- * Save system metadata
+ * Merge-save system metadata. Only the top-level keys present on `metadata`
+ * are written over the on-disk file, so concurrent writers' keys survive.
  */
 async function saveMetadata(metadata: SystemMetadata): Promise<void> {
-  try {
-    const metadataPath = getMetadataPath();
-    const dir = path.dirname(metadataPath);
-
-    // Ensure directory exists
-    await fs.ensureDir(dir);
-
-    // Save metadata
-    await fs.writeJson(metadataPath, metadata, { spaces: 2 });
-
-    logWithCategory('info', LogCategory.SYSTEM, 'System metadata saved successfully');
-  } catch (error) {
-    logger.error('Error saving system metadata:', error);
-    throw error;
-  }
+  await updateSystemMetadata<SystemMetadata>((disk) => {
+    Object.assign(disk, metadata);
+  });
+  logWithCategory('info', LogCategory.SYSTEM, 'System metadata saved successfully');
 }
 
 /**
@@ -264,8 +235,13 @@ export async function checkForMCPServersUpdate(): Promise<UpdateInfo> {
 
     // Get current version from metadata
     const metadata = await loadMetadata();
-    const currentSHA = metadata.mcpServers?.sha;
+    let currentSHA = metadata.mcpServers?.sha;
     const currentDate = metadata.mcpServers?.updatedAt;
+
+    // Self-heal: the checkout is the truth, the JSON is a cache.
+    if (!currentSHA) {
+      currentSHA = await readInstalledSha(getRepositoryDirectory('mcp-servers'));
+    }
 
     // Check if update is available
     const available = currentSHA !== latestSHA;
@@ -285,6 +261,20 @@ export async function checkForMCPServersUpdate(): Promise<UpdateInfo> {
       available: false,
       error: error.message,
     };
+  }
+}
+
+/**
+ * Read the installed commit from the clone itself; undefined when the clone
+ * does not exist (or git fails).
+ */
+async function readInstalledSha(repoDir: string): Promise<string | undefined> {
+  try {
+    if (!(await fs.pathExists(path.join(repoDir, '.git')))) return undefined;
+    const { stdout } = await execAsync('git rev-parse HEAD', { cwd: repoDir });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
   }
 }
 

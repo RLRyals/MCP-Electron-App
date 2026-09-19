@@ -16,6 +16,7 @@ import * as clientSelection from './client-selection';
 import * as typingMindAutoConfig from './typingmind-auto-config';
 import * as mcpConfigGenerator from './mcp-config-generator';
 import * as pgbouncerConfig from './pgbouncer-config';
+import { updateSystemMetadata } from './system-metadata';
 import { checkDockerRunning, getFixedEnv } from './prerequisites';
 import { startAndWaitForDocker as dockerStartAndWait } from './docker';
 
@@ -2197,13 +2198,12 @@ export async function getContainerResourceUsage(
  */
 async function saveStartupMetadata(): Promise<void> {
   try {
-    const metadataPath = path.join(getMCPWorkingDirectory(), '.system-metadata.json');
-    const metadata = {
-      lastStarted: new Date().toISOString(),
-      version: app.getVersion(),
-    };
-
-    await fs.writeJson(metadataPath, metadata, { spaces: 2 });
+    // Read-merge-write: this file also holds mcpServers.sha, customClients
+    // and updatePreferences (bead mea-ndz).
+    await updateSystemMetadata((metadata: any) => {
+      metadata.lastStarted = new Date().toISOString();
+      metadata.version = app.getVersion();
+    });
     logWithCategory('info', LogCategory.DOCKER, 'Saved startup metadata');
   } catch (error) {
     logWithCategory('warn', LogCategory.DOCKER, 'Failed to save startup metadata', error);
