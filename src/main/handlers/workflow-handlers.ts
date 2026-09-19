@@ -4,6 +4,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
+import { getActiveRunNames } from '../workflow/active-run-guard';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
 import { ClaudeCodeExporter, ExportOptions } from '../workflow/exporters/claude-code-exporter';
@@ -825,6 +826,11 @@ export function registerWorkflowHandlers() {
       win.webContents.send('workflow:list-active-error', { message, timestamp: new Date().toISOString() });
     });
   }
+
+  // Names of runs a restart/update would interrupt (bead mea-3ow). Never throws.
+  registerHandler('workflow:active-run-names', "Names of active workflow runs (update guard)", async () => {
+    return getActiveRunNames(async () => (await getWorkflowClient()).listActiveWorkflows());
+  });
 
   // List all active workflows
   registerHandler('workflow:list-active', "List active workflow instances", async () => {
