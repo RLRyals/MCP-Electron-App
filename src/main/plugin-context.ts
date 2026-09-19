@@ -117,6 +117,7 @@ import {
   IdentityService,
 } from '../types/plugin-api';
 import { logWithCategory, LogCategory } from './logger';
+import { getPluginDataDir, migrateLegacyConfigSync } from './plugin-data-paths';
 import { getCurrentUser } from './app-settings';
 
 /**
@@ -131,10 +132,22 @@ export function createPluginContext(
   onNotification?: (notification: PluginNotification) => void
 ): PluginContext {
   const permissions = manifest.permissions || {};
-  const dataPath = path.join(app.getPath('userData'), 'plugins', pluginId);
+  // Data lives OUTSIDE the install dir so plugin updates (which replace the
+  // install dir wholesale) never wipe settings (mea-1l3).
+  const userData = app.getPath('userData');
+  const dataPath = getPluginDataDir(userData, pluginId);
 
   // Ensure plugin data directory exists
   fs.ensureDirSync(dataPath);
+
+  // One-time migration of config.json from the legacy location.
+  try {
+    if (migrateLegacyConfigSync(path.join(userData, 'plugins', pluginId), dataPath)) {
+      logWithCategory('info', LogCategory.SYSTEM, `Migrated legacy config for plugin ${pluginId} to plugin-data`);
+    }
+  } catch (error) {
+    logWithCategory('warn', LogCategory.SYSTEM, `Failed to migrate legacy config for plugin ${pluginId}:`, error);
+  }
 
   const context: PluginContext = {
     services: createPluginServices(pluginId, permissions, dbPool),

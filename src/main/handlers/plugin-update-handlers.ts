@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 import { logWithCategory, LogCategory } from '../logger';
 import { pluginManager } from '../plugin-manager';
+import { removePluginData } from '../plugin-data-paths';
 import {
   updatePluginInPlace,
   validatePluginUpdateSource,
@@ -241,7 +242,7 @@ export function registerPluginUpdateHandlers() {
   });
 
   // Uninstall a plugin
-  ipcMain.handle('plugin:uninstall', async (_event, pluginId: string) => {
+  ipcMain.handle('plugin:uninstall', async (_event, pluginId: string, options?: { removeSettings?: boolean }) => {
     logWithCategory('info', LogCategory.SYSTEM, `IPC: Uninstall plugin ${pluginId}`);
     try {
       try {
@@ -255,7 +256,11 @@ export function registerPluginUpdateHandlers() {
 
       if (await fs.pathExists(pluginPath)) {
         await safeRemoveDir(pluginPath);
-        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${pluginId} uninstalled`);
+        // Settings are kept by default so a reinstall restores them.
+        if (options?.removeSettings) {
+          await removePluginData(app.getPath('userData'), pluginId);
+        }
+        logWithCategory('info', LogCategory.SYSTEM, `Plugin ${pluginId} uninstalled${options?.removeSettings ? ' (settings removed)' : ' (settings kept)'}`);
         return { success: true };
       } else {
         throw new Error('Plugin not found');
