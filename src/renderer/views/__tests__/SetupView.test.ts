@@ -161,7 +161,7 @@ describe('SetupView content', () => {
       await flushPromises();
 
       expect(checkMCPServers).toHaveBeenCalled();
-      expect(document.getElementById('mcp-servers-current-version')!.textContent).toBe('Current Version: deadbee');
+      expect(document.getElementById('mcp-servers-current-version')!.textContent).toBe('Current Version: deadbee | Latest: 1234567 | Update available');
     });
 
     it('falls back gracefully when the version check fails', async () => {

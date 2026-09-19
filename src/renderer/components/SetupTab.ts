@@ -117,6 +117,28 @@ async function loadSetupTabData(): Promise<void> {
 }
 
 /**
+ * Readable answer to "do I need to update?": current + latest short SHA,
+ * the latest commit's subject/date, and an explicit Up to date state.
+ */
+export function formatMCPServersVersion(info: {
+  available?: boolean;
+  error?: string;
+  currentVersion?: string;
+  latestVersion?: string;
+  latestDate?: string;
+  commitMessage?: string;
+}): string {
+  const current = info.currentVersion || 'unknown';
+  if (info.error || !info.latestVersion) {
+    return `Current Version: ${current}`;
+  }
+  const state = info.available ? 'Update available' : 'Up to date';
+  const date = info.latestDate ? ` (${info.latestDate.slice(0, 10)})` : '';
+  const latest = info.commitMessage ? `Latest: ${info.latestVersion} - ${info.commitMessage}${date}` : `Latest: ${info.latestVersion}${date}`;
+  return `Current Version: ${current} | ${latest} | ${state}`;
+}
+
+/**
  * Load and display the current MCP-Writing-Servers version (non-mutating check,
  * distinct from the "Update MCP-Writing-Servers" button which also pulls changes)
  */
@@ -126,7 +148,7 @@ async function loadMCPServersVersion(): Promise<void> {
 
   try {
     const updateCheck = await window.electronAPI.updater.checkMCPServers();
-    versionElement.textContent = `Current Version: ${updateCheck.currentVersion || 'unknown'}`;
+    versionElement.textContent = formatMCPServersVersion(updateCheck);
   } catch (error) {
     console.error('Error loading MCP-Writing-Servers version:', error);
     versionElement.textContent = 'Current Version: unavailable';
