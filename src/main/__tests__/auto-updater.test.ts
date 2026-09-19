@@ -50,7 +50,12 @@ import * as autoUpdaterModule from '../auto-updater';
 import { checkForAppUpdate } from '../app-updater';
 
 describe('auto-updater', () => {
+  const realPlatform = process.platform;
+
   beforeEach(() => {
+    // The electron-updater flow is non-darwin only; pin the host so these tests
+    // don't take the macOS notify-and-link path when CI runs on macos-latest.
+    Object.defineProperty(process, 'platform', { value: 'win32' });
     jest.clearAllMocks();
     jest.useFakeTimers();
     isPackaged = true;
@@ -61,6 +66,7 @@ describe('auto-updater', () => {
   afterEach(() => {
     autoUpdaterModule.stopAutoUpdater();
     jest.useRealTimers();
+    Object.defineProperty(process, 'platform', { value: realPlatform });
   });
 
   it('does nothing on init when the app is not packaged (dev build)', () => {
