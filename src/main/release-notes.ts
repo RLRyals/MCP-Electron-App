@@ -19,6 +19,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as semver from 'semver';
 
 const execAsync = promisify(exec);
 
@@ -174,14 +175,54 @@ const RELEASES_PAGE_SIZE = 30;
 const RELEASES_MAX_PAGES = 10;
 
 /**
+ * Strip a source's `tagPrefix` (if any), then a leading "v"/"V", so both
+ * plain `v1.2.3` tags and per-plugin tags like `workflow-plugin-v1.2.0`
+ * compare against plain semver.
+ */
+export function normalizeVersion(version: string, tagPrefix?: string): string {
+  let trimmed = (version || '').trim();
+  if (tagPrefix && trimmed.startsWith(tagPrefix)) {
+    trimmed = trimmed.slice(tagPrefix.length);
+  }
+  return trimmed.replace(/^v/i, '');
+}
+
+/**
+ * Pick the release with the highest semver version out of a set of
+ * same-prefix matches. Releases whose normalized tag isn't valid semver are
+ * ignored for comparison purposes; if none of the matches are valid semver,
+ * falls back to the first match (the previous, order-dependent behavior).
+ */
+function pickHighestVersionRelease(matches: any[], tagPrefix: string): any {
+  let best: any | undefined;
+  let bestVersion: string | undefined;
+
+  for (const candidate of matches) {
+    const normalized = normalizeVersion(candidate.tag_name, tagPrefix);
+    if (!semver.valid(normalized)) {
+      continue;
+    }
+    if (!best || semver.gt(normalized, bestVersion!)) {
+      best = candidate;
+      bestVersion = normalized;
+    }
+  }
+
+  return best ?? matches[0];
+}
+
+/**
  * Fetch the latest published release for a repo whose tag_name starts with
  * `tagPrefix` (bead mea-ecp). Repos that publish one GitHub Release per
  * plugin (fictionlab-workflow: `workflow-plugin-vX.Y.Z`,
  * `kanban-plugin-vX.Y.Z`, `agent-factory-plugin-vX.Y.Z`, ...) can't rely on
  * `/releases/latest`, which is whichever plugin released most recently
  * repo-wide -- this walks `/repos/{repo}/releases` (paginated, newest first)
- * and returns the first non-draft, non-prerelease release matching the
- * prefix.
+ * and, across every page fetched, collects every non-draft, non-prerelease
+ * release matching the prefix, then returns the one with the highest semver
+ * version (bead mea-tp3: GitHub's `/releases` list is not sorted by version,
+ * so returning the first match can pick an older release than one further
+ * down the list or on a later page).
  *
  * When `tagPrefix` is falsy this delegates to `fetchLatestRelease` --
  * backward compat for single-plugin repos and already-installed manifests
@@ -198,6 +239,7 @@ export async function fetchLatestReleaseForPrefix(
   }
 
   const fetchFn = options.fetchFn ?? fetch;
+  const matches: any[] = [];
 
   try {
     for (let page = 1; page <= RELEASES_MAX_PAGES; page++) {
@@ -210,26 +252,28 @@ export async function fetchLatestReleaseForPrefix(
 
       const releases = await response.json();
       if (!Array.isArray(releases) || releases.length === 0) {
-        return { status: 'not-found' };
+        break;
       }
 
-      const match = releases.find(
-        (r: any) =>
-          !r?.draft && !r?.prerelease && typeof r?.tag_name === 'string' && r.tag_name.startsWith(tagPrefix)
-      );
-      if (match) {
-        return parseRelease(match);
+      for (const r of releases) {
+        if (!r?.draft && !r?.prerelease && typeof r?.tag_name === 'string' && r.tag_name.startsWith(tagPrefix)) {
+          matches.push(r);
+        }
       }
 
       if (releases.length < RELEASES_PAGE_SIZE) {
-        return { status: 'not-found' };
+        break;
       }
     }
-
-    return { status: 'not-found' };
   } catch (error: any) {
     return { status: 'error', error: error?.message || String(error) };
   }
+
+  if (matches.length === 0) {
+    return { status: 'not-found' };
+  }
+
+  return parseRelease(pickHighestVersionRelease(matches, tagPrefix));
 }
 
 // ---------------------------------------------------------------------------
