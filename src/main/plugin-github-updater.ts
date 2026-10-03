@@ -51,6 +51,7 @@ import * as semver from 'semver';
 import {
   fetchLatestReleaseForPrefix,
   downloadReleaseAsset,
+  normalizeVersion,
   ReleaseFetchOptions,
   ReleaseInfo,
   ReleaseAssetInfo,
@@ -62,6 +63,14 @@ import {
   PluginUpdateError,
   MinimalPluginManifest,
 } from './plugin-update-swap';
+
+/**
+ * Re-exported so existing importers (and this module's own tests) can keep
+ * referencing `normalizeVersion` from here; the implementation lives in
+ * `release-notes.ts` alongside the version comparison it now also powers in
+ * `fetchLatestReleaseForPrefix`.
+ */
+export { normalizeVersion };
 
 // ---------------------------------------------------------------------------
 // Known update sources
@@ -207,23 +216,6 @@ export function findMatchingAsset(
   if (!assets || assets.length === 0) return undefined;
   const regex = patternToRegExp(assetPattern);
   return assets.find((asset) => regex.test(asset.name || ''));
-}
-
-// ---------------------------------------------------------------------------
-// Version compare
-// ---------------------------------------------------------------------------
-
-/**
- * Strip a source's `tagPrefix` (if any), then a leading "v"/"V", so both
- * plain `v1.2.3` tags and per-plugin tags like `workflow-plugin-v1.2.0`
- * compare against plain semver.
- */
-export function normalizeVersion(version: string, tagPrefix?: string): string {
-  let trimmed = (version || '').trim();
-  if (tagPrefix && trimmed.startsWith(tagPrefix)) {
-    trimmed = trimmed.slice(tagPrefix.length);
-  }
-  return trimmed.replace(/^v/i, '');
 }
 
 // ---------------------------------------------------------------------------

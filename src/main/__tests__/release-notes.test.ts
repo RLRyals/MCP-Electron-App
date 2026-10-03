@@ -214,6 +214,101 @@ describe('fetchLatestReleaseForPrefix (bead mea-ecp)', () => {
       expect.anything()
     );
   });
+
+  it('picks the highest semver release when GitHub returns them out of version order (bead mea-tp3)', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'workflow-plugin-v1.9.0', assets: [] },
+        { tag_name: 'workflow-plugin-v1.8.0', assets: [] },
+        { tag_name: 'workflow-plugin-v1.10.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.10.0');
+  });
+
+  it('ignores a release whose tag does not start with the prefix', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'kanban-plugin-v9.9.9', assets: [] },
+        { tag_name: 'workflow-plugin-v1.2.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.2.0');
+  });
+
+  it('ignores a draft or prerelease release even when its version is higher', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'workflow-plugin-v5.0.0', draft: true, assets: [] },
+        { tag_name: 'workflow-plugin-v4.0.0', prerelease: true, assets: [] },
+        { tag_name: 'workflow-plugin-v1.2.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.2.0');
+  });
+
+  it('skips a tag whose version suffix is not valid semver, falling back to the first match if none parse', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'workflow-plugin-vnightly', assets: [] },
+        { tag_name: 'workflow-plugin-vunstable', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.release?.tagName).toBe('workflow-plugin-vnightly');
+  });
+
+  it('skips an unparseable tag in favor of a valid, lower-looking-order match', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      okJsonResponse([
+        { tag_name: 'workflow-plugin-vnightly', assets: [] },
+        { tag_name: 'workflow-plugin-v1.2.0', assets: [] },
+      ])
+    );
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v1.2.0');
+  });
+
+  it('picks the higher version when the match on page 2 beats the match on page 1', async () => {
+    const page1 = Array.from({ length: 29 }, (_, i) => ({ tag_name: `kanban-plugin-v${i}.0.0`, assets: [] }));
+    page1.push({ tag_name: 'workflow-plugin-v1.0.0', assets: [] } as any);
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce(okJsonResponse(page1))
+      .mockResolvedValueOnce(okJsonResponse([{ tag_name: 'workflow-plugin-v2.0.0', assets: [] }]));
+
+    const result = await fetchLatestReleaseForPrefix('RLRyals/fictionlab-workflow', 'workflow-plugin-', {
+      fetchFn: fetchFn as any,
+    });
+
+    expect(result.release?.tagName).toBe('workflow-plugin-v2.0.0');
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('downloadReleaseAsset (bead mea-6tt)', () => {
