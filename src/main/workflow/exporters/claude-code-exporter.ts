@@ -125,7 +125,8 @@ export class ClaudeCodeExporter {
       }
 
       const agentsArray = Array.from(agents);
-      const skillsArray = Array.from(skills);
+      // Licensed (private) skills are never exported -- list them as "requires" instead
+      const { shareable: skillsArray, privateSkills } = await this.partitionPrivateSkills(Array.from(skills));
       const outputStylesArray = Array.from(outputStyles);
 
       // 4. Export workflow YAML/JSON
@@ -158,7 +159,7 @@ export class ClaudeCodeExporter {
       // 8. Generate README (if enabled) - now includes all skills and output-styles from sub-workflows
       let readmeFile = '';
       if (options.includeReadme !== false) {
-        readmeFile = await this.generateReadme(workflow, agentsArray, skillsArray, outputStylesArray, subWorkflowIds, outputPath);
+        readmeFile = await this.generateReadme(workflow, agentsArray, skillsArray, outputStylesArray, subWorkflowIds, outputPath, privateSkills);
       }
 
       logWithCategory('info', LogCategory.WORKFLOW,
@@ -600,6 +601,43 @@ export class ClaudeCodeExporter {
   }
 
   /**
+   * Split skills into shareable vs private/licensed. A skill is private when its
+   * SKILL.md (or single-file skill-name.md) frontmatter sets `private: true`.
+   */
+  private async partitionPrivateSkills(skills: string[]): Promise<{ shareable: string[]; privateSkills: string[] }> {
+    const shareable: string[] = [];
+    const privateSkills: string[] = [];
+    for (const skill of skills) {
+      if (await this.isPrivateSkill(skill)) {
+        privateSkills.push(skill);
+      } else {
+        shareable.push(skill);
+      }
+    }
+    if (privateSkills.length > 0) {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Excluding ${privateSkills.length} private skill(s) from export: ${privateSkills.join(', ')}`);
+    }
+    return { shareable, privateSkills };
+  }
+
+  private async isPrivateSkill(skill: string): Promise<boolean> {
+    const candidates = [
+      path.join(this.skillsPath, `${skill}.md`),
+      path.join(this.skillsPath, skill, 'SKILL.md')
+    ];
+    for (const file of candidates) {
+      if (!(await fs.pathExists(file))) continue;
+      const content = await fs.readFile(file, 'utf-8');
+      const match = content.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/);
+      if (match && /^private:\s*(true|yes)\s*(#.*)?$/mi.test(match[1])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Copy skill files to export directory
    */
   private async copySkills(skills: string[], outputPath: string): Promise<string[]> {
@@ -695,7 +733,8 @@ export class ClaudeCodeExporter {
     skills: string[],
     outputStyles: string[],
     subWorkflows: string[],
-    outputPath: string
+    outputPath: string,
+    privateSkills: string[] = []
   ): Promise<string> {
     const readmePath = path.join(outputPath, 'README.md');
 
@@ -755,7 +794,10 @@ ${agents.length > 0 ? agents.map(a => `- ${a}`).join('\n') : 'None'}
 ### Skills (${skills.length})
 ${skills.length > 0 ? skills.map(s => `- ${s}`).join('\n') : 'None'}
 
-### Output Styles (${outputStyles.length})
+${privateSkills.length > 0 ? `### Requires (not included)
+${privateSkills.map(s => `- requires: ${s} -- install it yourself (not included: licensed for private use)`).join('\n')}
+
+` : ''}### Output Styles (${outputStyles.length})
 ${outputStyles.length > 0 ? outputStyles.map(os => `- ${os}`).join('\n') : 'None'}
 
 ### Sub-Workflows (${subWorkflows.length})

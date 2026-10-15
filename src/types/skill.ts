@@ -76,6 +76,7 @@ export interface SkillInstallStatus {
   location?: 'bundled' | 'claude-skills' | 'marketplace';  // ~/.claude/skills/ vs bundled
   path?: string;
   version?: string;
+  private?: boolean;                // Licensed/private skill (SKILL.md `private: true`) -- never exported
   mcpsAvailable: boolean;           // Are required MCP servers available?
   missingMcps?: string[];
 }
