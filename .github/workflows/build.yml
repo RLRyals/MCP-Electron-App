@@ -101,7 +101,13 @@ jobs:
           echo "Build artifacts:"
           ls -lR out/
 
+      # mea-5h0: installers ship through release.yml (straight to the GitHub
+      # release), not from here. Push/PR builds are a pass/fail gate only --
+      # an upload here used to fail the whole build when the artifact quota
+      # ran out, which also blocked auto-tag-release below (needs: build).
+      # Run this workflow by hand to get a one-off artifact.
       - name: Upload artifacts
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
