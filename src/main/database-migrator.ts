@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import { getFixedEnv } from './prerequisites';
 import { logWithCategory, LogCategory } from './logger';
 import * as envConfig from './env-config';
+import * as databaseBackup from './database-backup';
 
 const execAsync = promisify(exec);
 
@@ -16,6 +17,17 @@ interface MigrationFile {
   version: number; // Extracted from filename (e.g., 026)
   name: string;    // Extracted from filename (e.g., revision_and_metrics)
   fullPath: string;
+}
+
+/**
+ * Result of a migration run. backupPath is set whenever a pre-migration
+ * backup was taken (even if the migrations then failed).
+ */
+export interface MigrationRunResult {
+  success: boolean;
+  executed: string[];
+  error?: string;
+  backupPath?: string;
 }
 
 /**
@@ -42,9 +54,10 @@ export class DatabaseMigrator {
    */
   async runMigrations(
     progressCallback?: (message: string, progress: number) => void
-  ): Promise<{ success: boolean; executed: string[]; error?: string }> {
+  ): Promise<MigrationRunResult> {
     logWithCategory('info', LogCategory.SYSTEM, 'Starting database migration process...');
-    
+    let backupPath: string | undefined;
+
     try {
       if (progressCallback) progressCallback('Checking for pending migrations...', 10);
 
@@ -78,7 +91,24 @@ export class DatabaseMigrator {
 
       logWithCategory('info', LogCategory.SYSTEM, `Found ${pendingMigrations.length} pending migrations: ${pendingMigrations.map(m => m.filename).join(', ')}`);
 
-      // 6. Execute pending migrations
+      // 6. Back up the database BEFORE touching it. If the backup fails we stop
+      //    here and leave the database untouched.
+      if (progressCallback) progressCallback('Backing up database before migrations...', 15);
+      const backup = await databaseBackup.createBackup(this.buildPreMigrationBackupPath(), false);
+      if (!backup.success || !backup.path) {
+        const reason = backup.error || backup.message || 'unknown error';
+        logWithCategory('error', LogCategory.SYSTEM, `Pre-migration backup failed; migrations NOT run: ${reason}`);
+        return {
+          success: false,
+          executed: [],
+          error: `Could not back up the database before migrating, so no migrations were run and the database is unchanged. Backup error: ${reason}`,
+        };
+      }
+      backupPath = backup.path;
+      logWithCategory('info', LogCategory.SYSTEM, `Pre-migration backup created: ${backupPath}`);
+      if (progressCallback) progressCallback(`Database backed up to ${backupPath}`, 18);
+
+      // 7. Execute pending migrations
       const executed: string[] = [];
       let currentProgress = 20;
       const progressPerFile = 70 / pendingMigrations.length;
@@ -98,16 +128,28 @@ export class DatabaseMigrator {
 
       if (progressCallback) progressCallback('Migrations completed successfully!', 100);
       
-      return { success: true, executed };
+      return { success: true, executed, backupPath };
 
     } catch (error: any) {
       logWithCategory('error', LogCategory.SYSTEM, 'Migration failed', error);
-      return { 
-        success: false, 
-        executed: [], 
-        error: error.message || 'Unknown error during migration' 
+      const base = error.message || 'Unknown error during migration';
+      return {
+        success: false,
+        executed: [],
+        error: backupPath
+          ? `${base} A backup taken just before the migration is at: ${backupPath} To restore it: open the Backup Manager, choose this file and click Restore.`
+          : base,
+        backupPath,
       };
     }
+  }
+
+  /**
+   * Path for a pre-migration backup, in the app's regular backup folder.
+   */
+  private buildPreMigrationBackupPath(): string {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    return path.join(databaseBackup.getBackupDirectory(), `${this.dbName}_pre-migration_${timestamp}.sql`);
   }
 
   /**

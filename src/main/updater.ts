@@ -708,12 +708,12 @@ export async function updateMCPServers(progressCallback?: ProgressCallback): Pro
          // We warn the user instead.
          return {
            success: false,
-           message: `Update finished but migrations failed: ${migrationResult.error}. System may be unstable.`,
+           message: `Update finished but migrations failed: ${migrationResult.error}${migrationResult.backupPath ? '' : ' The database was not modified.'}`,
            error: migrationResult.error
          };
       }
       
-      logWithCategory('info', LogCategory.SYSTEM, `Migrations executed: ${migrationResult.executed.length}`);
+      logWithCategory('info', LogCategory.SYSTEM, `Migrations executed: ${migrationResult.executed.length}${migrationResult.backupPath ? ` (pre-migration backup: ${migrationResult.backupPath})` : ''}`);
       
     } catch (migrationError: any) {
         logWithCategory('error', LogCategory.SYSTEM, 'Migration error', migrationError);
