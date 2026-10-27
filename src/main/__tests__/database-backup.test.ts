@@ -77,30 +77,47 @@ afterEach(() => {
 });
 
 describe('createBackup', () => {
-  it('runs pg_dump inside the fictionlab-postgres container and writes the output to disk', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 2048 } as any);
+  // Make the host file look present, non-empty and (for -Fc) PGDMP-headed.
+  function mockHostFile(size = 2048, header = 'PGDMP') {
+    mockedFs.stat.mockResolvedValue({ size } as any);
+    (mockedFs as any).open.mockResolvedValue(7);
+    (mockedFs as any).read.mockImplementation(async (_fd: any, buf: Buffer) => {
+      buf.write(header, 0, 'latin1');
+      return { bytesRead: 5, buffer: buf };
+    });
+    (mockedFs as any).close.mockResolvedValue(undefined);
+  }
 
+  beforeEach(() => {
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mockHostFile();
+  });
+
+  it('dumps inside the container to a temp file, docker cps it out, then removes the temp file', async () => {
     const result = await databaseBackup.createBackup();
 
     expect(result.success).toBe(true);
     expect(result.path).toBeTruthy();
     expect(result.size).toBe(2048);
 
-    const [command] = mockExecAsync.mock.calls[0];
-    expect(command).toContain('docker exec fictionlab-postgres pg_dump');
-    expect(command).toContain('-U postgres');
-    expect(command).toContain('-d mcp_writing_db');
+    const cmds = mockExecAsync.mock.calls.map((c) => c[0] as string);
+    expect(cmds).toHaveLength(3);
+    expect(cmds[0]).toMatch(/^docker exec fictionlab-postgres pg_dump -U postgres -Fc -Z 9 -f \/tmp\/fl-backup-\d+\.dump -d mcp_writing_db$/);
+    const tmp = cmds[0].match(/-f (\/tmp\/\S+)/)![1];
+    expect(cmds[1]).toBe(`docker cp fictionlab-postgres:${tmp} "${result.path}"`);
+    expect(cmds[2]).toBe(`docker exec fictionlab-postgres rm -f ${tmp}`);
+  });
 
-    expect(mockedFs.writeFile).toHaveBeenCalledWith(expect.any(String), 'BINARYDUMP');
+  it('never routes dump data through stdout / writeFile', async () => {
+    mockExecAsync.mockResolvedValue({ stdout: 'SHOULD-NOT-BE-USED', stderr: '' });
+    await databaseBackup.createBackup();
+    expect(mockedFs.writeFile).not.toHaveBeenCalled();
+    for (const call of mockExecAsync.mock.calls) {
+      expect(call[1]?.maxBuffer).toBeUndefined();
+    }
   });
 
   it('writes backups under the Electron userData directory by default (not C:\\Backups\\fictionlab)', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 1024 } as any);
-
     const result = await databaseBackup.createBackup();
 
     expect(result.path).toContain('fake-userdata');
@@ -108,42 +125,73 @@ describe('createBackup', () => {
   });
 
   it('honors a custom backup path when provided', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 512 } as any);
-
     const result = await databaseBackup.createBackup('D:/custom/my-backup.sql.gz');
 
     expect(result.path).toBe('D:/custom/my-backup.sql.gz');
-    expect(mockedFs.writeFile).toHaveBeenCalledWith('D:/custom/my-backup.sql.gz', 'BINARYDUMP');
+    expect(mockExecAsync.mock.calls[1][0]).toContain('"D:/custom/my-backup.sql.gz"');
   });
 
-  it('uses plain SQL pg_dump (no -Fc/-Z) when compressed=false', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'PLAINSQL', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 100 } as any);
+  it('uses plain SQL pg_dump (no -Fc/-Z, no PGDMP check) when compressed=false', async () => {
+    mockHostFile(100, 'plain');
+    const result = await databaseBackup.createBackup(undefined, false);
 
-    await databaseBackup.createBackup(undefined, false);
-
+    expect(result.success).toBe(true);
     const [command] = mockExecAsync.mock.calls[0];
     expect(command).not.toContain('-Fc');
+    expect(command).toMatch(/-f \/tmp\/fl-backup-\d+\.sql /);
   });
 
-  it('returns a failure result (not a throw) when pg_dump fails', async () => {
-    mockExecAsync.mockRejectedValue(new Error('docker: container not found'));
+  it('returns a failure result (not a throw) when pg_dump fails, and still cleans up the temp file', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('pg_dump')) throw new Error('docker: container not found');
+      return { stdout: '', stderr: '' };
+    });
 
     const result = await databaseBackup.createBackup();
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('container not found');
-    expect(mockedFs.writeFile).not.toHaveBeenCalled();
+    const cmds = mockExecAsync.mock.calls.map((c) => c[0] as string);
+    expect(cmds.some((c) => c.startsWith('docker cp'))).toBe(false);
+    expect(cmds[cmds.length - 1]).toContain('rm -f /tmp/fl-backup-');
+  });
+
+  it('fails when docker cp fails, and still removes the temp file', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.startsWith('docker cp')) throw new Error('cp failed');
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await databaseBackup.createBackup();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('cp failed');
+    const cmds = mockExecAsync.mock.calls.map((c) => c[0] as string);
+    expect(cmds[cmds.length - 1]).toContain('rm -f /tmp/fl-backup-');
+  });
+
+  it('fails when the host file is empty', async () => {
+    mockHostFile(0);
+    const result = await databaseBackup.createBackup();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('empty');
+  });
+
+  it('fails when the host file is missing', async () => {
+    mockedFs.pathExists.mockResolvedValue(false as any);
+    const result = await databaseBackup.createBackup();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not copied');
+  });
+
+  it('fails when a custom-format dump lacks the PGDMP header', async () => {
+    mockHostFile(2048, 'JUNK!');
+    const result = await databaseBackup.createBackup();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('PGDMP');
   });
 
   it('scopes the pg_dump command to specific tables via repeated -t flags (table-level backup, issue #130)', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 2048 } as any);
-
     const result = await databaseBackup.createBackup(undefined, true, ['characters', 'scenes']);
 
     expect(result.success).toBe(true);
@@ -156,10 +204,6 @@ describe('createBackup', () => {
   });
 
   it('runs a full backup (no -t flags) when tables is an empty array', async () => {
-    mockExecAsync.mockResolvedValue({ stdout: 'BINARYDUMP', stderr: '' });
-    mockedFs.writeFile.mockResolvedValue(undefined as any);
-    mockedFs.stat.mockResolvedValue({ size: 2048 } as any);
-
     await databaseBackup.createBackup(undefined, true, []);
 
     const [command] = mockExecAsync.mock.calls[0];
@@ -172,7 +216,6 @@ describe('createBackup', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Invalid table name');
     expect(mockExecAsync).not.toHaveBeenCalled();
-    expect(mockedFs.writeFile).not.toHaveBeenCalled();
   });
 });
 
