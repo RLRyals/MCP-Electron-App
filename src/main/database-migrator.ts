@@ -94,7 +94,7 @@ export class DatabaseMigrator {
       // 6. Back up the database BEFORE touching it. If the backup fails we stop
       //    here and leave the database untouched.
       if (progressCallback) progressCallback('Backing up database before migrations...', 15);
-      const backup = await databaseBackup.createBackup(this.buildPreMigrationBackupPath(), false);
+      const backup = await databaseBackup.createBackup(this.buildPreMigrationBackupPath(), true);
       if (!backup.success || !backup.path) {
         const reason = backup.error || backup.message || 'unknown error';
         logWithCategory('error', LogCategory.SYSTEM, `Pre-migration backup failed; migrations NOT run: ${reason}`);
@@ -137,7 +137,7 @@ export class DatabaseMigrator {
         success: false,
         executed: [],
         error: backupPath
-          ? `${base} A backup taken just before the migration is at: ${backupPath} To restore it: open the Backup Manager, choose this file and click Restore.`
+          ? `${base} A backup taken just before the migration is at: ${backupPath} To restore it: open the Backup Manager, choose this file and click Restore (it runs pg_restore --clean --if-exists, replacing the current data with the backup).`
           : base,
         backupPath,
       };
@@ -149,7 +149,7 @@ export class DatabaseMigrator {
    */
   private buildPreMigrationBackupPath(): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    return path.join(databaseBackup.getBackupDirectory(), `${this.dbName}_pre-migration_${timestamp}.sql`);
+    return path.join(databaseBackup.getBackupDirectory(), `${this.dbName}_pre-migration_${timestamp}.dump`);
   }
 
   /**

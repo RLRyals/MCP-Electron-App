@@ -32,7 +32,7 @@ function makeMigrator(applied: string[], available: string[]) {
   });
   createBackup.mockImplementation(async () => {
     order.push('backup');
-    return { success: true, message: 'ok', path: '/tmp/backups/db_pre-migration_x.sql' };
+    return { success: true, message: 'ok', path: '/tmp/backups/db_pre-migration_x.dump' };
   });
   return { m, proto, order };
 }
@@ -48,10 +48,10 @@ describe('DatabaseMigrator pre-migration backup', () => {
     expect(order).toEqual(['backup', 'migrate:002.sql', 'migrate:003.sql']);
     expect(createBackup).toHaveBeenCalledTimes(1);
     const [customPath, compressed] = createBackup.mock.calls[0];
-    expect(customPath).toMatch(/pre-migration_.*\.sql$/);
-    expect(compressed).toBe(false);
-    expect(result.backupPath).toBe('/tmp/backups/db_pre-migration_x.sql');
-    expect(messages.some((x) => x.includes('/tmp/backups/db_pre-migration_x.sql'))).toBe(true);
+    expect(customPath).toMatch(/pre-migration_.*\.dump$/);
+    expect(compressed).toBe(true);
+    expect(result.backupPath).toBe('/tmp/backups/db_pre-migration_x.dump');
+    expect(messages.some((x) => x.includes('/tmp/backups/db_pre-migration_x.dump'))).toBe(true);
   });
 
   it('does not migrate when the backup fails', async () => {
@@ -78,8 +78,8 @@ describe('DatabaseMigrator pre-migration backup', () => {
     const result = await m.runMigrations();
     expect(result.success).toBe(false);
     expect(result.error).toContain('syntax error');
-    expect(result.error).toContain('/tmp/backups/db_pre-migration_x.sql');
+    expect(result.error).toContain('/tmp/backups/db_pre-migration_x.dump');
     expect(result.error).toContain('Restore');
-    expect(result.backupPath).toBe('/tmp/backups/db_pre-migration_x.sql');
+    expect(result.backupPath).toBe('/tmp/backups/db_pre-migration_x.dump');
   });
 });

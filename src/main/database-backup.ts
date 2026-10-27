@@ -154,38 +154,56 @@ export async function createBackup(
 
     logWithCategory('info', LogCategory.SYSTEM, `Creating backup to: ${backupPath}`);
 
-    // Build pg_dump command
-    // We'll execute this inside the postgres container for simplicity
+    // Dump INSIDE the container to a temp file, then docker cp it out. Streaming the
+    // dump through Node's stdout string would corrupt the binary -Fc format (utf8
+    // decoding) and cap plain-SQL dumps at maxBuffer. Mirrors backup-fictionlab-db.ps1.
     const containerName = 'fictionlab-postgres';
-
-    // Determine the format and compression options
-    let dumpCommand: string;
-    if (compressed) {
-      // Custom format with compression (can be restored with pg_restore)
-      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -Fc -Z 9 -d ${database}${tableArgs}`;
-    } else {
-      // Plain SQL format
-      dumpCommand = `docker exec ${containerName} pg_dump -U ${user} -d ${database}${tableArgs}`;
-    }
+    const tmpName = `/tmp/fl-backup-${Date.now()}${compressed ? '.dump' : '.sql'}`;
+    const dumpFlags = compressed ? '-Fc -Z 9 ' : '';
+    const dumpCommand = `docker exec ${containerName} pg_dump -U ${user} ${dumpFlags}-f ${tmpName} -d ${database}${tableArgs}`;
+    const copyCommand = `docker cp ${containerName}:${tmpName} "${backupPath}"`;
+    const cleanupCommand = `docker exec ${containerName} rm -f ${tmpName}`;
+    const execEnv = { ...getFixedEnv(), PGPASSWORD: password };
 
     logWithCategory('info', LogCategory.SYSTEM, `Executing: ${dumpCommand.replace(password, '****')}`);
 
-    // Execute the backup command and save output to file
-    const { stdout, stderr } = await execAsync(dumpCommand, {
-      maxBuffer: 100 * 1024 * 1024, // 100MB buffer
-      timeout: 300000, // 5 minutes timeout
-      env: {
-        ...getFixedEnv(),
-        PGPASSWORD: password,
-      },
-    });
+    try {
+      const { stderr } = await execAsync(dumpCommand, {
+        timeout: 300000, // 5 minutes timeout
+        env: execEnv,
+      });
+      // pg_dump may write warnings to stderr even on success
+      if (stderr && stderr.trim().length > 0) {
+        logWithCategory('warn', LogCategory.SYSTEM, `pg_dump warnings: ${stderr}`);
+      }
 
-    // Write the backup to file
-    await fs.writeFile(backupPath, stdout);
+      await execAsync(copyCommand, { timeout: 300000, env: execEnv });
+    } finally {
+      try {
+        await execAsync(cleanupCommand, { env: execEnv });
+      } catch (cleanupError) {
+        logWithCategory('warn', LogCategory.SYSTEM, `Failed to remove temp dump ${tmpName} in container`);
+      }
+    }
 
-    // Check if stderr has any warnings (pg_dump may write warnings to stderr even on success)
-    if (stderr && stderr.trim().length > 0) {
-      logWithCategory('warn', LogCategory.SYSTEM, `pg_dump warnings: ${stderr}`);
+    if (!await fs.pathExists(backupPath)) {
+      throw new Error(`Backup file was not copied to the host: ${backupPath}`);
+    }
+    const checkStats = await fs.stat(backupPath);
+    if (!checkStats || checkStats.size <= 0) {
+      throw new Error(`Backup file is empty: ${backupPath}`);
+    }
+    if (compressed) {
+      const fd = await fs.open(backupPath, 'r');
+      try {
+        const buf = Buffer.alloc(5);
+        await fs.read(fd, buf, 0, 5, 0);
+        if (buf.toString('latin1') !== 'PGDMP') {
+          throw new Error(`Backup file is not a valid pg_dump custom-format archive (missing PGDMP header): ${backupPath}`);
+        }
+      } finally {
+        await fs.close(fd);
+      }
     }
 
     // Get file size
