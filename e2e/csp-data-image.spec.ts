@@ -17,6 +17,7 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from 'playwright';
 import * as path from 'path';
+import { E2E_GPU_ARGS } from './launch-args';
 import * as os from 'os';
 import * as fs from 'fs';
 
@@ -39,7 +40,7 @@ let userDataDir: string;
 test.beforeAll(async () => {
   userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fictionlab-e2e-csp-'));
   electronApp = await electron.launch({
-    args: ['.', `--user-data-dir=${userDataDir}`],
+    args: ['.', `--user-data-dir=${userDataDir}`, ...E2E_GPU_ARGS],
     cwd: APP_ROOT,
     env: launchEnv(),
   });

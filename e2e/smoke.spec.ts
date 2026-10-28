@@ -25,6 +25,7 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from 'playwright';
 import * as path from 'path';
+import { E2E_GPU_ARGS } from './launch-args';
 
 const APP_ROOT = path.resolve(__dirname, '..');
 
@@ -48,7 +49,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   electronApp = await electron.launch({
-    args: ['.'],
+    args: ['.', ...E2E_GPU_ARGS],
     cwd: APP_ROOT,
     env: launchEnv(),
   });
