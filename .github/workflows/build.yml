@@ -20,6 +20,7 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
+            runner: windows-2022 # mea-3ya: temporary pin, see release.yml
             platform: win
             artifact_name: windows-build
             build_script: package:win
@@ -32,7 +33,7 @@ jobs:
             artifact_name: linux-build
             build_script: package:linux
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
 
     steps:
       - name: Checkout code
@@ -62,6 +63,13 @@ jobs:
         if: steps.full_tests.outcome == 'failure'
         run: |
           echo "::warning::Full suite (npm test) has pre-existing failures tracked in issue #176; not blocking this build. The required gate above (npm run test:ci) covers the currently-green suites and does block on regressions there. See the 'Run full test suite' step log for detail."
+
+      # mea-3ya: release.yml runs the Electron e2e smoke tests but this
+      # workflow never did, so a runner change that broke Electron boot only
+      # showed up at release time. Run them here on Windows so it shows on a PR.
+      - name: Run Electron E2E smoke tests (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm run test:e2e
 
       - name: Build Electron app
         run: npm run ${{ matrix.build_script }}
