@@ -20,7 +20,6 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
-            runner: windows-2022 # mea-3ya: temporary pin, see release.yml
             platform: win
             artifact_name: windows-build
             build_script: package:win
