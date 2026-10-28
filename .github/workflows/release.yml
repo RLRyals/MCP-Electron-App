@@ -109,9 +109,7 @@ jobs:
   build-windows:
     name: Build Windows
     needs: prepare-release
-    # Pinned (mea-3ya): windows-latest (windows-2025-vs2026, image 20261007+) crashes
-    # Electron 28 at boot (GPU sandbox, 0xC0000005). Temporary until Electron is upgraded.
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
