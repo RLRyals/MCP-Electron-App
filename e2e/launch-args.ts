@@ -9,4 +9,4 @@
  * renderer/IPC behaviour, not GPU rendering, so run them on the software path.
  * This does not change what is asserted, only how Chromium composites.
  */
-export const E2E_GPU_ARGS: string[] = ['--disable-gpu'];
+export const E2E_GPU_ARGS: string[] = ['--disable-gpu', '--disable-gpu-compositing', '--disable-software-rasterizer'];
