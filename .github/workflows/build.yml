@@ -67,6 +67,18 @@ jobs:
       # workflow never did, so a boot regression on the Windows runner only
       # showed up at release time. DEBUG=pw:browser makes Playwright print the
       # Electron process stdout/stderr, so a boot crash leaves a reason in the log.
+      - name: PROBE gpu variants
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        shell: bash
+        run: |
+          for v in "--in-process-gpu" "--disable-gpu-sandbox" "--use-angle=swiftshader --enable-unsafe-swiftshader" "--disable-d3d11" "--disable-direct-composition" "--use-gl=disabled" "--disable-gpu --in-process-gpu" "--use-angle=warp"; do
+            echo "=== VARIANT: $v"
+            E2E_EXTRA_ARGS="$v" npx playwright test e2e/smoke.spec.ts 2>&1 | grep -E "^\s+(ok|x)\s+[0-9]|passed|failed|FATAL" | head -8
+          done
+          echo "=== VARIANT: none"
+          npx playwright test e2e/smoke.spec.ts 2>&1 | grep -E "^\s+(ok|x)\s+[0-9]|passed|failed|FATAL" | head -8
+
       - name: Run Electron E2E smoke tests (Windows)
         if: matrix.os == 'windows-latest'
         env:
