@@ -371,6 +371,9 @@ jobs:
           ' sh {} +
           cat checksums-macos.txt
 
+      - name: Correct update manifest to uploaded bytes (mea-1ga)
+        run: node scripts/fix-update-manifest.js out latest-mac.yml
+
       - name: Upload to draft release
         shell: bash
         env:
@@ -445,6 +448,9 @@ jobs:
             done
           ' sh {} +
           cat checksums-linux.txt
+
+      - name: Correct update manifest to uploaded bytes (mea-1ga)
+        run: node scripts/fix-update-manifest.js out latest-linux.yml
 
       - name: Upload to draft release
         shell: bash
