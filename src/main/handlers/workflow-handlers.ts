@@ -4,7 +4,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { logWithCategory, LogCategory } from '../logger';
-import { getActiveRunNames } from '../workflow/active-run-guard';
+import { getActiveRunNames, getActiveRunSummary } from '../workflow/active-run-guard';
 import { PersistentMCPClient } from '../workflow/persistent-mcp-client';
 import { DependencyResolver } from '../workflow/dependency-resolver';
 import { ClaudeCodeExporter, ExportOptions } from '../workflow/exporters/claude-code-exporter';
@@ -830,6 +830,11 @@ export function registerWorkflowHandlers() {
   // Names of runs a restart/update would interrupt (bead mea-3ow). Never throws.
   registerHandler('workflow:active-run-names', "Names of active workflow runs (update guard)", async () => {
     return getActiveRunNames(async () => (await getWorkflowClient()).listActiveWorkflows());
+  });
+
+  // Running vs parked-at-approval-gate split for the update guard (bead mea-b5e). Never throws.
+  registerHandler('workflow:active-run-summary', "Active workflow runs split into running and parked (update guard)", async () => {
+    return getActiveRunSummary(async () => (await getWorkflowClient()).listActiveWorkflows());
   });
 
   // List all active workflows

@@ -6,7 +6,7 @@ function setInvoke(fn: jest.Mock) {
 afterEach(() => { document.body.innerHTML = ''; });
 
 it('warns listing runs; Wait (default) resolves false', async () => {
-  setInvoke(jest.fn().mockResolvedValue(['Chapter draft']));
+  setInvoke(jest.fn().mockResolvedValue({ running: ['Chapter draft'], parked: [] }));
   const p = confirmProceedWithActiveWorkflows('Restarting');
   await Promise.resolve(); await Promise.resolve();
   expect(document.body.textContent).toContain('Chapter draft');
@@ -15,7 +15,7 @@ it('warns listing runs; Wait (default) resolves false', async () => {
 });
 
 it('Restart anyway resolves true', async () => {
-  setInvoke(jest.fn().mockResolvedValue(['X']));
+  setInvoke(jest.fn().mockResolvedValue({ running: ['X'], parked: [] }));
   const p = confirmProceedWithActiveWorkflows('Restarting');
   await Promise.resolve(); await Promise.resolve();
   (document.getElementById('active-workflow-anyway') as HTMLElement).click();
@@ -23,7 +23,7 @@ it('Restart anyway resolves true', async () => {
 });
 
 it('none active -> proceeds with no dialog', async () => {
-  setInvoke(jest.fn().mockResolvedValue([]));
+  setInvoke(jest.fn().mockResolvedValue({ running: [], parked: [] }));
   expect(await confirmProceedWithActiveWorkflows('Restarting')).toBe(true);
   expect(document.getElementById('active-workflow-warning')).toBeNull();
 });
@@ -31,4 +31,19 @@ it('none active -> proceeds with no dialog', async () => {
 it('pluginless (invoke rejects) -> proceeds', async () => {
   setInvoke(jest.fn().mockRejectedValue(new Error('No handler')));
   expect(await confirmProceedWithActiveWorkflows('Restarting')).toBe(true);
+});
+
+it('only parked runs (approval gate) -> proceeds with no dialog', async () => {
+  setInvoke(jest.fn().mockResolvedValue({ running: [], parked: ['Waiting on approval'] }));
+  expect(await confirmProceedWithActiveWorkflows('Restarting')).toBe(true);
+  expect(document.getElementById('active-workflow-warning')).toBeNull();
+});
+
+it('running + parked -> dialog mentions the parked count', async () => {
+  setInvoke(jest.fn().mockResolvedValue({ running: ['A'], parked: ['B', 'C'] }));
+  const p = confirmProceedWithActiveWorkflows('Restarting');
+  await Promise.resolve(); await Promise.resolve();
+  expect(document.body.textContent).toContain('2 other run(s) are paused');
+  (document.getElementById('active-workflow-anyway') as HTMLElement).click();
+  expect(await p).toBe(true);
 });
