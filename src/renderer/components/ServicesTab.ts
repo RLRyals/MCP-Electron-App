@@ -14,6 +14,8 @@
  * - Ports settings section with conflict checking
  */
 
+import { MCP_RECONNECT_NOTICE } from '../utils/mcp-reconnect-notice.js';
+
 interface ContainerHealth {
   name: string;
   status: string;
@@ -437,6 +439,7 @@ export class ServicesTab {
           const restartResult = await window.electronAPI.mcpSystem.restart();
           if (restartResult.success) {
             this.showNotification('Services restarted successfully', 'success');
+            this.showNotification(MCP_RECONNECT_NOTICE, 'info');
             await this.refreshAllServices();
           } else {
             this.showNotification(`Failed to restart services: ${restartResult.message}`, 'error');

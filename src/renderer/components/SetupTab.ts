@@ -11,6 +11,7 @@
 
 import { showWhatsNewPanel } from './WhatsNewPanel.js';
 import { confirmProceedWithActiveWorkflows } from '../utils/interrupt-guard.js';
+import { MCP_RECONNECT_NOTICE } from '../utils/mcp-reconnect-notice.js';
 
 interface PrerequisiteStatus {
   installed: boolean;
@@ -351,9 +352,10 @@ async function handleUpdateMCPServers(): Promise<void> {
     if (result.success) {
       showNotification('MCP-Writing-Servers updated successfully!', 'success');
       if (statusDiv) {
-        statusDiv.textContent = `Updated: ${result.message}`;
+        statusDiv.textContent = `Updated: ${result.message} ${MCP_RECONNECT_NOTICE}`;
         statusDiv.style.color = '#00D4AA';
       }
+      showNotification(MCP_RECONNECT_NOTICE, 'info');
       showMCPServersWhatsNew(result.whatsNew);
     } else {
       showNotification(`Update failed: ${result.error || result.message}`, 'error');
