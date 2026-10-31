@@ -20,13 +20,24 @@ for (const m of ['latest.yml', 'latest-mac.yml', 'latest-linux.yml']) {
     if (e.sha512 && hash(e.url, 'sha512', 'base64') !== e.sha512) { err(m + ': sha512 mismatch ' + e.url); ok = false; }
     if (ok) console.log('ok: ' + m + ' -> ' + e.url);
   };
+  // mea-5wd: a files[] entry ends at the first non-indented (top-level) line.
+  // Top-level path: + sha512: are their own pair (the first file) and must not
+  // leak into the last files[] entry.
+  const top = {};
   for (const l of fs.readFileSync(m, 'utf8').split(/\r?\n/)) {
+    if (/^\S/.test(l)) {
+      if (cur) { check(cur); cur = null; }
+      const tm = l.match(/^(path|sha512):\s*(.+?)\s*$/);
+      if (tm) top[tm[1]] = unquote(tm[2]);
+      continue;
+    }
     const mm = l.match(/^\s*(-\s+)?(url|sha512|size):\s*(.+?)\s*$/);
     if (!mm) continue;
     if (mm[2] === 'url' && mm[1]) { if (cur) check(cur); cur = {}; }
     if (cur) cur[mm[2]] = unquote(mm[3]);
   }
   if (cur) check(cur);
+  if (top.path) check({ url: top.path, sha512: top.sha512 });
 }
 
 for (const c of fs.readdirSync('.').filter((f) => /^checksums-.*\.txt$/.test(f))) {
