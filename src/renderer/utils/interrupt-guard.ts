@@ -4,12 +4,15 @@
  */
 export async function confirmProceedWithActiveWorkflows(action: string): Promise<boolean> {
   let names: string[] = [];
+  let parked: string[] = [];
   try {
-    const r = await (window.electronAPI as any).invoke('workflow:active-run-names');
-    names = Array.isArray(r) ? r : [];
+    const r = await (window.electronAPI as any).invoke('workflow:active-run-summary');
+    names = Array.isArray(r?.running) ? r.running : [];
+    parked = Array.isArray(r?.parked) ? r.parked : [];
   } catch {
     return true; // pluginless / channel missing: current behaviour
   }
+  // Parked runs (approval gate / paused) resume from state: nothing to warn about.
   if (names.length === 0) return true;
 
   return new Promise<boolean>((resolve) => {
@@ -28,6 +31,7 @@ export async function confirmProceedWithActiveWorkflows(action: string): Promise
         <h3>A workflow is running</h3>
         <p>${action} now will interrupt it:</p>
         <div id="active-workflow-list"></div>
+        ${parked.length ? `<p>${parked.length} other run(s) are paused at an approval gate and will resume from saved state.</p>` : ''}
         <div class="error-dialog-buttons">
           <button id="active-workflow-wait" class="button primary">Wait until it finishes</button>
           <button id="active-workflow-anyway" class="button">Restart anyway</button>
