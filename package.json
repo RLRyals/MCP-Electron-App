@@ -1,6 +1,6 @@
 {
   "name": "fictionlab",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "AI-powered writing workspace for authors - your creative laboratory",
   "main": "dist/main/index.js",
   "author": "FictionLab",

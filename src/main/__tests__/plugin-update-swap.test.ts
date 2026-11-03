@@ -406,3 +406,20 @@ describe('plugin settings survive updates (mea-1l3)', () => {
     expect(await fs.readJson(path.join(dataRootFor(), 'p4', 'config.json'))).toEqual({ boardKey: 'K' });
   });
 });
+
+describe('performPluginSwap preserves imported workflows (mea-5vs)', () => {
+  it('keeps workflows/ from the old install and prefers bundle-shipped files', async () => {
+    const live = await writeInstalledPlugin('wf', '1.0.0');
+    await fs.outputFile(path.join(live, 'workflows', 'a', 'scripts', 'run.js'), 'old-a');
+    await fs.outputFile(path.join(live, 'workflows', 'b', 'config.json'), 'old-b');
+    const source = await writeSourceBundle('wf', '1.1.0');
+    await fs.outputFile(path.join(source, 'workflows', 'b', 'config.json'), 'shipped-b');
+
+    await performPluginSwap(pluginsDir, 'wf', source);
+
+    const dir = path.join(pluginsDir, 'wf');
+    expect(await fs.readFile(path.join(dir, 'workflows', 'a', 'scripts', 'run.js'), 'utf8')).toBe('old-a');
+    expect(await fs.readFile(path.join(dir, 'workflows', 'b', 'config.json'), 'utf8')).toBe('shipped-b');
+    expect((await readPluginManifestSafe(dir))?.version).toBe('1.1.0');
+  });
+});

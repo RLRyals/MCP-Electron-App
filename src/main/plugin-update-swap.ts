@@ -32,6 +32,12 @@ import { migrateLegacyConfig } from './plugin-data-paths';
 const BAK_SUFFIX = '.bak';
 /** Suffix used for the staged copy of the new plugin bundle before swap-in. */
 const STAGING_SUFFIX = '.staging';
+/**
+ * User-generated directories inside a plugin dir that the release bundle does
+ * not ship (e.g. the workflow plugin's imported workflows/ -- mea-5vs). They
+ * are carried from the old install into the new one on every swap.
+ */
+const PRESERVED_DIRS = ['workflows'];
 
 export type PluginUpdateErrorCode =
   | 'NOT_INSTALLED'
@@ -241,6 +247,15 @@ export async function performPluginSwap(
   await fs.remove(bakPath);
 
   const hadExisting = await fs.pathExists(pluginPath);
+  if (hadExisting) {
+    // Overlay (never overwrite) user-generated dirs so the update keeps them.
+    for (const dir of PRESERVED_DIRS) {
+      const oldDir = path.join(pluginPath, dir);
+      if (await fs.pathExists(oldDir)) {
+        await fs.copy(oldDir, path.join(stagingPath, dir), { overwrite: false });
+      }
+    }
+  }
   if (hadExisting) {
     await rename(pluginPath, bakPath);
   }
