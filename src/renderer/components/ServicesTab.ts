@@ -48,6 +48,9 @@ interface EnvConfig {
   CHARACTER_PORT: number;
   SCENE_PORT: number;
   AUTHOR_PORT: number;
+  CORE_CONTINUITY_PORT: number;
+  REVIEW_PORT: number;
+  REPORTING_PORT: number;
 }
 
 /**
@@ -117,7 +120,7 @@ const MCP_SERVERS: Array<{
  * A single row in the Ports settings table
  */
 interface PortRowDefinition {
-  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT' | 'OUTLINE_PORT' | 'KANBAN_PORT' | 'STORY_ANALYSIS_PORT' | 'SERIES_PORT' | 'CHAPTER_PORT' | 'CHARACTER_PORT' | 'SCENE_PORT' | 'AUTHOR_PORT';
+  key: 'POSTGRES_PORT' | 'PGBOUNCER_PORT' | 'MCP_CONNECTOR_PORT' | 'HTTP_SSE_PORT' | 'DB_ADMIN_PORT' | 'NPE_PORT' | 'WORKFLOW_MANAGER_PORT' | 'OUTLINE_PORT' | 'KANBAN_PORT' | 'STORY_ANALYSIS_PORT' | 'SERIES_PORT' | 'CHAPTER_PORT' | 'CHARACTER_PORT' | 'SCENE_PORT' | 'AUTHOR_PORT' | 'CORE_CONTINUITY_PORT' | 'REVIEW_PORT' | 'REPORTING_PORT';
   name: string;
 }
 
@@ -140,6 +143,9 @@ const PORT_ROWS: PortRowDefinition[] = [
   { key: 'CHARACTER_PORT', name: 'Character Server' },
   { key: 'SCENE_PORT', name: 'Scene Server' },
   { key: 'AUTHOR_PORT', name: 'Author Server' },
+  { key: 'CORE_CONTINUITY_PORT', name: 'Core Continuity Server' },
+  { key: 'REVIEW_PORT', name: 'Review Server' },
+  { key: 'REPORTING_PORT', name: 'Reporting Server' },
 ];
 
 export class ServicesTab {

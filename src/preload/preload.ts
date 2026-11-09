@@ -86,6 +86,9 @@ interface EnvConfig {
   CHARACTER_PORT: number;
   SCENE_PORT: number;
   AUTHOR_PORT: number;
+  CORE_CONTINUITY_PORT: number;
+  REVIEW_PORT: number;
+  REPORTING_PORT: number;
   GITHUB_TOKEN?: string;
   /** Fine-grained PAT for the private plugin repo (bead mea-6tt). */
   GITHUB_PLUGINS_TOKEN?: string;

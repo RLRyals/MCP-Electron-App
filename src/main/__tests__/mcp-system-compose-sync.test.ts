@@ -67,6 +67,9 @@ const testConfig = {
   CHARACTER_PORT: 3004,
   SCENE_PORT: 3005,
   AUTHOR_PORT: 3009,
+  CORE_CONTINUITY_PORT: 3006,
+  REVIEW_PORT: 3007,
+  REPORTING_PORT: 3008,
 };
 jest.mock('../env-config', () => ({
   loadEnvConfig: jest.fn(() => testConfig),

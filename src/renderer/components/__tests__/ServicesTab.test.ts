@@ -66,6 +66,9 @@ const CONFIG_FIXTURE = {
   CHARACTER_PORT: 8772,
   SCENE_PORT: 8773,
   AUTHOR_PORT: 8774,
+  CORE_CONTINUITY_PORT: 8775,
+  REVIEW_PORT: 8776,
+  REPORTING_PORT: 8777,
 };
 
 /**
@@ -201,7 +204,7 @@ describe('Services tab (issue #124)', () => {
     expect(container.textContent).toContain('Docker Desktop');
 
     const portRows = document.querySelectorAll('#ports-table-body tr');
-    expect(portRows.length).toBe(15);
+    expect(portRows.length).toBe(18);
   });
 
   it('shows PostgreSQL connection info (host, port, database) from the env config', async () => {
