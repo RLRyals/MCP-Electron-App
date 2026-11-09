@@ -737,6 +737,9 @@ async function saveEnvironmentConfig(): Promise<boolean> {
             CHARACTER_PORT: currentConfig?.CHARACTER_PORT || 3004,
             SCENE_PORT: currentConfig?.SCENE_PORT || 3005,
             AUTHOR_PORT: currentConfig?.AUTHOR_PORT || 3009,
+            CORE_CONTINUITY_PORT: currentConfig?.CORE_CONTINUITY_PORT || 3006,
+            REVIEW_PORT: currentConfig?.REVIEW_PORT || 3007,
+            REPORTING_PORT: currentConfig?.REPORTING_PORT || 3008,
             // Not exposed in this wizard step - preserve existing value so a re-save
             // doesn't silently erase a stored GitHub token
             GITHUB_TOKEN: currentConfig?.GITHUB_TOKEN,

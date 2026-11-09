@@ -81,6 +81,9 @@ interface EnvConfig {
   CHARACTER_PORT: number;
   SCENE_PORT: number;
   AUTHOR_PORT: number;
+  CORE_CONTINUITY_PORT: number;
+  REVIEW_PORT: number;
+  REPORTING_PORT: number;
 }
 
 interface PortConflictDetail {

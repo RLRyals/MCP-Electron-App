@@ -779,6 +779,9 @@ async function execDockerCompose(
         CHARACTER_PORT: String(config.CHARACTER_PORT),
         SCENE_PORT: String(config.SCENE_PORT),
         AUTHOR_PORT: String(config.AUTHOR_PORT),
+        CORE_CONTINUITY_PORT: String(config.CORE_CONTINUITY_PORT),
+        REVIEW_PORT: String(config.REVIEW_PORT),
+        REPORTING_PORT: String(config.REPORTING_PORT),
         MCP_AUTH_TOKEN: config.MCP_AUTH_TOKEN,
         // Path to MCP config file for Docker volume mounting
         MCP_CONFIG_FILE_PATH: mcpConfigPath,

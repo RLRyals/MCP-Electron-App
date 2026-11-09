@@ -39,6 +39,9 @@ export interface EnvConfig {
   CHARACTER_PORT: number;
   SCENE_PORT: number;
   AUTHOR_PORT: number;
+  CORE_CONTINUITY_PORT: number;
+  REVIEW_PORT: number;
+  REPORTING_PORT: number;
   GITHUB_TOKEN?: string;
   /**
    * Fine-grained GitHub PAT scoped ONLY to RLRyals/fictionlab-workflow,
@@ -73,6 +76,9 @@ export const DEFAULT_CONFIG: EnvConfig = {
   CHARACTER_PORT: 3004,
   SCENE_PORT: 3005,
   AUTHOR_PORT: 3009,
+  CORE_CONTINUITY_PORT: 3006,
+  REVIEW_PORT: 3007,
+  REPORTING_PORT: 3008,
   GITHUB_TOKEN: '',
   GITHUB_PLUGINS_TOKEN: '',
 };
@@ -490,6 +496,9 @@ export async function checkAllPortsAndSuggestAlternatives(
     { port: config.CHARACTER_PORT, name: 'Character Server', key: 'CHARACTER_PORT' as const },
     { port: config.SCENE_PORT, name: 'Scene Server', key: 'SCENE_PORT' as const },
     { port: config.AUTHOR_PORT, name: 'Author Server', key: 'AUTHOR_PORT' as const },
+    { port: config.CORE_CONTINUITY_PORT, name: 'Core Continuity Server', key: 'CORE_CONTINUITY_PORT' as const },
+    { port: config.REVIEW_PORT, name: 'Review Server', key: 'REVIEW_PORT' as const },
+    { port: config.REPORTING_PORT, name: 'Reporting Server', key: 'REPORTING_PORT' as const },
   ];
 
   // Check configurable ports
@@ -687,6 +696,15 @@ export function parseEnvFile(content: string): Partial<EnvConfig> {
         case 'AUTHOR_PORT':
           config.AUTHOR_PORT = parseInt(unquotedValue, 10);
           break;
+        case 'CORE_CONTINUITY_PORT':
+          config.CORE_CONTINUITY_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'REVIEW_PORT':
+          config.REVIEW_PORT = parseInt(unquotedValue, 10);
+          break;
+        case 'REPORTING_PORT':
+          config.REPORTING_PORT = parseInt(unquotedValue, 10);
+          break;
         case 'GITHUB_TOKEN':
           config.GITHUB_TOKEN = unquotedValue;
           break;
@@ -800,6 +818,9 @@ export function formatEnvFile(config: EnvConfig): string {
     `CHARACTER_PORT=${config.CHARACTER_PORT}`,
     `SCENE_PORT=${config.SCENE_PORT}`,
     `AUTHOR_PORT=${config.AUTHOR_PORT}`,
+    `CORE_CONTINUITY_PORT=${config.CORE_CONTINUITY_PORT}`,
+    `REVIEW_PORT=${config.REVIEW_PORT}`,
+    `REPORTING_PORT=${config.REPORTING_PORT}`,
   ];
 
   // Only include GITHUB_TOKEN if it's set
@@ -944,6 +965,21 @@ export function validateConfig(config: EnvConfig): { valid: boolean; errors: str
   const authorPortValidation = validatePort(config.AUTHOR_PORT);
   if (!authorPortValidation.valid) {
     errors.push(`Author port: ${authorPortValidation.error}`);
+  }
+
+  const coreContinuityPortValidation = validatePort(config.CORE_CONTINUITY_PORT);
+  if (!coreContinuityPortValidation.valid) {
+    errors.push(`Core Continuity port: ${coreContinuityPortValidation.error}`);
+  }
+
+  const reviewPortValidation = validatePort(config.REVIEW_PORT);
+  if (!reviewPortValidation.valid) {
+    errors.push(`Review port: ${reviewPortValidation.error}`);
+  }
+
+  const reportingPortValidation = validatePort(config.REPORTING_PORT);
+  if (!reportingPortValidation.valid) {
+    errors.push(`Reporting port: ${reportingPortValidation.error}`);
   }
 
   // Validate auth token
