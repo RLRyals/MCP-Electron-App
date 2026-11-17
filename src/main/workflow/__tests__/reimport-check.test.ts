@@ -8,7 +8,7 @@
 jest.mock('../folder-importer');
 
 import { FolderImporter } from '../folder-importer';
-import { checkAndReimportWorkflow, checkAndReimportAllWorkflows } from '../reimport-check';
+import { checkAndReimportWorkflow, checkAndReimportAllWorkflows, isScratchSourcePath } from '../reimport-check';
 
 const MockedFolderImporter = FolderImporter as jest.MockedClass<typeof FolderImporter>;
 
@@ -29,7 +29,7 @@ describe('checkAndReimportWorkflow', () => {
   it('returns no-source when the workflow has no recorded import source', async () => {
     const client = makeClient({ getWorkflowImportSource: jest.fn().mockResolvedValue(null) });
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(result.status).toBe('no-source');
     expect(MockedFolderImporter).not.toHaveBeenCalled();
@@ -39,7 +39,7 @@ describe('checkAndReimportWorkflow', () => {
     MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue('1.9.1');
     const client = makeClient();
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(result.status).toBe('up-to-date');
     expect(MockedFolderImporter.prototype.importFromFolder).not.toHaveBeenCalled();
@@ -49,7 +49,7 @@ describe('checkAndReimportWorkflow', () => {
     MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue('1.8.0');
     const client = makeClient();
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(result.status).toBe('up-to-date');
     expect(MockedFolderImporter.prototype.importFromFolder).not.toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe('checkAndReimportWorkflow', () => {
     });
     const client = makeClient();
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(MockedFolderImporter.prototype.importFromFolder).toHaveBeenCalledWith('/repo/workflows/my-flow');
     expect(result.status).toBe('reimported');
@@ -81,7 +81,7 @@ describe('checkAndReimportWorkflow', () => {
     });
     const client = makeClient();
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(result.status).toBe('refused');
     expect(result.message).toMatch(/Refusing to import/);
@@ -115,7 +115,7 @@ describe('checkAndReimportWorkflow - worktree remap (mea-38o)', () => {
       getWorkflowDefinition: jest.fn().mockResolvedValue({ workflow_id: 'book-formatting', version: '1.9.1' }),
     });
 
-    const result = await checkAndReimportWorkflow('book-formatting', client);
+    const result = await checkAndReimportWorkflow('book-formatting', client, { trigger: 'user' });
 
     expect(result.status).toBe('reimported');
     expect(MockedFolderImporter.prototype.importFromFolder).toHaveBeenCalledWith(canonicalPath);
@@ -127,7 +127,7 @@ describe('checkAndReimportWorkflow - worktree remap (mea-38o)', () => {
     MockedFolderImporter.prototype.importFromFolder = jest.fn();
     const client = makeClient({ getWorkflowImportSource: jest.fn().mockResolvedValue(worktreePath) });
 
-    const result = await checkAndReimportWorkflow('book-formatting', client);
+    const result = await checkAndReimportWorkflow('book-formatting', client, { trigger: 'user' });
 
     expect(result.status).toBe('error');
     expect(result.message).toContain(worktreePath);
@@ -138,7 +138,7 @@ describe('checkAndReimportWorkflow - worktree remap (mea-38o)', () => {
     MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue(null);
     const client = makeClient({ getWorkflowImportSource: jest.fn().mockResolvedValue('/repo/workflows/my-flow') });
 
-    const result = await checkAndReimportWorkflow('my-flow', client);
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
 
     expect(result.status).toBe('error');
     // Only the one, non-worktree path should ever have been probed.
@@ -179,7 +179,7 @@ describe('checkAndReimportAllWorkflows', () => {
         ),
     });
 
-    const results = await checkAndReimportAllWorkflows(client, { force: true });
+    const results = await checkAndReimportAllWorkflows(client, { force: true, trigger: 'user' });
 
     expect(results).toHaveLength(1);
     expect(results[0].workflowId).toBe('stale-flow');
@@ -199,23 +199,71 @@ describe('checkAndReimportAllWorkflows', () => {
 
     // First automatic check: surfaces the error.
     nowSpy.mockReturnValue(1_000_000);
-    const first = await checkAndReimportAllWorkflows(client, { force: true });
+    const first = await checkAndReimportAllWorkflows(client, { force: true, trigger: 'user' });
     expect(first).toHaveLength(1);
     expect(first[0].status).toBe('error');
 
     // A later automatic (non-force) check, well past the cooldown window,
     // must not re-surface the same unreadable-path error again.
     nowSpy.mockReturnValue(1_000_000 + 61_000);
-    const second = await checkAndReimportAllWorkflows(client);
+    const second = await checkAndReimportAllWorkflows(client, { trigger: 'user' });
     expect(second).toHaveLength(0);
 
     // An explicit forced check (the user clicking "check for updates") still
     // surfaces current state.
     nowSpy.mockReturnValue(1_000_000 + 122_000);
-    const third = await checkAndReimportAllWorkflows(client, { force: true });
+    const third = await checkAndReimportAllWorkflows(client, { force: true, trigger: 'user' });
     expect(third).toHaveLength(1);
     expect(third[0].status).toBe('error');
 
     nowSpy.mockRestore();
+  });
+});
+
+describe('no import without explicit user action (mea-fij)', () => {
+  beforeEach(() => {
+    MockedFolderImporter.mockClear();
+  });
+
+  it.each(['focus', 'preflight', 'unknown'] as const)('never imports for trigger=%s', async (trigger) => {
+    const importFromFolder = jest.fn();
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue('2.0.0');
+    MockedFolderImporter.prototype.importFromFolder = importFromFolder;
+
+    const result = await checkAndReimportWorkflow('my-flow', makeClient(), { trigger });
+
+    expect(result.status).toBe('refused');
+    expect(importFromFolder).not.toHaveBeenCalled();
+  });
+
+  it('defaults to no import when no trigger is given', async () => {
+    const importFromFolder = jest.fn();
+    MockedFolderImporter.prototype.getFolderVersion = jest.fn().mockResolvedValue('2.0.0');
+    MockedFolderImporter.prototype.importFromFolder = importFromFolder;
+
+    await checkAndReimportWorkflow('my-flow', makeClient());
+
+    expect(importFromFolder).not.toHaveBeenCalled();
+  });
+
+  it('never reads a worktree source path, even for a user trigger', async () => {
+    const getFolderVersion = jest.fn().mockResolvedValue(null);
+    MockedFolderImporter.prototype.getFolderVersion = getFolderVersion;
+    const client = makeClient({
+      getWorkflowImportSource: jest.fn().mockResolvedValue('C:\\repos\\x-worktrees\\main-tools\\workflows\\my-flow'),
+    });
+
+    const result = await checkAndReimportWorkflow('my-flow', client, { trigger: 'user' });
+
+    expect(result.status).not.toBe('reimported');
+    for (const call of getFolderVersion.mock.calls) {
+      expect(call[0]).not.toMatch(/-worktrees/i);
+    }
+  });
+
+  it('classifies scratch paths', () => {
+    expect(isScratchSourcePath('/a/repo-worktrees/b/c')).toBe(true);
+    expect(isScratchSourcePath('C:\\a\\scratchpad\\wf')).toBe(true);
+    expect(isScratchSourcePath('/a/repo/workflows/wf')).toBe(false);
   });
 });

@@ -114,32 +114,12 @@ async function getWorkflowClient(): Promise<PersistentMCPClient> {
 /**
  * Broadcast an auto re-import staleness check result to all renderer windows
  * (mea-ov6). Fired from the workflow:register-active run-preflight check and
- * from the app-focus hook (see runFocusReimportCheck below).
+ * (report-only; never imports).
  */
 function broadcastReimportResult(result: ReimportCheckResult) {
   BrowserWindow.getAllWindows().forEach(win => {
     win.webContents.send('workflow:auto-reimport-result', result);
   });
-}
-
-/**
- * Entry point for the app-focus hook in src/main/index.ts (mea-ov6):
- * re-checks every imported workflow against its on-disk source and
- * re-imports through the guarded import path any that are newer. Never
- * blocks or throws -- a failed check is logged and otherwise ignored.
- */
-export async function runFocusReimportCheck(): Promise<void> {
-  try {
-    const client = await getWorkflowClient();
-    const results = await checkAndReimportAllWorkflows(client);
-    for (const result of results) {
-      logWithCategory('info', LogCategory.WORKFLOW,
-        `Focus reimport check: ${result.workflowId} -> ${result.status}: ${result.message}`);
-      broadcastReimportResult(result);
-    }
-  } catch (error: any) {
-    logWithCategory('warn', LogCategory.WORKFLOW, `Focus reimport check failed: ${error.message}`);
-  }
 }
 
 /**
@@ -203,7 +183,7 @@ export function registerWorkflowHandlers() {
     logWithCategory('info', LogCategory.WORKFLOW, 'IPC: Check workflows for on-disk updates');
     try {
       const client = await getWorkflowClient();
-      const results = await checkAndReimportAllWorkflows(client, opts || {});
+      const results = await checkAndReimportAllWorkflows(client, { ...(opts || {}), trigger: 'user' });
       results.forEach(broadcastReimportResult);
       return results;
     } catch (error: any) {
@@ -961,7 +941,7 @@ export function registerWorkflowHandlers() {
       // path if the on-disk workflow is newer than the DB-served definition.
       // Never blocks the run -- a failed/refused check is only surfaced.
       try {
-        const reimportResult = await checkAndReimportWorkflow(params.workflowId, client);
+        const reimportResult = await checkAndReimportWorkflow(params.workflowId, client, { trigger: 'preflight' });
         if (reimportResult.status !== 'no-source' && reimportResult.status !== 'up-to-date') {
           logWithCategory('info', LogCategory.WORKFLOW,
             `IPC: Run-preflight reimport for ${params.workflowId}: ${reimportResult.status} - ${reimportResult.message}`);
