@@ -18,6 +18,7 @@
 import { PersistentMCPClient } from './persistent-mcp-client';
 import { FolderImporter } from './folder-importer';
 import { logWithCategory, LogCategory } from '../logger';
+import * as os from 'os';
 import { remapWorktreeSourcePath } from './worktree-path';
 
 export type ReimportStatus = 'reimported' | 'up-to-date' | 'no-source' | 'refused' | 'error';
@@ -29,6 +30,27 @@ export interface ReimportCheckResult {
   dbVersion?: string;
   previousVersion?: string;
   message: string;
+}
+
+/**
+ * Who asked for this check (mea-fij). Imports only ever happen for an
+ * explicit user action; anything else (app focus, run preflight, timers)
+ * must never write to the DB.
+ */
+export type ReimportTrigger = 'user' | 'focus' | 'preflight' | 'unknown';
+
+const SCRATCH_SEGMENT = /^(.*-worktrees|scratchpad|tmp|temp|\.staging|\.bak)$/i;
+
+/**
+ * True when a path sits in a dispatch worktree or temp/scratch location --
+ * never a legitimate import source (mea-fij).
+ */
+export function isScratchSourcePath(sourcePath: string): boolean {
+  const segments = sourcePath.split(/[\\/]+/);
+  if (segments.some(seg => SCRATCH_SEGMENT.test(seg))) return true;
+  const tmp = os.tmpdir().replace(/[\\/]+$/, '').toLowerCase().replace(/\\/g, '/');
+  const norm = sourcePath.toLowerCase().replace(/\\/g, '/');
+  return !!tmp && norm.startsWith(tmp + '/');
 }
 
 /**
@@ -61,8 +83,10 @@ function compareVersions(a: string, b: string): number {
  */
 export async function checkAndReimportWorkflow(
   workflowId: string,
-  client: PersistentMCPClient
+  client: PersistentMCPClient,
+  opts: { trigger?: ReimportTrigger } = {}
 ): Promise<ReimportCheckResult> {
+  const trigger: ReimportTrigger = opts.trigger ?? 'unknown';
   try {
     const sourcePath = await client.getWorkflowImportSource(workflowId);
     if (!sourcePath) {
@@ -76,15 +100,21 @@ export async function checkAndReimportWorkflow(
     }
 
     const importer = new FolderImporter();
-    let diskVersion = await importer.getFolderVersion(sourcePath);
+    let diskVersion: string | null = null;
     let resolvedSourcePath = sourcePath;
+
+    // Never read a worktree/temp scratch path as an import source (mea-fij).
+    const recordedIsScratch = isScratchSourcePath(sourcePath);
+    if (!recordedIsScratch) {
+      diskVersion = await importer.getFolderVersion(sourcePath);
+    }
 
     if (!diskVersion) {
       // The recorded path may be a dispatch worktree that was cleaned up
       // after its PR merged (mea-38o) - retry against the repo's canonical
       // checkout before giving up.
       const remapped = remapWorktreeSourcePath(sourcePath);
-      if (remapped) {
+      if (remapped && !isScratchSourcePath(remapped)) {
         const remappedVersion = await importer.getFolderVersion(remapped);
         if (remappedVersion) {
           logWithCategory('info', LogCategory.WORKFLOW,
@@ -94,6 +124,15 @@ export async function checkAndReimportWorkflow(
           resolvedSourcePath = remapped;
         }
       }
+    }
+
+    if (!diskVersion && recordedIsScratch && !remapWorktreeSourcePath(sourcePath)) {
+      return {
+        workflowId,
+        status: 'no-source',
+        dbVersion,
+        message: `Recorded import source is a worktree/temp path and is ignored: ${sourcePath}`,
+      };
     }
 
     if (!diskVersion) {
@@ -115,8 +154,23 @@ export async function checkAndReimportWorkflow(
       };
     }
 
+    // No import without an explicit user action (mea-fij). Focus/preflight/
+    // unknown triggers only report that a newer copy exists.
+    if (trigger !== 'user') {
+      logWithCategory('info', LogCategory.WORKFLOW,
+        `Reimport check (trigger=${trigger}): ${workflowId} disk v${diskVersion} newer than DB v${dbVersion}; ` +
+        `NOT importing (requires explicit user action)`);
+      return {
+        workflowId,
+        status: 'refused',
+        diskVersion,
+        dbVersion,
+        message: `Disk v${diskVersion} is newer than DB v${dbVersion}; import requires an explicit user action.`,
+      };
+    }
+
     logWithCategory('info', LogCategory.WORKFLOW,
-      `Auto re-import: ${workflowId} disk v${diskVersion} is newer than DB v${dbVersion}, re-importing`);
+      `Re-import (trigger=${trigger}): ${workflowId} disk v${diskVersion} is newer than DB v${dbVersion}, re-importing from ${resolvedSourcePath}`);
 
     const result = await importer.importFromFolder(resolvedSourcePath);
     if (!result.success) {
@@ -168,7 +222,7 @@ function isMissingSourceError(result: ReimportCheckResult): boolean {
  */
 export async function checkAndReimportAllWorkflows(
   client: PersistentMCPClient,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; trigger?: ReimportTrigger } = {}
 ): Promise<ReimportCheckResult[]> {
   const now = Date.now();
   if (!opts.force && now - lastFocusCheckAt < FOCUS_CHECK_COOLDOWN_MS) {
@@ -183,7 +237,7 @@ export async function checkAndReimportAllWorkflows(
     const workflowId = (def as any).workflow_id || (def as any).id;
     if (!workflowId) continue;
 
-    const result = await checkAndReimportWorkflow(workflowId, client);
+    const result = await checkAndReimportWorkflow(workflowId, client, { trigger: opts.trigger });
 
     if (isMissingSourceError(result)) {
       const alreadyReported = reportedMissingSourceWorkflowIds.has(workflowId);
