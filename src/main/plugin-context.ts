@@ -120,6 +120,30 @@ import { logWithCategory, LogCategory } from './logger';
 import { getPluginDataDir, migrateLegacyConfigSync } from './plugin-data-paths';
 import { getCurrentUser } from './app-settings';
 
+const MCP_ERROR_DETAIL_MAX = 1000;
+
+/**
+ * Build a readable message from a JSON-RPC error object returned by an MCP
+ * server: `message` plus `data` (string as-is, otherwise JSON, truncated).
+ */
+export function formatMcpErrorDetail(err: any): string {
+  const message = typeof err?.message === 'string' ? err.message : '';
+  const d = err?.data;
+  let detail = '';
+  if (d !== undefined && d !== null && d !== '') {
+    try {
+      detail = typeof d === 'string' ? d : JSON.stringify(d);
+    } catch {
+      detail = String(d);
+    }
+    if (detail && detail.length > MCP_ERROR_DETAIL_MAX) {
+      detail = detail.substring(0, MCP_ERROR_DETAIL_MAX) + '...';
+    }
+  }
+  if (message && detail) return `${message}: ${detail}`;
+  return message || detail || 'Unknown MCP error';
+}
+
 /**
  * Creates a plugin context for a loaded plugin
  */
@@ -434,7 +458,7 @@ function createMCPConnectionManager(
         // Handle both JSON-RPC and direct response formats
         const data = response.data;
         if (data.error) {
-          throw new Error(`MCP Error: ${data.error.message}`);
+          throw new Error(`MCP Error: ${formatMcpErrorDetail(data.error)}`);
         }
 
         // Extract result from JSON-RPC format or direct format
@@ -454,7 +478,14 @@ function createMCPConnectionManager(
         return content as T;
       } catch (error: any) {
         logWithCategory('error', LogCategory.SYSTEM, `Plugin ${pluginId} MCP error:`, error);
-        throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${error.message}`);
+        // axios throws on non-2xx and its message ("Request failed with status
+        // code 500") drops the server's body. Surface the JSON-RPC error text
+        // so callers can match on it (e.g. "already exists" -> update_*).
+        const serverError = error?.response?.data?.error;
+        const detail = serverError
+          ? `${formatMcpErrorDetail(serverError)}${error.response.status ? ` (HTTP ${error.response.status})` : ''}`
+          : error.message;
+        throw new Error(`Failed to call MCP tool ${toolName} on ${serverId}: ${detail}`);
       }
     },
 
